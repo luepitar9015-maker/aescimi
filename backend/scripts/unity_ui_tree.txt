@@ -1,0 +1,73 @@
+Control Identifiers:
+
+Dialog - 'Nuevo formulario - OnBase 160 - Google Chrome'    (L-9, T-9, R1929, B1029)
+['Dialog', 'Nuevo formulario - OnBase 160 - Google Chrome', 'Nuevo formulario - OnBase 160 - Google ChromeDialog']
+child_window(title="Nuevo formulario - OnBase 160 - Google Chrome", control_type="Window")
+   | 
+   | Pane - ''    (L0, T0, R1920, B1020)
+   | ['Presione la tecla flecha hacia abajo para obtener acceso a los valores disponibles para este campo o empiece a escribir para filtrar los valoresPane', 'Pane', 'Pane0', 'Pane1']
+   | 
+   | Pane - 'Nuevo formulario - OnBase 160 - Google Chrome - Luis Ernesto'    (L0, T0, R1921, B1022)
+   | ['Nuevo formulario - OnBase 160 - Google Chrome - Luis Ernesto', 'Pane2', 'Nuevo formulario - OnBase 160 - Google Chrome - Luis ErnestoPane']
+   | child_window(title="Nuevo formulario - OnBase 160 - Google Chrome - Luis Ernesto", control_type="Pane")
+   |    | 
+   |    | Pane - ''    (L0, T0, R1921, B1022)
+   |    | ['Pane3']
+   |    |    | 
+   |    |    | Pane - ''    (L0, T0, R1921, B1022)
+   |    |    | ['Pane4']
+   |    |    |    | 
+   |    |    |    | Pane - ''    (L1730, T0, R1921, B56)
+   |    |    |    | ['Pane5']
+   |    |    |    |    | 
+   |    |    |    |    | Button - 'Minimizar'    (L1730, T0, R1793, B56)
+   |    |    |    |    | ['Minimizar', 'MinimizarButton', 'Button', 'Button0', 'Button1']
+   |    |    |    |    | child_window(title="Minimizar", auto_id="view_1", control_type="Button")
+   |    |    |    |    | 
+   |    |    |    |    | Button - 'Restaurar'    (L1793, T0, R1858, B56)
+   |    |    |    |    | ['RestaurarButton', 'Button2', 'Restaurar']
+   |    |    |    |    | child_window(title="Restaurar", auto_id="view_3", control_type="Button")
+   |    |    |    |    | 
+   |    |    |    |    | Button - 'Cerrar'    (L1856, T0, R1921, B56)
+   |    |    |    |    | ['Button3', 'CerrarButton', 'Cerrar', 'CerrarButton0', 'CerrarButton1', 'Cerrar0', 'Cerrar1']
+   |    |    |    |    | child_window(title="Cerrar", auto_id="view_4", control_type="Button")
+   |    |    |    | 
+   |    |    |    | Pane - ''    (L0, T0, R1921, B1022)
+   |    |    |    | ['Pane6']
+   |    |    |    |    | 
+   |    |    |    |    | Pane - ''    (L0, T56, R1921, B168)
+   |    |    |    |    | ['Pane7']
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Toolbar - ''    (L0, T56, R1921, B121)
+   |    |    |    |    |    | ['Toolbar', 'Toolbar0', 'Toolbar1']
+   |    |    |    |    |    | child_window(auto_id="view_1000", control_type="ToolBar")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Toolbar - 'Favoritos'    (L0, T119, R1921, B167)
+   |    |    |    |    |    | ['Toolbar2', 'FavoritosToolbar', 'Favoritos', 'Favoritos0', 'Favoritos1']
+   |    |    |    |    |    | child_window(title="Favoritos", auto_id="view_1024", control_type="ToolBar")
+   |    |    |    |    | 
+   |    |    |    |    | Pane - ''    (L0, T167, R1921, B1023)
+   |    |    |    |    | ['FormulariosPane', 'Pane15', 'FormulariosPane0', 'FormulariosPane1']
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Pane - ''    (L0, T167, R1921, B1023)
+   |    |    |    |    |    | ['FormulariosPane2', 'Pane16']
+   |    |    |    |    | 
+   |    |    |    |    | TabControl - ''    (L0, T0, R1731, B57)
+   |    |    |    |    | ['TabControlNueva pestaña', 'TabControl']
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Pane - ''    (L8, T0, R48, B57)
+   |    |    |    |    |    | ['Pane21']
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Pane - ''    (L39, T0, R1626, B57)
+   |    |    |    |    |    | ['Pane22']
+   |    |    |    |    |    | child_window(auto_id="view_21", control_type="Pane")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Button - 'Nueva pestaña'    (L1616, T0, R1656, B57)
+   |    |    |    |    |    | ['Nueva pestaña', 'Button89', 'Nueva pestañaButton']
+   |    |    |    |    |    | child_window(title="Nueva pestaña", control_type="Button")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Pane - ''    (L1672, T0, R1732, B57)
+   |    |    |    |    |    | ['Pane25']
+   |    |    |    |    | 
+   |    |    |    |    | Pane - ''    (L0, T0, R0, B0)
+   |    |    |    |    | ['Pane26']

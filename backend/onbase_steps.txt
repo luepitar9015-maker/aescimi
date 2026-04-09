@@ -1,0 +1,86 @@
+
+======== PASO 1: LOGIN ========
+­ƒô© Screenshot: C:\tmp\step_01_login_page.png
+Submit btn clicked: <button type="button" id="loginButton" onclick="submitForm();" class="btn btn-pr
+Post-login URL: https://onbase.sena.edu.co/Onbase/NavPanel.aspx
+­ƒô© Screenshot: C:\tmp\step_02_post_login.png
+
+[Frames @ post-login]: total = 8
+  Frame[0]: "Recuperaci├│n de documentos - OnBase 160" ÔåÆ NavPanel.aspx
+  Frame[2]: "Recuperaci├│n de documentos" ÔåÆ Retrieve.aspx?defaultContextSpecificID=&OBToken=96b7a340-8365-4a2d-bef5-8cc1261e45f3
+  Frame[3]: "Seleccionar documento" ÔåÆ DocumentSelectContainer.aspx
+  Frame[4]: "OnBase" ÔåÆ blank.aspx?OBToken=96b7a340-8365-4a2d-bef5-8cc1261e45f3
+  Frame[5]: "Descargar p├ígina" ÔåÆ UnloadHandler.ashx?type=unloadframe
+  Frame[6]: "" ÔåÆ DocumentSelectList.aspx?OBToken=96b7a340-8365-4a2d-bef5-8cc1261e45f3
+  Frame[7]: "OnBase" ÔåÆ blank.aspx
+
+======== PASO 2: MEN├Ü HAMBURGUESA ========
+Burger menu clicked: true
+­ƒô© Screenshot: C:\tmp\step_03_menu_open.png
+Menu class: js-navMenu navMenu
+
+======== PASO 3: NUEVO FORMULARIO ========
+Nuevo Formulario: clicked #newform
+­ƒô© Screenshot: C:\tmp\step_04_nuevo_formulario.png
+
+[Frames @ after nuevo formulario]: total = 6
+  Frame[0]: "Nuevo formulario - OnBase 160" ÔåÆ NavPanel.aspx
+  Frame[2]: "Crear un nuevo formulario" ÔåÆ NewForm.aspx?defaultContextSpecificID=&OBToken=96b7a340-8365-4a2d-bef5-8cc1261e45f3
+  Frame[3]: "OnBase" ÔåÆ blank.aspx?theme=light&emptyStateText=nothing&useEmptyStateIcon=true&OBToken=96b7a340-8365-4a2d-bef5-8cc1261e45f3
+  Frame[4]: "OnBase" ÔåÆ blank.aspx?OBToken=96b7a340-8365-4a2d-bef5-8cc1261e45f3
+  Frame[5]: "Descargar p├ígina" ÔåÆ UnloadHandler.ashx?type=unloadframe
+
+======== PASO 4: SELECCI├ôN DE TIPO DOCUMENTAL ========
+Frame[2] tiene lista con 10+ items. Primeros:
+  #li659: "01-FRM Respuestas Electronicas"
+  #li499: "01-FRM-Comunicacion Producida"
+  #liunity118: "UForm Comunicacion Electronica"
+  #li104: "01-FRM-Comunicacion Otros Envios Recibidos"
+  #li690: "01-FRM-Comunicacion Portal"
+  #li488: "01-FRM-Comunicacion Recibida"
+  #li485: "01-FRM-Radicacion Recibida"
+  #liunity109: "FRM-Comunicacion Portal"
+  #liunity116: "UForm Comunicaciones Oficina Virtual"
+  #li781: "Plantilla radicacion Convenios"
+Filter result: Filter box found: Escriba para filtrar
+SGDEA selection: Clicked: SGDEA - Ingreso a Expediente
+­ƒô© Screenshot: C:\tmp\step_05_sgdea_selected.png
+
+[Frames @ after sgdea select]: total = 7
+  Frame[0]: "Nuevo formulario - OnBase 160" ÔåÆ NavPanel.aspx
+  Frame[2]: "Crear un nuevo formulario" ÔåÆ NewForm.aspx?defaultContextSpecificID=&OBToken=96b7a340-8365-4a2d-bef5-8cc1261e45f3
+  Frame[3]: "Nuevo formulario" ÔåÆ NewUnityForm.aspx
+  Frame[4]: "OnBase" ÔåÆ blank.aspx?OBToken=96b7a340-8365-4a2d-bef5-8cc1261e45f3
+  Frame[5]: "Descargar p├ígina" ÔåÆ UnloadHandler.ashx?type=unloadframe
+  Frame[6]: "SGDEA - Ingreso a Expediente" ÔåÆ UnityFormHandler.ashx?action=CreateNewForm&key=&templateid=148&OBToken=96b7a340-8365-4a2d-bef5-8cc1261e45f3
+
+======== PASO 5: CAMPOS DEL FORMULARIO ========
+
+Frame[2] form fields (1):
+  [INPUT type=text] id="" name="" label=""
+­ƒô© Screenshot: C:\tmp\step_06_form_fields.png
+
+======== PASO 6: BOTONES VISIBLES ========
+Frame[0] buttons:
+  [DIV] id="" txt="Pregunte a Discovery"
+  [DIV] id="" txt="Favoritos"
+  [DIV] id="" txt="Correo"
+  [DIV] id="" txt="68-9224-(S)-JORGE RICARDO ROZO HERNANDEZ"
+Frame[2] buttons:
+  [DIV] id="" txt="Borrar filtro"
+  [LABEL] id="itemLabel659" txt="01-FRM Respuestas Electronicas"
+  [LABEL] id="itemLabel499" txt="01-FRM-Comunicacion Producida"
+  [LABEL] id="itemLabelunity118" txt="UForm Comunicacion Electronica"
+  [LABEL] id="itemLabel104" txt="01-FRM-Comunicacion Otros Envios Recibidos"
+  [LABEL] id="itemLabel690" txt="01-FRM-Comunicacion Portal"
+  [LABEL] id="itemLabel488" txt="01-FRM-Comunicacion Recibida"
+  [LABEL] id="itemLabel485" txt="01-FRM-Radicacion Recibida"
+  [LABEL] id="itemLabelunity109" txt="FRM-Comunicacion Portal"
+  [LABEL] id="itemLabelunity116" txt="UForm Comunicaciones Oficina Virtual"
+  [LABEL] id="itemLabel781" txt="Plantilla radicacion Convenios"
+  [LABEL] id="itemLabelunity103" txt="Radicaci├│n de Convenios"
+  [LABEL] id="itemLabel543" txt="RESOLUCIONES - FRM"
+  [LABEL] id="itemLabelunity148" txt="SGDEA - Ingreso a Expediente"
+
+====== DIAGN├ôSTICO COMPLETO ======
+Revisa los screenshots en C:\tmp\step_*.png

@@ -1,0 +1,9 @@
+Logged in. URL: https://onbase.sena.edu.co/Onbase/NavPanel.aspx
+Token: 030c1235-a99e-4797-b45a-66492999d889
+Navigating to: https://onbase.sena.edu.co/Onbase/NewForm.aspx?OBToken=030c1235-a99e-4797-b45a-66492999d889
+NewForm title: Invalid App Server Session
+Total frames: 2
+Frame[0]: title="Invalid App Server Session" url="https://onbase.sena.edu.co/Onbase/NewForm.aspx?OBToken=030c1235-a99e-4797-b45a-66492999d889"
+Frame[1]: title="Unload Page" url="https://onbase.sena.edu.co/Onbase/UnloadHandler.ashx?type=unloadframe"
+
+Done

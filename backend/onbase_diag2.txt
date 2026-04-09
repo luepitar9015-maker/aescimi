@@ -1,0 +1,12 @@
+Post-login URL: https://onbase.sena.edu.co/Onbase/NavPanel.aspx
+OBToken: b8f9c8ab-cc6b-401e-aace-d9db3d5b4d8c
+
+=== Frame[0] NAV ELEMENTS ===
+
+URL test: https://onbase.sena.edu.co/Onbase/DocumentEntry.aspx ÔåÆ title="Error" final="https://onbase.sena.edu.co/Onbase/ErrorPage.aspx?errorId=ddc14372-2725-49c4-888c-1d19cd56f064"
+
+URL test: https://onbase.sena.edu.co/Onbase/NewForm.aspx ÔåÆ title="Crear un nuevo formulario" final="https://onbase.sena.edu.co/Onbase/NewForm.aspx?OBToken=b8f9c8ab-cc6b-401e-aace-d9db3d5b4d8c"
+
+URL test: https://onbase.sena.edu.co/Onbase/DocumentCreate.aspx ÔåÆ title="Error" final="https://onbase.sena.edu.co/Onbase/ErrorPage.aspx?errorId=af2784bf-31a6-47ad-b9c4-dc4e0ff1bcd3"
+
+Done

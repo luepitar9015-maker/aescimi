@@ -1,0 +1,69 @@
+<!DOCTYPE html><!--************************Confidential and Proprietary************************
+* File Name: Login.aspx
+********************Copyright (c) Hyland Software, Inc. 1992-2024******************--><html lang="es-419" dir="ltr"><head><link rel="stylesheet" type="text/css" href="/Onbase/WebResource.axd?d=5KhAzwIrOpTIxwxtd84PJdqQF2EtNIQHbkdquD02ceXmgEZ2eCv0pihvKhyVonKEzqtJdpek9GcJ-WpsIT5aOO9sF5WjwKsIz-itRzZxhTvf8YbAHwd82A74BXz2oj61P_smsgoG4L9W0J-qeG_jnEM9FwrI9W5IetPewvydO5wZ5wc4w7vg3Z5tOO74gq6O0&amp;t=638980222500000000?v=25,1,11,1000">
+<link rel="stylesheet" type="text/css" href="https://onbase.sena.edu.co/Onbase/styles/CSS/onbasemain-darkmode.min.css?v=25,1,11,1000">
+<script type="text/javascript">var __VirtualRoot="https://onbase.sena.edu.co/Onbase";</script>
+<script id="OBCommon" type="text/javascript" src="/Onbase/WebResource.axd?d=QAJDXcd0G8FvLGUxEW7KDRSWSir4uEoDgnvesobMnvJWbBCD5P-YcfTKax6A8UPn-pqCota3wlM1BRl4VbCP520YcsnHnc_cVm9xHv7j7HEZp2D3fS-G3y_u_znTZG_CqZ4Ln0FMi3kUMTKTM3CZ_jVfSxPkoxD_KP7iiZruaRk1&amp;t=638980220280000000"></script>
+<script id="Diagnostics" type="text/javascript" src="/Onbase/WebResource.axd?d=AZz-K6aCimMvs1UYPsri7w0BBJrFQ2_E8DS_WnfWvfI1P5hBcnQSPmPpLVdt1-8qME45T5eM5SGOJZ_fsAax8ENJqXFdXLcheZ4yIQiznxpj0kt1gjkSnK8blxC6g2ynP-eRLHIy3PwL8vt3KVeijBWWTxhWbe0TVxBPFPHJNEI1&amp;t=638980222500000000"></script>
+<script id="ParseInt64" type="text/javascript" src="/Onbase/WebResource.axd?d=yzkmJ5WdlUePkNbww8l0u1GnTOrFCSMvz7oSjDXd0kSQKMDT19hRY0RtWGiVfhb5T71bs1NsiuFcOxgssXhMqB8IbYcXCgK6DAZf-qVhdZuLCN7ZedHTnVnMgaXdduEuFbyYeM465X2_NT5KkHoV49Ez-mU6wTSXHZhickRaB1o1&amp;t=638980222500000000"></script>
+<script id="PromisesPolyfill" type="text/javascript" src="/Onbase/WebResource.axd?d=tUJJY48mbmy3e0bm96vguMFoqKvN6Dulj8Rhl3OASSmWFU-pKkI_nH376IQ0EFzd3Dd5bmRAb8rjsi0Mp2XuS0b5B-6OCWKIUetjV5o85c82gcDuDyyJ43AycUOE3CW_MCui4ywnT9U0DgioAg9laml8_J5e_w8w4FabyR15Oc81&amp;t=638980220280000000"></script>
+<script id="OBStorage" type="text/javascript" src="/Onbase/WebResource.axd?d=t7ui_m5LSP4yocIbViFQXhIy4pniVuh2RM1QOwqV6JrAsGjbh44Yvwf_WNbjgqab4x4cZMotEWszMAO6H1aakK7rDHN-ZPVH0CAsNeDqOTiXbJFyUVa4aiYyBslFBCwSqRJB2AStXcoHUT23jEjhWW85_MsFcrORgoLKBMA8BGo1&amp;t=638980220280000000"></script>
+<script id="Keyboard" type="text/javascript" src="/Onbase/WebResource.axd?d=K8Su-Jrm0XcTp7g-AALyiNDb3iJ-yectQ-HsCIwjl_xwiOoVyiFM4P_MjP7XglAxwxi-rNYrLt1PlPpIWw6ra4ERXMfrrTmFYS_aEZVpM33x-aOpppAqc5K22-19bqGp3MrtYtrkaPDvN-zyNXurhFA8t0i35FgTirapKAMwbG01&amp;t=638980220280000000"></script>
+<script id="DataAccess" type="text/javascript" src="/Onbase/WebResource.axd?d=ednm4MEkNkxZ2VMKy_qbv3Z-Snh9C8MQFjMfRofj5fqLLKPnLSijlON2jo5_EJ0C-a33tcQ7yL6fR7aF44w_66YzQr7k8czLlYfkfUeq-jzgnvNZ8S2533YCpjesUtP8udGBX-LYTqSHhDuLKcc2PQiek_XJB4K1ZgWA5a4QVHM1&amp;t=638980220280000000"></script>
+<script type="text/javascript">DataAccess.registerService('Resources/DialogManager','GetDmUrls','resourceNames','Resources');DataAccess.registerService('Resources/Notifications','GetNotificationUrls','resourceNames','Resources');DataAccess.registerService('Strings/','Get','lrmIds','Strings');</script>
+<script id="DialogManager" type="text/javascript" src="/Onbase/WebResource.axd?d=-9Tf0jKLlRRJs8M6Zf-Oe28zOkob_ckYkDy0fYfkBdsR0f-uG0wgEN60EHYhFn01m-cs8gEH3erbWpGXBIZG-4zibe66kIIeVwTojXdaOe2OwcCG8wOpANK00BWCDd_EWj1ICINivzP48jqnmyQyRiMbISHg-bHr--jZ5A2LnEY1&amp;t=638980220280000000"></script>
+<script id="OBNotification" type="text/javascript" src="/Onbase/WebResource.axd?d=txseSCrNqZLfNQE7ZB_0F3kgCAJhCdObmTbEb3qntQhYG3I8i8n7ux63ZxlY7cgVgXP85znA_eYL-XUEUWnMC4lV19-EFa7JtM1q5u53raF6KYhjTtUAOQNpQB92o5g6I5QoYYyxUhpd_TPyV_9sWezevaL0cLKLFuQNz7ALF2w1&amp;t=638980220280000000"></script>
+<script id="WebPageScripts" type="text/javascript" src="/Onbase/WebResource.axd?d=fjvZjrvsyTDtiDh5w7kp3V9qqIs-9XSybxV84uTnZbm3Z5qnP0kT01va6Gxbk43k9MCiMd500_nYQ7IGcv_JtoL1vmMl7Xy4oAcnW_HTRO8AAI9jlSWD-UwDoB3XIfL_CJklDehioVA8ThNrd6ggVdcbTJ_dSl8UTg_Z3QqKnF41&amp;t=638980222500000000"></script>
+<script type="text/javascript">(function(){var t=document.getElementsByTagName('html')[0];t.setAttribute('lang','es-419');t.setAttribute('dir','ltr');Page.Merge({"IsDebugging":false,"AllowedFunctionKeyList":"","DisableFunctionKeys":true,"DisableContextMenu":true,"PreventDropEvent":true,"IsReleaseMode":true,"IsRTL":false,"__UseUnicode":false,"__IsTransient":false,"__OBToken":"","InvalidSessionStatusCode":409,"CloseWindowOnInvalidSession":false,"EnableDesktopHost":true});})();</script>
+<script id="LoginCtrlJS" type="text/javascript" src="/Onbase/WebResource.axd?d=aMLrh_s07A0wpmE3yjs_XgTxrStGfNAmgMnP4qTUrVpa_PItF0xgyAFpy1DfrvCviGxdos_xrTV8wtcoEuhsvTx48egDwYpHHfRjyxdOS7KGvjXcxSukHma3YLJBEYejMH7jwk2G5sMcSaPqDoFUfw2&amp;t=638980280380000000"></script>
+<script type="text/javascript">var _VirtualRoot="https://onbase.sena.edu.co/Onbase";var _FullStylePath="https://onbase.sena.edu.co/Onbase/styles/XP";
+var _DisplayOverrideUILanguage=false;var _LocaleUIName="es-419";var _performPopupBlockerCheck=false;var _strRcUnblockConfirmation="Un bloqueador de elementos emergentes ha sido detectado.  Ésta aplicación no funcionará debidamente con el bloqueador de elementos emergentes activo.  Al seleccionar \"Aceptar\" se intentará agregar solamente este sitio a los sitios permitidos del bloqueador de elementos emergentes. Si no desea agregar este sitio al bloqueador, o prefiere corregir este problema manualmente, haga clic en \"Cancelar\".\r\n\r\n\r\n¿Desea que esta aplicación intente ser automáticamente agregada a los sitios permitidos?";var _strRcFailToUnblock="La aplicación fue incapaz de agregarse automáticamente a la lista blanca del bloqueador de mensajes  emergentes.  Para poder utilizar ésta aplicación, usted debe desactivar el bloqueador o manualmente agregar éste sitio a la lista blanca.";var _strRcPopupBlocker="Esta aplicación no funcionará correctamente si está activado el bloqueador de mensajes emergentes. Agregue este sitio a la lista de sitios aprobados o desactive el bloqueador de mensajes emergentes antes de seguir usando esta aplicación.";var _strRcInvalidUserNameAndPassword="Error de inicio de sesión. Verifique que el nombre del usuario y la contraseña sean válidos.";var _strRcInvalidUserNameAndPasswordAndDomain="Error al iniciar sesión. Verifique que se están usando contraseña, nombre de usuario y dominio válidos.";var _strRcFailedLoadPopBlocker="Error de carga del control ActiveX del asistente bloqueador de ventanas emergentes.";var _itiOEM=false;$OB(window).addEvent("load", function(){Window_OnLoad();});</script>
+<link rel="shortcut icon" href="https://onbase.sena.edu.co/Onbase/styles/XP/WebClientLogo.ico">
+<title>
+	INICIAR SESIÓN -  OnBase 160
+</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="application-name" content="INICIAR SESI&amp;#211;N -  OnBase 160"><meta name="msapplication-tooltip" content="INICIAR SESI&amp;#211;N -  OnBase 160"><meta name="msapplication-starturl" content="https://onbase.sena.edu.co/Onbase/Login.aspx"></head>
+<body>
+	<form name="ctl01" method="post" action="https://onbase.sena.edu.co/Onbase/Login.aspx" id="ctl01" autocomplete="off">
+<div>
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="k2D4jn5ymPqr3bQVa9b0FT9ioV6py6PNI8V1ZuAx56o0CHogW/ffIudKxR3timFbvrNQ84xXYnj1IFbWv0nttgfysgdUctzPvSbxzFbkbbuID+WuYv1Wfk3J3qF9ZMdaX6Lq9XplErOekjcxnTEhQq9s4UNqRG/4MNVPgs2pihextd+laLUdrN9OAbUhQ38LpPGFbd8Zs4HCum3OKTMRxA==">
+</div>
+
+<div>
+
+	<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="9E48BA4E">
+	<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="QBsHAseym3ZaijDomOaxGy9MFVAUSihCk32cekG3sX9pwf5WHLNeshDSGWUhg+k93gGygTMzAGzzKbwekO1ceJhwfXCpK8ehxLMT+/9U1Dsp5GaFmLHwmbFN8i1kjaA0bhbPtNgxkTiyl57MAmePXpzNfxIKs2mzs6Qa+clxkXAG2WtJtewSVx9j/NwLQDJnAZvHjD0T0CGUMlW/GJo+74oHz3ezpwN2q6XqDZU75dGYcCCf+L5Ne8rGcUfLkbOvHiwyjOpelbh+uWsYm2JWrQ==">
+</div>
+		<div id="LoginCtrl1" class=" loginCtrlStyleWrapper" style="height:100%;width:100%;">
+	<link id="LoginCtrlCSS" rel="stylesheet" href="/Onbase/WebResource.axd?d=bZ5oali1rUBxajAKdWE3s-FonaPAx1qsX2pXXWDUqrc7mBPDsdKV87LWc_DkdNVkf8DX2cGSx2uXDopFI7fGgFysTsKel1wXxp7ljUfxYQGs1rezlJsleOTjgcwnYFltD8QQ3j0XL4_xFQtQOxp4Q1Yj95gWecaCujPsGj0e68c1&amp;t=638980280380000000"><script type="text/javascript">var suppressOpeningTargetPage=false;var displaySessionOverride=false;</script><input name="lat" type="hidden" id="lat" value="DBF37C0D619B5CC00CF91F4F35EEF0E446CA6C0EB816A6A3213A327BA4941586C7958A18A35A3BCE21DD80BB2FB4CC2B398C480A67F4C23C331E56E9E895347B23554C597E3C65E5B98F74BD39B89FD6614283E729634B9B2B8B15EBD3B5D96B"><input name="languageParam" type="hidden" id="languageParam" value="es-419"><input name="darkmode" type="hidden" id="darkmode" value="true"><input name="contentmode" type="hidden" id="contentmode"><input name="browserIdentifier" type="hidden" id="browserIdentifier" value="1cc3676e-56a7-4cfc-89c5-bc2b5ba4d95d"><input name="formInput" type="hidden" id="formInput" value="true"><div style="position:relative;border:0px;display:block;"><img src="/Onbase/WebResource.axd?d=AXg7dE_Bo8y3VSxVK7WsfjaDrRkWTWZyVu1QxsCJHE3r65HC9nJgErzmtbMWRqOgcUKkxRPHa5J_fYKCe72k-TXxyiDf5YzfumSwYjXViPsgk927UjvXsU00evSAG72Ox8yRe1ZUX5-pyJnbNoPfB9tTN4FRn1z0V1ugU2XPZkQ1&amp;t=638980280380000000" alt="OnBase Logo" width="816" height="540"><div id="errorbox" class="errorbox" style="position:absolute;width:350px;height:250px;top:150px;left:335px;display:block;"><table width="100%" cellpadding="2" cellspacing="3" border="0">
+		<tbody><tr>
+			<td><img src="/Onbase/WebResource.axd?d=o6WT6LSHm6RHWTdmJ3sKIxApOFnWOhSrf993PCnqh1PnB2Io462o1q3q1QRcXF5y4CIW9jkKN_U2UMOcdloE9_DzokDshsFW9vhZNKgnSb_vPwZlzrHZBlyazO_JhMl2vFwE_sixsEYU82FcUIAmtQd9rFM70CaTUJ2xWpKNHsjstnG-yHX5qxIdM8o8kB2X0&amp;t=638980222500000000" id="imgExclamation" style="visibility:visible;" alt="Advertencia" class="loginErrorIcon"></td>
+			<td><div id="_loginErrorBox" style="visibility:visible;">
+				<span>Error de conexión. Las credenciales están incorrectas o la cuenta especificada está bloqueada.</span>
+			</div></td>
+		</tr>
+	</tbody></table>
+	</div><div id="loginpanel" class="loginpanel" role="main" style="position:absolute;width:400px;height:250px;top:220px;left:360px;display:block;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" onkeydown="captureKey(event)">
+		<tbody><tr>
+			<td id="usernameText" style="text-align:right;vertical-align:middle;"><img class="loginIcon loginIcon-user" title="Nombre del usuario" alt="Nombre del usuario" src="/Onbase/WebResource.axd?d=E_z8R8bstFVktBsgq8XXYID6VdjPi1TmUZYH0p-ftx6bFyDkjR04XnZQRHycado6YEY-EFHsq3c8tXbnG0ZnUDFMj7zObkQK6XIe5fnnxOSMBKaTog_3jUfJk9uM5K8GHGvtIWswzla1Dn7McAFNAKi2RIX8EHUglL06wm6FzMM1&amp;t=638980280380000000.png"></td>
+			<td><input name="username" type="text" id="username" aria-labelledby="_loginErrorBox srTextUserName" placeholder="Nombre del usuario" style="text-transform:uppercase;" class="highlightFocus" required=""><label id="srTextUserName" class="sr-only">Nombre del usuario</label></td>
+		</tr>
+		<tr>
+			<td colspan="2" height="5"></td>
+		</tr>
+		<tr>
+			<td id="passwordText" style="text-align:right;vertical-align:middle;"><img class="loginIcon loginIcon-password" title="Contraseña" alt="Contraseña" src="/Onbase/WebResource.axd?d=JjaynONhIv9RtLeZWkp8RsF1qZpJr28ChqBMa094ZSL6SfgRFdRda4b5aYQOYwmk5uv-PLsjKGURR1MttKLzOOMOpjcn3OfegYGN4-t3M1gEg8ww3EbsuB2GLkp5mzJC3x8wkLfrnO9idqF75722mbU3Hid1Y4E-eoteizf0oXhD-GJyPr66eVTy6cbRGbaR0&amp;t=638980280380000000.png"></td>
+			<td><input name="password" type="password" id="password" placeholder="Contraseña" aria-labelledby="srTextPassword" class="highlightFocus" required=""><label id="srTextPassword" class="sr-only">Contraseña</label></td>
+		</tr>
+		<tr>
+			<td colspan="2" height="5"></td>
+		</tr>
+		<tr>
+			<td></td>
+			<td nowrap="nowrap" style="text-align:center;padding-top:20px;"><span id="SPANLoggingIn" style="display:none">Iniciando sesión. Espere.</span><button type="button" id="loginButton" onclick="submitForm();" class="btn btn-primary loginButton">Iniciar sesión</button></td>
+		</tr>
+	</tbody></table>
+	</div><div id="infopanel" class="infoFooterText"><div role="contentinfo">Version 25.1.11.1000 - Copyright © 1992 - 2025 Hyland Software, Inc.</div></div></div>
+</div>
+	</form>
+
+<div id="status-change-indicator" role="status" aria-live="polite" aria-relevant="additions" style="border: 0px; clip: rect(1px, 1px, 1px, 1px); height: 1px; margin: -1px; overflow: hidden; padding: 0px; width: 1px; position: absolute !important;"></div></body></html>

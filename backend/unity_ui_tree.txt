@@ -1,0 +1,386 @@
+Control Identifiers:
+
+Dialog - 'OnBase (Unity Client Produccion)'    (L-9, T-9, R1929, B1029)
+['OnBase (Unity Client Produccion)Dialog', 'Dialog', 'OnBase (Unity Client Produccion)']
+child_window(title="OnBase (Unity Client Produccion)", control_type="Window")
+   | 
+   | TitleBar - ''    (L28, T0, R1920, B29)
+   | ['Sin títuloTitleBar', 'TitleBar']
+   |    | 
+   |    | Menu - 'Sistema'    (L0, T0, R22, B22)
+   |    | ['Menu', 'Sistema', 'SistemaMenu', 'Sistema0', 'Sistema1', 'Menu0', 'Menu1']
+   |    | child_window(title="Sistema", auto_id="MenuBar", control_type="MenuBar")
+   |    |    | 
+   |    |    | MenuItem - 'Sistema'    (L0, T0, R22, B22)
+   |    |    | ['SistemaMenuItem', 'MenuItem', 'Sistema2']
+   |    |    | child_window(title="Sistema", control_type="MenuItem")
+   |    | 
+   |    | Button - 'Minimizar'    (L1835, T-1, R1865, B29)
+   |    | ['Button', 'Minimizar', 'MinimizarButton', 'Button0', 'Button1', 'Minimizar0', 'Minimizar1', 'MinimizarButton0', 'MinimizarButton1']
+   |    | child_window(title="Minimizar", control_type="Button")
+   |    | 
+   |    | Button - 'Restaurar'    (L1863, T-1, R1893, B29)
+   |    | ['Button2', 'Restaurar', 'RestaurarButton']
+   |    | child_window(title="Restaurar", control_type="Button")
+   |    | 
+   |    | Button - 'Cerrar'    (L1891, T-1, R1921, B29)
+   |    | ['Button3', 'Cerrar', 'CerrarButton', 'Cerrar0', 'Cerrar1', 'CerrarButton0', 'CerrarButton1']
+   |    | child_window(title="Cerrar", control_type="Button")
+   | 
+   | Custom - ''    (L0, T177, R1920, B1020)
+   | ['Custom', 'Páginas webCustom', 'Custom0', 'Custom1', 'Páginas webCustom0', 'Páginas webCustom1']
+   | child_window(auto_id="canvasLayoutCustom", control_type="Custom")
+   |    | 
+   |    | GroupBox - 'Páginas web'    (L0, T177, R250, B1020)
+   |    | ['GroupBox', 'Páginas webGroupBox', 'Páginas web', 'Páginas web0', 'Páginas web1', 'GroupBox0', 'GroupBox1']
+   |    | child_window(title="Páginas web", auto_id="websitesGroup", control_type="Group")
+   |    |    | 
+   |    |    | Static - 'Páginas web'    (L11, T180, R181, B205)
+   |    |    | ['Páginas web2', 'Static', 'Páginas webStatic', 'Static0', 'Static1']
+   |    |    | child_window(title="Páginas web", control_type="Text")
+   |    |    | 
+   |    |    | Button - 'Configurar'    (L181, T177, R211, B209)
+   |    |    | ['Button4', 'ConfigurarButton', 'Configurar', 'ConfigurarButton0', 'ConfigurarButton1', 'Configurar0', 'Configurar1']
+   |    |    | child_window(title="Configurar", auto_id="configureButton", control_type="Button")
+   |    |    |    | 
+   |    |    |    | Image - ''    (L186, T182, R206, B202)
+   |    |    |    | ['Image', 'Páginas webImage', 'Image0', 'Image1']
+   |    |    |    | child_window(auto_id="PART_Image", control_type="Image")
+   |    |    | 
+   |    |    | Button - 'Expandir /  Contraer'    (L211, T177, R244, B209)
+   |    |    | ['Button5', 'Expandir /  Contraer', 'Expandir /  ContraerButton', 'Expandir /  Contraer0', 'Expandir /  Contraer1', 'Expandir /  ContraerButton0', 'Expandir /  ContraerButton1']
+   |    |    | child_window(title="Expandir /  Contraer", auto_id="toggleButton", control_type="Button")
+   |    |    | 
+   |    |    | Custom - ''    (L6, T209, R244, B1014)
+   |    |    | ['Custom2', 'Páginas webCustom2']
+   |    |    | child_window(auto_id="sites", control_type="Custom")
+   |    |    |    | 
+   |    |    |    | ListBox - 'Páginas web'    (L9, T212, R241, B1011)
+   |    |    |    | ['Páginas web3', 'ListBox', 'Páginas webListBox', 'ListBox0', 'ListBox1']
+   |    |    |    | child_window(title="Páginas web", auto_id="websitesListView", control_type="List")
+   |    |    |    |    | 
+   |    |    |    |    | ListItem - 'Unity'    (L14, T217, R236, B242)
+   |    |    |    |    | ['ListItem', 'Unity', 'UnityListItem', 'Unity0', 'Unity1', 'ListItem0', 'ListItem1']
+   |    |    |    |    | child_window(title="Unity", control_type="ListItem")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Static - 'Unity'    (L19, T219, R234, B239)
+   |    |    |    |    |    | ['UnityStatic', 'Static2', 'Unity2']
+   |    |    |    |    |    | child_window(title="Unity", control_type="Text")
+   |    |    |    |    | 
+   |    |    |    |    | ListItem - 'Community'    (L14, T242, R236, B267)
+   |    |    |    |    | ['ListItem2', 'CommunityListItem', 'Community', 'Community0', 'Community1']
+   |    |    |    |    | child_window(title="Community", control_type="ListItem")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Static - 'Community'    (L19, T244, R234, B264)
+   |    |    |    |    |    | ['Community2', 'Static3', 'CommunityStatic']
+   |    |    |    |    |    | child_window(title="Community", control_type="Text")
+   |    |    |    |    | 
+   |    |    |    |    | ListItem - 'OnBase'    (L14, T267, R236, B292)
+   |    |    |    |    | ['ListItem3', 'OnBase', 'OnBaseListItem', 'OnBase0', 'OnBase1']
+   |    |    |    |    | child_window(title="OnBase", control_type="ListItem")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Static - 'OnBase'    (L19, T269, R234, B289)
+   |    |    |    |    |    | ['OnBase2', 'Static4', 'OnBaseStatic']
+   |    |    |    |    |    | child_window(title="OnBase", control_type="Text")
+   |    | 
+   |    | GroupBox - 'Tablero RSS'    (L260, T177, R1920, B283)
+   |    | ['GroupBox2', 'Tablero RSS', 'Tablero RSSGroupBox', 'Tablero RSS0', 'Tablero RSS1']
+   |    | child_window(title="Tablero RSS", auto_id="rssTickerGroup", control_type="Group")
+   |    |    | 
+   |    |    | Static - 'Tablero RSS'    (L271, T180, R1851, B205)
+   |    |    | ['Tablero RSS2', 'Static5', 'Tablero RSSStatic']
+   |    |    | child_window(title="Tablero RSS", control_type="Text")
+   |    |    | 
+   |    |    | Button - 'Configurar'    (L1851, T177, R1881, B209)
+   |    |    | ['Button6', 'ConfigurarButton2', 'Configurar2']
+   |    |    | child_window(title="Configurar", auto_id="configureButton", control_type="Button")
+   |    |    |    | 
+   |    |    |    | Image - ''    (L1856, T182, R1876, B202)
+   |    |    |    | ['Image2', 'Tablero RSSImage']
+   |    |    |    | child_window(auto_id="PART_Image", control_type="Image")
+   |    |    | 
+   |    |    | Button - 'Expandir /  Contraer'    (L1881, T177, R1914, B209)
+   |    |    | ['Button7', 'Expandir /  Contraer2', 'Expandir /  ContraerButton2']
+   |    |    | child_window(title="Expandir /  Contraer", auto_id="toggleButton", control_type="Button")
+   |    |    | 
+   |    |    | Custom - ''    (L266, T209, R1914, B277)
+   |    |    | ['Tablero RSSCustom', 'Custom3', 'Tablero RSSCustom0', 'Tablero RSSCustom1']
+   |    |    | child_window(auto_id="rssTicker", control_type="Custom")
+   |    |    |    | 
+   |    |    |    | Custom - ''    (L269, T212, R682, B274)
+   |    |    |    | ['Tablero RSSCustom2', 'Custom4']
+   |    |    |    | child_window(auto_id="rssFeedItemCustom", control_type="Custom")
+   |    |    |    |    | 
+   |    |    |    |    | Static - 'What kind of innovation organisation are you?'    (L283, T215, R669, B240)
+   |    |    |    |    | ['What kind of innovation organisation are you?Static', 'Static6', 'What kind of innovation organisation are you?']
+   |    |    |    |    | child_window(title="What kind of innovation organisation are you?", auto_id="feedItemTitleText", control_type="Text")
+   |    |    |    |    | 
+   |    |    |    |    | Static - 'The Hyland Blog'    (L281, T248, R391, B268)
+   |    |    |    |    | ['The Hyland BlogStatic', 'The Hyland Blog', 'Static7']
+   |    |    |    |    | child_window(title="The Hyland Blog", auto_id="channelText", control_type="Text")
+   |    |    |    |    | 
+   |    |    |    |    | Static - '17/01/2023 7:12:07 a. m.'    (L513, T248, R670, B268)
+   |    |    |    |    | ['17/01/2023 7:12:07\u202fa.\u202fm.Static', 'Static8', '17/01/2023 7:12:07\u202fa.\u202fm.']
+   |    |    |    |    | child_window(title="17/01/2023 7:12:07 a. m.", auto_id="publicationDateText", control_type="Text")
+   |    |    |    | 
+   |    |    |    | Button - 'Arriba'    (L1880, T212, R1911, B232)
+   |    |    |    | ['Button8', 'Arriba', 'ArribaButton']
+   |    |    |    | child_window(title="Arriba", auto_id="upButton", control_type="Button")
+   |    |    |    | 
+   |    |    |    | Button - 'Pausa'    (L1880, T232, R1911, B253)
+   |    |    |    | ['Button9', 'PausaButton', 'Pausa']
+   |    |    |    | child_window(title="Pausa", auto_id="pauseButton", control_type="Button")
+   |    |    |    | 
+   |    |    |    | Button - 'Abajo'    (L1880, T253, R1911, B274)
+   |    |    |    | ['Button10', 'AbajoButton', 'Abajo']
+   |    |    |    | child_window(title="Abajo", auto_id="downButton", control_type="Button")
+   |    | 
+   |    | GroupBox - 'https://unity.hyland.com'    (L260, T283, R1920, B1020)
+   |    | ['GroupBox3', 'https://unity.hyland.com', 'https://unity.hyland.comGroupBox', 'https://unity.hyland.com0', 'https://unity.hyland.com1']
+   |    | child_window(title="https://unity.hyland.com", auto_id="browserGroup", control_type="Group")
+   |    |    | 
+   |    |    | Static - 'https://unity.hyland.com'    (L271, T287, R1851, B312)
+   |    |    | ['https://unity.hyland.com2', 'Static9', 'https://unity.hyland.comStatic', 'https://unity.hyland.comStatic0', 'https://unity.hyland.comStatic1']
+   |    |    | child_window(title="https://unity.hyland.com", control_type="Text")
+   |    |    | 
+   |    |    | Button - 'Configurar'    (L1851, T283, R1881, B315)
+   |    |    | ['Button11', 'ConfigurarButton3', 'Configurar3']
+   |    |    | child_window(title="Configurar", auto_id="configureButton", control_type="Button")
+   |    |    |    | 
+   |    |    |    | Image - ''    (L1856, T288, R1876, B308)
+   |    |    |    | ['Image3', 'https://unity.hyland.comImage']
+   |    |    |    | child_window(auto_id="PART_Image", control_type="Image")
+   |    |    | 
+   |    |    | Button - 'Expandir /  Contraer'    (L1881, T283, R1914, B315)
+   |    |    | ['Button12', 'Expandir /  Contraer3', 'Expandir /  ContraerButton3']
+   |    |    | child_window(title="Expandir /  Contraer", auto_id="toggleButton", control_type="Button")
+   |    |    | 
+   |    |    | Custom - ''    (L266, T315, R1914, B1014)
+   |    |    | ['Custom5', 'https://unity.hyland.comCustom', 'https://unity.hyland.comCustom0', 'https://unity.hyland.comCustom1']
+   |    |    | child_window(auto_id="browser", control_type="Custom")
+   |    |    |    | 
+   |    |    |    | Custom - ''    (L269, T318, R1911, B1011)
+   |    |    |    | ['Custom6', 'https://unity.hyland.comCustom2']
+   |    |    |    | child_window(auto_id="browser", control_type="Custom")
+   |    |    |    |    | 
+   |    |    |    |    | Custom - ''    (L271, T320, R1909, B1009)
+   |    |    |    |    | ['Custom7', 'https://unity.hyland.comCustom3']
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Pane - ''    (L274, T323, R1906, B1006)
+   |    |    |    |    |    | ['https://unity.hyland.comPane', 'Pane', 'https://unity.hyland.comPane0', 'https://unity.hyland.comPane1', 'Pane0', 'Pane1']
+   | 
+   | Toolbar - 'Canvas Ribbon'    (L0, T0, R1920, B177)
+   | ['Canvas Ribbon', 'Canvas RibbonToolbar', 'Toolbar', 'Toolbar0', 'Toolbar1']
+   | child_window(title="Canvas Ribbon", auto_id="canvasRibbonToolbar", control_type="ToolBar")
+   |    | 
+   |    | TabControl - ''    (L0, T28, R1920, B177)
+   |    | ['TabControlAyuda', 'TabControlÚltimo inicio de sesión: 11/03/2026 8:55:45\u202fa.\u202fm.', 'TabControl', 'Sin títuloTabControl']
+   |    | child_window(auto_id="XamRibbonTabs", control_type="Tab")
+   |    |    | 
+   |    |    | TabItem - 'Inicio'    (L73, T28, R146, B56)
+   |    |    | ['TabItem', 'InicioTabItem', 'Inicio', 'Inicio0', 'Inicio1']
+   |    |    | child_window(title="Inicio", auto_id="HomeRibbon", control_type="TabItem")
+   |    |    |    | 
+   |    |    |    | Static - 'Inicio'    (L80, T33, R139, B53)
+   |    |    |    | ['Static22', 'InicioStatic', 'Inicio2']
+   |    |    |    | child_window(title="Inicio", control_type="Text")
+   |    |    |    | 
+   |    |    |    | Toolbar - 'Favoritos'    (L3, T60, R216, B175)
+   |    |    |    | ['Favoritos', 'Toolbar2', 'FavoritosToolbar', 'Favoritos0', 'Favoritos1']
+   |    |    |    | child_window(title="Favoritos", auto_id="favoritesRibbonGroup", control_type="ToolBar")
+   |    |    |    |    | 
+   |    |    |    |    | Menu - 'Inicio'    (L3, T63, R54, B149)
+   |    |    |    |    | ['InicioMenu', 'Inicio3', 'Menu2']
+   |    |    |    |    | child_window(title="Inicio", auto_id="homeMenuTool", control_type="Menu")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Button - ''    (L3, T63, R54, B109)
+   |    |    |    |    |    | ['Button19', 'Sin títuloButton']
+   |    |    |    |    |    | child_window(auto_id="PART_SegmentedButton", control_type="Button")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | CheckBox - ''    (L3, T109, R54, B149)
+   |    |    |    |    |    | ['CheckBox', 'Sin títuloCheckBox', 'CheckBox0', 'CheckBox1']
+   |    |    |    |    |    | child_window(auto_id="dropDownBtn", control_type="CheckBox")
+   |    |    |    |    | 
+   |    |    |    |    | Menu - 'Página personal'    (L54, T63, R136, B149)
+   |    |    |    |    | ['Página personal', 'Página personalMenu', 'Menu3']
+   |    |    |    |    | child_window(title="Página personal", auto_id="personalPageMenuTool", control_type="Menu")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Button - ''    (L54, T63, R136, B109)
+   |    |    |    |    |    | ['Button20', 'InicioButton']
+   |    |    |    |    |    | child_window(auto_id="PART_SegmentedButton", control_type="Button")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | CheckBox - ''    (L54, T109, R136, B149)
+   |    |    |    |    |    | ['CheckBox2', 'InicioCheckBox', 'InicioCheckBox0', 'InicioCheckBox1']
+   |    |    |    |    |    | child_window(auto_id="dropDownBtn", control_type="CheckBox")
+   |    |    |    |    | 
+   |    |    |    |    | Menu - 'Favoritos'    (L136, T63, R211, B149)
+   |    |    |    |    | ['Favoritos2', 'FavoritosMenu', 'Menu4']
+   |    |    |    |    | child_window(title="Favoritos", auto_id="favoritesMenuTool", control_type="Menu")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | CheckBox - ''    (L136, T63, R211, B149)
+   |    |    |    |    |    | ['CheckBox3', 'InicioCheckBox2']
+   |    |    |    |    |    | child_window(auto_id="dropdownBtn", control_type="CheckBox")
+   |    |    |    | 
+   |    |    |    | Toolbar - 'Documentos'    (L219, T60, R755, B175)
+   |    |    |    | ['Documentos', 'DocumentosToolbar', 'Toolbar3']
+   |    |    |    | child_window(title="Documentos", auto_id="documentsRibbonGroup", control_type="ToolBar")
+   |    |    |    |    | 
+   |    |    |    |    | Button - 'Consultas personalizadas'    (L219, T63, R338, B149)
+   |    |    |    |    | ['Button21', 'Consultas personalizadasButton', 'Consultas personalizadas']
+   |    |    |    |    | child_window(title="Consultas personalizadas", auto_id="customQueriesButtonTool", control_type="Button")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Image - ''    (L258, T66, R298, B106)
+   |    |    |    |    |    | ['Image7', 'InicioImage3']
+   |    |    |    |    |    | child_window(auto_id="image", control_type="Image")
+   |    |    |    |    | 
+   |    |    |    |    | Button - 'Recuperación'    (L338, T63, R443, B149)
+   |    |    |    |    | ['Button22', 'Recuperación', 'RecuperaciónButton']
+   |    |    |    |    | child_window(title="Recuperación", auto_id="retrievalButtonTool", control_type="Button")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Image - ''    (L370, T66, R410, B106)
+   |    |    |    |    |    | ['Image8', 'InicioImage4']
+   |    |    |    |    |    | child_window(auto_id="image", control_type="Image")
+   |    |    |    |    | 
+   |    |    |    |    | Button - 'Archivadores'    (L443, T63, R544, B149)
+   |    |    |    |    | ['Button23', 'ArchivadoresButton', 'Archivadores']
+   |    |    |    |    | child_window(title="Archivadores", auto_id="showFolderButtonTool", control_type="Button")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Image - ''    (L473, T66, R513, B106)
+   |    |    |    |    |    | ['Image9', 'InicioImage5']
+   |    |    |    |    |    | child_window(auto_id="image", control_type="Image")
+   |    |    |    |    | 
+   |    |    |    |    | Button - 'Historial de consultas'    (L544, T63, R720, B91)
+   |    |    |    |    | ['Button24', 'Historial de consultasButton', 'Historial de consultas', 'Historial de consultas0', 'Historial de consultas1']
+   |    |    |    |    | child_window(title="Historial de consultas", auto_id="queryHistoryButtonTool", control_type="Button")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Image - ''    (L548, T67, R568, B87)
+   |    |    |    |    |    | ['Image10', 'InicioImage6']
+   |    |    |    |    |    | child_window(auto_id="image", control_type="Image")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Static - 'Historial de consultas'    (L571, T66, R713, B86)
+   |    |    |    |    |    | ['Historial de consultasStatic', 'Static23', 'Historial de consultas2']
+   |    |    |    |    |    | child_window(title="Historial de consultas", control_type="Text")
+   |    |    |    |    | 
+   |    |    |    |    | Button - 'Mis documentos retirados'    (L544, T91, R750, B120)
+   |    |    |    |    | ['Button25', 'Mis documentos retirados', 'Mis documentos retiradosButton', 'Mis documentos retirados0', 'Mis documentos retirados1']
+   |    |    |    |    | child_window(title="Mis documentos retirados", auto_id="myCheckoutsButtonTool", control_type="Button")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Image - ''    (L548, T96, R568, B116)
+   |    |    |    |    |    | ['Image11', 'InicioImage7']
+   |    |    |    |    |    | child_window(auto_id="image", control_type="Image")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Static - 'Mis documentos retirados'    (L571, T95, R743, B115)
+   |    |    |    |    |    | ['Mis documentos retirados2', 'Static24', 'Mis documentos retiradosStatic']
+   |    |    |    |    |    | child_window(title="Mis documentos retirados", control_type="Text")
+   |    |    |    | 
+   |    |    |    | Toolbar - 'Crear'    (L758, T60, R1005, B175)
+   |    |    |    | ['CrearToolbar', 'Crear', 'Toolbar4']
+   |    |    |    | child_window(title="Crear", auto_id="createRibbonGroup", control_type="ToolBar")
+   |    |    |    |    | 
+   |    |    |    |    | Button - 'Formularios'    (L758, T63, R851, B149)
+   |    |    |    |    | ['Button26', 'Formularios', 'FormulariosButton']
+   |    |    |    |    | child_window(title="Formularios", auto_id="eFormButtonTool", control_type="Button")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Image - ''    (L784, T66, R824, B106)
+   |    |    |    |    |    | ['Image12', 'Mis documentos retiradosImage', 'Mis documentos retiradosImage0', 'Mis documentos retiradosImage1']
+   |    |    |    |    |    | child_window(auto_id="image", control_type="Image")
+   |    |    |    |    | 
+   |    |    |    |    | Button - 'Importar'    (L851, T63, R925, B149)
+   |    |    |    |    | ['Button27', 'Importar', 'ImportarButton']
+   |    |    |    |    | child_window(title="Importar", auto_id="uploadButtonTool", control_type="Button")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Image - ''    (L868, T66, R908, B106)
+   |    |    |    |    |    | ['Image13', 'Mis documentos retiradosImage2']
+   |    |    |    |    |    | child_window(auto_id="image", control_type="Image")
+   |    |    |    |    | 
+   |    |    |    |    | Button - 'Plantillas'    (L925, T63, R1000, B149)
+   |    |    |    |    | ['Button28', 'PlantillasButton', 'Plantillas']
+   |    |    |    |    | child_window(title="Plantillas", auto_id="documentTemplatesButtonTool", control_type="Button")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Image - ''    (L942, T66, R982, B106)
+   |    |    |    |    |    | ['Image14', 'Mis documentos retiradosImage3']
+   |    |    |    |    |    | child_window(auto_id="image", control_type="Image")
+   |    |    |    | 
+   |    |    |    | Toolbar - 'Informe'    (L1008, T60, R1080, B175)
+   |    |    |    | ['Informe', 'Toolbar5', 'InformeToolbar', 'Informe0', 'Informe1']
+   |    |    |    | child_window(title="Informe", auto_id="dashboardsRibbonGroup", control_type="ToolBar")
+   |    |    |    |    | 
+   |    |    |    |    | Button - 'Informe'    (L1008, T63, R1075, B149)
+   |    |    |    |    | ['Button29', 'Informe2', 'InformeButton']
+   |    |    |    |    | child_window(title="Informe", auto_id="dashboardsButtonTool", control_type="Button")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Image - ''    (L1021, T66, R1061, B106)
+   |    |    |    |    |    | ['Image15', 'Mis documentos retiradosImage4']
+   |    |    |    |    |    | child_window(auto_id="image", control_type="Image")
+   |    |    |    | 
+   |    |    |    | Toolbar - 'Correo interno'    (L1083, T60, R1183, B175)
+   |    |    |    | ['Correo interno', 'Correo internoToolbar', 'Toolbar6', 'Correo interno0', 'Correo interno1']
+   |    |    |    | child_window(title="Correo interno", auto_id="internalMailRibbonGroup", control_type="ToolBar")
+   |    |    |    |    | 
+   |    |    |    |    | Button - 'Correo interno'    (L1091, T63, R1169, B149)
+   |    |    |    |    | ['Button30', 'Correo interno2', 'Correo internoButton']
+   |    |    |    |    | child_window(title="Correo interno", auto_id="internalMailButtonTool", control_type="Button")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Image - ''    (L1110, T66, R1150, B106)
+   |    |    |    |    |    | ['Image16', 'Mis documentos retiradosImage5']
+   |    |    |    |    |    | child_window(auto_id="image", control_type="Image")
+   |    |    |    | 
+   |    |    |    | Toolbar - 'Workflow'    (L1185, T60, R1269, B175)
+   |    |    |    | ['WorkflowToolbar', 'Workflow', 'Toolbar7', 'Workflow0', 'Workflow1']
+   |    |    |    | child_window(title="Workflow", auto_id="workflowRibbonGroup", control_type="ToolBar")
+   |    |    |    |    | 
+   |    |    |    |    | Button - 'Workflow'    (L1185, T63, R1264, B149)
+   |    |    |    |    | ['Button31', 'Workflow2', 'WorkflowButton']
+   |    |    |    |    | child_window(title="Workflow", auto_id="workflowButtonTool", control_type="Button")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Image - ''    (L1204, T66, R1244, B106)
+   |    |    |    |    |    | ['Image17', 'Mis documentos retiradosImage6']
+   |    |    |    |    |    | child_window(auto_id="image", control_type="Image")
+   |    |    |    | 
+   |    |    |    | Toolbar - 'Knowledge'    (L1271, T60, R1363, B175)
+   |    |    |    | ['Knowledge', 'KnowledgeToolbar', 'Toolbar8']
+   |    |    |    | child_window(title="Knowledge", auto_id="knowledgeDiscoveryRibbonGroup", control_type="ToolBar")
+   |    |    |    |    | 
+   |    |    |    |    | Button - 'Pregunte a Discovery'    (L1271, T63, R1358, B149)
+   |    |    |    |    | ['Button32', 'Pregunte a DiscoveryButton', 'Pregunte a Discovery']
+   |    |    |    |    | child_window(title="Pregunte a Discovery", auto_id="knowledgeDiscoveryButtonTool", control_type="Button")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Image - ''    (L1294, T66, R1334, B106)
+   |    |    |    |    |    | ['Image18', 'Mis documentos retiradosImage7']
+   |    |    |    |    |    | child_window(auto_id="image", control_type="Image")
+   |    |    |    | 
+   |    |    |    | Toolbar - 'Procesamiento de imágenes'    (L1365, T60, R1595, B175)
+   |    |    |    | ['Procesamiento de imágenesToolbar', 'Procesamiento de imágenes', 'Toolbar9']
+   |    |    |    | child_window(title="Procesamiento de imágenes", auto_id="imagingRibbonGroup", control_type="ToolBar")
+   |    |    |    |    | 
+   |    |    |    |    | Button - 'Escaneo de lotes'    (L1365, T63, R1455, B149)
+   |    |    |    |    | ['Button33', 'Escaneo de lotesButton', 'Escaneo de lotes']
+   |    |    |    |    | child_window(title="Escaneo de lotes", auto_id="batchScanningButtonTool", control_type="Button")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Image - ''    (L1390, T66, R1430, B106)
+   |    |    |    |    |    | ['Image19', 'Mis documentos retiradosImage8']
+   |    |    |    |    |    | child_window(auto_id="image", control_type="Image")
+   |    |    |    |    | 
+   |    |    |    |    | Button - 'Procesamiento de lotes'    (L1455, T63, R1590, B149)
+   |    |    |    |    | ['Button34', 'Procesamiento de lotesButton', 'Procesamiento de lotes']
+   |    |    |    |    | child_window(title="Procesamiento de lotes", auto_id="batchProcessingButtonTool", control_type="Button")
+   |    |    |    |    |    | 
+   |    |    |    |    |    | Image - ''    (L1502, T66, R1542, B106)
+   |    |    |    |    |    | ['Image20', 'Mis documentos retiradosImage9']
+   |    |    |    |    |    | child_window(auto_id="image", control_type="Image")
+   |    |    | 
+   |    |    | Static - 'Último inicio de sesión: 11/03/2026 8:55:45 a. m.'    (L1564, T32, R1879, B52)
+   |    |    | ['Último inicio de sesión: 11/03/2026 8:55:45\u202fa.\u202fm.', 'Static25', 'Último inicio de sesión: 11/03/2026 8:55:45\u202fa.\u202fm.Static']
+   |    |    | child_window(title="Último inicio de sesión: 11/03/2026 8:55:45 a. m.", auto_id="lastLoginTimeTextBlock", control_type="Text")
+   |    |    | 
+   |    |    | Button - 'Ayuda'    (L1886, T28, R1920, B56)
+   |    |    | ['Button35', 'Ayuda', 'AyudaButton']
+   |    |    | child_window(title="Ayuda", auto_id="helpMenuItem", control_type="Button")
+   |    |    |    | 
+   |    |    |    | Image - ''    (L1890, T32, R1910, B52)
+   |    |    |    | ['Image21', 'Último inicio de sesión: 11/03/2026 8:55:45\u202fa.\u202fm.Image']
+   |    |    |    | child_window(auto_id="image", control_type="Image")
+   |    | 
+   |    | Menu - 'Archivo'    (L0, T28, R70, B56)
+   |    | ['Archivo', 'ArchivoMenu', 'Menu5']
+   |    | child_window(title="Archivo", auto_id="applicationMenu", control_type="Menu")

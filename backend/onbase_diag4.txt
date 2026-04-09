@@ -1,0 +1,143 @@
+NavPanel URL: https://onbase.sena.edu.co/Onbase/NavPanel.aspx
+Total frames: 8
+Frame[0]: title="Recuperaci├│n de documentos - OnBase 160" url="https://onbase.sena.edu.co/Onbase/NavPanel.aspx"
+Frame[1]: title="" url="about:blank"
+Frame[2]: title="Recuperaci├│n de documentos" url="https://onbase.sena.edu.co/Onbase/Retrieve.aspx?defaultContextSpecificID=&OBToken=05a83b59-589b-4ae7-a870-505603c4a13c"
+Frame[3]: title="Seleccionar documento" url="https://onbase.sena.edu.co/Onbase/DocumentSelectContainer.aspx"
+Frame[4]: title="OnBase" url="https://onbase.sena.edu.co/Onbase/blank.aspx?OBToken=05a83b59-589b-4ae7-a870-505603c4a13c"
+Frame[5]: title="Descargar p├ígina" url="https://onbase.sena.edu.co/Onbase/UnloadHandler.ashx?type=unloadframe"
+Frame[6]: title="" url="https://onbase.sena.edu.co/Onbase/DocumentSelectList.aspx?OBToken=05a83b59-589b-4ae7-a870-505603c4a13c"
+Frame[7]: title="OnBase" url="https://onbase.sena.edu.co/Onbase/blank.aspx"
+
+=== Frame[0] BODY (first 5000 chars) ===
+ 
+	<header class="client_header">
+		<section class="navigationSide">
+			<div class="js-navMenuButton navMenuButton" tabindex="0" role="navigation" aria-label="Men├║ principal" title="Men├║ principal" aria-expanded="false">
+				<svg class="navMenuButtonIcon" height="24" width="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M0 0h24v24H0z" fill="none"></path><path d="M2 2h4v4h-4zM10 2h4v4h-4zM18 2h4v4h-4zM2 10h4v4h-4zM10 10h4v4h-4zM18 10h4v4h-4zM2 18h4v4h-4zM10 18h4v4h-4zM18 18h4v4h-4z"></path></svg>
+				<svg class="navMenuButtonIcon-close svg-close-cancel" width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path><path d="M0 0h24v24H0z" fill="none"></path></svg>
+			</div>
+			<h1 class="navigationLocation">
+				<span class="hide"></span>
+			<span class="flipText"><span class="text u-textTruncate">Recuperaci├│n de documentos</span></span></h1>
+		</section>
+
+		<div class="logoBlock">
+			<img class="productLogo" src="https://onbase.sena.edu.co/Onbase/images/productLogo.png" alt="OnBase Logo">
+		</div>
+
+		<section class="userSide">
+			<div class="features">
+				<div class="pushToSide"></div>
+                <div class="js-discoveryMenuButton featureIcon" title="Pregunte a Discovery" tabindex="0" role="button">
+					<img src="https://onbase.sena.edu.co/Onbase/images/icons/Sparkle_24.svg" height="24" width="24" alt="Pregunte a Discovery">
+                </div>
+				
+				<div class="js-favoritesMenuButton featureIcon favoritesIcon" title="Favoritos" tabindex="0" role="button" aria-expanded="false">
+					<img src="https://onbase.sena.edu.co/Onbase/images/icons/Favorites_24.png" alt="Favoritos">
+				</div>
+				
+				<div class="js-mailMenuButton featureIcon mailIcon" title="Correo" tabindex="0" role="button" aria-expanded="false">
+					<img src="https://onbase.sena.edu.co/Onbase/images/icons/Mail_24.png" alt="Correo">
+				</div>
+				
+			</div>
+			<div class="js-userMenuButton userBlock" tabindex="0" role="button" title="Men├║ del usuario" aria-labelledby="realNameDiv" aria-expanded="false">
+				<div id="realNameDiv" class="displayedName u-textTruncate">68-9224-(S)-JORGE RICARDO ROZO HERNANDEZ</div>
+				<div class="js-userMenuButtonToggle featureIcon userBlockToggle"></div>
+			</div>
+		</section>
+	</header>
+
+	<div class="client_content js-client_content">
+		<iframe class="js-mainBlockerIframe mainBlockerIframe hide"></iframe>
+
+		<!-- Main navigation menu-->
+		<nav class="js-navMenu navMenu isClosed" role="menu">			<h1 id="DocumentHeader" class="navMenuHeading">Documento</h1>			<ul class="navMenuLinkSet" role="group" aria-labelledby="DocumentHeader">									<li id="retrievedocument" class="navLink firstLinkSet active" tabindex="-1" role="menuitem" data-splitview="True" data-path="Retrieve.aspx" data-name="Recuperaci├│n de documentos" aria-current="true">Recuperaci├│n de documentos</li>									<li id="customquery" class="navLink firstLinkSet" tabindex="-1" role="menuitem" data-splitview="True" data-path="CustomQuery.aspx" data-name="Consultas personalizadas">Consultas personalizadas</li>									<li id="newform" class="navLink firstLinkSet" tabindex="-1" role="menuitem" data-splitview="True" data-path="NewForm.aspx" data-name="Nuevo formulario">Nuevo formulario</li>									<li id="upload" class="navLink firstLinkSet" tabindex="-1" role="menuitem" data-splitview="True" data-path="FileUploadEnhanced.aspx" data-name="Importar documento">Importar documento</li>									<li id="versioncontrol" class="navLink firstLinkSet" tabindex="-1" role="menuitem" data-splitview="False" data-path="VersionControl.aspx" data-name="Documentos retirados">Documentos retirados</li>							</ul>						<h1 id="WorkflowHeader" class="navMenuHeading">Workflow</h1>			<ul class="navMenuLinkSet" role="group" aria-labelledby="WorkflowHeader">									<li id="openworkflow" class="navLink" tabindex="-1" role="menuitem" data-splitview="True" data-path="blank.aspx" data-name="Workflow">Abrir Workflow</li>							</ul>						<h1 id="WorkViewHeader" class="navMenuHeading">WorkView</h1>			<ul class="navMenuLinkSet" role="group" aria-labelledby="WorkViewHeader">									<li id="openworkview" class="navLink" tabindex="-1" role="menuitem" data-splitview="True" data-path="./Workview/SelectApplication.aspx" data-name="WorkView">Abrir WorkView</li>							</ul>						<h1 id="StatusViewHeader" class="navMenuHeading">StatusView</h1>			<ul class="navMenuLinkSet" role="group" aria-labelledby="StatusViewHeader">									<li id="mylayouts" class="navLink" tabindex="-1" role="menuitem" data-splitview="True" data-path="./StatusView/MyLayouts.aspx" data-name="StatusView">Abrir StatusView</li>							</ul>						<h1 id="FoldersHeader" class="navMenuHeading">Carpetas</h1>			<ul class="navMenuLinkSet" role="group" aria-labelledby="FoldersHeader">									<li id="openfolders" class="navLink" tabindex="-1" role="menuitem" data-splitvie
+
+=== MAIN PAGE BODY ===
+ 
+	<header class="client_header">
+		<section class="navigationSide">
+			<div class="js-navMenuButton navMenuButton" tabindex="0" role="navigation" aria-label="Men├║ principal" title="Men├║ principal" aria-expanded="false">
+				<svg class="navMenuButtonIcon" height="24" width="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M0 0h24v24H0z" fill="none"></path><path d="M2 2h4v4h-4zM10 2h4v4h-4zM18 2h4v4h-4zM2 10h4v4h-4zM10 10h4v4h-4zM18 10h4v4h-4zM2 18h4v4h-4zM10 18h4v4h-4zM18 18h4v4h-4z"></path></svg>
+				<svg class="navMenuButtonIcon-close svg-close-cancel" width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path><path d="M0 0h24v24H0z" fill="none"></path></svg>
+			</div>
+			<h1 class="navigationLocation">
+				<span class="hide"></span>
+			<span class="flipText"><span class="text u-textTruncate">Recuperaci├│n de documentos</span></span></h1>
+		</section>
+
+		<div class="logoBlock">
+			<img class="productLogo" src="https://onbase.sena.edu.co/Onbase/images/productLogo.png" alt="OnBase Logo">
+		</div>
+
+		<section class="userSide">
+			<div class="features">
+				<div class="pushToSide"></div>
+                <div class="js-discoveryMenuButton featureIcon" title="Pregunte a Discovery" tabindex="0" role="button">
+					<img src="https://onbase.sena.edu.co/Onbase/images/icons/Sparkle_24.svg" height="24" width="24" alt="Pregunte a Discovery">
+                </div>
+				
+				<div class="js-favoritesMenuButton featureIcon favoritesIcon" title="Favoritos" tabindex="0" role="button" aria-expanded="false">
+					<img src="https://onbase.sena.edu.co/Onbase/images/icons/Favorites_24.png" alt="Favoritos">
+				</div>
+				
+				<div class="js-mailMenuButton featureIcon mailIcon" title="Correo" tabindex="0" role="button" aria-expanded="false">
+					<img src="https://onbase.sena.edu.co/Onbase/images/icons/Mail_24.png" alt="Correo">
+				</div>
+				
+			</div>
+			<div class="js-userMenuButton userBlock" tabindex="0" role="button" title="Men├║ del usuario" aria-labelledby="realNameDiv" aria-expanded="false">
+				<div id="realNameDiv" class="displayedName u-textTruncate">68-9224-(S)-JORGE RICARDO ROZO HERNANDEZ</div>
+				<div class="js-userMenuButtonToggle featureIcon userBlockToggle"></div>
+			</div>
+		</section>
+	</header>
+
+	<div class="client_content js-client_content">
+		<iframe class="js-mainBlockerIframe mainBlockerIframe hide"></iframe>
+
+		<!-- Main navigation menu-->
+		<nav class="js-navMenu navMenu isClosed" role="menu">			<h1 id="DocumentHeader" class="navMenuHeading">Documento</h1>			<ul class="navMenuLinkSet" role="group" aria-labelledby="DocumentHeader">									<li id="retrievedocument" class="navLink firstLinkSet active" tabindex="-1" role="menuitem" data-splitview="True" data-path="Retrieve.aspx" data-name="Recuperaci├│n de documentos" aria-current="true">Recuperaci├│n de documentos</li>									<li id="customquery" class="navLink firstLinkSet" tabindex="-1" role="menuitem" data-splitview="True" data-path="CustomQuery.aspx" data-name="Consultas personalizadas">Consultas personalizadas</li>									<li id="newform" class="navLink firstLinkSet" tabindex="-1" role="menuitem" data-splitview="True" data-path="NewForm.aspx" data-name="Nuevo formulario">Nuevo formulario</li>									<li id="upload" class="navLink firstLinkSet" tabindex="-1" role="menuitem" data-splitview="True" data-path="FileUploadEnhanced.aspx" data-name="Importar documento">Importar documento</li>									<li id="versioncontrol" class="navLink firstLinkSet" tabindex="-1" role="menuitem" data-splitview="False" data-path="VersionControl.aspx" data-name="Documentos retirados">Documentos retirados</li>							</ul>						<h1 id="WorkflowHeader" class="navMenuHeading">Workflow</h1>			<ul class="navMenuLinkSet" role="group" aria-labelledby="WorkflowHeader">									<li id="openworkflow" class="navLink" tabindex="-1" role="menuitem" data-splitview="True" data-path="blank.aspx" data-name="Workflow">Abrir Workflow</li>							</ul>						<h1 id="WorkViewHeader" class="navMenuHeading">WorkView</h1>			<ul class="navMenuLinkSet" role="group" aria-labelledby="WorkViewHeader">									<li id="openworkview" class="navLink" tabindex="-1" role="menuitem" data-splitview="True" data-path="./Workview/SelectApplication.aspx" data-name="WorkView">Abrir WorkView</li>							</ul>						<h1 id="StatusViewHeader" class="navMenuHeading">StatusView</h1>			<ul class="navMenuLinkSet" role="group" aria-labelledby="StatusViewHeader">									<li id="mylayouts" class="navLink" tabindex="-1" role="menuitem" data-splitview="True" data-path="./StatusView/MyLayouts.aspx" data-name="StatusView">Abrir StatusView</li>							</ul>						<h1 id="FoldersHeader" class="navMenuHeading">Carpetas</h1>			<ul class="navMenuLinkSet" role="group" aria-labelledby="FoldersHeader">									<li id="openfolders" class="navLink" tabindex="-1" role="menuitem" data-splitview="True" data-path="blank.aspx" data-name="Carpetas">Carpetas abiertas</li>							</ul>						<h1 id="UserHeader" class="navMenuHeading">Usuarios</h1>			<ul class="navMenuLinkSet" role="group" aria-labelledby="UserHeader">									<li id="mailbox" class="navLink lastLinkSet" tabindex="-1" role="menuitem" data-splitview="False" data-path="./InternalMail/InternalMail.aspx" data-name="Buz├│n de correo">Buz├│n de correo</li>									<li id="envelopes" class="navLink lastLinkSet" tabindex="-1" role="menuitem" data-splitview="True" data-path="Envelopes/Envelopes.aspx" data-name="Sobres">Sobres</li>									<li id="lockedobjects" class="navLink lastLinkSet" tabindex="-1" role="menuitem" data-splitview="False" data-path="LockGrid.aspx" data-name="Objetos bloqueados">Objetos bloqueados</li>							</ul>			</nav>
+
+		<!-- Becomes resize container for main client interaction -->
+		<div class="js-navMenuUICover mainBlocker hide"></div>
+
+		<main class="client_content_main">
+			<!-- SPLIT VIEW LAYOUT -->
+			<div class="js-mainSplitView mainSplitView flexResizeContainer horizontal ltrStandard">
+				<div class="navPanelContainer sideOne" role="region" aria-label="Panel de navegaci├│n" tabindex="-1" style="max-width: 350px; width: 350px;">
+					<iframe id="NavPanelIFrame" name="NavPanelIFrame" title="Panel de navegaci├│n" class="main_iframe main_iframe-sideOne" src="https://onbase.sena.edu.co/Onbase/Retrieve.aspx?defaultContextSpecificID=&amp;OBToken=05a83b59-589b-4ae7-a870-505603c4a13c"></iframe>
+				</div>
+				<button class="tuckButton hide" type="button" title="Haga clic parar mostrar Panel"><span class="symbol" aria-hidden="true">┬╗</span></button><div class="flexResizeGrip noDrag" title="Haga clic y arrastre para redireccionar
+Haga doble clic para contraer"></div><div id="ViewerDiv" class="viewerContainer sideTwo" role="region" aria-label="Results View">
+					<iframe id="frmViewer" name="frmViewer" title="Results View" class="main_iframe main_iframe-sideTwo" src="https://onbase.sena.edu.co/Onbase/blank.aspx?OBToken=05a83b59-589b-4ae7-a870-505603c4a13c"></iframe>
+				</div>
+			</div>
+
+			<!-- NON-SPLIT VIEW LAYOUT -->
+			<div id="mainSinglePage" class="js-mainSinglePage mainSinglePage hide" role="region" aria-label="Results View">
+				<iframe id="frmSinglePage" name="frmSinglePage" title="Results View" class="main_iframe" src="https://onbase.sena.edu.co/Onbase/blank.aspx?OBToken=05a83b59-589b-4ae7-a870-505603c4a13c"></iframe>
+			</div>
+		</main>
+
+	</div>
+	<div class="js-client_statusbar client_statusbar hide">
+		<span class="js-client_statusbar_message client_statusbar_message"></span>
+	</div>
+	<!-- Favorites menu, innerHTML extracted to popup -->
+	
+
+	<!-- Mail menu, innerHTML extracted to popup -->
+	
+
+	<!-- User menu, innerHTML extracted to popup -->
+	
+
+	
+
+	<script type="text/javascript" src="https://onbase.sena.edu.co/Onbase/Scripts/TextFlip.min.js?v=25,1,11,1000"></script>
+	<script type="text/javascript" src="https://onbase.sena.edu.co/Onbase/Scripts/NavPanel.min.
+
+Done. Screenshot: C:\tmp\onbase_navpanel.png

@@ -1,0 +1,11 @@
+Ô£à Login OK. URL: https://onbase.sena.edu.co/Onbase/Login.aspx
+Ô£à Men├║ abierto
+Ô£à Nuevo Formulario cargado
+
+======== FRAMES DESPU├ëS DE SGDEA ========
+Frame[0]: "INICIAR SESI├ôN - OnBase 160" ÔåÆ Login.aspx
+
+======== CAMPOS DE TODOS LOS FRAMES ========
+Frame[0] inputs: [{"type":"text","id":"username","name":"username","placeholder":"Nombre del usuario"},{"type":"password","id":"password","name":"password","placeholder":"Contrase├▒a"}]
+
+Done. Screenshot: C:\tmp\sgdea_form_full.png

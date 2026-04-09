@@ -1,0 +1,93 @@
+[AUTH] Recv doc: "1098680638", pass: "sANTANDER2026**", length: 15
+[AUTH] validPassword=false, hash=$2b$10$LTrNLsv9PYNCzu7fVXCsdOdiJ.zFG5FaDBsxOhU2YwGW0BgWu5HFi
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$10$LTrNLsv9PYNCzu7fVXCsdOdiJ.zFG5FaDBsxOhU2YwGW0BgWu5HFi
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$10$LTrNLsv9PYNCzu7fVXCsdOdiJ.zFG5FaDBsxOhU2YwGW0BgWu5HFi
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$10$LTrNLsv9PYNCzu7fVXCsdOdiJ.zFG5FaDBsxOhU2YwGW0BgWu5HFi
+[AUTH] Recv doc: "superadmin", pass: "superadmin", length: 10
+[AUTH] Recv doc: "admin", pass: "admin", length: 5
+[AUTH] validPassword=true, hash=$2b$10$snMxt8evFV0CQhomB8nghO9sa/UzpYCbp4SXg/iDrJ1.oREcqok6K
+[AUTH] Recv doc: "superadmin", pass: "superadmin", length: 10
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$10$LTrNLsv9PYNCzu7fVXCsdOdiJ.zFG5FaDBsxOhU2YwGW0BgWu5HFi
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$10$LTrNLsv9PYNCzu7fVXCsdOdiJ.zFG5FaDBsxOhU2YwGW0BgWu5HFi
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$10$LTrNLsv9PYNCzu7fVXCsdOdiJ.zFG5FaDBsxOhU2YwGW0BgWu5HFi
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$10$LTrNLsv9PYNCzu7fVXCsdOdiJ.zFG5FaDBsxOhU2YwGW0BgWu5HFi
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$10$LTrNLsv9PYNCzu7fVXCsdOdiJ.zFG5FaDBsxOhU2YwGW0BgWu5HFi
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$10$LTrNLsv9PYNCzu7fVXCsdOdiJ.zFG5FaDBsxOhU2YwGW0BgWu5HFi
+[AUTH] Recv doc: "SUSPEND123", pass: "SUSPEND123", length: 10
+[AUTH] validPassword=true, hash=$2b$10$e.l1ur.G3f.X0jJDvU1GHOW/jToXbLX5mcEDXZz1JpHUgWHPO/N3i
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$10$LTrNLsv9PYNCzu7fVXCsdOdiJ.zFG5FaDBsxOhU2YwGW0BgWu5HFi
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$10$LTrNLsv9PYNCzu7fVXCsdOdiJ.zFG5FaDBsxOhU2YwGW0BgWu5HFi
+[AUTH] Recv doc: "SUSPEND123", pass: "SUSPEND123", length: 10
+[AUTH] validPassword=true, hash=$2b$10$1/V9OVxu2xtUDK5svtknLu9GDjbtL4Q4NY.rSJ3QupAl1r3vCQP76
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$10$LTrNLsv9PYNCzu7fVXCsdOdiJ.zFG5FaDBsxOhU2YwGW0BgWu5HFi
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$10$LTrNLsv9PYNCzu7fVXCsdOdiJ.zFG5FaDBsxOhU2YwGW0BgWu5HFi
+[AUTH] Recv doc: "SUSPEND123", pass: "SUSPEND123", length: 10
+[AUTH] validPassword=true, hash=$2b$10$2nTXLmacYmMQAOGTMWRppeOSGyFo3YvAVa0EQD7mnLxwJlut6KJ3W
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$10$LTrNLsv9PYNCzu7fVXCsdOdiJ.zFG5FaDBsxOhU2YwGW0BgWu5HFi
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$10$LTrNLsv9PYNCzu7fVXCsdOdiJ.zFG5FaDBsxOhU2YwGW0BgWu5HFi
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$10$LTrNLsv9PYNCzu7fVXCsdOdiJ.zFG5FaDBsxOhU2YwGW0BgWu5HFi
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$10$PNVMYHXWpF/G2eqEXiehIeLB7SyIFXZYjrs7ii92nKOM7iRmUr2US
+[AUTH] Recv doc: "123456789", pass: "admin123", length: 8
+[AUTH] validPassword=true, hash=$2b$10$fJ1.Hl1sPjDQmNLLHhx2pO8x47h3yYeWT68dXqYRAliIfCgSMMwg.
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$10$PNVMYHXWpF/G2eqEXiehIeLB7SyIFXZYjrs7ii92nKOM7iRmUr2US
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$10$PNVMYHXWpF/G2eqEXiehIeLB7SyIFXZYjrs7ii92nKOM7iRmUr2US
+[AUTH] Recv doc: "1098680638", pass: "Sena2024*", length: 9
+[AUTH] Recv doc: "1098680638", pass: "Sena2024*", length: 9
+[AUTH] Recv doc: "1098680638", pass: "Sena2024*", length: 9
+[AUTH] Recv doc: "1098680638", pass: "Sena2024*", length: 9
+[AUTH] validPassword=false, hash=$2b$10$AkaaY54fx9YjIvDcOdZ8H../RZnuOMDd2E/02iNQodSkwFb.KE8sS
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$10$AkaaY54fx9YjIvDcOdZ8H../RZnuOMDd2E/02iNQodSkwFb.KE8sS
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$10$AkaaY54fx9YjIvDcOdZ8H../RZnuOMDd2E/02iNQodSkwFb.KE8sS
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$10$AkaaY54fx9YjIvDcOdZ8H../RZnuOMDd2E/02iNQodSkwFb.KE8sS
+[AUTH] Recv doc: "1098680638", pass: "Sena2024*", length: 9
+[AUTH] validPassword=false, hash=$2b$10$AkaaY54fx9YjIvDcOdZ8H../RZnuOMDd2E/02iNQodSkwFb.KE8sS
+[AUTH] Recv doc: "1098680638", pass: "Sena2024*", length: 9
+[AUTH] validPassword=false, hash=$2b$10$AkaaY54fx9YjIvDcOdZ8H../RZnuOMDd2E/02iNQodSkwFb.KE8sS
+[AUTH] Recv doc: "63553823", pass: "63553823", length: 8
+[AUTH] validPassword=true, hash=$2b$10$l.hafrKcQBhzSUMJd./pYuwX5KFtVlSIYhvFmBOxfTkA10jn9ruiS
+[AUTH] Recv doc: "63553823", pass: "63553289", length: 8
+[AUTH] validPassword=false, hash=$2b$10$l.hafrKcQBhzSUMJd./pYuwX5KFtVlSIYhvFmBOxfTkA10jn9ruiS
+[AUTH] Recv doc: "63553823", pass: "63553823", length: 8
+[AUTH] validPassword=true, hash=$2b$10$l.hafrKcQBhzSUMJd./pYuwX5KFtVlSIYhvFmBOxfTkA10jn9ruiS
+[AUTH] Recv doc: "1098680638", pass: "Sena2024*", length: 9
+[AUTH] validPassword=false, hash=$2b$10$AkaaY54fx9YjIvDcOdZ8H../RZnuOMDd2E/02iNQodSkwFb.KE8sS
+[AUTH] Recv doc: "63553823", pass: "63553823", length: 8
+[AUTH] validPassword=true, hash=$2b$10$l.hafrKcQBhzSUMJd./pYuwX5KFtVlSIYhvFmBOxfTkA10jn9ruiS
+[AUTH] Recv doc: "undefined", pass: "undefined", length: undefined
+[AUTH] Recv doc: "1098680638", pass: "Sena2024*", length: 9
+[AUTH] validPassword=false, hash=$2b$10$AkaaY54fx9YjIvDcOdZ8H../RZnuOMDd2E/02iNQodSkwFb.KE8sS
+[AUTH] Recv doc: "63553823", pass: "63553823", length: 8
+[AUTH] validPassword=true, hash=$2b$10$l.hafrKcQBhzSUMJd./pYuwX5KFtVlSIYhvFmBOxfTkA10jn9ruiS
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$12$Yq.ScOOi2lqNkUybJ85NhOr4x2YvgAGf53ly.K2i44P2TMobu6RTa
+[AUTH] Recv doc: "109868638", pass: "Santander2026**", length: 15
+[AUTH] Recv doc: "109868638", pass: "Santander2026**", length: 15
+[AUTH] Recv doc: "109868638", pass: "Santander2026**", length: 15
+[AUTH] Recv doc: "109868638", pass: "Santander2026**", length: 15
+[AUTH] Recv doc: "109868638", pass: "Santander2026**", length: 15
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$12$Yq.ScOOi2lqNkUybJ85NhOr4x2YvgAGf53ly.K2i44P2TMobu6RTa
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$12$Q6M5vvBQpMd05P3f5mm2vOZ4615hZGWgkA7sYH3WQSaayHEHbzV4m

@@ -1,0 +1,20 @@
+[dotenv@17.3.1] injecting env (8) from .env -- tip: 🤖 agentic secret storage: https://dotenvx.com/as2
+=== SIMULACIÓN EXACTA DEL SISTEMA DERECHOS DE PETICIÓN ===
+
+Resultados de Simulación (Lógica Nativa del Backend):
+
+[Expediente]: Serie - ID = 1843
+   📂 Ruta (Carpeta Expediente): C:\Users\Propietario\OneDrive - Servicio Nacional de Aprendizaje\Documents\CIMI\689224\689224\72025003555
+   📄 Archivos/Tipologías esperadas dentro de la carpeta:
+      |- 01_DOCUMENTO_GENERAL.pdf
+   ---------------------------------------------------------------------
+[Expediente]: Serie - ID = 1842
+   📂 Ruta (Carpeta Expediente): C:\Users\Propietario\OneDrive - Servicio Nacional de Aprendizaje\Documents\CIMI\689224\689224\72025000227
+   📄 Archivos/Tipologías esperadas dentro de la carpeta:
+      |- 01_DOCUMENTO_GENERAL.pdf
+   ---------------------------------------------------------------------
+[Expediente]: Serie - ID = 1841
+   📂 Ruta (Carpeta Expediente): C:\Users\Propietario\OneDrive - Servicio Nacional de Aprendizaje\Documents\CIMI\689224\689224\72025002461
+   📄 Archivos/Tipologías esperadas dentro de la carpeta:
+      |- 01_DOCUMENTO_GENERAL.pdf
+   ---------------------------------------------------------------------

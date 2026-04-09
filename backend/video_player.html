@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Reproductor - Análisis de Campo Fecha</title>
+  <style>
+    body { background: #111; color: #eee; font-family: Arial; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+    h2 { margin-bottom: 10px; color: #7ec8e3; }
+    video { width: 90vw; max-width: 1200px; border: 2px solid #7ec8e3; border-radius: 8px; }
+    .controls { margin-top: 12px; display: flex; gap: 10px; }
+    button { background: #7ec8e3; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; }
+    button:hover { background: #5bb3d0; }
+    .info { margin-top: 8px; font-size: 13px; color: #aaa; }
+  </style>
+</head>
+<body>
+  <h2>🎬 Análisis: Fecha Creacion Documento</h2>
+  <video id="vid" controls autoplay muted>
+    <source src="/api/video/fecha" type="video/mp4">
+    Tu navegador no soporta el video.
+  </video>
+  <div class="controls">
+    <button onclick="document.getElementById('vid').currentTime -= 5">⏪ -5s</button>
+    <button onclick="document.getElementById('vid').currentTime += 5">+5s ⏩</button>
+    <button onclick="document.getElementById('vid').playbackRate = 0.25">0.25x 🐢</button>
+    <button onclick="document.getElementById('vid').playbackRate = 0.5">0.5x</button>
+    <button onclick="document.getElementById('vid').playbackRate = 1">1x ▶️</button>
+    <button onclick="takeSnapshot()">📷 Captura</button>
+  </div>
+  <canvas id="canvas" style="display:none"></canvas>
+  <img id="snapshot" style="max-width:600px; margin-top:10px; border: 2px solid green; display:none;" />
+  <div class="info">Usa los controles para navegar el video. Presiona "Captura" para tomar un fotograma.</div>
+  
+  <script>
+    function takeSnapshot() {
+      const vid = document.getElementById('vid');
+      const canvas = document.getElementById('canvas');
+      canvas.width = vid.videoWidth;
+      canvas.height = vid.videoHeight;
+      canvas.getContext('2d').drawImage(vid, 0, 0);
+      const snap = document.getElementById('snapshot');
+      snap.src = canvas.toDataURL('image/png');
+      snap.style.display = 'block';
+    }
+  </script>
+</body>
+</html>

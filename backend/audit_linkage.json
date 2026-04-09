@@ -1,0 +1,330 @@
+{
+  "organizations": [
+    {
+      "id": 6,
+      "entity_name": "SENA",
+      "regional_code": "68",
+      "regional_name": "REGIONAL SANTANDER",
+      "center_code": "9224",
+      "center_name": "CENTRO INDUSTRIAL DE MANTENIMIENTO INTEGRAL",
+      "section_code": "9224",
+      "section_name": "SUBDIRECCIÓN DE CENTRO DE FORMACIÓN PROFESIONAL",
+      "subsection_code": "9224.2",
+      "subsection_name": "GRUPO ADMINISTRACION EDUCATIVA",
+      "created_at": "2026-02-20 04:32:35",
+      "storage_path": ""
+    },
+    {
+      "id": 7,
+      "entity_name": "SENA",
+      "regional_code": "68",
+      "regional_name": "REGIONAL SANTANDER",
+      "center_code": "9224",
+      "center_name": "CENTRO INDUSTRIAL DE MANTENIMIENTO INTEGRAL",
+      "section_code": "9224",
+      "section_name": "SUBDIRECCION DE CENTRO DE FORMACION PROFESIONAL",
+      "subsection_code": "9224.4",
+      "subsection_name": "GRUPO DE FORMACION PROFESIONAL INTEGRAL, GESTION EDUCATIVA Y RELACIONES CORPORATIVAS",
+      "created_at": "2026-02-20 04:34:43",
+      "storage_path": ""
+    },
+    {
+      "id": 8,
+      "entity_name": "SENA",
+      "regional_code": "68",
+      "regional_name": "REGIONAL SANTANDER",
+      "center_code": "9224",
+      "center_name": "CENTRO INDUSTRIAL DE MANTENIMIENTO INTEGRAL",
+      "section_code": "9224",
+      "section_name": "SUBDIRECCION DE CENTRO DE FORMACION PROFESIONAL",
+      "subsection_code": "",
+      "subsection_name": "",
+      "created_at": "2026-02-20 04:35:16",
+      "storage_path": ""
+    }
+  ],
+  "series": [
+    {
+      "id": 1,
+      "series_code": "100",
+      "series_name": "SERIE SIMPLE TEST",
+      "dependency_id": 1
+    },
+    {
+      "id": 2,
+      "series_code": "200",
+      "series_name": "SERIE COMPLEJA TEST",
+      "dependency_id": 1
+    },
+    {
+      "id": 3,
+      "series_code": "02",
+      "series_name": "ACTAS",
+      "dependency_id": 2
+    },
+    {
+      "id": 4,
+      "series_code": "03",
+      "series_name": "ACTOS ADMINISTRATIVOS",
+      "dependency_id": 2
+    },
+    {
+      "id": 5,
+      "series_code": "22",
+      "series_name": "CONTRATOS",
+      "dependency_id": 2
+    },
+    {
+      "id": 6,
+      "series_code": "27",
+      "series_name": "DERECHOS DE PETICION",
+      "dependency_id": 2
+    },
+    {
+      "id": 7,
+      "series_code": "42",
+      "series_name": "INFORMES",
+      "dependency_id": 2
+    },
+    {
+      "id": 8,
+      "series_code": "52",
+      "series_name": "ORDENES DE COMPRA",
+      "dependency_id": 2
+    },
+    {
+      "id": 9,
+      "series_code": "79",
+      "series_name": "PROCESOS DE RESPONSABILIDAD FISCAL",
+      "dependency_id": 2
+    },
+    {
+      "id": 10,
+      "series_code": "64",
+      "series_name": "PROCESOS CONTRACTAULES DECLARADOS DESIERTOS",
+      "dependency_id": 2
+    },
+    {
+      "id": 11,
+      "series_code": "65",
+      "series_name": "PROCESOS CONTRACTUALES REVOCADOS",
+      "dependency_id": 2
+    },
+    {
+      "id": 12,
+      "series_code": "02",
+      "series_name": "ACTAS",
+      "dependency_id": 4
+    },
+    {
+      "id": 13,
+      "series_code": "27",
+      "series_name": "DERECHOS DE PETICION",
+      "dependency_id": 4
+    },
+    {
+      "id": 14,
+      "series_code": "42",
+      "series_name": "INFORMES",
+      "dependency_id": 4
+    },
+    {
+      "id": 15,
+      "series_code": "28",
+      "series_name": "DISENO CURRICULAR DE LOS PROGRAMAS DE FORMACION PROFESIONAL INTEGRAL",
+      "dependency_id": 4
+    },
+    {
+      "id": 16,
+      "series_code": "81",
+      "series_name": "PROCESOS DE VENTA DE PRODUCTOS",
+      "dependency_id": 4
+    },
+    {
+      "id": 17,
+      "series_code": "37",
+      "series_name": "HISTORIAS ACADEMICAS",
+      "dependency_id": 4
+    },
+    {
+      "id": 18,
+      "series_code": "85",
+      "series_name": "PROGRAMAS",
+      "dependency_id": 4
+    },
+    {
+      "id": 19,
+      "series_code": "53",
+      "series_name": "PLANES",
+      "dependency_id": 4
+    },
+    {
+      "id": 23,
+      "series_code": "68.9224-02",
+      "series_name": "ACTAS",
+      "dependency_id": 8
+    },
+    {
+      "id": 24,
+      "series_code": "68.9224-03",
+      "series_name": "ACTOS ADMINISTRATIVOS",
+      "dependency_id": 8
+    },
+    {
+      "id": 25,
+      "series_code": "68.9224-22",
+      "series_name": "CONTRATOS",
+      "dependency_id": 8
+    },
+    {
+      "id": 26,
+      "series_code": "68.9224-27",
+      "series_name": "DERECHOS DE PETICION",
+      "dependency_id": 8
+    },
+    {
+      "id": 27,
+      "series_code": "68.9224-42",
+      "series_name": "INFORMES",
+      "dependency_id": 8
+    },
+    {
+      "id": 28,
+      "series_code": "68.9224-52",
+      "series_name": "ORDENES DE COMPRA",
+      "dependency_id": 8
+    },
+    {
+      "id": 29,
+      "series_code": "68.9224-79",
+      "series_name": "PROCESOS DE RESPONSABILIDAD FISCAL",
+      "dependency_id": 8
+    },
+    {
+      "id": 30,
+      "series_code": "68.9224-64",
+      "series_name": "PROCESOS CONTRACTAULES DECLARADOS DESIERTOS",
+      "dependency_id": 8
+    },
+    {
+      "id": 31,
+      "series_code": "68.9224-65",
+      "series_name": "PROCESOS CONTRACTUALES REVOCADOS",
+      "dependency_id": 8
+    },
+    {
+      "id": 32,
+      "series_code": "68.9224.4-02",
+      "series_name": "ACTAS",
+      "dependency_id": 7
+    },
+    {
+      "id": 33,
+      "series_code": "68.9224.4-27",
+      "series_name": "DERECHOS DE PETICION",
+      "dependency_id": 7
+    },
+    {
+      "id": 34,
+      "series_code": "68.9224.4-42",
+      "series_name": "INFORMES",
+      "dependency_id": 7
+    },
+    {
+      "id": 35,
+      "series_code": "68.9224.4-28",
+      "series_name": "DISENO CURRICULAR DE LOS PROGRAMAS DE FORMACION PROFESIONAL INTEGRAL",
+      "dependency_id": 7
+    },
+    {
+      "id": 36,
+      "series_code": "68.9224.4-81",
+      "series_name": "PROCESOS DE VENTA DE PRODUCTOS",
+      "dependency_id": 7
+    },
+    {
+      "id": 37,
+      "series_code": "68.9224.4-37",
+      "series_name": "HISTORIAS ACADEMICAS",
+      "dependency_id": 7
+    },
+    {
+      "id": 38,
+      "series_code": "68.9224.4-85",
+      "series_name": "PROGRAMAS",
+      "dependency_id": 7
+    },
+    {
+      "id": 39,
+      "series_code": "68.9224.4-53",
+      "series_name": "PLANES",
+      "dependency_id": 7
+    },
+    {
+      "id": 40,
+      "series_code": "68.9224.4-86",
+      "series_name": "PROGRAMAS DE APOYOS DE SOSTENIMIENTO",
+      "dependency_id": 7
+    },
+    {
+      "id": 41,
+      "series_code": "68.9224.4-31",
+      "series_name": "ESTRUCTURAS FUNCIONALES DE LA OCUPACION",
+      "dependency_id": 7
+    },
+    {
+      "id": 42,
+      "series_code": "68.9224.4-49",
+      "series_name": "MAPAS FUNCIONALES",
+      "dependency_id": 7
+    },
+    {
+      "id": 43,
+      "series_code": "68.9224.4-51",
+      "series_name": "NORMAS DE COMPETENCIAS LABORALES",
+      "dependency_id": 7
+    },
+    {
+      "id": 44,
+      "series_code": "68.9224.4-87",
+      "series_name": "PROYECTOS",
+      "dependency_id": 7
+    },
+    {
+      "id": 45,
+      "series_code": "68.9224.4-77",
+      "series_name": "PROCESOS DE EVALUACION Y CERTIFICACION DE COMPETENCIAS LABORALES",
+      "dependency_id": 7
+    },
+    {
+      "id": 46,
+      "series_code": "68.9224.2-07",
+      "series_name": "BANCO DE INSTRUMENTOS DE EVALUACION DE ASPIRANTES A PROGRAMAS DE FORMACION",
+      "dependency_id": 6
+    },
+    {
+      "id": 47,
+      "series_code": "68.9224.2-27",
+      "series_name": "DERECHOS DE PETICION",
+      "dependency_id": 6
+    },
+    {
+      "id": 48,
+      "series_code": "68.9224.2-42",
+      "series_name": "INFORMES",
+      "dependency_id": 6
+    },
+    {
+      "id": 49,
+      "series_code": "68.9224.2-53",
+      "series_name": "PLANES",
+      "dependency_id": 6
+    },
+    {
+      "id": 50,
+      "series_code": "68.9224.4-100",
+      "series_name": "Serie de Prueba Verify",
+      "dependency_id": 7
+    }
+  ]
+}

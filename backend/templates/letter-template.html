@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carta SENA</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.5;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .logo {
+            width: 100px; /* Adjust size as needed */
+            height: auto;
+        }
+        .reference-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            font-size: 10pt;
+        }
+        .recipient-info {
+            margin-bottom: 20px;
+        }
+        .subject {
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .content {
+            text-align: justify;
+        }
+        .footer {
+            margin-top: 50px;
+            text-align: center;
+            font-size: 8pt;
+            color: #777;
+            border-top: 1px solid #ccc;
+            padding-top: 10px;
+        }
+        .signature {
+            margin-top: 60px;
+        }
+        .signature-name {
+            font-weight: bold;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Sena_Colombia_logo.svg/1200px-Sena_Colombia_logo.svg.png" alt="SENA Logo" class="logo">
+    </div>
+
+    <div class="reference-info">
+        <div>
+            <strong>68-9224-102</strong>
+        </div>
+        <div style="text-align: right;">
+            Girón, {{date}}<br>
+            SENA - CFP 889224<br>
+            RADICACIÓN PRODUCIDA<br>
+            No. 68-2-2026-000097
+        </div>
+    </div>
+
+    <div class="recipient-info">
+        Señor(a):<br>
+        <strong>{{name}}</strong><br>
+        CC {{cc}}<br>
+        Correo: {{email}}<br>
+        Dirección: {{address}}
+    </div>
+
+    <div class="subject">
+        Asunto: Notificación
+    </div>
+
+    <div class="content">
+        <p>Cordial saludo, estimado señor(a) {{name}}:</p>
+
+        <p>Por medio de la presente, nos permitimos comunicar lo resuelto en la resolución No. 68 - 00155 (adjunta) emitida del día 03 FEB 2026, por el subdirector del Centro Industrial de Mantenimiento Integral, en cuanto a su proceso de formación.</p>
+
+        <p>Para tal efecto, se transcribe la parte resolutiva del referido acto administrativo:</p>
+
+        <p>
+            <em>
+            "Artículo 1º. DECLARAR LA DESERCION en el proceso de formación del aprendiz {{name}} identificado (a) con CC {{cc}}, quien se encuentra registrado en el programa {{program}} con numero de ficha {{ficha}}, por las razones anteriormente expuestas.
+            </em>
+        </p>
+
+        <p>
+            <em>
+            Artículo 2º. De conformidad con lo anterior, ORDENAR LA CANCELACION DEL REGISTRO DE MATRICULA al aprendiz referido en el artículo primero de esta resolución, quien no podrá participar en proceso de ingreso a la institución en programas de formación titulada dentro de los seis (6) meses siguientes, contados a partir del registro de la novedad en el sistema de gestión de la formación.".
+            </em>
+        </p>
+
+        <p>Por lo tanto, es necesario requerirlo para que presente su respectivo recurso o excusa escrita, aportando las pruebas legalmente producidas y allegadas, como soportes o evidencias, necesarias, pertinentes y conducentes, dentro de los 10 días siguientes hábiles al envió de esta comunicación. Dicho recurso puede ser presentado de manera presencial en Centro de Formación o virtual a través de la dirección deserciones9224@sena.edu.co, buzón electrónico creado por el Centro de Formación para dicho trámite administrativo.</p>
+    </div>
+
+    <div class="signature">
+        <p>Atentamente,</p>
+        <br><br>
+        <!-- Signature Image Placeholder -->
+        <!-- <img src="signature.png" alt="Firma" style="width: 150px;"> -->
+        <div class="signature-name">
+            MANUEL ENRIQUE VALENCIA MORENO<br>
+            Coordinador Académico
+        </div>
+    </div>
+
+    <div class="footer">
+        Regional Santander / Centro Industrial de Mantenimiento Integral<br>
+        Dirección Km 7 Vía Palenque Rincón de Girón, Ciudad Girón. - PBX (57) 6076468036<br>
+        www.sena.edu.co
+    </div>
+
+</body>
+</html>
