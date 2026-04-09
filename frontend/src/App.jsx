@@ -168,7 +168,7 @@ function Login() {
   return (
     <div className="login-container">
       <div className="card login-card">
-        <h2>Iniciar Sesión Automatizador</h2>
+        <h2>Automatizador de Gestión Documental</h2>
         <form onSubmit={handleLogin}>
           <div className="form-group">
             <label>No. Consumo (Usuario)</label>
@@ -257,7 +257,7 @@ function Layout({ children }) {
     <div className="app-layout">
       <aside className="sidebar">
         <div className="sidebar-header">
-          <h3>Automatizador de Sistemas</h3>
+          <h3>Automatizador de Gestión Documental</h3>
           <p className="user-info">{currentUser.name}</p>
           <span className="role-badge">{currentUser.role}</span>
         </div>
