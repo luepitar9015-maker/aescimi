@@ -8,7 +8,7 @@ const { pool } = require('../database_pg');
 router.get('/', requireAuth, requireAdmin, async (req, res) => {
     try {
         const result = await pool.query(
-            'SELECT id, full_name, area, position, document_no, email, role, organization_id FROM users ORDER BY id'
+            'SELECT id, full_name, area, position, document_no, email, role, organization_id, is_active FROM users ORDER BY id'
         );
         res.json({ data: result.rows });
     } catch (err) {
@@ -149,6 +149,28 @@ router.post('/mass', requireAuth, requireAdmin, async (req, res) => {
         message: `Proceso completado: ${results.created} creados, ${results.skipped} duplicados omitidos, ${results.errors.length} errores.`,
         ...results
     });
+});
+
+// Toggle user active/suspended status (admin only)
+router.put('/:id/toggle-status', requireAuth, requireAdmin, async (req, res) => {
+    const userId = parseInt(req.params.id);
+    if (userId === req.user.id) {
+        return res.status(400).json({ error: 'No puede cambiar el estado de su propia cuenta.' });
+    }
+    try {
+        const result = await pool.query(
+            'UPDATE users SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END WHERE id = $1 RETURNING is_active',
+            [userId]
+        );
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Usuario no encontrado.' });
+        }
+        const newStatus = result.rows[0].is_active === 1 ? 'Activo' : 'Suspendido';
+        res.json({ message: `Usuario ${newStatus} exitosamente.`, is_active: result.rows[0].is_active });
+    } catch (err) {
+        console.error('[USERS] TOGGLE-STATUS error:', err);
+        res.status(500).json({ error: 'Error al cambiar el estado del usuario.' });
+    }
 });
 
 module.exports = router;
