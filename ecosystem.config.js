@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: "sena-backend",
-      script: "index.js",
+      script: "server.js",
       cwd: "./backend",
       env: {
         NODE_ENV: "production",

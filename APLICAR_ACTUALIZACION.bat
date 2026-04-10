@@ -9,7 +9,7 @@ echo Recuerda que la contrasena es: Aut0m4t1z4d0r2026%%*
 echo (Al escribirla no se veran asteriscos, solo escribela y dale a Enter)
 echo.
 
-ssh cimi@aescimi.web-virtual.com "echo 'Conexion Exitosa' && cd ~/aescimi && git pull origin main && cd frontend && npm install && npm run build && cd ../backend && npm install && pm2 restart sena-backend && echo '¡ACTUALIZACION EXITOSA!'"
+ssh -t cimi@aescimi.web-virtual.com "echo '1. Limpiando servicios del sistema viejo (por si quedaron de root)...' && sudo pm2 kill 2>/dev/null ; pm2 kill 2>/dev/null && echo '2. Ingresando al repositorio nuevo...' && cd ~/aescimi && echo '3. Ejecutando actualización y levantando todo...' && chmod +x ACTUALIZAR_DESDE_GITHUB_LINUX.sh && ./ACTUALIZAR_DESDE_GITHUB_LINUX.sh"
 
 echo.
 echo ==========================================================
