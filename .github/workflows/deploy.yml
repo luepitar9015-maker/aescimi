@@ -22,22 +22,38 @@ jobs:
           git stash || true
           git pull origin main
 
-          # 2. Actualizar BACKEND (solo producción)
+          # 2. Copiar certificados SSL desde Let's Encrypt (si existen)
+          echo "=== Verificando certificados SSL ==="
+          DOMAIN="automatizadorgd.web-virtual.com"
+          CERT_SRC="/etc/letsencrypt/live/$DOMAIN"
+          CERT_DST="$HOME/aescimi/backend/ssl"
+          mkdir -p "$CERT_DST"
+          if [ -f "$CERT_SRC/fullchain.pem" ] && [ -f "$CERT_SRC/privkey.pem" ]; then
+            sudo cp "$CERT_SRC/fullchain.pem" "$CERT_DST/cert.pem"
+            sudo cp "$CERT_SRC/privkey.pem"   "$CERT_DST/key.pem"
+            sudo chown cimi:cimi "$CERT_DST/cert.pem" "$CERT_DST/key.pem"
+            sudo chmod 600 "$CERT_DST/cert.pem" "$CERT_DST/key.pem"
+            echo "✔ Certificados SSL actualizados correctamente"
+          else
+            echo "⚠ Certificados SSL no encontrados en $CERT_SRC — se usará HTTP"
+          fi
+
+          # 3. Actualizar BACKEND (solo producción)
           echo "=== Actualizando Backend ==="
           cd ~/aescimi/backend
           npm install --omit=dev
           pm2 restart sena-backend || pm2 start server.js --name "sena-backend"
 
-          # 3. Actualizar FRONTEND
-          # IMPORTANTE: npm install completo (sin --omit=dev) porque
-          # Vite está en devDependencies y se necesita para el build
+          # 4. Actualizar FRONTEND
+          # IMPORTANTE: npm install completo porque Vite está en devDependencies
           echo "=== Actualizando Frontend ==="
           cd ~/aescimi/frontend
           npm install
           npm run build
           pm2 restart sena-frontend || pm2 start "npx serve -s dist -l 4173" --name "sena-frontend"
 
-          # 4. Guardar estado de PM2 para que persista tras reinicios
+          # 5. Guardar estado de PM2 para que persista tras reinicios
           pm2 save
 
           echo "=== Deploy completado exitosamente ==="
+
