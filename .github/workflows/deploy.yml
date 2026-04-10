@@ -11,21 +11,33 @@ jobs:
     steps:
       - name: Actualizar Código y Reiniciar Servicios
         run: |
-          # 1. Entrar a la carpeta raíz y bajar cambios
+          echo "=== Versiones del entorno ==="
+          node -v
+          npm -v
+          pm2 -v
+
+          # 1. Bajar cambios del repositorio
+          echo "=== Actualizando código ==="
           cd ~/aescimi
           git stash || true
           git pull origin main
 
-          # 2. Actualizar BACKEND
-          echo "Actualizando Backend..."
+          # 2. Actualizar BACKEND (solo producción)
+          echo "=== Actualizando Backend ==="
           cd ~/aescimi/backend
           npm install --omit=dev
           pm2 restart sena-backend || pm2 start server.js --name "sena-backend"
 
           # 3. Actualizar FRONTEND
-          echo "Actualizando Frontend..."
+          # IMPORTANTE: npm install completo (sin --omit=dev) porque
+          # Vite está en devDependencies y se necesita para el build
+          echo "=== Actualizando Frontend ==="
           cd ~/aescimi/frontend
-          npm install --omit=dev
-          # Si usas Vite (como veo en tus archivos), necesitas compilar el dist
+          npm install
           npm run build
-          pm2 restart sena-frontend || pm2 start "serve -s dist" --name "sena-frontend"
+          pm2 restart sena-frontend || pm2 start "npx serve -s dist -l 4173" --name "sena-frontend"
+
+          # 4. Guardar estado de PM2 para que persista tras reinicios
+          pm2 save
+
+          echo "=== Deploy completado exitosamente ==="
