@@ -1,4 +1,4 @@
-name: Deploy Nodejs App
+name: Deploy Nodejs App (Frontend & Backend)
 
 on:
   push:
@@ -9,15 +9,23 @@ jobs:
   deploy:
     runs-on: self-hosted
     steps:
-      - name: Actualizar Código y Reiniciar App
+      - name: Actualizar Código y Reiniciar Servicios
         run: |
+          # 1. Entrar a la carpeta raíz y bajar cambios
           cd ~/aescimi
           git stash || true
           git pull origin main
-          
-          # Instalación de dependencias
-          npm install --production
-          
-          # Reiniciar ambos servicios para aplicar cambios
-          pm2 restart sena-backend
-          pm2 restart sena-frontend
+
+          # 2. Actualizar BACKEND
+          echo "Actualizando Backend..."
+          cd ~/aescimi/backend
+          npm install --omit=dev
+          pm2 restart sena-backend || pm2 start server.js --name "sena-backend"
+
+          # 3. Actualizar FRONTEND
+          echo "Actualizando Frontend..."
+          cd ~/aescimi/frontend
+          npm install --omit=dev
+          # Si usas Vite (como veo en tus archivos), necesitas compilar el dist
+          npm run build
+          pm2 restart sena-frontend || pm2 start "serve -s dist" --name "sena-frontend"
