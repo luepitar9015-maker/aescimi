@@ -1,0 +1,72 @@
+name: Instalar / Renovar Certificado SSL (Let's Encrypt)
+
+on:
+  # Ejecutar manualmente desde GitHub → Actions → "Run workflow"
+  workflow_dispatch:
+    inputs:
+      dominio:
+        description: 'Dominio para el certificado (ej: automatizadorgd.web-virtual.com)'
+        required: true
+        default: 'automatizadorgd.web-virtual.com'
+      email:
+        description: 'Email para notificaciones de Let''s Encrypt'
+        required: true
+        default: 'admin@sena.edu.co'
+
+  # También renovar automáticamente cada lunes a las 3am (UTC-5)
+  schedule:
+    - cron: '0 8 * * 1'   # Lunes 3am Colombia (UTC-5 = 8am UTC)
+
+jobs:
+  ssl:
+    runs-on: self-hosted
+    steps:
+      - name: Instalar / Renovar Certificado SSL
+        run: |
+          DOMAIN="${{ github.event.inputs.dominio || 'automatizadorgd.web-virtual.com' }}"
+          EMAIL="${{ github.event.inputs.email || 'admin@sena.edu.co' }}"
+          CERT_DST="$HOME/aescimi/backend/ssl"
+
+          echo "=== Iniciando proceso SSL para: $DOMAIN ==="
+
+          # 1. Parar el backend temporalmente para liberar el puerto 443
+          echo "--- Deteniendo backend para liberar puerto 443 ---"
+          pm2 stop sena-backend || true
+
+          # 2. Instalar certbot si no está disponible
+          if ! command -v certbot &> /dev/null; then
+            echo "--- Instalando certbot ---"
+            sudo dnf install -y certbot
+          else
+            echo "--- Certbot ya instalado: $(certbot --version) ---"
+          fi
+
+          # 3. Obtener o renovar el certificado
+          echo "--- Obteniendo/renovando certificado para $DOMAIN ---"
+          sudo certbot certonly \
+            --standalone \
+            --non-interactive \
+            --agree-tos \
+            --email "$EMAIL" \
+            --domain "$DOMAIN" \
+            --keep-until-expiring \
+            --expand
+
+          # 4. Copiar certificados al backend
+          echo "--- Copiando certificados a $CERT_DST ---"
+          mkdir -p "$CERT_DST"
+          sudo cp "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" "$CERT_DST/cert.pem"
+          sudo cp "/etc/letsencrypt/live/$DOMAIN/privkey.pem"   "$CERT_DST/key.pem"
+          sudo chown cimi:cimi "$CERT_DST/cert.pem" "$CERT_DST/key.pem"
+          sudo chmod 600 "$CERT_DST/cert.pem" "$CERT_DST/key.pem"
+
+          # 5. Verificar fechas del certificado
+          echo "--- Información del certificado ---"
+          openssl x509 -in "$CERT_DST/cert.pem" -noout -subject -dates
+
+          # 6. Reiniciar el backend con HTTPS activo
+          echo "--- Reiniciando backend con HTTPS ---"
+          pm2 restart sena-backend || pm2 start "$HOME/aescimi/backend/server.js" --name "sena-backend" --cwd "$HOME/aescimi/backend"
+          pm2 save
+
+          echo "=== ✔ Certificado SSL instalado y backend corriendo con HTTPS ==="
