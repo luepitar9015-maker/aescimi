@@ -7,40 +7,18 @@ on:
 
 jobs:
   Deploy_Updates:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
-      - name: Conectarse y Actualizar Servidor
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASSWORD }}
-          port: 22
-          script_stop: true
-          script: |
-            echo "==== Explorando el directorio principal del servidor ===="
-            ls -la
-            echo "========================================================="
-            
-            echo "1. Ingresando a la carpeta principal..."
-            if [ -d "aescimi" ]; then
-              cd aescimi
-              echo "Entramos a 'aescimi'"
-            elif [ -d "INSTALADOR_SENA" ]; then
-              cd INSTALADOR_SENA
-              echo "Entramos a 'INSTALADOR_SENA'"
-            elif [ -d "SENA V2" ]; then
-              cd "SENA V2"
-              echo "Entramos a 'SENA V2'"
-            elif [ -d "backend" ]; then
-              echo "Parece que ya estamos directamente sobre la raiz del proyecto"
-            else
-              echo "ERROR CRITICO: No pude encontrar la carpeta del proyecto. Por favor mira la lista de arriba y dinos el nombre."
-              exit 1
-            fi
-            
-            echo "2. Ejecutando el proceso de actualizacion desatendido..."
-            chmod +x ACTUALIZAR_DESDE_GITHUB_LINUX.sh
-            ./ACTUALIZAR_DESDE_GITHUB_LINUX.sh
-            
-            echo "¡Actualizacion aplicada exitosamente!"
+      - name: Actualizando Servidor Directamente (Modo Local)
+        run: |
+          echo "==== Actualizando servidor de forma directa y silenciosa ===="
+          cd /home/cimi/aescimi
+          
+          echo "1. Bajando los ultimos cambios de codigo..."
+          git pull origin main
+          
+          echo "2. Ejecutando el proceso de configuracion desatendido..."
+          chmod +x ACTUALIZAR_DESDE_GITHUB_LINUX.sh
+          ./ACTUALIZAR_DESDE_GITHUB_LINUX.sh
+          
+          echo "¡Actualizacion aplicada exitosamente desde tu propia red!"
