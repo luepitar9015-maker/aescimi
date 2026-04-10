@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FileSpreadsheet, ClipboardList, LayoutDashboard } from 'lucide-react';
 import HojaControl from './HojaControl';
+import InventarioDocumental from './InventarioDocumental';
 
 function Formatos() {
     const [activeTab, setActiveTab] = useState('inventario');
@@ -48,12 +49,8 @@ function Formatos() {
             {/* Tab Content */}
             <div className="bg-white p-6 rounded-b-xl shadow-sm border border-t-0 border-gray-200 min-h-[500px]">
                 {activeTab === 'inventario' && (
-                    <div className="space-y-6 animate-fadeIn">
-                        <h2 className="text-xl font-bold text-gray-800 border-b pb-2">Configuración de Inventario Documental</h2>
-                        <div className="p-12 text-center border-2 border-dashed border-gray-300 rounded-xl bg-gray-50">
-                            <p className="text-gray-500 font-medium text-lg">Ámbito de desarrollo: Inventario Documental</p>
-                            <p className="text-gray-400 mt-2">Esperando instrucciones de configuración...</p>
-                        </div>
+                    <div className="animate-fadeIn">
+                        <InventarioDocumental />
                     </div>
                 )}
 

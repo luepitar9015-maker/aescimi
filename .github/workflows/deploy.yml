@@ -1,4 +1,4 @@
-name: Deploy Updates to Rocky Linux
+name: Deploy Nodejs App
 
 on:
   push:
@@ -6,19 +6,18 @@ on:
       - main
 
 jobs:
-  Deploy_Updates:
+  deploy:
     runs-on: self-hosted
     steps:
-      - name: Actualizando Servidor Directamente (Modo Local)
+      - name: Actualizar Código y Reiniciar App
         run: |
-          echo "==== Actualizando servidor de forma directa y silenciosa ===="
-          cd /home/cimi/aescimi
-          
-          echo "1. Bajando los ultimos cambios de codigo..."
+          cd ~/aescimi
+          git stash || true
           git pull origin main
           
-          echo "2. Ejecutando el proceso de configuracion desatendido..."
-          chmod +x ACTUALIZAR_DESDE_GITHUB_LINUX.sh
-          ./ACTUALIZAR_DESDE_GITHUB_LINUX.sh
+          # Instalación de dependencias
+          npm install --production
           
-          echo "¡Actualizacion aplicada exitosamente desde tu propia red!"
+          # Reiniciar ambos servicios para aplicar cambios
+          pm2 restart sena-backend
+          pm2 restart sena-frontend
