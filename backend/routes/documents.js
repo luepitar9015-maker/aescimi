@@ -151,24 +151,18 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                 .trim();
         });
 
-        // 2. Final Grouping (Nivel 3, 4, 5 are combined)
-        const pathParts = [];
-        if (rawLevels[0]) pathParts.push(rawLevels[0]); // N1: Regional
-        if (rawLevels[1]) pathParts.push(rawLevels[1]); // N2: Centro
-        
-        // Group N3, N4, N5 (Dep, Ser, Sub)
-        const trdGroup = rawLevels.slice(2, 5).filter(v => v).join(' ');
-        if (trdGroup) pathParts.push(trdGroup);
-        
-        // Nest M6, M7... (Metadata)
-        if (rawLevels.length > 5) {
-            pathParts.push(...rawLevels.slice(5));
-        }
+        // 2. Construir path: cada nivel configurado = una carpeta independiente
+        //    Se respeta exactamente la jerarquía configurada por el usuario en el módulo TRD.
+        //    Ej: [dep_conc, ser_conc, meta_4] → /68922400/689224001/ValorExpediente/
+        const pathParts = rawLevels.filter(v => v.trim() !== '');
 
         const basePath = (await getSystemSetting('storage_path')) || trdInfo?.storage_path || path.join(__dirname, '../uploads/Gestion_Documental');
         const expDir = path.join(basePath, ...pathParts);
         
-        console.log("[UPLOAD] ✅ Final directory (Grouped N3-5):", expDir);
+        console.log("[UPLOAD] ✅ Jerarquía configurada:", hierarchy.map(h => h.type).join(' / '));
+        console.log("[UPLOAD] ✅ Niveles resueltos:", pathParts.join(' > '));
+        console.log("[UPLOAD] ✅ Directorio final:", expDir);
+
 
         if (!fs.existsSync(expDir)) {
             fs.mkdirSync(expDir, { recursive: true });
