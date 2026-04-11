@@ -135,21 +135,23 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             else if (type === 'sub') value = trdInfo?.subseries_code || 'SUBSERIE';
             else if (type === 'sub_name') value = trdInfo?.subseries_name || 'SUBSERIE';
             else if (type === 'sub_conc') value = `${regCode}${ctrCode}${serieSuffix}${subserieSuffix}`;
-            else if (type === 'typ_val' || type === 'meta_4') {
-                value = (type === 'meta_4' && metaValues['valor4']) ? metaValues['valor4'] : String(typologyValue || '4');
-            }
-            else if (type === 'meta_1') value = expediente.title || metaValues['valor1'] || 'Expediente';
+            // typ_val: valor de tipología (para clasificación por tipo de documento)
+            else if (type === 'typ_val') value = String(typologyValue || '');
+            // meta_1: título del expediente como primer valor por defecto
+            else if (type === 'meta_1') value = expediente.title || metaValues['valor1'] || metaValues['Metadato 1'] || '';
+            // meta_N: todos los valores de metadatos del expediente (valor1..valor8)
             else if (type.startsWith('meta_')) {
                 const idx = type.split('_')[1];
-                value = metaValues[`valor${idx}`] || metaValues[`Metadato ${idx}`];
+                value = metaValues[`valor${idx}`] || metaValues[`Metadato ${idx}`] || '';
             }
             
-            // CLEANING: Remove dots, dashes and forbidden windows chars
+            // CLEANING: Remove dots, dashes and forbidden filesystem chars
             return String(value || '')
-                .replace(/[.-]/g, '') // Remove dots and dashes as requested
+                .replace(/[.-]/g, '') // Quitar puntos y guiones
                 .replace(/[<>:"/\\|?*]/g, '') 
                 .trim();
         });
+
 
         // 2. Construir path: cada nivel configurado = una carpeta independiente
         //    Se respeta exactamente la jerarquía configurada por el usuario en el módulo TRD.
