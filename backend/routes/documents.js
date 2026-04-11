@@ -505,7 +505,7 @@ router.delete('/:id', async (req, res) => {
     });
 });
 
-// GET /stats/summary - Summary for Dashboard
+// GET /stats/summary - Summary for Dashboard (legado, mantener compatibilidad)
 router.get('/stats/summary', (req, res) => {
     const query = `
         SELECT 
@@ -518,6 +518,83 @@ router.get('/stats/summary', (req, res) => {
         res.json({ data: row || { pending: 0, completed: 0 } });
     });
 });
+
+// GET /stats/dashboard - Estadísticas completas para el Dashboard
+router.get('/stats/dashboard', (req, res) => {
+    const user = req.user;
+    const isSuperOrAdmin = user && (user.role === 'admin' || user.role === 'superadmin');
+
+    // Para admin/superadmin: stats globales de TODOS los expedientes
+    if (isSuperOrAdmin) {
+        const query = `
+            SELECT
+                (SELECT COUNT(*) FROM expedientes) AS total_expedientes,
+                (SELECT COUNT(DISTINCT e.id) 
+                 FROM expedientes e 
+                 INNER JOIN documents d ON d.expediente_id = e.id
+                ) AS expedientes_con_docs,
+                (SELECT COUNT(DISTINCT e.id) 
+                 FROM expedientes e 
+                 LEFT JOIN documents d ON d.expediente_id = e.id
+                 WHERE d.id IS NULL
+                ) AS expedientes_sin_docs,
+                (SELECT COUNT(*) FROM documents WHERE status = 'Pendiente') AS docs_pendientes,
+                (SELECT COUNT(*) FROM documents WHERE status = 'Cargado' 
+                 AND DATE(created_at) = DATE('now')
+                ) AS docs_cargados_hoy,
+                (SELECT COUNT(*) FROM documents) AS total_docs
+        `;
+        db.get(query, [], (err, row) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ data: row || {}, scope: 'global' });
+        });
+        return;
+    }
+
+    // Para usuarios normales: stats filtradas por su dependencia (via user_trd_permissions)
+    if (!user) return res.status(401).json({ error: 'No autenticado' });
+
+    const permsQuery = `
+        SELECT series_id, subseries_id FROM user_trd_permissions 
+        WHERE user_id = $1 AND can_view = 1
+    `;
+    db.all(permsQuery, [user.id], (err, perms) => {
+        if (err) return res.status(500).json({ error: 'Error verificando permisos.' });
+        if (!perms || perms.length === 0) {
+            return res.json({ data: {
+                total_expedientes: 0, expedientes_con_docs: 0,
+                expedientes_sin_docs: 0, docs_pendientes: 0,
+                docs_cargados_hoy: 0, total_docs: 0
+            }, scope: 'dependencia' });
+        }
+
+        const seriesIds = perms.map(p => p.series_id).filter(Boolean);
+        const subseriesIds = perms.map(p => p.subseries_id).filter(Boolean);
+        const paramSer = seriesIds.length > 0 ? seriesIds : [-1];
+        const paramSub = subseriesIds.length > 0 ? subseriesIds : [-1];
+
+        const statsQuery = `
+            SELECT
+                COUNT(DISTINCT e.id) AS total_expedientes,
+                COUNT(DISTINCT CASE WHEN d.id IS NOT NULL THEN e.id END) AS expedientes_con_docs,
+                COUNT(DISTINCT CASE WHEN d.id IS NULL THEN e.id END) AS expedientes_sin_docs,
+                COUNT(CASE WHEN d.status = 'Pendiente' THEN 1 END) AS docs_pendientes,
+                COUNT(CASE WHEN d.status = 'Cargado' AND DATE(d.created_at) = DATE('now') THEN 1 END) AS docs_cargados_hoy,
+                COUNT(d.id) AS total_docs
+            FROM expedientes e
+            LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie LIKE '%-' || sub.subseries_code)
+            LEFT JOIN trd_series s ON (sub.series_id = s.id OR e.subserie = s.series_code)
+            LEFT JOIN documents d ON d.expediente_id = e.id
+            WHERE (s.id = ANY($1::int[]) OR sub.id = ANY($2::int[]))
+        `;
+        db.get(statsQuery, [paramSer, paramSub], (err, row) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ data: row || {}, scope: 'dependencia' });
+        });
+    });
+});
+
+
 
 module.exports = router;
 
