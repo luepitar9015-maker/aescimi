@@ -17,6 +17,7 @@ import PermissionsManagement from './pages/PermissionsManagement'; // New
 import Dashboard from './pages/Dashboard'; // New
 import TRDQuery from './pages/TRDQuery'; // New
 import SuperuserModule from './pages/SuperuserModule'; // New
+import ExploradorDocumental from './pages/ExploradorDocumental'; // Explorador archivos
 import Formatos from './pages/Formatos'; // Nuevo módulo de Formatos
 import ComunicacionesProducidas from './pages/ComunicacionesProducidas'; // Nuevo módulo
 import './App.css';
@@ -293,6 +294,9 @@ function Layout({ children }) {
               <Link to="/superuser" className="nav-item" style={{ color: '#db2777' }}>
                 <Database size={18} /> Gestión de Sistema
               </Link>
+              <Link to="/explorador" className="nav-item" style={{ color: '#db2777' }}>
+                <Folder size={18} /> Explorador Archivos
+              </Link>
             </div>
           )}
         </nav>
@@ -362,6 +366,9 @@ function App() {
         } />
         <Route path="/superuser" element={
           <ProtectedRoute><Layout><SuperuserModule /></Layout></ProtectedRoute>
+        } />
+        <Route path="/explorador" element={
+          <ProtectedRoute><Layout><ExploradorDocumental /></Layout></ProtectedRoute>
         } />
 
         <Route path="*" element={<Navigate to="/login" replace />} />

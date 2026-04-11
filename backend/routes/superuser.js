@@ -132,5 +132,134 @@ router.post('/set-expiration', (req, res) => {
     );
 });
 
+// ──────────────────────────────────────────────────────────────────────────────
+// EXPLORADOR DE ARCHIVOS
+// ──────────────────────────────────────────────────────────────────────────────
+const fs      = require('fs');
+const path    = require('path');
+const archiver = require('archiver');
+const db_main  = require('../database'); // para leer storage_path de settings
+
+/** Obtiene la ruta raíz del almacenamiento desde system_settings o por defecto */
+const getStoragePath = () => new Promise((resolve) => {
+    db_main.get("SELECT value FROM system_settings WHERE key = 'storage_path'", [], (err, row) => {
+        resolve(row?.value || path.join(__dirname, '../uploads/Gestion_Documental'));
+    });
+});
+
+/** Construye un árbol de nodos a partir de un directorio */
+const buildTree = (dir, relativeTo) => {
+    let items = [];
+    try {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+            const fullPath  = path.join(dir, entry.name);
+            const relPath   = path.relative(relativeTo, fullPath).replace(/\\/g, '/');
+            if (entry.isDirectory()) {
+                items.push({
+                    type: 'folder',
+                    name: entry.name,
+                    path: relPath,
+                    children: buildTree(fullPath, relativeTo),
+                });
+            } else {
+                const stat = fs.statSync(fullPath);
+                items.push({
+                    type: 'file',
+                    name: entry.name,
+                    path: relPath,
+                    size: stat.size,
+                    modified: stat.mtime,
+                    ext: path.extname(entry.name).toLowerCase().replace('.', ''),
+                });
+            }
+        }
+    } catch (_) { /* carpeta inaccesible */ }
+    return items;
+};
+
+// GET /api/superuser/files — lista el árbol completo o subdirectorio
+router.get('/files', async (req, res) => {
+    try {
+        const root    = await getStoragePath();
+        const subdir  = req.query.path ? path.join(root, req.query.path) : root;
+
+        // Seguridad: evitar path traversal
+        if (!subdir.startsWith(root)) {
+            return res.status(403).json({ error: 'Acceso denegado.' });
+        }
+        if (!fs.existsSync(subdir)) {
+            return res.json({ items: [], root: '', storageRoot: root });
+        }
+
+        const items = buildTree(subdir, root);
+        res.json({ items, root: req.query.path || '', storageRoot: root });
+    } catch (err) {
+        console.error('[EXPLORADOR] Error:', err);
+        res.status(500).json({ error: 'Error al listar archivos.' });
+    }
+});
+
+// GET /api/superuser/files/download?path=rel/path/to/file — descarga un archivo
+router.get('/files/download', async (req, res) => {
+    try {
+        const root    = await getStoragePath();
+        const relPath = req.query.path;
+        if (!relPath) return res.status(400).json({ error: 'Path requerido.' });
+
+        const fullPath = path.join(root, relPath);
+        if (!fullPath.startsWith(root)) return res.status(403).json({ error: 'Acceso denegado.' });
+        if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'Archivo no encontrado.' });
+
+        res.download(fullPath);
+    } catch (err) {
+        res.status(500).json({ error: 'Error al descargar archivo.' });
+    }
+});
+
+// POST /api/superuser/files/zip — descarga una selección de archivos/carpetas como ZIP
+// Body: { paths: ['rel/path1', 'rel/folder2', ...], zipName: 'mi_descarga' }
+router.post('/files/zip', async (req, res) => {
+    try {
+        const root    = await getStoragePath();
+        const { paths = [], zipName = 'documentos' } = req.body;
+
+        if (!Array.isArray(paths) || paths.length === 0) {
+            return res.status(400).json({ error: 'Se requiere al menos un archivo o carpeta.' });
+        }
+
+        // Validar todos los paths antes de empacar
+        const resolved = paths.map(p => {
+            const full = path.join(root, p);
+            if (!full.startsWith(root)) throw new Error(`Path inválido: ${p}`);
+            return { rel: p, full };
+        });
+
+        const safeName = zipName.replace(/[^a-zA-Z0-9_\-]/g, '_');
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${safeName}.zip"`);
+
+        const archive = archiver('zip', { zlib: { level: 6 } });
+        archive.on('error', err => { console.error('[ZIP]', err); });
+        archive.pipe(res);
+
+        for (const { rel, full } of resolved) {
+            if (!fs.existsSync(full)) continue;
+            const stat = fs.statSync(full);
+            if (stat.isDirectory()) {
+                archive.directory(full, rel);
+            } else {
+                archive.file(full, { name: rel });
+            }
+        }
+
+        await archive.finalize();
+    } catch (err) {
+        console.error('[EXPLORADOR/ZIP] Error:', err);
+        if (!res.headersSent) res.status(500).json({ error: err.message || 'Error al comprimir.' });
+    }
+});
+
 module.exports = router;
+
 
