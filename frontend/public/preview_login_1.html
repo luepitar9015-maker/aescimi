@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Propuesta 1 — Split Screen</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', sans-serif; min-height: 100vh; display: flex; }
+
+  .left {
+    flex: 1;
+    background: linear-gradient(145deg, #1a7a00 0%, #39A900 55%, #2d8800 100%);
+    display: flex; align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
+  }
+  .circle { position: absolute; border-radius: 50%; }
+  .c1 { width: 340px; height: 340px; top: -90px; right: -90px; background: rgba(255,255,255,0.07); }
+  .c2 { width: 400px; height: 400px; bottom: -110px; left: -70px; background: rgba(255,255,255,0.05); }
+  .c3 { width: 200px; height: 200px; top: 45%; right: -50px; background: rgba(255,255,255,0.09); }
+
+  .brand { position: relative; z-index: 1; color: white; padding: 56px 48px; max-width: 500px; }
+  .brand-icon {
+    width: 62px; height: 62px; background: rgba(255,255,255,0.15);
+    border-radius: 16px; display: flex; align-items: center; justify-content: center;
+    margin-bottom: 28px; font-size: 28px;
+  }
+  .brand-tag {
+    font-size: 11px; font-weight: 700; letter-spacing: 3.5px;
+    text-transform: uppercase; color: rgba(255,255,255,0.65); margin-bottom: 14px;
+  }
+  .brand-title { font-size: 42px; font-weight: 900; line-height: 1.12; margin-bottom: 24px; }
+  .brand-line { width: 56px; height: 3px; background: rgba(255,255,255,0.35); border-radius: 2px; margin-bottom: 22px; }
+  .brand-desc { font-size: 15px; line-height: 1.75; color: rgba(255,255,255,0.78); margin-bottom: 36px; }
+  .badges { display: flex; gap: 10px; flex-wrap: wrap; }
+  .badge {
+    background: rgba(255,255,255,0.13); border: 1px solid rgba(255,255,255,0.22);
+    color: white; font-size: 12px; font-weight: 600; padding: 6px 15px; border-radius: 20px;
+  }
+
+  .right {
+    flex: 1; background: #f0f4f8;
+    display: flex; align-items: center; justify-content: center; padding: 40px 24px;
+  }
+  .card {
+    background: white; border-radius: 22px; padding: 44px 40px;
+    box-shadow: 0 6px 50px rgba(0,0,0,0.09); width: 100%; max-width: 400px;
+  }
+  .form-head { text-align: center; margin-bottom: 32px; }
+  .form-title { font-size: 28px; font-weight: 800; color: #111827; margin-bottom: 8px; }
+  .form-sub { font-size: 14px; color: #6b7280; }
+  .field { margin-bottom: 20px; }
+  label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 8px; }
+  input {
+    width: 100%; padding: 12px 16px; font-size: 14px; font-family: 'Inter', sans-serif;
+    border: 1.5px solid #e5e7eb; border-radius: 11px; outline: none;
+    color: #111827; transition: border 0.2s;
+  }
+  input:focus { border-color: #39A900; box-shadow: 0 0 0 3px rgba(57,169,0,0.1); }
+  .pw-wrap { position: relative; }
+  .pw-wrap input { padding-right: 46px; }
+  .eye { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 18px; }
+  .btn-main {
+    width: 100%; padding: 14px; font-size: 15px; font-weight: 700; font-family: 'Inter', sans-serif;
+    background: linear-gradient(135deg, #39A900, #2d8c00); color: white;
+    border: none; border-radius: 11px; cursor: pointer; margin-top: 6px;
+    box-shadow: 0 4px 16px rgba(57,169,0,0.35); transition: transform 0.1s;
+  }
+  .btn-main:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(57,169,0,0.4); }
+  .footer-note { text-align: center; margin-top: 24px; font-size: 11px; color: #9ca3af; }
+
+  .label-badge {
+    display: inline-block; background: #f0fdf4; color: #15803d;
+    font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; margin-left: 8px;
+  }
+</style>
+</head>
+<body>
+  <div class="left">
+    <div class="circle c1"></div>
+    <div class="circle c2"></div>
+    <div class="circle c3"></div>
+    <div class="brand">
+      <div class="brand-icon">📄</div>
+      <p class="brand-tag">Gestión Documental Inteligente</p>
+      <h1 class="brand-title">Automatizador de<br>Gestión Documental</h1>
+      <div class="brand-line"></div>
+      <p class="brand-desc">Plataforma institucional para la gestión, organización y automatización de expedientes y documentos digitales.</p>
+      <div class="badges">
+        <span class="badge">📁 Expedientes</span>
+        <span class="badge">🔄 Automatización</span>
+        <span class="badge">📊 Reportes</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="card">
+      <div class="form-head">
+        <h2 class="form-title">Bienvenido</h2>
+        <p class="form-sub">Ingrese sus credenciales para acceder al sistema</p>
+      </div>
+      <div class="field">
+        <label>No. Consumo (Usuario)</label>
+        <input type="text" placeholder="Ingrese su número de documento">
+      </div>
+      <div class="field">
+        <label>Contraseña</label>
+        <div class="pw-wrap">
+          <input type="password" placeholder="Ingrese su contraseña">
+          <button class="eye">👁️</button>
+        </div>
+      </div>
+      <button class="btn-main">Ingresar al Sistema</button>
+      <p class="footer-note">Sistema de uso institucional — Acceso restringido</p>
+    </div>
+  </div>
+</body>
+</html>

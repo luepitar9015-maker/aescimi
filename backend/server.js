@@ -30,7 +30,8 @@ const automationRoutes = require('./routes/automation');
 const permissionsRoutes = require('./routes/permissions');
 
 const app = express();
-const port = process.env.PORT || 443;
+// Puerto: 3000 internamente (Nginx maneja el 443 con SSL)
+const port = process.env.PORT || 3000;
 
 // CORS: restrict to known trusted origins only
 const allowedOrigins = [

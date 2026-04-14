@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DEMO — Vista Previa Editable | SENA Gestión Documental</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f172a; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px; }
+
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 12px; }
+  .modal { background: white; border-radius: 16px; box-shadow: 0 25px 80px rgba(0,0,0,0.5); width: 100%; max-width: 1100px; max-height: 92vh; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #bbf7d0; }
+
+  /* Header */
+  .modal-header { background: linear-gradient(135deg, #14532d 0%, #166534 60%, #15803d 100%); padding: 20px 24px; color: white; }
+  .modal-header h2 { font-size: 18px; font-weight: 800; display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .modal-header p { font-size: 13px; color: #86efac; margin-bottom: 16px; }
+  .stats { display: flex; gap: 12px; flex-wrap: wrap; }
+  .stat { background: rgba(255,255,255,0.15); border-radius: 12px; padding: 10px 20px; text-align: center; min-width: 80px; }
+  .stat .num { font-size: 24px; font-weight: 900; }
+  .stat .lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: #bbf7d0; margin-top: 2px; }
+  .stat.warn { background: rgba(251,146,60,0.3); }
+  .stat.warn .num { color: #fdba74; }
+  .stat.err { background: rgba(239,68,68,0.3); }
+  .stat.err .num { color: #fca5a5; }
+  .stat.ok { background: rgba(52,211,153,0.25); }
+  .stat.ok .num { color: #6ee7b7; }
+
+  .close-btn { position: absolute; top: 16px; right: 16px; background: rgba(255,255,255,0.15); border: none; color: white; border-radius: 8px; width: 32px; height: 32px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
+  .close-btn:hover { background: rgba(255,255,255,0.3); }
+
+  /* Table */
+  .table-wrap { overflow: auto; flex: 1; }
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+  thead { position: sticky; top: 0; z-index: 10; }
+  thead tr { background: #f8fafc; border-bottom: 2px solid #e2e8f0; }
+  th { padding: 10px 10px; font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.06em; white-space: nowrap; }
+  th.trd-col { color: #16a34a; min-width: 180px; }
+  th.meta-col { color: #3b82f6; }
+
+  tbody tr { border-bottom: 1px solid #e5e7eb; transition: background 0.15s; }
+  tbody tr.row-ok { background: white; }
+  tbody tr.row-ok:nth-child(even) { background: #f0fdf4; }
+  tbody tr.row-warn { background: #fffbeb; }
+  tbody tr.row-err { background: #fff7f7; }
+
+  td { padding: 6px 8px; vertical-align: middle; }
+  td.num-cell { color: #9ca3af; font-family: monospace; font-size: 11px; }
+
+  /* Status badges */
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+  .badge.ok { background: #dcfce7; color: #15803d; }
+  .badge.warn { background: #ffedd5; color: #c2410c; cursor: help; }
+  .badge.err { background: #fee2e2; color: #dc2626; cursor: help; }
+
+  /* Inline inputs */
+  .cell-input { width: 100%; background: transparent; border: none; border-bottom: 1px dashed #cbd5e1; outline: none; padding: 3px 4px; font-size: 12px; color: #111827; min-width: 80px; font-family: inherit; transition: border-color 0.2s, color 0.2s; }
+  .cell-input:focus { border-bottom-style: solid; border-bottom-color: #6366f1; background: #f8faff; border-radius: 4px 4px 0 0; }
+  .cell-input.mono { font-family: 'Consolas', monospace; font-weight: 700; }
+  .cell-input.trd-valid { border-bottom-color: #16a34a; border-bottom-style: solid; color: #15803d; }
+  .cell-input.trd-invalid { border-bottom-color: #dc2626; border-bottom-style: solid; color: #dc2626; }
+
+  .trd-wrap { display: flex; align-items: center; gap: 4px; }
+  .trd-indicator { font-size: 14px; font-weight: 900; flex-shrink: 0; }
+  .trd-indicator.valid { color: #16a34a; }
+  .trd-indicator.invalid { color: #dc2626; }
+  .trd-name { font-size: 9px; color: #16a34a; margin-top: 2px; padding-left: 4px; }
+
+  select.cell-input { cursor: pointer; }
+
+  /* Footer */
+  .modal-footer { padding: 14px 20px; border-top: 1px solid #e5e7eb; background: #f8fafc; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .footer-msg { font-size: 13px; }
+  .footer-msg.ok-msg { color: #15803d; font-weight: 500; }
+  .footer-msg.warn-msg { color: #dc2626; font-weight: 600; }
+  .btn { padding: 10px 20px; border-radius: 10px; font-weight: 700; font-size: 14px; cursor: pointer; border: none; transition: all 0.15s; display: flex; align-items: center; gap: 6px; }
+  .btn-cancel { background: white; border: 1px solid #d1d5db; color: #374151; }
+  .btn-cancel:hover { background: #f3f4f6; }
+  .btn-confirm { background: linear-gradient(135deg, #16a34a, #15803d); color: white; box-shadow: 0 4px 15px rgba(22,163,74,0.4); }
+  .btn-confirm:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(22,163,74,0.5); }
+
+  /* Tooltip */
+  .tooltip-note { background: #fef9c3; border: 1px solid #fde047; border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #713f12; margin: 8px 16px; display: flex; align-items: center; gap: 6px; }
+</style>
+</head>
+<body>
+<div class="modal-backdrop">
+  <div class="modal" style="position:relative">
+
+    <!-- HEADER -->
+    <div class="modal-header">
+      <button class="close-btn" onclick="alert('Cancelado')">✕</button>
+      <h2>📋 Vista Previa — Revisión antes de Cargar</h2>
+      <p>Edite directamente en cada celda. El campo Subserie valida el código TRD en tiempo real (✓ verde = reconocido, ✗ rojo = no encontrado).</p>
+      <div class="stats">
+        <div class="stat"><div class="num" id="total">25</div><div class="lbl">Total</div></div>
+        <div class="stat ok"><div class="num" id="ok-count">0</div><div class="lbl">Sin errores</div></div>
+        <div class="stat warn"><div class="num" id="warn-count">0</div><div class="lbl">Advertencias</div></div>
+        <div class="stat err"><div class="num" id="err-count">0</div><div class="lbl">Sin TRD</div></div>
+      </div>
+    </div>
+
+    <!-- TOOLTIP NOTE -->
+    <div class="tooltip-note">
+      💡 <span>Haga clic en cualquier celda para editarla. En la columna <strong>Subserie/TRD</strong> puede escribir el código y el sistema lo validará automáticamente. Use el autocompletado para seleccionar códigos válidos.</span>
+    </div>
+
+    <!-- TABLE -->
+    <div class="table-wrap">
+      <datalist id="trd-list">
+        <option value="68.9224.4-37">Historias Académicas de Aprendices</option>
+        <option value="68.9224-27">Contratos de Aprendizaje</option>
+        <option value="68.9224.4-28">Certificados de Formación</option>
+        <option value="68.9224.5-40">Actas de Grado</option>
+        <option value="68.100.1-01">Correspondencia Recibida</option>
+      </datalist>
+
+      <table id="data-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Estado</th>
+            <th>Cód. Expediente</th>
+            <th>Fecha Apertura</th>
+            <th class="trd-col">Subserie / TRD 🗒️</th>
+            <th>Tipo Almac.</th>
+            <th style="min-width:200px">Título / Nombre</th>
+            <th class="meta-col">Documento ID</th>
+            <th class="meta-col">Programa</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="modal-footer">
+      <div id="footer-msg" class="footer-msg"></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-cancel" onclick="alert('Importación cancelada. Corrija el Excel y vuelva a intentarlo.')">✕ Cancelar</button>
+        <button class="btn btn-confirm" onclick="confirmar()">💾 Confirmar y Cargar <span id="total-footer">25</span> Registros →</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const validCodes = new Set(['68.9224.4-37','68.9224-27','68.9224.4-28','68.9224.5-40','68.100.1-01']);
+const codeNames = {
+  '68.9224.4-37': 'Historias Académicas de Aprendices',
+  '68.9224-27': 'Contratos de Aprendizaje',
+  '68.9224.4-28': 'Certificados de Formación',
+  '68.9224.5-40': 'Actas de Grado',
+  '68.100.1-01': 'Correspondencia Recibida',
+};
+
+// Sample data: 25 expedientes
+const data = [
+  { code: '2025EX-001', date: '2025-03-01', subserie: '68.9224.4-37', type: 'Fisico', title: 'María García López', doc: '1098123456', prog: 'Sistemas' },
+  { code: '2025EX-002', date: '2025-03-02', subserie: '68.9224.4-37', type: 'Fisico', title: 'Carlos Pérez Ruiz', doc: '1098234567', prog: 'Electricidad' },
+  { code: '2025EX-003', date: '2025-03-03', subserie: '', type: 'Digital', title: 'Ana Torres Vega', doc: '1098345678', prog: 'Contabilidad' },
+  { code: '', date: '2025-03-04', subserie: '68.9224.4-37', type: 'Fisico', title: '', doc: '1098456789', prog: 'Marketing' },
+  { code: '2025EX-005', date: '2025-03-05', subserie: '68.9224.4-37', type: 'Fisico', title: 'Luis Méndez Castro', doc: '1098567890', prog: 'Sistemas' },
+  { code: '2025EX-006', date: '', subserie: '68.9224-27', type: 'Hibrido', title: 'Sandra Mora Fuentes', doc: '1098678901', prog: 'Electricidad' },
+  { code: '2025EX-007', date: '2025-04-01', subserie: '68.9224.4-37', type: 'Fisico', title: 'Pedro Jiménez Ríos', doc: '1099111222', prog: 'Automatización' },
+  { code: '2025EX-008', date: '2025-04-02', subserie: 'CODIGO-INCORRECTO', type: 'Digital', title: 'Laura Suárez Bernal', doc: '1099222333', prog: 'Sistemas' },
+  { code: '2025EX-009', date: '2025-04-03', subserie: '68.9224.4-28', type: 'Fisico', title: 'Miguel Vargas Duque', doc: '1099333444', prog: 'Contabilidad' },
+  { code: '2025EX-010', date: '2025-04-04', subserie: '68.9224.4-37', type: 'Fisico', title: 'Diana Castillo López', doc: '1099444555', prog: 'Marketing' },
+  { code: '2025EX-011', date: '2025-04-05', subserie: '68.9224.4-37', type: 'Digital', title: 'Andrés Morales Silva', doc: '1099555666', prog: 'Sistemas' },
+  { code: '2025EX-012', date: '2025-04-06', subserie: '68.9224.4-37', type: 'Fisico', title: 'Patricia Herrera Cruz', doc: '1099666777', prog: 'Electricidad' },
+  { code: '', date: '2025-04-07', subserie: '', type: '', title: '', doc: '', prog: '' },
+  { code: '2025EX-014', date: '2025-04-08', subserie: '68.9224.5-40', type: 'Fisico', title: 'Roberto Guzmán Ortiz', doc: '1099888999', prog: 'Automatización' },
+  { code: '2025EX-015', date: '2025-04-09', subserie: '68.9224.4-37', type: 'Digital', title: 'Claudia Ramírez Pinto', doc: '1099999000', prog: 'Contabilidad' },
+  { code: '2025EX-016', date: '2025-04-10', subserie: '68.9224.4-37', type: 'Fisico', title: 'Fernando Lozano Vera', doc: '1100000111', prog: 'Marketing' },
+  { code: '2025EX-017', date: '2025-04-11', subserie: '68.9224.4-37', type: 'Fisico', title: 'Marcela Cárdenas Paz', doc: '1100111222', prog: 'Sistemas' },
+  { code: '2025EX-018', date: '2025-04-12', subserie: '68.100.1-01', type: 'Digital', title: 'Julián Ospina Reyes', doc: '1100222333', prog: 'Electricidad' },
+  { code: '2025EX-019', date: '2025-04-13', subserie: '68.9224.4-37', type: 'Fisico', title: 'Camila Torres Nava', doc: '1100333444', prog: 'Automatización' },
+  { code: '2025EX-020', date: '2025-04-14', subserie: '68.9224.4-37', type: 'Fisico', title: 'Sergio Blanco Rueda', doc: '1100444555', prog: 'Contabilidad' },
+  { code: '2025EX-021', date: '2025-04-15', subserie: '68.9224.4-37', type: 'Digital', title: 'Valentina Cano Díaz', doc: '1100555666', prog: 'Marketing' },
+  { code: '2025EX-022', date: '2025-04-16', subserie: '68.9224.4-37', type: 'Fisico', title: 'Esteban Murillo Fox', doc: '1100666777', prog: 'Sistemas' },
+  { code: '2025EX-023', date: '', subserie: '68.9224-27', type: 'Fisico', title: 'Isabella Prada Sol', doc: '1100777888', prog: 'Electricidad' },
+  { code: '2025EX-024', date: '2025-04-18', subserie: '68.9224.4-37', type: 'Digital', title: 'Nicolás Agudelo Jara', doc: '1100888999', prog: 'Automatización' },
+  { code: '2025EX-025', date: '2025-04-19', subserie: '68.9224.4-37', type: 'Fisico', title: 'Sofía Patiño Lagos', doc: '1100999000', prog: 'Contabilidad' },
+];
+
+// State: mutable copy
+let rows = data.map(d => ({...d}));
+
+function getWarnings(row) {
+  const w = [];
+  if (!row.subserie) w.push('Sin código TRD');
+  if (!row.title) w.push('Sin título');
+  if (!row.date) w.push('Sin fecha');
+  return w;
+}
+
+function updateStats() {
+  const ok = rows.filter(r => getWarnings(r).length === 0).length;
+  const noTRD = rows.filter(r => !r.subserie).length;
+  const warnOnly = rows.filter(r => getWarnings(r).length > 0 && r.subserie).length;
+  document.getElementById('total').textContent = rows.length;
+  document.getElementById('ok-count').textContent = ok;
+  document.getElementById('err-count').textContent = noTRD;
+  document.getElementById('warn-count').textContent = warnOnly;
+  document.getElementById('total-footer').textContent = rows.length;
+  const footerMsg = document.getElementById('footer-msg');
+  if (noTRD > 0) {
+    footerMsg.className = 'footer-msg warn-msg';
+    footerMsg.textContent = `⚠ ${noTRD} fila(s) sin código TRD — se cargarán sin vinculación de permisos.`;
+  } else {
+    footerMsg.className = 'footer-msg ok-msg';
+    footerMsg.textContent = '✓ Todos los registros tienen código TRD asignado.';
+  }
+}
+
+function renderRow(row, i) {
+  const warns = getWarnings(row);
+  const trdOk = validCodes.has(row.subserie);
+  const isErr = !row.subserie;
+  const rowClass = isErr ? 'row-err' : (warns.length > 0 ? 'row-warn' : 'row-ok');
+  const warnText = warns.join(' · ');
+  const badgeClass = isErr ? 'err' : (warns.length > 0 ? 'warn' : 'ok');
+  const badgeText = warns.length === 0 ? '✓ OK' : ('⚠ ' + warnText);
+  const trdBorderColor = trdOk ? '#16a34a' : (row.subserie ? '#dc2626' : '#cbd5e1');
+  const trdColor = trdOk ? '#15803d' : (row.subserie ? '#dc2626' : '#6b7280');
+  const trdIndicator = row.subserie ? (trdOk ? '<span class="trd-indicator valid">✓</span>' : '<span class="trd-indicator invalid">✗</span>') : '';
+  const trdName = (row.subserie && trdOk) ? `<div class="trd-name">${codeNames[row.subserie] || ''}</div>` : '';
+
+  return `<tr class="${rowClass}" data-idx="${i}">
+    <td class="num-cell">${i+1}</td>
+    <td><span class="badge ${badgeClass}" title="${warnText}">${badgeText}</span></td>
+    <td><input class="cell-input mono" data-field="code" value="${row.code}" placeholder="—" oninput="update(${i},'code',this.value)"></td>
+    <td><input type="date" class="cell-input" data-field="date" value="${row.date}" oninput="update(${i},'date',this.value)"></td>
+    <td>
+      <div class="trd-wrap">
+        <div style="flex:1">
+          <input list="trd-list" class="cell-input mono" style="border-bottom-color:${trdBorderColor};border-bottom-style:solid;color:${trdColor};min-width:130px" data-field="subserie" value="${row.subserie}" placeholder="Ingrese código TRD..." oninput="update(${i},'subserie',this.value)" title="${trdOk ? 'Código TRD válido ✓' : (row.subserie ? 'No reconocido – verifíquelo' : 'Requerido')}">
+          ${trdName}
+        </div>
+        ${trdIndicator}
+      </div>
+    </td>
+    <td>
+      <select class="cell-input" onchange="update(${i},'type',this.value)">
+        <option value="">— Seleccionar —</option>
+        <option value="Fisico" ${row.type==='Fisico'?'selected':''}>Físico</option>
+        <option value="Digital" ${row.type==='Digital'?'selected':''}>Digital</option>
+        <option value="Hibrido" ${row.type==='Hibrido'?'selected':''}>Híbrido</option>
+      </select>
+    </td>
+    <td><input class="cell-input" value="${row.title.replace(/"/g,'&quot;')}" placeholder="Sin título..." oninput="update(${i},'title',this.value)"></td>
+    <td><input class="cell-input" value="${row.doc}" placeholder="—" oninput="update(${i},'doc',this.value)"></td>
+    <td><input class="cell-input" value="${row.prog}" placeholder="—" oninput="update(${i},'prog',this.value)"></td>
+  </tr>`;
+}
+
+function renderAll() {
+  document.getElementById('tbody').innerHTML = rows.map((r,i) => renderRow(r,i)).join('');
+  updateStats();
+}
+
+function update(i, field, value) {
+  rows[i][field] = value;
+  // Re-render only this row (for speed)
+  const tbody = document.getElementById('tbody');
+  const tr = tbody.querySelector(`tr[data-idx="${i}"]`);
+  if (tr) {
+    const temp = document.createElement('tbody');
+    temp.innerHTML = renderRow(rows[i], i);
+    // Replace focused input to avoid losing focus
+    tbody.replaceChild(temp.firstChild, tr);
+  }
+  updateStats();
+  // Restore focus to the correct input (by field)
+  const newTr = tbody.querySelector(`tr[data-idx="${i}"]`);
+  if (newTr) {
+    const inp = newTr.querySelector(`[data-field="${field}"]`);
+    if (inp) { inp.focus(); const len = inp.value?.length; if(len !== undefined) try{inp.setSelectionRange(len,len);}catch(e){} }
+  }
+}
+
+function confirmar() {
+  const ok = rows.filter(r => getWarnings(r).length === 0).length;
+  const noTRD = rows.filter(r => !r.subserie).length;
+  let msg = `✅ Se cargarán ${rows.length} expedientes:\n• ${ok} completamente válidos\n• ${noTRD} sin código TRD`;
+  if (noTRD > 0) msg += '\n\n⚠ Los que no tienen TRD se guardarán igual, pero sin vinculación de permisos.';
+  msg += '\n\n¿Confirmar la carga?';
+  if (confirm(msg)) alert('✅ ¡Expedientes cargados exitosamente a la tabla!\nAhora haga clic en "Guardar BD" para persistirlos en la base de datos.');
+}
+
+renderAll();
+</script>
+</body>
+</html>

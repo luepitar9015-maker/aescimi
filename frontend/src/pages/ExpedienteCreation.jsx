@@ -78,6 +78,11 @@ function ExpedienteCreation() {
     const [typologies, setTypologies] = useState([]);
     const [loadingTypologies, setLoadingTypologies] = useState(false);
 
+    // ── Vista previa importación Excel ──
+    const [previewData, setPreviewData] = useState([]);
+    const [showPreviewModal, setShowPreviewModal] = useState(false);
+    const [previewLabels, setPreviewLabels] = useState({});
+
     const fetchTypologies = async (subserieCode) => {
         if (!subserieCode) { setTypologies([]); return; }
         setLoadingTypologies(true);
@@ -230,9 +235,19 @@ function ExpedienteCreation() {
         setStatus('Guardando...');
 
         try {
-            await axios.post('/api/expedientes/mass', expedientes);
-            setStatus('¡Guardado exitoso en base de datos!');
-            setExpedientes([]); // Clear after save? Or keep? Let's clear for now.
+            const res = await axios.post('/api/expedientes/mass', expedientes);
+            const { message, errors } = res.data;
+            
+            if (errors && errors.length > 0) {
+                // Hubo errores parciales
+                const errDetail = errors.slice(0, 3).map(e => `• ${e.expediente}: ${e.error}`).join('\n');
+                const moreMsg = errors.length > 3 ? `\n...y ${errors.length - 3} más.` : '';
+                setStatus(`⚠️ ${message}`);
+                alert(`${message}\n\nErrores detectados:\n${errDetail}${moreMsg}\n\nRevise la consola del servidor para detalles completos.`);
+            } else {
+                setStatus('✅ ¡Guardado exitoso en base de datos!');
+                setExpedientes([]);
+            }
         } catch (err) {
             console.error(err);
             setStatus('Error al guardar: ' + (err.response?.data?.error || err.message));
@@ -312,27 +327,65 @@ function ExpedienteCreation() {
                 const wb = XLSX.read(data, { type: 'array' });
                 const wsname = wb.SheetNames[0];
                 const ws = wb.Sheets[wsname];
-                const jsonData = XLSX.utils.sheet_to_json(ws);
 
-                console.log("Datos leídos del Excel:", jsonData);
+                // ── Detección automática de fila de encabezados ──────────────
+                // Escanea las primeras 15 filas para encontrar cuál tiene más
+                // nombres de columna reconocibles. Esto permite importar Excels
+                // con filas de título/info antes de los encabezados reales.
+                const range = XLSX.utils.decode_range(ws['!ref']);
+                const knownColSynonyms = [
+                    'Codigo Expediente','Cod Exp','Nro Expediente','Expediente',
+                    'Id Caja','Caja','Caja No',
+                    'Fecha Apertura','Fecha Inicio','Apertura','Fecha',
+                    'Subserie','Cod Subserie','Codigo Subserie',
+                    'Tipo Almacenamiento','Tipo Almacen','Soporte',
+                    'Titulo','Nombre Expediente','Asunto','Descripcion',
+                    'Valor 1','Valor 2','Valor 3','Valor 4','Metadato 1','Meta 1',
+                ];
+                const normalizedKnown = knownColSynonyms.map(normalize);
+
+                let bestHeaderRow = range.s.r;
+                let bestScore = 0;
+                const scanLimit = Math.min(range.s.r + 14, range.e.r);
+                for (let R = range.s.r; R <= scanLimit; ++R) {
+                    let score = 0;
+                    for (let C = range.s.c; C <= range.e.c; ++C) {
+                        const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
+                        if (cell && cell.v) {
+                            if (normalizedKnown.includes(normalize(String(cell.v)))) score++;
+                        }
+                    }
+                    if (score > bestScore) { bestScore = score; bestHeaderRow = R; }
+                }
+                console.log(`[EXCEL] Encabezados en fila ${bestHeaderRow + 1} (score: ${bestScore})`);
+
+                // Recortar el sheet desde la fila de encabezados detectada
+                const wsClipped = {};
+                for (const addr in ws) {
+                    if (addr.startsWith('!')) continue;
+                    const cc = XLSX.utils.decode_cell(addr);
+                    if (cc.r >= bestHeaderRow) wsClipped[addr] = ws[addr];
+                }
+                wsClipped['!ref'] = XLSX.utils.encode_range({ s: { r: bestHeaderRow, c: range.s.c }, e: range.e });
+
+                const jsonData = XLSX.utils.sheet_to_json(wsClipped, { defVal: '' });
+                console.log(`[EXCEL] Registros extraídos: ${jsonData.length}`);
 
                 if (jsonData.length === 0) {
                     alert("El archivo está vacío o no tiene datos legibles.");
                     return;
                 }
 
-                // Get ALL headers from the first row of the sheet (more robust)
-                const range = XLSX.utils.decode_range(ws['!ref']);
+                // Leer encabezados de la fila detectada
                 const firstRow = [];
                 for (let C = range.s.c; C <= range.e.c; ++C) {
-                    const cell = ws[XLSX.utils.encode_cell({ r: range.s.r, c: C })];
+                    const cell = ws[XLSX.utils.encode_cell({ r: bestHeaderRow, c: C })];
                     if (cell && cell.v) firstRow.push(String(cell.v));
                 }
-
-                const allHeaders = firstRow.length > 0 ? firstRow : Object.keys(jsonData[0]);
+                const allHeaders = firstRow.length > 0 ? firstRow : Object.keys(jsonData[0] || {});
                 console.log("Cabeceras reales detectadas:", allHeaders);
-                
                 const normalizedHeaders = allHeaders.map(h => ({ original: h, normalized: normalize(h) }));
+
 
                 // --- MAPPING LOGIC ---
                 const findHeader = (synonyms) => {
@@ -341,13 +394,38 @@ function ExpedienteCreation() {
                 };
 
                 const colMap = {
-                    expediente_code: findHeader(['Codigo Expediente', 'Cod Exp', 'Nro Expediente', 'Expediente']),
-                    box_id: findHeader(['Id Caja', 'Caja', 'Caja No']),
-                    opening_date: findHeader(['Fecha Apertura', 'Fecha Inicio', 'Apertura', 'Fecha']),
-                    subserie: findHeader(['Subserie', 'Cod Subserie', 'Codigo Subserie']),
-                    storage_type: findHeader(['Tipo Almacenamiento', 'Tipo Almacen', 'Soporte']),
-                    title: findHeader(['Titulo', 'Nombre Expediente', 'Asunto', 'Descripcion']),
+                    expediente_code: findHeader([
+                        'Codigo Expediente', 'Cod Exp', 'Nro Expediente', 'Expediente',
+                        'Numero Expediente', 'No Expediente', 'No. Expediente',
+                        'ID Expediente', 'Codigo', 'Cod', 'No', 'Numero', 'N'
+                    ]),
+                    box_id: findHeader(['Id Caja', 'Caja', 'Caja No', 'No Caja', 'Numero Caja', 'Box']),
+                    opening_date: findHeader([
+                        'Fecha Apertura', 'Fecha Inicio', 'Apertura', 'Fecha',
+                        'Fecha Ingreso', 'Fecha Creacion', 'Fecha Matricula', 'Fecha de Inicio',
+                        'Fecha de Grado', 'Fecha Grado', 'Ano', 'Year', 'Vigencia'
+                    ]),
+                    subserie: findHeader([
+                        'Subserie', 'Cod Subserie', 'Codigo Subserie',
+                        'Codigo Serie Subserie', 'Cod Serie Subserie', 'Serie Subserie',
+                        'TRD', 'Cod TRD', 'Codigo TRD', 'Codigo de la Serie',
+                        'Cod Serie', 'Codigo Serie', 'Serie', 'Clasificacion TRD',
+                        'Clasificacion', 'Tabla Retencion', 'Tabla de Retencion',
+                        'Tipo Expediente', 'Tipo de Expediente'
+                    ]),
+                    storage_type: findHeader([
+                        'Tipo Almacenamiento', 'Tipo Almacen', 'Soporte', 'Medio',
+                        'Tipo Soporte', 'Formato', 'Tipo'
+                    ]),
+                    title: findHeader([
+                        'Titulo', 'Nombre Expediente', 'Asunto', 'Descripcion',
+                        'Nombre', 'Nombres', 'Nombre Completo', 'Nombre del Estudiante',
+                        'Aprendiz', 'Nombre Aprendiz', 'Beneficiario',
+                        'Nombre del Trabajador', 'Trabajador', 'Funcionario',
+                        'Contratista', 'Nombre Contratista', 'Denominacion'
+                    ]),
                 };
+
 
                 // Detect metadata headers (Valor 1 - 8)
                 const metadataCols = Array(8).fill(null);
@@ -408,26 +486,17 @@ function ExpedienteCreation() {
                 });
 
                 if (newExpedientes.length > 0) {
-                    setExpedientes(prev => [...prev, ...newExpedientes]);
-
+                    // Construir mapa de etiquetas de columnas de metadatos
                     const labelsMap = {};
                     metadataCols.forEach((h, i) => {
                         if (h && i < 8) labelsMap[`meta_${i + 1}`] = h;
                     });
-                    
-                    if (Object.keys(labelsMap).length > 0) {
-                        setCurrentLabels(labelsMap);
-                        const uniqueSubseries = [...new Set(newExpedientes.map(e => e.subserie).filter(Boolean))];
-                        for (const subserieCod of uniqueSubseries) {
-                            await autoSaveLabels(subserieCod, labelsMap);
-                        }
-                        const res = await axios.get('/api/trd/subseries/all');
-                        setAllSubseries(res.data.data || []);
-                    }
-
-                    alert(`${newExpedientes.length} registros cargados exitosamente.`);
+                    // Mostrar vista previa en lugar de cargar directamente
+                    setPreviewLabels(labelsMap);
+                    setPreviewData(newExpedientes);
+                    setShowPreviewModal(true);
                 } else {
-                    alert("No se pudieron extraer registros válidos.");
+                    alert("No se pudieron extraer registros válidos del archivo.");
                 }
 
             } catch (err) {
@@ -501,6 +570,46 @@ function ExpedienteCreation() {
         reader.readAsArrayBuffer(file);
         e.target.value = null;
     };
+
+    // ── Confirmar carga desde vista previa ──
+    const handleConfirmPreview = async () => {
+        setExpedientes(prev => [...prev, ...previewData]);
+        if (Object.keys(previewLabels).length > 0) {
+            setCurrentLabels(previewLabels);
+            const uniqueSubseries = [...new Set(previewData.map(e => e.subserie).filter(Boolean))];
+            for (const subserieCod of uniqueSubseries) {
+                await autoSaveLabels(subserieCod, previewLabels);
+            }
+            try {
+                const res = await axios.get('/api/trd/subseries/all');
+                setAllSubseries(res.data.data || []);
+            } catch (e) { console.error(e); }
+        }
+        setShowPreviewModal(false);
+        setPreviewData([]);
+        setPreviewLabels({});
+    };
+
+    const getRowWarnings = (exp) => {
+        const w = [];
+        if (!exp.subserie) w.push('Sin código TRD');
+        if (!exp.title || exp.title === 'Sin Título') w.push('Sin título');
+        if (!exp.opening_date) w.push('Sin fecha');
+        return w;
+    };
+
+    // ── Edición inline en Vista Previa ──
+    const updatePreviewRow = (idx, field, value) => {
+        setPreviewData(prev => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row));
+    };
+
+    // Valida si un código TRD existe en el catálogo del sistema
+    const validTRDCodes = new Set(
+        allSubseries.flatMap(s => [
+            s.subseries_code, s.concatenated_code, s.series_code
+        ].filter(Boolean)).map(c => String(c).trim())
+    );
+    const isValidTRD = (code) => !!code && validTRDCodes.has(String(code).trim());
 
     return (
         <div className="p-4 md:p-8 space-y-6">
@@ -899,6 +1008,247 @@ function ExpedienteCreation() {
                     </div>
                 </div>
             )}
+
+            {/* ══════════════════════════════════════════
+                MODAL VISTA PREVIA — IMPORTACIÓN EXCEL
+            ══════════════════════════════════════════ */}
+            {showPreviewModal && (
+                <div className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[96vw] max-h-[94vh] flex flex-col overflow-hidden border border-green-200">
+
+                        {/* ── Header ── */}
+                        <div style={{background: 'linear-gradient(135deg, #14532d 0%, #166534 60%, #15803d 100%)'}} className="p-5 text-white">
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <h2 className="text-xl font-bold flex items-center gap-2">
+                                        <FileText size={22}/> Vista Previa — Revisión antes de Cargar
+                                    </h2>
+                                    <p className="text-green-300 text-sm mt-1">Revise cada fila. Los datos con advertencias se marcan en naranja/rojo. Confirme sólo si todo está correcto.</p>
+                                </div>
+                                <button
+                                    onClick={() => { setShowPreviewModal(false); setPreviewData([]); setPreviewLabels({}); }}
+                                    className="text-white/60 hover:text-white p-2 rounded-xl hover:bg-white/20 transition-all"
+                                ><X size={20}/></button>
+                            </div>
+
+                            {/* Stats */}
+                            <div className="flex flex-wrap gap-3">
+                                <div className="bg-white/15 rounded-xl px-5 py-2.5 text-center min-w-[90px]">
+                                    <div className="text-2xl font-black">{previewData.length}</div>
+                                    <div className="text-[10px] text-green-200 uppercase tracking-widest">Total</div>
+                                </div>
+                                <div className="bg-emerald-500/25 rounded-xl px-5 py-2.5 text-center min-w-[90px]">
+                                    <div className="text-2xl font-black text-emerald-200">{previewData.filter(e => getRowWarnings(e).length === 0).length}</div>
+                                    <div className="text-[10px] text-emerald-300 uppercase tracking-widest">Sin errores</div>
+                                </div>
+                                <div className="bg-orange-400/25 rounded-xl px-5 py-2.5 text-center min-w-[90px]">
+                                    <div className="text-2xl font-black text-orange-200">{previewData.filter(e => getRowWarnings(e).length > 0 && e.subserie).length}</div>
+                                    <div className="text-[10px] text-orange-300 uppercase tracking-widest">Advertencias</div>
+                                </div>
+                                <div className="bg-red-500/25 rounded-xl px-5 py-2.5 text-center min-w-[90px]">
+                                    <div className="text-2xl font-black text-red-300">{previewData.filter(e => !e.subserie).length}</div>
+                                    <div className="text-[10px] text-red-300 uppercase tracking-widest">Sin TRD</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ── Table ── */}
+                        {/* Datalist compartido para autocomplete de códigos TRD */}
+                        <datalist id="preview-subseries-list">
+                            {allSubseries.map(s => (
+                                <option key={s.id} value={s.subseries_code || s.concatenated_code}>
+                                    {s.subseries_name || s.series_name}
+                                </option>
+                            ))}
+                        </datalist>
+
+                        <div className="overflow-auto flex-1">
+                            <table className="w-full text-sm text-left" style={{borderCollapse: 'separate', borderSpacing: 0}}>
+                                <thead className="text-[10px] uppercase text-gray-500 tracking-wider" style={{background: '#f8fafc', position: 'sticky', top: 0, zIndex: 10}}>
+                                    <tr style={{borderBottom: '2px solid #e2e8f0'}}>
+                                        <th className="px-3 py-3 font-bold">#</th>
+                                        <th className="px-3 py-3 font-bold">Estado</th>
+                                        <th className="px-3 py-3 font-bold">Cód. Expediente</th>
+                                        <th className="px-3 py-3 font-bold">Fecha Apertura</th>
+                                        <th className="px-3 py-3 font-bold" style={{minWidth: '180px'}}>Subserie / TRD 🗒️</th>
+                                        <th className="px-3 py-3 font-bold">Tipo Almac.</th>
+                                        <th className="px-3 py-3 font-bold" style={{minWidth: '200px'}}>Título</th>
+                                        {Object.entries(previewLabels).map(([k, lbl]) => (
+                                            <th key={k} className="px-3 py-3 font-bold" style={{color: '#3b82f6'}}>{lbl || k}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {previewData.map((exp, rowIdx) => {
+                                        const warns = getRowWarnings(exp);
+                                        const trdValid = isValidTRD(exp.subserie);
+                                        const isError = !exp.subserie;
+                                        const rowBg = isError ? '#fff7f7' : warns.length > 0 ? '#fffbeb' : (rowIdx % 2 === 0 ? '#ffffff' : '#f0fdf4');
+                                        // Estilos reutilizables para inputs inline
+                                        const cellInput = {
+                                            width: '100%', background: 'transparent', border: 'none',
+                                            outline: 'none', padding: '2px 4px', fontSize: '12px',
+                                            borderBottom: '1px dashed #cbd5e1', color: '#111827',
+                                            minWidth: '80px'
+                                        };
+                                        return (
+                                            <tr key={rowIdx} style={{background: rowBg, borderBottom: '1px solid #e5e7eb'}}>
+                                                {/* # */}
+                                                <td className="px-3 py-2" style={{color: '#9ca3af', fontSize: '11px', fontFamily: 'monospace'}}>{rowIdx + 1}</td>
+
+                                                {/* Estado */}
+                                                <td className="px-3 py-2">
+                                                    {warns.length === 0 ? (
+                                                        <span style={{background: '#dcfce7', color: '#15803d', fontSize: '11px', padding: '2px 8px', borderRadius: '999px', fontWeight: 700}}>✓ OK</span>
+                                                    ) : (
+                                                        <span title={warns.join(' | ')} style={{
+                                                            background: isError ? '#fee2e2' : '#ffedd5',
+                                                            color: isError ? '#dc2626' : '#c2410c',
+                                                            fontSize: '10px', padding: '2px 8px', borderRadius: '999px', fontWeight: 700,
+                                                            cursor: 'help', display: 'inline-block', maxWidth: '180px',
+                                                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                                                        }}>
+                                                            ⚠ {warns.join(' · ')}
+                                                        </span>
+                                                    )}
+                                                </td>
+
+                                                {/* Código expediente */}
+                                                <td className="px-2 py-1.5">
+                                                    <input
+                                                        style={{...cellInput, fontFamily: 'monospace'}}
+                                                        value={exp.expediente_code || ''}
+                                                        onChange={e => updatePreviewRow(rowIdx, 'expediente_code', e.target.value)}
+                                                        placeholder="—"
+                                                        title="Editar código de expediente"
+                                                    />
+                                                </td>
+
+                                                {/* Fecha */}
+                                                <td className="px-2 py-1.5">
+                                                    <input
+                                                        type="date"
+                                                        style={cellInput}
+                                                        value={exp.opening_date || ''}
+                                                        onChange={e => updatePreviewRow(rowIdx, 'opening_date', e.target.value)}
+                                                        title="Editar fecha"
+                                                    />
+                                                </td>
+
+                                                {/* Subserie TRD — con autocomplete y validación */}
+                                                <td className="px-2 py-1.5">
+                                                    <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
+                                                        <input
+                                                            list="preview-subseries-list"
+                                                            style={{
+                                                                ...cellInput,
+                                                                fontFamily: 'monospace', fontWeight: 700,
+                                                                borderBottomColor: trdValid ? '#16a34a' : (exp.subserie ? '#dc2626' : '#cbd5e1'),
+                                                                borderBottomStyle: 'solid',
+                                                                color: trdValid ? '#15803d' : (exp.subserie ? '#dc2626' : '#6b7280'),
+                                                                minWidth: '130px'
+                                                            }}
+                                                            value={exp.subserie || ''}
+                                                            onChange={e => updatePreviewRow(rowIdx, 'subserie', e.target.value)}
+                                                            placeholder="Ingrese código TRD..."
+                                                            title={trdValid ? 'Código TRD válido ✓' : (exp.subserie ? 'Código TRD no reconocido – verifíquelo' : 'Ingrese el código TRD')}
+                                                        />
+                                                        {exp.subserie && (
+                                                            <span style={{fontSize: '14px', fontWeight: 900, color: trdValid ? '#16a34a' : '#dc2626', flexShrink: 0}}>
+                                                                {trdValid ? '✓' : '✗'}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {exp.subserie && trdValid && (
+                                                        <div style={{fontSize: '9px', color: '#16a34a', marginTop: '1px', paddingLeft: '4px'}}>
+                                                            {allSubseries.find(s => (s.subseries_code || s.concatenated_code) === exp.subserie.trim())?.subseries_name || ''}
+                                                        </div>
+                                                    )}
+                                                </td>
+
+                                                {/* Tipo almacenamiento */}
+                                                <td className="px-2 py-1.5">
+                                                    <select
+                                                        style={{...cellInput, cursor: 'pointer', paddingRight: '4px'}}
+                                                        value={exp.storage_type || ''}
+                                                        onChange={e => updatePreviewRow(rowIdx, 'storage_type', e.target.value)}
+                                                    >
+                                                        <option value="">— Seleccionar —</option>
+                                                        <option value="Fisico">Físico</option>
+                                                        <option value="Digital">Digital</option>
+                                                        <option value="Hibrido">Híbrido</option>
+                                                    </select>
+                                                </td>
+
+                                                {/* Título */}
+                                                <td className="px-2 py-1.5">
+                                                    <input
+                                                        style={{...cellInput, fontWeight: 500}}
+                                                        value={exp.title === 'Sin Título' ? '' : (exp.title || '')}
+                                                        onChange={e => updatePreviewRow(rowIdx, 'title', e.target.value || 'Sin Título')}
+                                                        placeholder="Sin título..."
+                                                        title="Editar título"
+                                                    />
+                                                </td>
+
+                                                {/* Metadatos */}
+                                                {Object.entries(previewLabels).map(([k], metaIdx) => {
+                                                    const val = exp.metadata_values?.[`valor${metaIdx + 1}`] || '';
+                                                    return (
+                                                        <td key={k} className="px-2 py-1.5" style={{maxWidth: '130px'}}>
+                                                            <input
+                                                                style={cellInput}
+                                                                value={val}
+                                                                onChange={e => {
+                                                                    const newMeta = { ...(exp.metadata_values || {}), [`valor${metaIdx + 1}`]: e.target.value };
+                                                                    updatePreviewRow(rowIdx, 'metadata_values', newMeta);
+                                                                }}
+                                                                placeholder="—"
+                                                                title={`Editar ${previewLabels[k] || k}`}
+                                                            />
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* ── Footer ── */}
+                        <div className="p-4 border-t flex justify-between items-center" style={{background: '#f8fafc'}}>
+                            <div style={{fontSize: '13px', color: '#6b7280'}}>
+                                {previewData.filter(e => !e.subserie).length > 0 && (
+                                    <span style={{color: '#dc2626', fontWeight: 600}}>
+                                        ⚠ {previewData.filter(e => !e.subserie).length} fila(s) sin código TRD — se cargarán pero no se podrán vincular a permisos.
+                                    </span>
+                                )}
+                                {previewData.filter(e => !e.subserie).length === 0 && (
+                                    <span style={{color: '#15803d', fontWeight: 500}}>✓ Todos los registros tienen código TRD asignado.</span>
+                                )}
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => { setShowPreviewModal(false); setPreviewData([]); setPreviewLabels({}); }}
+                                    className="px-5 py-2.5 rounded-xl font-semibold text-gray-700 border border-gray-300 hover:bg-gray-100 transition-colors"
+                                >
+                                    ✕ Cancelar
+                                </button>
+                                <button
+                                    onClick={handleConfirmPreview}
+                                    className="px-6 py-2.5 rounded-xl font-bold text-white shadow-lg transition-all flex items-center gap-2"
+                                    style={{background: 'linear-gradient(135deg, #16a34a, #15803d)', boxShadow: '0 4px 15px rgba(22,163,74,0.4)'}}
+                                >
+                                    <Save size={16}/> Confirmar y Cargar {previewData.length} Registros →
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            )}
+
         </div>
     );
 }

@@ -112,7 +112,16 @@ router.get('/search', (req, res) => {
                    OR e.subserie ILIKE $3
                    OR e.box_id ILIKE $3
                    OR e.metadata_values ILIKE $3)
-                AND (s.id = ANY($1::int[]) OR sub.id = ANY($2::int[]))
+                AND (
+                    s.id = ANY($1::int[])
+                    OR sub.id = ANY($2::int[])
+                    OR (s.series_name IS NOT NULL AND s.series_name IN (
+                        SELECT ps.series_name FROM trd_series ps WHERE ps.id = ANY($1::int[]) AND ps.series_name IS NOT NULL
+                    ))
+                    OR (sub.subseries_name IS NOT NULL AND sub.subseries_name IN (
+                        SELECT pss.subseries_name FROM trd_subseries pss WHERE pss.id = ANY($2::int[]) AND pss.subseries_name IS NOT NULL
+                    ))
+                )
                 GROUP BY e.id
                 ORDER BY e.created_at DESC
             `;
@@ -165,7 +174,16 @@ router.get('/', (req, res) => {
                     SELECT e2.id FROM expedientes e2
                     LEFT JOIN trd_subseries sub ON (e2.subserie = sub.subseries_code OR e2.subserie LIKE '%-' || sub.subseries_code)
                     LEFT JOIN trd_series s ON (e2.subserie = s.series_code OR e2.subserie LIKE '%-' || s.series_code OR sub.series_id = s.id)
-                    WHERE (s.id = ANY($1::int[]) OR sub.id = ANY($2::int[]))
+                    WHERE (
+                        s.id = ANY($1::int[])
+                        OR sub.id = ANY($2::int[])
+                        OR (s.series_name IS NOT NULL AND s.series_name IN (
+                            SELECT ps.series_name FROM trd_series ps WHERE ps.id = ANY($1::int[]) AND ps.series_name IS NOT NULL
+                        ))
+                        OR (sub.subseries_name IS NOT NULL AND sub.subseries_name IN (
+                            SELECT pss.subseries_name FROM trd_subseries pss WHERE pss.id = ANY($2::int[]) AND pss.subseries_name IS NOT NULL
+                        ))
+                    )
                     GROUP BY e2.id
                 )
                 ORDER BY created_at DESC
@@ -264,77 +282,92 @@ router.post('/', (req, res) => {
 });
 
 // POST mass create expedientes
-router.post('/mass', (req, res) => {
+router.post('/mass', async (req, res) => {
     const expedientes = req.body; // Array of objects
-    
+
     if (!Array.isArray(expedientes) || expedientes.length === 0) {
         return res.status(400).json({ error: 'No data provided' });
     }
 
-    const errors = [];
-    let completed = 0;
-
     console.log(`[EXPEDIENTES] Recibida solicitud masiva con ${expedientes.length} registros.`);
 
-    db.serialize(() => {
-        db.run("BEGIN TRANSACTION");
+    const { pool } = require('../database_pg');
+    const client = await pool.connect();
+    const errors = [];
+    let created = 0;
 
-        const stmt = db.prepare(`INSERT INTO expedientes (expediente_code, box_id, opening_date, subserie, regional, centro, dependencia, storage_type, title, metadata_values) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-        
-        let pending = expedientes.length;
-        let committed = false; // Guard to prevent double response
+    try {
+        await client.query('BEGIN');
 
-        // Helper to finish
-        const finish = () => {
-            if (committed) return;
-            committed = true;
-            
-            stmt.finalize(() => {
-                db.run("COMMIT", (err) => {
-                    if (err) {
-                        console.error("[EXPEDIENTES] Error en COMMIT:", err);
-                        return res.status(500).json({ error: 'Fallo al guardar en base de datos (COMMIT).' });
-                    }
-                    console.log(`[EXPEDIENTES] Completado. ${expedientes.length - errors.length} creados.`);
-                    res.json({ 
-                        message: `Procesado. ${expedientes.length - errors.length} creados, ${errors.length} fallidos.`,
-                        errors: errors 
-                    });
-                });
-            });
+        // Helper: normaliza cualquier formato de fecha a ISO o null
+        const normalizeDate = (val) => {
+            if (!val || val === '') return null;
+            // Si es número (Excel serial)
+            if (typeof val === 'number') {
+                const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+                return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
+            }
+            const str = String(val).trim();
+            // Formato DD/MM/YYYY (colombiano)
+            const colMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+            if (colMatch) return `${colMatch[3]}-${colMatch[2].padStart(2,'0')}-${colMatch[1].padStart(2,'0')}`;
+            // Formato DD-MM-YYYY
+            const dashMatch = str.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+            if (dashMatch) return `${dashMatch[3]}-${dashMatch[2].padStart(2,'0')}-${dashMatch[1].padStart(2,'0')}`;
+            // Cualquier otro formato — dejar que JS lo intente
+            const d = new Date(str);
+            return isNaN(d.getTime()) ? null : str; // Si es válido, pasar tal cual (ISO)
         };
 
-        if (expedientes.length === 0) {
-            finish();
-            return;
-        }
-
-        expedientes.forEach(exp => {
+        for (let i = 0; i < expedientes.length; i++) {
+            const exp = expedientes[i];
             const params = [
-                exp.expediente_code, 
-                exp.box_id, 
-                exp.opening_date, 
-                exp.subserie, 
-                exp.regional,
-                exp.centro,
-                exp.dependencia,
-                exp.storage_type, 
-                exp.title, // Allow NULL/empty as per DB migration
+                exp.expediente_code || null,
+                exp.box_id || null,
+                normalizeDate(exp.opening_date),
+                exp.subserie || null,
+                exp.regional || null,
+                exp.centro || null,
+                exp.dependencia || null,
+                exp.storage_type || null,
+                exp.title || 'Sin Título',
                 JSON.stringify(exp.metadata_values || {})
             ];
 
-            stmt.run(params, function(err) {
-                if (err) {
-                    console.error(`[EXPEDIENTES] Error insertando ${exp.expediente_code}:`, err.message);
-                    errors.push({ expediente: exp.expediente_code || 'Desconocido', error: err.message });
-                }
-                pending--;
-                if (pending === 0) {
-                    finish();
-                }
-            });
+
+            const savepointName = `sp_exp_${i}`;
+            try {
+                await client.query(`SAVEPOINT ${savepointName}`);
+                await client.query(
+                    `INSERT INTO expedientes 
+                     (expediente_code, box_id, opening_date, subserie, regional, centro, dependencia, storage_type, title, metadata_values) 
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+                    params
+                );
+                await client.query(`RELEASE SAVEPOINT ${savepointName}`);
+                created++;
+            } catch (err) {
+                await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+                const errMsg = err.detail || err.message;
+                console.error(`[EXPEDIENTES] Error insertando "${exp.expediente_code || exp.title}": ${errMsg}`);
+                errors.push({ expediente: exp.expediente_code || exp.title || `Fila ${i + 1}`, error: errMsg });
+            }
+        }
+
+        await client.query('COMMIT');
+        console.log(`[EXPEDIENTES] Completado. ${created} creados, ${errors.length} fallidos.`);
+        res.json({
+            message: `Procesado. ${created} creados, ${errors.length} fallidos.`,
+            errors
         });
-    });
+
+    } catch (fatalErr) {
+        await client.query('ROLLBACK');
+        console.error('[EXPEDIENTES] Error fatal en inserción masiva:', fatalErr);
+        res.status(500).json({ error: 'Fallo crítico al guardar en base de datos: ' + fatalErr.message });
+    } finally {
+        client.release();
+    }
 });
 
 // POST mass update expedientes (By Title/Metadata)
