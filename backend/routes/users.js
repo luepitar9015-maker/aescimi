@@ -31,8 +31,8 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
         const hash = bcrypt.hashSync(passwordToHash, salt);
 
         const result = await pool.query(
-            'INSERT INTO users (full_name, area, position, document_no, password_hash, email, role, organization_id, force_password_change) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id',
-            [full_name, area, position, document_no, hash, email, role || 'user', organization_id || null, true]
+            'INSERT INTO users (full_name, area, position, document_no, password_hash, email, role, organization_id, must_change_password) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id',
+            [full_name, area, position, document_no, hash, email, role || 'user', organization_id || null, 1]
         );
 
         res.json({
@@ -132,8 +132,8 @@ router.post('/mass', requireAuth, requireAdmin, async (req, res) => {
             const salt = bcrypt.genSaltSync(10);
             const hash = bcrypt.hashSync(password_raw, salt);
             await pool.query(
-                'INSERT INTO users (full_name, area, position, document_no, password_hash, email, role, force_password_change) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
-                [full_name, area, position, document_no, hash, email, safeRole, true]
+                'INSERT INTO users (full_name, area, position, document_no, password_hash, email, role, must_change_password) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+                [full_name, area, position, document_no, hash, email, safeRole, 1]
             );
             results.created++;
         } catch (err) {
