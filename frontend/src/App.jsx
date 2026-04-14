@@ -251,9 +251,9 @@ function BrandPanel() {
             <rect width="52" height="52" rx="14" fill="rgba(255,255,255,0.15)" />
             <path d="M13 14h16l8 8v16H13V14z" fill="rgba(255,255,255,0.9)" />
             <path d="M29 14l8 8h-8V14z" fill="rgba(255,255,255,0.5)" />
-            <rect x="18" y="24" width="14" height="2" rx="1" fill="#39A900" />
-            <rect x="18" y="28" width="10" height="2" rx="1" fill="#39A900" />
-            <rect x="18" y="32" width="12" height="2" rx="1" fill="#39A900" />
+            <rect x="18" y="24" width="14" height="2" rx="1" fill="#4ade80" />
+            <rect x="18" y="28" width="10" height="2" rx="1" fill="#4ade80" />
+            <rect x="18" y="32" width="12" height="2" rx="1" fill="#4ade80" />
           </svg>
         </div>
 
@@ -286,7 +286,7 @@ const styles = {
   // Panel izquierdo verde
   leftPanel: {
     flex: '1 1 50%',
-    background: 'linear-gradient(145deg, #1a7a00 0%, #39A900 50%, #2d8c00 100%)',
+    background: 'linear-gradient(145deg, #052e16 0%, #14532d 50%, #0d3d1f 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -405,10 +405,10 @@ const styles = {
   },
   btnPrimary: {
     width: '100%', padding: '13px', fontSize: '15px', fontWeight: '700',
-    background: 'linear-gradient(135deg, #39A900, #2d8c00)',
+    background: 'linear-gradient(135deg, #14532d, #052e16)',
     color: 'white', border: 'none', borderRadius: '10px',
     cursor: 'pointer', marginTop: '4px', marginBottom: '10px',
-    boxShadow: '0 4px 14px rgba(57,169,0,0.35)',
+    boxShadow: '0 4px 14px rgba(20,83,45,0.45)',
     transition: 'opacity 0.2s',
   },
   btnSecondary: {
