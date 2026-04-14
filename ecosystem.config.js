@@ -1,9 +1,10 @@
 module.exports = {
   apps: [
     {
-      // ── Backend ───────────────────────────────────────────────────
-      // Node.js corre HTTP en puerto 3000.
-      // Nginx proxy inverso recibe en 80/443 y reenvía aquí.
+      // ── Backend ────────────────────────────────────────────────────────────
+      // Node.js HTTP puro en puerto 80.
+      // NPM (Nginx Proxy Manager) recibe solicitudes en 443 (HTTPS)
+      // y las reenvía aquí como HTTP. NO se necesitan certificados SSL aquí.
       name: "sena-backend",
       script: "server.js",
       cwd: "./backend",
@@ -12,11 +13,10 @@ module.exports = {
       watch: false,
       env: {
         NODE_ENV: "production",
-        PORT: 3000,          // Puerto interno HTTP (Nginx maneja el externo)
-        BEHIND_PROXY: "true" // Indica que corre detrás de proxy reverso
+        PORT: 80,            // Puerto upstream que NPM usa como destino
+        BEHIND_PROXY: "true" // Corre detrás de proxy reverso (NPM)
       }
     }
-    // sena-frontend eliminado: el backend Express sirve el dist/ directamente
-    // via app.use(express.static('../frontend/dist')) y el catch-all de React Router
+    // sena-frontend eliminado: Express sirve el dist/ via static + catch-all
   ]
 };
