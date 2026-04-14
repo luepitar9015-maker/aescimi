@@ -196,7 +196,7 @@ function InventarioDocumental() {
                                     <th className="p-1 border text-center">Ini</th>
                                     <th className="p-1 border text-center">Fin</th>
                                     <th className="p-1 border text-center w-12">Cajas</th>
-                                    <th className="p-1 border text-center w-12">Carp.</th>
+                                    <th className="p-1 border text-center w-12">Carp..</th>
                                     <th className="p-1 border text-center w-12">Tomo</th>
                                     <th className="p-1 border text-center w-12">Otro</th>
                                     <th className="p-1 border text-center w-12">Del</th>
