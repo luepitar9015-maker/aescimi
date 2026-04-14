@@ -391,31 +391,14 @@ app.use((req, res, next) => {
     res.sendFile(path.join(__dirname, '../frontend/dist', 'index.html'));
 });
 
-// Inicialización de HTTPS si existen los certificados
-const https = require('https');
+// ══════════════════════════════════════════════════════════════
+// HTTP únicamente — SSL/TLS es responsabilidad del proxy Nginx.
+// NO se usan certificados autofirmados ni Let's Encrypt aquí.
+// Nginx recibe en 80/443 y reenvía a este proceso por HTTP.
+// ══════════════════════════════════════════════════════════════
 const http = require('http');
+http.createServer(app).listen(port, '0.0.0.0', () => {
+    console.log(`[SERVER] ✅ HTTP escuchando en http://0.0.0.0:${port}`);
+    console.log(`[SERVER] 🔀 Proxy inverso Nginx maneja HTTPS externamente.`);
+});
 
-let sslOptions = {};
-let useHttps = false;
-
-try {
-    const certPath = path.join(__dirname, 'ssl', 'cert.pem');
-    const keyPath = path.join(__dirname, 'ssl', 'key.pem');
-    if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
-        sslOptions.cert = fs.readFileSync(certPath);
-        sslOptions.key = fs.readFileSync(keyPath);
-        useHttps = true;
-    }
-} catch (error) {
-    console.warn('[HTTPS] No se pudo leer el certificado SSL, se utilizará HTTP.');
-}
-
-if (useHttps) {
-    https.createServer(sslOptions, app).listen(port, '0.0.0.0', () => {
-        console.log(`HTTPS Server running at https://0.0.0.0:${port}`);
-    });
-} else {
-    http.createServer(app).listen(port, '0.0.0.0', () => {
-        console.log(`HTTP Server running at http://0.0.0.0:${port}`);
-    });
-}

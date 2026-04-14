@@ -22,38 +22,31 @@ jobs:
           git stash || true
           git pull origin main
 
-          # 2. Copiar certificados SSL desde Let's Encrypt (si existen)
-          echo "=== Verificando certificados SSL ==="
-          DOMAIN="automatizadorgd.web-virtual.com"
-          CERT_SRC="/etc/letsencrypt/live/$DOMAIN"
-          CERT_DST="$HOME/aescimi/backend/ssl"
-          mkdir -p "$CERT_DST"
-          if [ -f "$CERT_SRC/fullchain.pem" ] && [ -f "$CERT_SRC/privkey.pem" ]; then
-            sudo cp "$CERT_SRC/fullchain.pem" "$CERT_DST/cert.pem"
-            sudo cp "$CERT_SRC/privkey.pem"   "$CERT_DST/key.pem"
-            sudo chown cimi:cimi "$CERT_DST/cert.pem" "$CERT_DST/key.pem"
-            sudo chmod 600 "$CERT_DST/cert.pem" "$CERT_DST/key.pem"
-            echo "✔ Certificados SSL actualizados correctamente"
-          else
-            echo "⚠ Certificados SSL no encontrados en $CERT_SRC — se usará HTTP"
-          fi
+          # 2. Verificar y liberar el puerto 3000 si está ocupado
+          echo "=== Verificando puerto 3000 ==="
+          fuser -k 3000/tcp 2>/dev/null && echo "⚠ Puerto 3000 liberado" || echo "✔ Puerto 3000 libre"
 
-          # 3. Actualizar BACKEND (solo producción)
-          echo "=== Actualizando Backend ==="
+          # 3. Actualizar BACKEND (sin SSL — Nginx maneja HTTPS)
+          echo "=== Actualizando Backend (HTTP puro) ==="
           cd ~/aescimi/backend
           npm install --omit=dev
-          pm2 restart sena-backend || pm2 start server.js --name "sena-backend"
 
-          # 4. Actualizar FRONTEND
-          # IMPORTANTE: npm install completo porque Vite está en devDependencies
-          echo "=== Actualizando Frontend ==="
+          # 4. Actualizar FRONTEND (Vite está en devDependencies, requiere npm install completo)
+          echo "=== Actualizando y compilando Frontend ==="
           cd ~/aescimi/frontend
           npm install
           npm run build
-          pm2 restart sena-frontend || pm2 start "npx serve -s dist -l 4173" --name "sena-frontend"
 
-          # 5. Guardar estado de PM2 para que persista tras reinicios
+          # 5. Reiniciar solo el backend con PM2 (backend sirve el frontend compilado)
+          echo "=== Reiniciando PM2 ==="
+          cd ~/aescimi
+          pm2 restart sena-backend || pm2 start ecosystem.config.js --only sena-backend
+          pm2 delete sena-frontend 2>/dev/null || true
           pm2 save
 
-          echo "=== Deploy completado exitosamente ==="
+          # 6. Recargar Nginx para asegurar configuración vigente
+          echo "=== Recargando Nginx ==="
+          sudo nginx -t && sudo systemctl reload nginx || echo "⚠ Revisar configuración de Nginx"
 
+          echo "=== ✅ Deploy completado exitosamente ==="
+          echo "=== Backend HTTP en localhost:3000 — Nginx sirve en 80/443 ==="
