@@ -105,4 +105,93 @@ router.get('/backup', requireAuth, async (req, res) => {
     }
 });
 
+// ── NUEVA RUTA: Copia de seguridad solo de PDFs ──────────────────────────────
+router.get('/backup-pdf', requireAuth, async (req, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Acceso denegado. Se requiere rol de administrador.' });
+    }
+
+    try {
+        const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        const filename = `backup_pdf_sena_${dateStr}.zip`;
+
+        res.writeHead(200, {
+            'Content-Type': 'application/zip',
+            'Content-Disposition': `attachment; filename=${filename}`
+        });
+
+        const archive = archiver('zip', { zlib: { level: 5 } });
+
+        archive.on('error', (err) => {
+            console.error('[backup-pdf] Error al crear ZIP:', err);
+            res.end();
+        });
+
+        archive.pipe(res);
+
+        // 1. Carpeta uploads del backend (backup local)
+        const uploadsDir = path.join(__dirname, '..', 'uploads');
+        if (fs.existsSync(uploadsDir)) {
+            // Agregar recursivamente solo archivos .pdf
+            const addPdfsFromDir = (dir, zipBase) => {
+                const entries = fs.readdirSync(dir, { withFileTypes: true });
+                for (const entry of entries) {
+                    const fullPath = path.join(dir, entry.name);
+                    if (entry.isDirectory()) {
+                        addPdfsFromDir(fullPath, path.join(zipBase, entry.name));
+                    } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.pdf')) {
+                        archive.file(fullPath, { name: path.join(zipBase, entry.name) });
+                    }
+                }
+            };
+            addPdfsFromDir(uploadsDir, 'uploads');
+        }
+
+        // 2. Carpeta de almacenamiento configurada (storage_path) si existe y es diferente
+        const db = require('../database');
+        const getStoragePath = () => new Promise((resolve) => {
+            if (db.pool) {
+                db.pool.query("SELECT value FROM system_settings WHERE key = 'storage_path'")
+                    .then(r => resolve(r.rows[0]?.value || null))
+                    .catch(() => resolve(null));
+            } else {
+                db.get("SELECT value FROM system_settings WHERE key = 'storage_path'", [], (err, row) => {
+                    resolve(row?.value || null);
+                });
+            }
+        });
+
+        const storagePath = await getStoragePath();
+        if (storagePath && fs.existsSync(storagePath) && storagePath !== uploadsDir) {
+            const addPdfsFromDir = (dir, zipBase) => {
+                try {
+                    const entries = fs.readdirSync(dir, { withFileTypes: true });
+                    for (const entry of entries) {
+                        const fullPath = path.join(dir, entry.name);
+                        if (entry.isDirectory()) {
+                            addPdfsFromDir(fullPath, path.join(zipBase, entry.name));
+                        } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.pdf')) {
+                            archive.file(fullPath, { name: path.join(zipBase, entry.name) });
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[backup-pdf] No se pudo leer:', dir, e.message);
+                }
+            };
+            addPdfsFromDir(storagePath, 'storage');
+        }
+
+        await archive.finalize();
+        console.log(`[backup-pdf] ✅ Copia de seguridad PDF generada: ${filename}`);
+
+    } catch (error) {
+        console.error('[backup-pdf] Error:', error);
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Error al generar la copia de seguridad de PDFs.' });
+        } else {
+            res.end();
+        }
+    }
+});
+
 module.exports = router;

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, Upload, FileText, Save, Eye, X, Check, Folder, Pencil, Edit, Trash2 } from 'lucide-react';
+import { Search, Upload, FileText, Save, Eye, X, Check, Folder, Pencil, Edit, Trash2, Download } from 'lucide-react';
 
 function DocumentManagement() {
     // State
@@ -20,6 +20,11 @@ function DocumentManagement() {
     const [assignments, setAssignments] = useState([]);
     const [editingDoc, setEditingDoc] = useState(null);
     const [hybridStatus, setHybridStatus] = useState(null);
+    const [backupLoading, setBackupLoading] = useState(false);
+
+    // Leer usuario actual del localStorage
+    const currentUser = (() => { try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; } })();
+    const isAdmin = currentUser.role === 'admin' || currentUser.role === 'superadmin';
 
     const fetchSavedDocs = async () => {
         setLoadingSaved(true);
@@ -99,8 +104,39 @@ function DocumentManagement() {
         setHybridStatus(null);
     };
 
+    // Visualizar PDF con fallback automático (si el disco/OneDrive no está disponible, usa backup local)
     const handleView = (doc) => {
-        window.open(`/api/ades/view/${doc.id}`, '_blank');
+        window.open(`/api/documents/file/${doc.id}`, '_blank');
+    };
+
+    // Descargar copia de seguridad de todos los PDFs
+    const handleBackupPdf = async () => {
+        setBackupLoading(true);
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/system/backup-pdf', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                alert('Error al generar copia de seguridad: ' + (err.error || response.statusText));
+                return;
+            }
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
+            a.href = url;
+            a.download = `backup_pdf_sena_${dateStr}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert('Error al descargar la copia de seguridad: ' + err.message);
+        } finally {
+            setBackupLoading(false);
+        }
     };
 
     const handleEditDoc = (doc) => {
@@ -414,7 +450,20 @@ function DocumentManagement() {
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                     <div className="p-4 border-b flex justify-between items-center bg-gray-50">
                         <h3 className="font-bold text-gray-700">Documentos Guardados ({savedDocs.length})</h3>
-                        <button onClick={fetchSavedDocs} className="text-xs text-green-700 font-medium px-3 py-1.5 border border-green-200 rounded hover:bg-green-50">↻ Actualizar</button>
+                        <div className="flex items-center gap-2">
+                            {isAdmin && (
+                                <button
+                                    onClick={handleBackupPdf}
+                                    disabled={backupLoading}
+                                    title="Descargar copia de seguridad de todos los PDFs (.zip)"
+                                    className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded shadow-sm transition-colors disabled:opacity-60"
+                                >
+                                    <Download size={13} />
+                                    {backupLoading ? 'Generando...' : '💾 Copia de Seguridad PDF'}
+                                </button>
+                            )}
+                            <button onClick={fetchSavedDocs} className="text-xs text-green-700 font-medium px-3 py-1.5 border border-green-200 rounded hover:bg-green-50">↻ Actualizar</button>
+                        </div>
                     </div>
                     {loadingSaved ? (
                         <div className="p-8 text-center text-gray-400">Cargando...</div>

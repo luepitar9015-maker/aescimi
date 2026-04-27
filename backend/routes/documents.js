@@ -592,5 +592,77 @@ router.get('/stats/dashboard', (req, res) => {
 
 
 
+// ── GET /file/:id — Servir PDF con fallback automático ────────────────────────
+// 1. Intenta servir desde el path registrado en BD (disco/OneDrive)
+// 2. Si no existe, busca por nombre de archivo en uploads/ (backup local)
+// 3. Si tampoco existe → 404
+router.get('/file/:id', async (req, res) => {
+    const { id } = req.params;
+
+    db.get('SELECT path, filename FROM documents WHERE id = ?', [id], (err, doc) => {
+        if (err) return res.status(500).json({ error: 'Error al consultar la base de datos.' });
+        if (!doc) return res.status(404).json({ error: 'Documento no encontrado.' });
+
+        const primaryPath = doc.path;
+        const filename = doc.filename;
+
+        // Helper para servir el archivo
+        const serveFile = (filePath, source) => {
+            console.log(`[file/:id] ✅ Sirviendo desde ${source}: ${filePath}`);
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+            res.sendFile(filePath, { root: '/' }, (sendErr) => {
+                if (sendErr && !res.headersSent) {
+                    console.error('[file/:id] Error al enviar archivo:', sendErr.message);
+                    res.status(500).json({ error: 'Error al enviar el archivo.' });
+                }
+            });
+        };
+
+        // 1. Intentar ruta principal
+        if (primaryPath && fs.existsSync(primaryPath)) {
+            return serveFile(primaryPath, 'ruta principal');
+        }
+
+        // 2. Fallback: buscar en uploads/ por nombre de archivo (recursivo)
+        console.warn(`[file/:id] ⚠️ No encontrado en ruta principal: ${primaryPath}. Buscando en backup...`);
+        const uploadsDir = path.join(__dirname, '..', 'uploads');
+
+        const findInDir = (dir) => {
+            if (!fs.existsSync(dir)) return null;
+            try {
+                const entries = fs.readdirSync(dir, { withFileTypes: true });
+                for (const entry of entries) {
+                    const fullPath = path.join(dir, entry.name);
+                    if (entry.isDirectory()) {
+                        const found = findInDir(fullPath);
+                        if (found) return found;
+                    } else if (entry.isFile() && entry.name === filename) {
+                        return fullPath;
+                    }
+                }
+            } catch (e) {
+                console.warn('[file/:id] No se pudo leer directorio:', dir);
+            }
+            return null;
+        };
+
+        const backupPath = findInDir(uploadsDir);
+
+        if (backupPath) {
+            console.log(`[file/:id] ✅ Encontrado en backup: ${backupPath}`);
+            return serveFile(backupPath, 'backup local');
+        }
+
+        // 3. No encontrado en ninguna parte
+        console.error(`[file/:id] ❌ Archivo no disponible: ${filename}`);
+        return res.status(404).json({
+            error: 'El archivo PDF no está disponible. El disco de almacenamiento puede no estar conectado y no hay copia de respaldo local.',
+            filename,
+            primaryPath
+        });
+    });
+});
+
 module.exports = router;
 
