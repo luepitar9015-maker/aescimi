@@ -30,6 +30,7 @@ const automationRoutes = require('./routes/automation');
 const permissionsRoutes = require('./routes/permissions');
 
 const app = express();
+app.set('trust proxy', 1); // Confiar en el proxy Nginx (X-Forwarded-For para express-rate-limit)
 // Puerto: 3000 internamente (Nginx maneja el 443 con SSL)
 const port = process.env.PORT || 3000;
 
