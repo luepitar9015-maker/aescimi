@@ -286,7 +286,7 @@ const styles = {
   // Panel izquierdo verde
   leftPanel: {
     flex: '1 1 50%',
-    background: 'linear-gradient(145deg, #052e16 0%, #14532d 50%, #0d3d1f 100%)',
+    background: 'linear-gradient(145deg, #4CAF50 0%, #39A900 50%, #2E7D32 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -405,10 +405,10 @@ const styles = {
   },
   btnPrimary: {
     width: '100%', padding: '13px', fontSize: '15px', fontWeight: '700',
-    background: 'linear-gradient(135deg, #14532d, #052e16)',
+    background: 'linear-gradient(135deg, #39A900, #2E7D32)',
     color: 'white', border: 'none', borderRadius: '10px',
     cursor: 'pointer', marginTop: '4px', marginBottom: '10px',
-    boxShadow: '0 4px 14px rgba(20,83,45,0.45)',
+    boxShadow: '0 4px 14px rgba(57,169,0,0.45)',
     transition: 'opacity 0.2s',
   },
   btnSecondary: {

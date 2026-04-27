@@ -9,7 +9,7 @@ git add .
 
 echo.
 echo [2/3] Creando punto de guardado (Commit)...
-git commit -m "Se actualiza el titulo a: Automatizador de Gestion Documental"
+git commit -m "Se actualiza el color de la pantalla de inicio a verde SENA vivo"
 
 echo.
 echo [3/3] Subiendo cambios a GitHub... (Esto puede tomar un momento dependiendo de tu conexion)

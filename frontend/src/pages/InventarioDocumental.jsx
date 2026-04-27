@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import html2pdf from 'html2pdf.js';
-import { Download, Plus, Trash2, FileText } from 'lucide-react';
+import { Download, Plus, Trash2, FileText, Database } from 'lucide-react';
 
 // Logo SENA en base64 (SVG)
 const SENA_LOGO_B64 = `data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA3NSA3My41Ij48cGF0aCBmaWxsPSIjMzlBOTAwIiBkPSJNMzcuNzMgMC43N2E3Ljk3IDcuOTcgMCAxIDAgLjAxIDE1Ljk0IDcuOTcgNy45NyAwIDAgMC0uMDEtMTUuOTR6TTExLjQ1IDE5LjE3Yy0xLjQgMC0yLjgyLjA5LTQuMTYuNDItLjg4LjIyLTEuNzMuNTktMi4yOCAxLjE2LS42OS43MS0uNzggMS42OC0uNDQgMi41MS4zLjczIDEuMTIgMS4yOCAyLjAyIDEuNTkgMS45NS42NyA0LjEyLjgxIDYuMTcgMS4yMy4zOC4wOS43OC4xOSAxLjAzLjQ1LjI0LjMxLjEuNzMtLjMuOTItLjY3LjM0LTEuNTIuMzQtMi4yOS4zM0M4LjgzIDI2LjggOC4wNSAyNi43NCA3LjQ5IDI2LjRjLS40MS0uMjYtLjQ5LS44Ny0uMzktMS4wNmwtNC41NyAuMDFjLS4wMS43LjEyIDEuNDIuNjMgMi4wMi40My41MSAxLjExLjg3IDEuODUgMS4wOSAxLjE4LjM1IDIuNDYuNDUgMy43Mi40OCA1LjEuMDUgNi41Ni0uMzcgNy42Ny0xLjY2LjgzLS45OC44Ny0yLjY1LS4yLTMuNTMtLjc0LS40My0xLjYyLS43LTIuNTItLjg3LTEuMzItLjI3LTIuNjYtLjQ3LTMuOTktLjY5LS40Ny0uMDktLjk2LS4xNy0xLjM2LS4zOS0uNDEtLjIyLS40NS0uNzQtLjAzLS45Ny41NC0uMzEgMS4yNy0uMzEgMS45Mi0uMzEuNjkuMDEgMS40My4wNSAxLjk5LjM4LjMyLjE4LjQ0LjQ3LjQ1Ljc2bDQuMzUtLjAxYy0uMDItLjU1LS4xMi0xLjEyLS41Mi0xLjYtLjQ3LS41OS0xLjI5LS45NS0yLjEzLTEuMTctMS4zMy0uMzQtMi43NC0uNDEtNC4xMy0uNDF6bTkuNDMuMzNsLS4wMSAxMC4zOCAxMi42Ny4wMS0uMDEtMi4yNmgtNy41MnYtMS44M2g3LjE2di0yLjIxaC03LjE2di0xLjY1bDcuNzMtLjAwNC0uMDA0LTIuMjR6bTIwLjg3LjAwNHMtMy45MS4wMDEtNS44Ny4wMDFsLS4wMDEgMTAuMzggNC40NS4wMDEtLjAwMy02Ljk5IDYuMDkgNi45OCA2LjEuMDA2LS4wMDItMTAuMzgtNC40NS4wMDEuMDA1IDYuOTN6bTE4LjcuMDJzLTQuOCA2LjkzLTcuMjEgMTAuMzh6bTIuMzMgMi40OGwyLjIxIDMuNzYtNC41OC4wMDd6TTAgMzMuMjJsLjA0IDUuNjUgMjEuMTItLjA4YzEuMDguMjMgMS43LjkzIDEuNDggMi41M2wtMTIuOTkgMjIuNzQgNC4yMyAzLjk2IDIwLjEyLTM0Ljh6bTQwLjMgLjA1bDE5Ljc4IDM0LjY1IDQuMzctMy45My0xMy4xNC0yMi42OGMtLjIyLTEuNi40MDUtMi4zMSAxLjQ4LTIuNTRsMjEuMTIuMDgtLjAwNi01LjU2em0tMy4zNCA1LjczbC0xOC41NiAzMS44NSA0LjkzIDIuNCAxMi4zOC0yMC45MmMuNDMtLjM1Ljg2LS41MyAxLjI5LS41NS40Ni0uMDIuOTIuMTUgMS4zOC41MWwxMi4zNSAyMC45OSA1LjA4LTIuNjV6Ii8+PC9zdmc+`;
@@ -48,7 +48,13 @@ function InventarioDocumental() {
     const [fecReci, setFecReci] = useState('');
 
     const [generando, setGenerando] = useState(false);
+    const [generandoBackup, setGenerandoBackup] = useState(false);
     const pdfRef = useRef(null);
+    
+    // Obtener info del usuario actual para saber si es admin/superadmin
+    const userStr = localStorage.getItem('user');
+    const user = userStr ? JSON.parse(userStr) : null;
+    const isAdmin = user && (user.role === 'admin' || user.role === 'superadmin');
 
     const agregarFila = () => {
         setItems(prev => [...prev, camposVaciosItem()]);
@@ -83,6 +89,41 @@ function InventarioDocumental() {
         }
     };
 
+    const descargarBackup = async () => {
+        setGenerandoBackup(true);
+        try {
+            const token = localStorage.getItem('token');
+            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+            const response = await fetch(`${apiUrl}/api/system/backup`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Error al descargar la copia de seguridad.');
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            // The backend sets the filename in Content-Disposition, but we can provide a default here
+            a.download = `backup_sena_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Error en backup:', err);
+            alert(`Hubo un error al generar la copia de seguridad: ${err.message}`);
+        } finally {
+            setGenerandoBackup(false);
+        }
+    };
+
     const inputCls = "w-full border border-gray-300 rounded p-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#39A900]";
     const tblInputCls = "w-full bg-transparent p-1 text-xs border-none outline-none focus:ring-1 focus:ring-blue-400 rounded";
 
@@ -108,14 +149,27 @@ function InventarioDocumental() {
                         <p className="text-green-100 text-xs font-semibold uppercase tracking-widest">Formato Oficial GD-F-004 (V. 06)</p>
                     </div>
                 </div>
-                <button
-                    onClick={exportarPDF}
-                    disabled={generando}
-                    className="bg-yellow-400 hover:bg-yellow-500 disabled:opacity-60 text-blue-900 font-black py-2.5 px-6 rounded-xl shadow transition-all flex items-center gap-2 uppercase text-xs italic"
-                >
-                    <Download size={18} />
-                    {generando ? 'Generando PDF...' : 'Descargar Formato PDF'}
-                </button>
+                <div className="flex gap-2">
+                    {isAdmin && (
+                        <button
+                            onClick={descargarBackup}
+                            disabled={generandoBackup}
+                            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-black py-2.5 px-6 rounded-xl shadow transition-all flex items-center gap-2 uppercase text-xs italic"
+                            title="Generar y descargar archivo ZIP con base de datos y documentos"
+                        >
+                            <Database size={18} />
+                            {generandoBackup ? 'Generando...' : 'Copia de Seguridad'}
+                        </button>
+                    )}
+                    <button
+                        onClick={exportarPDF}
+                        disabled={generando}
+                        className="bg-yellow-400 hover:bg-yellow-500 disabled:opacity-60 text-blue-900 font-black py-2.5 px-6 rounded-xl shadow transition-all flex items-center gap-2 uppercase text-xs italic"
+                    >
+                        <Download size={18} />
+                        {generando ? 'Generando PDF...' : 'Descargar Formato PDF'}
+                    </button>
+                </div>
             </div>
 
             {/* ---- FORMULARIO UI ---- */}
