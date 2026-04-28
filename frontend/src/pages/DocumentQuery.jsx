@@ -43,9 +43,11 @@ function DocumentQuery() {
         }
     };
 
+    // Usa la ruta con fallback automático (disco principal → backup local)
     const handleView = (doc) => {
-        window.open(`/api/ades/view/${doc.id}`, '_blank');
+        window.open(`/api/documents/file/${doc.id}`, '_blank');
     };
+
 
     return (
         <div className="p-6 max-w-7xl mx-auto bg-gray-50 min-h-screen">
@@ -110,6 +112,9 @@ function DocumentQuery() {
                             </div>
                             <h3 className="text-lg font-semibold text-gray-500">Sin resultados</h3>
                             <p className="text-gray-400 max-w-xs mt-2">Realice una búsqueda para ver los expedientes cargados en el sistema.</p>
+                            <p className="text-xs text-indigo-400 mt-2 max-w-xs">
+                                ⚠️ Si ya buscó y no aparecen resultados, es posible que no tenga series/subseries asignadas. Contacte al administrador.
+                            </p>
                         </div>
                     )}
 

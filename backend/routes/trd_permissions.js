@@ -3,7 +3,7 @@ const router = express.Router();
 const { pool } = require('../database_pg');
 
 // GET permissions for a user
-router.get('/user/:userId', (req, res) => {
+router.get('/user/:userId', async (req, res) => {
     const { userId } = req.params;
     const query = `
         SELECT p.*, s.series_name, sub.subseries_name 
@@ -12,14 +12,16 @@ router.get('/user/:userId', (req, res) => {
         LEFT JOIN trd_subseries sub ON p.subseries_id = sub.id
         WHERE p.user_id = $1
     `;
-    pool.query(query, [userId], (err, result) => {
-        if (err) return res.status(500).json({ error: err.message });
+    try {
+        const result = await pool.query(query, [userId]);
         res.json({ data: result.rows });
-    });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // POST add/update permission
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
     const { user_id, series_id, subseries_id, can_view, can_upload } = req.body;
     
     const query = `
@@ -29,18 +31,28 @@ router.post('/', (req, res) => {
         DO UPDATE SET can_view = EXCLUDED.can_view, can_upload = EXCLUDED.can_upload
     `;
     
-    pool.query(query, [user_id, series_id || null, subseries_id || null, can_view ? 1 : 0, can_upload ? 1 : 0], (err) => {
-        if (err) return res.status(500).json({ error: err.message });
+    try {
+        await pool.query(query, [
+            user_id,
+            series_id || null,
+            subseries_id || null,
+            can_view ? 1 : 0,
+            can_upload ? 1 : 0
+        ]);
         res.json({ message: "Permisos granulares actualizados" });
-    });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // DELETE permission
-router.delete('/:id', (req, res) => {
-    pool.query("DELETE FROM user_trd_permissions WHERE id = $1", [req.params.id], (err) => {
-        if (err) return res.status(500).json({ error: err.message });
+router.delete('/:id', async (req, res) => {
+    try {
+        await pool.query("DELETE FROM user_trd_permissions WHERE id = $1", [req.params.id]);
         res.json({ message: "Permiso granular eliminado" });
-    });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 module.exports = router;
