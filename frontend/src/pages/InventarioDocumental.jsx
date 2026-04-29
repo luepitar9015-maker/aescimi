@@ -19,11 +19,13 @@ const estilos = `
   .ed:hover { background:#f0f8ff; }
   .ed:focus { background:#fffbdd; }
   .ed-inline { display:inline-block; min-width:18px; border-bottom:1px solid #000; text-align:center; outline:none; margin:0 2px; }
+  .inv-select { width:100%; border:none; outline:none; background:transparent; font-size:10px; font-family:Arial,sans-serif; cursor:pointer; padding:2px; }
   #tablaInv thead td { padding:5px 2px; font-size:8.5px; }
   @media print {
     body { background:#fff; padding:0; }
     .inv-hoja { box-shadow:none; padding:0; margin:0; width:100%; }
     .inv-acciones, #inv-toast { display:none!important; }
+    .inv-select { appearance:none; -webkit-appearance:none; -moz-appearance:none; }
   }
 `;
 
@@ -197,7 +199,15 @@ export default function InventarioDocumental() {
                             </tr>
                             <tr>
                                 <td style={{fontWeight:'bold'}}>OBJETO:</td>
-                                <td colSpan={4}><EdDiv /></td>
+                                <td colSpan={4}>
+                                    <select className="inv-select" defaultValue="">
+                                        <option value="">Seleccione el objeto...</option>
+                                        <option value="TRANSFERENCIA PRIMARIA">TRANSFERENCIA PRIMARIA</option>
+                                        <option value="ENTREGA DE CARGO">ENTREGA DE CARGO</option>
+                                        <option value="ENTREGA DE CONTRATO">ENTREGA DE CONTRATO</option>
+                                        <option value="ARCHIVO DE GESTIÓN">ARCHIVO DE GESTIÓN</option>
+                                    </select>
+                                </td>
                                 <td style={{textAlign:'right', fontWeight:'bold', fontSize:11, paddingRight:16}}>
                                     Hoja{' '}
                                     <span className="ed-inline" contentEditable suppressContentEditableWarning />
