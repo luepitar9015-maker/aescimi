@@ -56,6 +56,7 @@ function CreationModule() {
 
     // --- Storage Path Global State ---
     const [editStoragePath, setEditStoragePath] = useState('');
+    const [editBackupPath, setEditBackupPath] = useState('');
 
     useEffect(() => {
         fetchGlobalSettings();
@@ -66,6 +67,9 @@ function CreationModule() {
             const res = await axios.get(`${API_URL}/settings/storage_path`);
             setEditStoragePath(res.data.value || '');
             setForm(prev => ({ ...prev, storage_path: res.data.value || '' })); // Sync with creation form too
+            
+            const resBackup = await axios.get(`${API_URL}/settings/backup_path`);
+            setEditBackupPath(resBackup.data.value || '');
         } catch (err) {
             console.error("Error fetching settings:", err);
         }
@@ -74,7 +78,8 @@ function CreationModule() {
     const handleUpdatePath = async () => {
         try {
             await axios.post(`${API_URL}/settings`, { key: 'storage_path', value: editStoragePath });
-            alert('Ruta GLOBAL de almacenamiento actualizada. Esta ruta se usará para todo el sistema.');
+            await axios.post(`${API_URL}/settings`, { key: 'backup_path', value: editBackupPath });
+            alert('Rutas globales actualizadas correctamente. Estas rutas se usarán para todo el sistema.');
             fetchGlobalSettings(); // Refresh
         } catch (err) {
             alert('Error updating path: ' + (err.response?.data?.error || err.message));
@@ -401,29 +406,49 @@ function CreationModule() {
                 <p style={{ margin: '0 0 15px 0', fontSize: '13px', color: '#555' }}>
                     Configure primero la ruta base donde se guardarán todas las carpetas y expedientes del sistema. <strong>Solo se configura una vez.</strong>
                 </p>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
-                    <div style={{ flex: 1 }}>
-                        <label style={{ fontWeight: 'bold', fontSize: '13px', display: 'block', marginBottom: '5px' }}>
-                            Ruta Base (OneDrive / Servidor):
-                        </label>
-                        <input
-                            type="text"
-                            value={editStoragePath}
-                            onChange={(e) => setEditStoragePath(e.target.value)}
-                            className="form-control"
-                            placeholder="C:\Users\Usuario\OneDrive - SENA\Gestión Documental"
-                            style={{ width: '100%' }}
-                        />
-                        {editStoragePath && (
-                            <small style={{ color: '#2e7d32', fontWeight: 'bold' }}>✔ Ruta configurada: {editStoragePath}</small>
-                        )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
+                        <div style={{ flex: 1 }}>
+                            <label style={{ fontWeight: 'bold', fontSize: '13px', display: 'block', marginBottom: '5px' }}>
+                                Ruta Base (OneDrive / Servidor):
+                            </label>
+                            <input
+                                type="text"
+                                value={editStoragePath}
+                                onChange={(e) => setEditStoragePath(e.target.value)}
+                                className="form-control"
+                                placeholder="C:\Users\Usuario\OneDrive - SENA\Gestión Documental"
+                                style={{ width: '100%' }}
+                            />
+                            {editStoragePath && (
+                                <small style={{ color: '#2e7d32', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>✔ Ruta configurada: {editStoragePath}</small>
+                            )}
+                        </div>
                     </div>
-                    <button
-                        onClick={handleUpdatePath}
-                        style={{ background: '#F57F17', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', height: '38px', whiteSpace: 'nowrap' }}
-                    >
-                        Guardar Ruta
-                    </button>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
+                        <div style={{ flex: 1 }}>
+                            <label style={{ fontWeight: 'bold', fontSize: '13px', display: 'block', marginBottom: '5px' }}>
+                                Ruta de Copia de Seguridad (Backup en tiempo real):
+                            </label>
+                            <input
+                                type="text"
+                                value={editBackupPath}
+                                onChange={(e) => setEditBackupPath(e.target.value)}
+                                className="form-control"
+                                placeholder="D:\Backup_SENA\Gestion_Documental"
+                                style={{ width: '100%' }}
+                            />
+                            {editBackupPath && (
+                                <small style={{ color: '#2e7d32', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>✔ Backup configurado: {editBackupPath}</small>
+                            )}
+                        </div>
+                        <button
+                            onClick={handleUpdatePath}
+                            style={{ background: '#F57F17', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', height: '38px', whiteSpace: 'nowrap' }}
+                        >
+                            Guardar Rutas
+                        </button>
+                    </div>
                 </div>
             </div>
 

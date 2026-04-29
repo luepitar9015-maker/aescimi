@@ -165,9 +165,19 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         console.log("[UPLOAD] ✅ Niveles resueltos:", pathParts.join(' > '));
         console.log("[UPLOAD] ✅ Directorio final:", expDir);
 
-
         if (!fs.existsSync(expDir)) {
             fs.mkdirSync(expDir, { recursive: true });
+        }
+
+        const backupBasePath = await getSystemSetting('backup_path');
+        let backupExpDir = null;
+        if (backupBasePath && backupBasePath.trim() !== '') {
+            backupExpDir = path.join(backupBasePath, ...pathParts);
+            if (!fs.existsSync(backupExpDir)) {
+                try { fs.mkdirSync(backupExpDir, { recursive: true }); } 
+                catch (e) { console.error("[BACKUP] Error creating dir:", e); backupExpDir = null; }
+            }
+            if (backupExpDir) console.log("[BACKUP] ✅ Directorio de respaldo preparado:", backupExpDir);
         }
 
         const sourcePath = req.file.path;
@@ -293,6 +303,16 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                 const pdfBytes = await newPdf.save();
                 fs.writeFileSync(outputPath, pdfBytes);
                 
+                if (backupExpDir) {
+                    try {
+                        const backupFilePath = path.join(backupExpDir, filename);
+                        fs.writeFileSync(backupFilePath, pdfBytes);
+                        console.log(`[BACKUP] Copia guardada en: ${backupFilePath}`);
+                    } catch (e) {
+                        console.error("[BACKUP] Error guardando copia:", e);
+                    }
+                }
+                
                 // Save record to DB
                 await saveToDb(filename, outputPath, typ.name);
                 
@@ -308,6 +328,16 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             
             const pdfBytes = await pdfDoc.save();
             fs.writeFileSync(outputPath, pdfBytes);
+            
+            if (backupExpDir) {
+                try {
+                    const backupFilePath = path.join(backupExpDir, filename);
+                    fs.writeFileSync(backupFilePath, pdfBytes);
+                    console.log(`[BACKUP] Copia guardada en: ${backupFilePath}`);
+                } catch (e) {
+                    console.error("[BACKUP] Error guardando copia:", e);
+                }
+            }
             
             // Save record to DB
             await saveToDb(filename, outputPath, mainTypology);
