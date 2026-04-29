@@ -30,7 +30,8 @@ function CargueAes() {
         { id: 'type', label: '3. Seleccionando "SGDEA - Ingreso a Expediente"', match: ['Buscando tipo documental SGDEA', 'Tipo documental seleccionado:'] },
         { id: 'fill', label: '4. Diligenciando Metadatos e Índices', match: ['Diligenciando metadatos', 'Metadatos diligenciados'] },
         { id: 'upload', label: '5. Adjuntando Archivo Electrónico PDF', match: ['Adjuntando archivo', 'Click en botón "Importar"', 'Archivo PDF cargado'] },
-        { id: 'save', label: '6. Guardando y Radicando Documento', match: ['Guardando y radicando', 'Botón guardar activado', 'Documento radicado exitosamente', 'Ventana aceptada'] }
+        { id: 'save', label: '6. Guardando y Radicando Documento', match: ['Guardando y radicando', 'Botón guardar activado', 'Documento radicado exitosamente', 'Ventana aceptada'] },
+        { id: 'restart', label: '7. Cerrar y si sigue el siguiente documento, reinicia al paso 1', match: ['Esperando para procesar', 'Reiniciando ciclo'] }
     ];
 
     useEffect(() => {
