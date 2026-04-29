@@ -149,7 +149,7 @@ export default function InventarioDocumental() {
                         </colgroup>
                         <tbody>
                             <tr>
-                                <td style={{fontWeight:'bold'}}>SEDE</td>
+                                <td style={{fontWeight:'bold'}}>SEDE (Submódulo Regional)</td>
                                 <td><EdDiv /></td>
                                 <td colSpan={3} style={{textAlign:'center', fontWeight:'bold', fontSize:9}}>REGISTRO DE ENTRADA</td>
                                 <td style={{textAlign:'center', fontWeight:'bold', fontSize:9}}>NUT - NÚMERO ÚNICO DE<br/>TRANSFERENCIA</td>
