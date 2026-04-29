@@ -38,15 +38,22 @@ export default function InventarioDocumental() {
     const [filas, setFilas] = useState(() => Array.from({length:8}, (_,i) => fila(i+1)));
     const [sedeName, setSedeName] = useState('');
     const [centroName, setCentroName] = useState('');
+    const [oficinaName, setOficinaName] = useState('');
 
     useEffect(() => {
         const fetchData = async () => {
             try {
                 const res = await axios.get('/api/organization');
                 if (res.data && res.data.data && res.data.data.length > 0) {
-                    // Tomamos el nombre de la regional del primer registro
-                    setSedeName(res.data.data[0].regional_name || '');
-                    setCentroName(res.data.data[0].center_name || '');
+                    const firstDep = res.data.data[0];
+                    setSedeName(firstDep.regional_name || '');
+                    setCentroName(firstDep.center_name || '');
+                    
+                    let oficina = firstDep.section_name || '';
+                    if (firstDep.subsection_name) {
+                        oficina += ` / ${firstDep.subsection_name}`;
+                    }
+                    setOficinaName(oficina);
                 }
             } catch (err) {
                 console.error("Error fetching organization data:", err);
@@ -183,7 +190,7 @@ export default function InventarioDocumental() {
                             </tr>
                             <tr>
                                 <td style={{fontWeight:'bold'}}>OFICINA PRODUCTORA</td>
-                                <td><EdDiv /></td>
+                                <td><div style={{width:'100%', minHeight:'14px', padding:'0 2px'}}>{oficinaName}</div></td>
                                 <td><EdDiv cls="text-center" /></td>
                                 <td><EdDiv cls="text-center" /></td>
                                 <td><EdDiv cls="text-center" /></td>
