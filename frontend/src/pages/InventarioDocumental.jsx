@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
+import axios from 'axios';
 
 const SENA_SVG = `data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA3NSA3My41Ij48cGF0aCBmaWxsPSIjMzlBOTAwIiBkPSJNMzcuNzMgMC43N2E3Ljk3IDcuOTcgMCAxIDAgLjAxIDE1Ljk0IDcuOTcgNy45NyAwIDAgMC0uMDEtMTUuOTR6TTExLjQ1IDE5LjE3Yy0xLjQgMC0yLjgyLjA5LTQuMTYuNDItLjg4LjIyLTEuNzMuNTktMi4yOCAxLjE2LS42OS43MS0uNzggMS42OC0uNDQgMi41MS4zLjczIDEuMTIgMS4yOCAyLjAyIDEuNTkgMS45NS42NyA0LjEyLjgxIDYuMTcgMS4yMy4zOC4wOS43OC4xOSAxLjAzLjQ1LjI0LjMxLjEuNzMtLjMuOTItLjY3LjM0LTEuNTIuMzQtMi4yOS4zM0M4LjgzIDI2LjggOC4wNSAyNi43NCA3LjQ5IDI2LjRjLS40MS0uMjYtLjQ5LS44Ny0uMzktMS4wNmwtNC41NyAuMDFjLS4wMS43LjEyIDEuNDIuNjMgMi4wMi40My41MSAxLjExLjg3IDEuODUgMS4wOSAxLjE4LjM1IDIuNDYuNDUgMy43Mi40OCA1LjEuMDUgNi41Ni0uMzcgNy42Ny0xLjY2LjgzLS45OC44Ny0yLjY1LS4yLTMuNTMtLjc0LS40My0xLjYyLS43LTIuNTItLjg3LTEuMzItLjI3LTIuNjYtLjQ3LTMuOTktLjY5LS40Ny0uMDktLjk2LS4xNy0xLjM2LS4zOS0uNDEtLjIyLS40NS0uNzQtLjAzLS45Ny41NC0uMzEgMS4yNy0uMzEgMS45Mi0uMzEuNjkuMDEgMS40My4wNSAxLjk5LjM4LjMyLjE4LjQ0LjQ3LjQ1Ljc2bDQuMzUtLjAxYy0uMDItLjU1LS4xMi0xLjEyLS41Mi0xLjYtLjQ3LS41OS0xLjI5LS45NS0yLjEzLTEuMTctMS4zMy0uMzQtMi43NC0uNDEtNC4xMy0uNDF6bTkuNDMuMzNsLS4wMSAxMC4zOCAxMi42Ny4wMS0uMDEtMi4yNmgtNy41MnYtMS44M2g3LjE2di0yLjIxaC03LjE2di0xLjY1bDcuNzMtLjAwNC0uMDA0LTIuMjR6bTIwLjg3LjAwNHMtMy45MS4wMDEtNS44Ny4wMDFsLS4wMDEgMTAuMzggNC40NS4wMDEtLjAwMy02Ljk5IDYuMDkgNi45OCA2LjEuMDA2LS4wMDItMTAuMzgtNC40NS4wMDEuMDA1IDYuOTN6bTE4LjcuMDJzLTQuOCA2LjkzLTcuMjEgMTAuMzh6bTIuMzMgMi40OGwyLjIxIDMuNzYtNC41OC4wMDd6TTAgMzMuMjJsLjA0IDUuNjUgMjEuMTItLjA4YzEuMDguMjMgMS43LjkzIDEuNDggMi41M2wtMTIuOTkgMjIuNzQgNC4yMyAzLjk2IDIwLjEyLTM0Ljh6bTQwLjMgLjA1bDE5Ljc4IDM0LjY1IDQuMzctMy45My0xMy4xNC0yMi42OGMtLjIyLTEuNi40MDUtMi4zMSAxLjQ4LTIuNTRsMjEuMTIuMDgtLjAwNi01LjU2em0tMy4zNCA1LjczbC0xOC41NiAzMS44NSA0LjkzIDIuNCAxMi4zOC0yMC45MmMuNDMtLjM1Ljg2LS41MyAxLjI5LS41NS40Ni0uMDIuOTIuMTUgMS4zOC41MWwxMi4zNSAyMC45OSA1LjA4LTIuNjV6Ii8+PC9zdmc+`;
 
@@ -35,6 +36,22 @@ export default function InventarioDocumental() {
     const [generando, setGenerando] = useState(false);
     const [toast, setToast] = useState(null);
     const [filas, setFilas] = useState(() => Array.from({length:8}, (_,i) => fila(i+1)));
+    const [sedeName, setSedeName] = useState('');
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const res = await axios.get('/api/organization');
+                if (res.data && res.data.data && res.data.data.length > 0) {
+                    // Tomamos el nombre de la regional del primer registro
+                    setSedeName(res.data.data[0].regional_name || '');
+                }
+            } catch (err) {
+                console.error("Error fetching organization data:", err);
+            }
+        };
+        fetchData();
+    }, []);
 
     // Campos encabezado (refs para leer al exportar sin re-renders)
     const mostrarToast = (msg, tipo='info') => {
@@ -149,8 +166,8 @@ export default function InventarioDocumental() {
                         </colgroup>
                         <tbody>
                             <tr>
-                                <td style={{fontWeight:'bold'}}>SEDE (Submódulo Regional)</td>
-                                <td><EdDiv /></td>
+                                <td style={{fontWeight:'bold'}}>SEDE</td>
+                                <td><EdDiv>{sedeName}</EdDiv></td>
                                 <td colSpan={3} style={{textAlign:'center', fontWeight:'bold', fontSize:9}}>REGISTRO DE ENTRADA</td>
                                 <td style={{textAlign:'center', fontWeight:'bold', fontSize:9}}>NUT - NÚMERO ÚNICO DE<br/>TRANSFERENCIA</td>
                             </tr>
