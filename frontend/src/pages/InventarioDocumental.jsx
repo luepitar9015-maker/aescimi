@@ -37,6 +37,7 @@ export default function InventarioDocumental() {
     const [toast, setToast] = useState(null);
     const [filas, setFilas] = useState(() => Array.from({length:8}, (_,i) => fila(i+1)));
     const [sedeName, setSedeName] = useState('');
+    const [centroName, setCentroName] = useState('');
 
     useEffect(() => {
         const fetchData = async () => {
@@ -45,6 +46,7 @@ export default function InventarioDocumental() {
                 if (res.data && res.data.data && res.data.data.length > 0) {
                     // Tomamos el nombre de la regional del primer registro
                     setSedeName(res.data.data[0].regional_name || '');
+                    setCentroName(res.data.data[0].center_name || '');
                 }
             } catch (err) {
                 console.error("Error fetching organization data:", err);
@@ -167,13 +169,13 @@ export default function InventarioDocumental() {
                         <tbody>
                             <tr>
                                 <td style={{fontWeight:'bold'}}>SEDE</td>
-                                <td><EdDiv>{sedeName}</EdDiv></td>
+                                <td><div style={{width:'100%', minHeight:'14px', padding:'0 2px'}}>{sedeName}</div></td>
                                 <td colSpan={3} style={{textAlign:'center', fontWeight:'bold', fontSize:9}}>REGISTRO DE ENTRADA</td>
                                 <td style={{textAlign:'center', fontWeight:'bold', fontSize:9}}>NUT - NÚMERO ÚNICO DE<br/>TRANSFERENCIA</td>
                             </tr>
                             <tr>
                                 <td style={{fontWeight:'bold'}}>UNIDAD ADMINISTRATIVA</td>
-                                <td><EdDiv /></td>
+                                <td><div style={{width:'100%', minHeight:'14px', padding:'0 2px'}}>{centroName}</div></td>
                                 <td style={{textAlign:'center', fontSize:10}}>AÑO</td>
                                 <td style={{textAlign:'center', fontSize:10}}>MES</td>
                                 <td style={{textAlign:'center', fontSize:10}}>DIA</td>
