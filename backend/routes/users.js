@@ -4,6 +4,25 @@ const bcrypt = require('bcryptjs');
 const { requireAuth, requireAdmin } = require('../middleware/authMiddleware');
 const { pool } = require('../database_pg');
 
+// Change own password (for must_change_password flow)
+router.post('/change-password', requireAuth, async (req, res) => {
+    const { password } = req.body;
+    if (!password || password.length < 6) {
+        return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres.' });
+    }
+
+    try {
+        const salt = bcrypt.genSaltSync(10);
+        const hash = bcrypt.hashSync(password, salt);
+        // Reseteamos el flag must_change_password a 0
+        await pool.query('UPDATE users SET password_hash=$1, must_change_password=0 WHERE id=$2', [hash, req.user.id]);
+        res.json({ message: 'Contraseña actualizada exitosamente' });
+    } catch (err) {
+        console.error('[USERS] CHANGE PASSWORD error:', err);
+        res.status(500).json({ error: 'Error al actualizar contraseña.' });
+    }
+});
+
 // List all users
 router.get('/', requireAuth, requireAdmin, async (req, res) => {
     try {
