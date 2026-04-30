@@ -35,26 +35,45 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         // typologies format: [{ name: 'TypologyName', range: '1-3' }]
 
         // 1. LOOKUP TRD CODES AND STORAGE PATH
-        // 1. LOOKUP TRD CODES AND STORAGE PATH
-        const query = `
-            SELECT 
-                s.subseries_code, s.subseries_name, s.folder_hierarchy as sub_hierarchy,
-                ser.series_code, ser.series_name, ser.folder_hierarchy as ser_hierarchy,
-                org.section_code, org.subsection_code, org.regional_code, org.center_code,
-                org.storage_path, org.entity_name, org.regional_name, org.center_name,
-                ser.id as series_id, s.id as id, org.id as dependency_id
-            FROM trd_subseries s
-            LEFT JOIN trd_series ser ON s.series_id = ser.id
-            LEFT JOIN organization_structure org ON ser.dependency_id = org.id
-            WHERE s.subseries_code = ? OR s.subseries_name = ?
-            LIMIT 1
-        `;
-
         const getTRDInfo = () => new Promise((resolve, reject) => {
-            db.get(query, [expediente.subserie, expediente.subserie], (err, row) => {
-                if (err) reject(err);
-                else resolve(row);
-            });
+            if (expediente && expediente.id) {
+                const query = `
+                    SELECT 
+                        sub.subseries_code, sub.subseries_name, sub.folder_hierarchy as sub_hierarchy,
+                        ser.series_code, ser.series_name, ser.folder_hierarchy as ser_hierarchy,
+                        org.section_code, org.subsection_code, org.regional_code, org.center_code,
+                        org.storage_path, org.entity_name, org.regional_name, org.center_name,
+                        ser.id as series_id, sub.id as id, org.id as dependency_id
+                    FROM expedientes e
+                    LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie LIKE '%-' || sub.subseries_code)
+                    LEFT JOIN trd_series ser ON (e.subserie = ser.series_code OR e.subserie LIKE '%-' || ser.series_code OR sub.series_id = ser.id)
+                    LEFT JOIN organization_structure org ON ser.dependency_id = org.id
+                    WHERE e.id = ?
+                    LIMIT 1
+                `;
+                db.get(query, [expediente.id], (err, row) => {
+                    if (err) reject(err);
+                    else resolve(row);
+                });
+            } else {
+                const query = `
+                    SELECT 
+                        s.subseries_code, s.subseries_name, s.folder_hierarchy as sub_hierarchy,
+                        ser.series_code, ser.series_name, ser.folder_hierarchy as ser_hierarchy,
+                        org.section_code, org.subsection_code, org.regional_code, org.center_code,
+                        org.storage_path, org.entity_name, org.regional_name, org.center_name,
+                        ser.id as series_id, s.id as id, org.id as dependency_id
+                    FROM trd_subseries s
+                    LEFT JOIN trd_series ser ON s.series_id = ser.id
+                    LEFT JOIN organization_structure org ON ser.dependency_id = org.id
+                    WHERE s.subseries_code = ? OR s.subseries_name = ?
+                    LIMIT 1
+                `;
+                db.get(query, [expediente.subserie, expediente.subserie], (err, row) => {
+                    if (err) reject(err);
+                    else resolve(row);
+                });
+            }
         });
 
         const trdInfo = await getTRDInfo();
@@ -62,11 +81,15 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         // GRANULAR PERMISSIONS CHECK
         if (req.user && req.user.role !== 'admin' && req.user.role !== 'superadmin') {
             const checkPerm = () => new Promise((resolve) => {
+                if (!trdInfo) {
+                    return resolve(false);
+                }
                 const q = `
                     SELECT can_upload FROM user_trd_permissions 
                     WHERE user_id = $1 AND (series_id = $2 OR subseries_id = $3)
+                    ORDER BY can_upload DESC LIMIT 1
                 `;
-                db.get(q, [req.user.id, trdInfo?.series_id, trdInfo?.id], (err, row) => {
+                db.get(q, [req.user.id, trdInfo.series_id || null, trdInfo.id || null], (err, row) => {
                     resolve(row ? row.can_upload === 1 : false);
                 });
             });
