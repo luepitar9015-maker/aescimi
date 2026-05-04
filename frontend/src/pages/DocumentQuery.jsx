@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, Eye, FileText, ChevronRight, Filter, Info, UserCheck } from 'lucide-react';
+import { Search, Eye, FileText, ChevronRight, Filter, Info, UserCheck, Folder, FileSpreadsheet } from 'lucide-react';
 
 function DocumentQuery() {
     const [searchTerm, setSearchTerm] = useState('');
@@ -169,6 +169,12 @@ function DocumentQuery() {
                                             {expedienteDocs.length}
                                         </span>
                                     </h3>
+                                    <a 
+                                        href={`/formatos`}
+                                        className="flex items-center gap-2 text-sm bg-amber-100 text-amber-700 hover:bg-amber-600 hover:text-white px-4 py-2 rounded-lg font-bold transition-all shadow-sm"
+                                    >
+                                        <FileSpreadsheet size={16} /> Ver Hoja de Control
+                                    </a>
                                 </div>
 
                                 {loadingDocs ? (
@@ -176,27 +182,33 @@ function DocumentQuery() {
                                         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
                                     </div>
                                 ) : expedienteDocs.length > 0 ? (
-                                    <div className="space-y-3">
-                                        {expedienteDocs.map(doc => (
-                                            <div 
-                                                key={doc.id}
-                                                className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100 hover:bg-indigo-50 hover:border-indigo-100 transition-all group"
-                                            >
-                                                <div className="flex items-center gap-4">
-                                                    <div className="bg-white p-2.5 rounded-lg shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                                                        <FileText size={20} />
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-bold text-gray-800 text-sm">{doc.filename}</p>
-                                                        <p className="text-xs text-indigo-500 font-medium">{doc.typology_name || 'Sin tipología'}</p>
-                                                    </div>
+                                    <div className="space-y-6">
+                                        {Object.entries(expedienteDocs.reduce((acc, doc) => {
+                                            const type = doc.typology_name || 'Documento_General';
+                                            if (!acc[type]) acc[type] = [];
+                                            acc[type].push(doc);
+                                            return acc;
+                                        }, {})).map(([typology, docs]) => (
+                                            <div key={typology} className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                                                <h4 className="font-bold text-indigo-800 mb-3 flex items-center gap-2">
+                                                    <Folder size={18} /> {typology}
+                                                </h4>
+                                                <div className="space-y-2 pl-4 border-l-2 border-indigo-100">
+                                                    {docs.map(doc => (
+                                                        <div key={doc.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-100 hover:border-indigo-200 hover:shadow-sm transition-all group">
+                                                            <div className="flex items-center gap-3">
+                                                                <FileText size={18} className="text-gray-400 group-hover:text-indigo-500 transition-colors" />
+                                                                <p className="font-semibold text-gray-700 text-sm">{doc.filename}</p>
+                                                            </div>
+                                                            <button 
+                                                                onClick={() => handleView(doc)}
+                                                                className="flex items-center gap-2 text-indigo-600 bg-indigo-50 hover:bg-indigo-600 hover:text-white px-3 py-1.5 rounded-md text-xs font-bold transition-all"
+                                                            >
+                                                                <Eye size={14} /> Visualizar
+                                                            </button>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                                <button 
-                                                    onClick={() => handleView(doc)}
-                                                    className="flex items-center gap-2 bg-white text-indigo-600 border border-indigo-200 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
-                                                >
-                                                    <Eye size={14} /> Visualizar
-                                                </button>
                                             </div>
                                         ))}
                                     </div>
