@@ -499,34 +499,7 @@ router.get('/expediente/:id', (req, res) => {
     });
 });
 
-// GET /fix-names/:expedienteId - Run the rename script for a specific expediente via API
-router.get('/fix-names/:expedienteId', async (req, res) => {
-    const searchValue = req.params.expedienteId;
-    try {
-        const expedienteQuery = `
-            SELECT e.*, 
-                   sub.id as subseries_id, ser.id as series_id
-            FROM expedientes e
-            LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie LIKE '%-' || sub.subseries_code)
-            LEFT JOIN trd_series ser ON (e.subserie = ser.series_code OR e.subserie LIKE '%-' || ser.series_code OR sub.series_id = ser.id)
-            WHERE e.id::text = $1 OR e.title LIKE $2 OR e.expediente_code LIKE $2
-            LIMIT 1
-        `;
-        const likeParam = `%${searchValue}%`;
-        
-        // As database_pg uses pg, we use db.query which is exposed correctly if we use it via our adapter or directly.
-        // In documents.js, db.all is used for sqlite compat. Let's use db.all for compatibility.
-        // Wait, db.all uses ?, not $1.
-        const sqliteQuery = `
-            SELECT e.*, 
-                   sub.id as subseries_id, ser.id as series_id
-            FROM expedientes e
-            LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie LIKE '%-' || sub.subseries_code)
-            LEFT JOIN trd_series ser ON (e.subserie = ser.series_code OR e.subserie LIKE '%-' || ser.series_code OR sub.series_id = ser.id)
-            WHERE e.id = ? OR e.title LIKE ? OR e.expediente_code LIKE ?
-            LIMIT 1
-        `;
-        
+// Helper function to auto-rename docs in an expediente based on TRD
 const fixExpedienteNames = async (searchValue) => {
     try {
         const sqliteQuery = `
