@@ -527,8 +527,20 @@ router.get('/fix-names/:expedienteId', async (req, res) => {
             LIMIT 1
         `;
         
+const fixExpedienteNames = async (searchValue) => {
+    try {
+        const sqliteQuery = `
+            SELECT e.*, 
+                   sub.id as subseries_id, ser.id as series_id
+            FROM expedientes e
+            LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie LIKE '%-' || sub.subseries_code)
+            LEFT JOIN trd_series ser ON (e.subserie = ser.series_code OR e.subserie LIKE '%-' || ser.series_code OR sub.series_id = ser.id)
+            WHERE e.id = ? OR e.title LIKE ? OR e.expediente_code LIKE ?
+            LIMIT 1
+        `;
+        const likeParam = `%${searchValue}%`;
+        
         const getExpediente = () => new Promise((resolve, reject) => {
-            // we try to parse it as int for e.id, if it's text we just pass 0
             const idVal = isNaN(parseInt(searchValue)) ? 0 : parseInt(searchValue);
             db.get(sqliteQuery, [idVal, likeParam, likeParam], (err, row) => {
                 if (err) reject(err); else resolve(row);
@@ -536,7 +548,7 @@ router.get('/fix-names/:expedienteId', async (req, res) => {
         });
         
         const expediente = await getExpediente();
-        if (!expediente) return res.status(404).json({ error: 'Expediente no encontrado.' });
+        if (!expediente) return { success: false, error: 'Expediente no encontrado.' };
 
         const getTypologyOrderMap = () => new Promise((resolve) => {
             let q, params;
@@ -604,10 +616,17 @@ router.get('/fix-names/:expedienteId', async (req, res) => {
                 });
             });
         }
-        res.json({ success: true, message: 'Renombrado completado.', logs: resultsLog });
+        return { success: true, logs: resultsLog };
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        return { success: false, error: err.message };
     }
+};
+
+// GET /fix-names/:expedienteId - Run the rename script for a specific expediente via API
+router.get('/fix-names/:expedienteId', async (req, res) => {
+    const result = await fixExpedienteNames(req.params.expedienteId);
+    if (!result.success) return res.status(500).json({ error: result.error });
+    res.json({ success: true, message: 'Renombrado completado.', logs: result.logs });
 });
 
 // PUT /:id - Update document details
@@ -634,36 +653,20 @@ router.put('/:id', async (req, res) => {
             const query = `UPDATE documents SET filename = ?, path = ?, typology_name = ?, document_date = ?, origen = ? WHERE id = ?`;
             db.run(query,
                 [resolvedFilename, resolvedPath, typology_name || doc.typology_name, document_date || doc.document_date, origen || doc.origen, id],
-                function(err) {
+                async function(err) {
                     if (err) return res.status(500).json({ error: err.message });
+                    
+                    // Trigger the auto-rename/re-order script for the expediente
+                    if (doc.expediente_id) {
+                        await fixExpedienteNames(doc.expediente_id);
+                    }
+                    
                     res.json({ success: true, message: 'Documento actualizado correctamente', path: resolvedPath, filename: resolvedFilename });
                 });
         };
 
-        if (isSafeName && !newDirectPath) {
-            const newFilename = resolvedFilename.endsWith('.pdf') ? resolvedFilename : `${resolvedFilename}.pdf`;
-            const newPath = path.join(dir, newFilename);
-            resolvedFilename = newFilename;
-            resolvedPath = newPath;
-
-            if (newFilename !== doc.filename) {
-                if (fs.existsSync(newPath)) {
-                    return res.status(400).json({ error: 'Ya existe un archivo con ese nombre.' });
-                }
-                try {
-                    if (fs.existsSync(oldPath)) fs.renameSync(oldPath, newPath);
-                    doUpdate();
-                } catch (fsErr) {
-                    console.error("Error renaming file:", fsErr);
-                    res.status(500).json({ error: 'Error al renombrar el archivo físico.' });
-                }
-            } else {
-                doUpdate();
-            }
-        } else {
-            // Display name (long joinedName) or direct path change — just update DB
-            doUpdate();
-        }
+        // We ignore manual filename changes since fixExpedienteNames will overwrite them anyway based on TRD.
+        doUpdate();
     });
 });
 
