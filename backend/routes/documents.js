@@ -122,15 +122,6 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                 : (expediente.metadata_values || {});
         } catch (e) { metaValues = {}; }
 
-        // Fetch typology mapping for the document
-        const mainTypologyName = typologies[0] ? typologies[0].name : 'Documento_General';
-        const getTypologyMapping = (name) => new Promise((resolve) => {
-            db.get("SELECT document_type_value FROM trd_typologies WHERE typology_name = ?", [name], (err, row) => {
-                resolve(row?.document_type_value || null);
-            });
-        });
-        const typologyValue = await getTypologyMapping(mainTypologyName);
-
         // Helper to extract suffixes without symbols
         const getCleanSuffix = (fullCode, separator) => {
             if (!fullCode) return '';
@@ -143,65 +134,63 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         const serieSuffix = getCleanSuffix(trdInfo?.series_code, '-');
         const subserieSuffix = getCleanSuffix(trdInfo?.subseries_code, '.');
 
-        // 1. Generate Raw Levels preserving dots/dashes
-        const rawLevels = hierarchy.map(level => {
-            let value = '';
-            const type = level.type;
-
-            if (type === 'reg') value = regCode;
-            else if (type === 'ctr') value = ctrCode;
-            else if (type === 'dep') value = trdInfo?.section_code || trdInfo?.subsection_code || 'DEP';
-            else if (type === 'dep_conc') value = `${regCode}${ctrCode}`;
-            else if (type === 'ser') value = trdInfo?.series_code || 'SERIE';
-            else if (type === 'ser_name') value = trdInfo?.series_name || 'SERIE';
-            else if (type === 'ser_conc') value = `${regCode}${ctrCode}${serieSuffix}`;
-            else if (type === 'sub') value = trdInfo?.subseries_code || 'SUBSERIE';
-            else if (type === 'sub_name') value = trdInfo?.subseries_name || 'SUBSERIE';
-            else if (type === 'sub_conc') value = `${regCode}${ctrCode}${serieSuffix}${subserieSuffix}`;
-            // typ_val: valor de tipología (para clasificación por tipo de documento)
-            else if (type === 'typ_val') value = String(typologyValue || '');
-            // meta_1: título del expediente como primer valor por defecto
-            else if (type === 'meta_1') value = expediente.title || metaValues['valor1'] || metaValues['Metadato 1'] || '';
-            // meta_N: todos los valores de metadatos del expediente (valor1..valor8)
-            else if (type.startsWith('meta_')) {
-                const idx = type.split('_')[1];
-                value = metaValues[`valor${idx}`] || metaValues[`Metadato ${idx}`] || '';
-            }
-            
-            // CLEANING: Remove dots, dashes and forbidden filesystem chars
-            return String(value || '')
-                .replace(/[.-]/g, '') // Quitar puntos y guiones
-                .replace(/[<>:"/\\|?*]/g, '') 
-                .trim();
-        });
-
-
-        // 2. Construir path: cada nivel configurado = una carpeta independiente
-        //    Se respeta exactamente la jerarquía configurada por el usuario en el módulo TRD.
-        //    Ej: [dep_conc, ser_conc, meta_4] → /68922400/689224001/ValorExpediente/
-        const pathParts = rawLevels.filter(v => v.trim() !== '');
-
         const basePath = (await getSystemSetting('storage_path')) || trdInfo?.storage_path || path.join(__dirname, '../uploads/Gestion_Documental');
-        const expDir = path.join(basePath, ...pathParts);
-        
-        console.log("[UPLOAD] ✅ Jerarquía configurada:", hierarchy.map(h => h.type).join(' / '));
-        console.log("[UPLOAD] ✅ Niveles resueltos:", pathParts.join(' > '));
-        console.log("[UPLOAD] ✅ Directorio final:", expDir);
-
-        if (!fs.existsSync(expDir)) {
-            fs.mkdirSync(expDir, { recursive: true });
-        }
-
         const backupBasePath = await getSystemSetting('backup_path');
-        let backupExpDir = null;
-        if (backupBasePath && backupBasePath.trim() !== '') {
-            backupExpDir = path.join(backupBasePath, ...pathParts);
-            if (!fs.existsSync(backupExpDir)) {
-                try { fs.mkdirSync(backupExpDir, { recursive: true }); } 
-                catch (e) { console.error("[BACKUP] Error creating dir:", e); backupExpDir = null; }
+
+        // Function to build path dynamically based on typology name
+        const buildPathsForTypology = async (typologyName) => {
+            const getTypologyMapping = (name) => new Promise((resolve) => {
+                db.get("SELECT document_type_value FROM trd_typologies WHERE typology_name = ?", [name], (err, row) => {
+                    resolve(row?.document_type_value || null);
+                });
+            });
+            const typValue = await getTypologyMapping(typologyName);
+
+            const rawLevels = hierarchy.map(level => {
+                let value = '';
+                const type = level.type;
+
+                if (type === 'reg') value = regCode;
+                else if (type === 'ctr') value = ctrCode;
+                else if (type === 'dep') value = trdInfo?.section_code || trdInfo?.subsection_code || 'DEP';
+                else if (type === 'dep_conc') value = `${regCode}${ctrCode}`;
+                else if (type === 'ser') value = trdInfo?.series_code || 'SERIE';
+                else if (type === 'ser_name') value = trdInfo?.series_name || 'SERIE';
+                else if (type === 'ser_conc') value = `${regCode}${ctrCode}${serieSuffix}`;
+                else if (type === 'sub') value = trdInfo?.subseries_code || 'SUBSERIE';
+                else if (type === 'sub_name') value = trdInfo?.subseries_name || 'SUBSERIE';
+                else if (type === 'sub_conc') value = `${regCode}${ctrCode}${serieSuffix}${subserieSuffix}`;
+                else if (type === 'typ_val') value = String(typValue || '');
+                else if (type === 'meta_1') value = expediente.title || metaValues['valor1'] || metaValues['Metadato 1'] || '';
+                else if (type.startsWith('meta_')) {
+                    const idx = type.split('_')[1];
+                    value = metaValues[`valor${idx}`] || metaValues[`Metadato ${idx}`] || '';
+                }
+                
+                return String(value || '')
+                    .replace(/[.-]/g, '')
+                    .replace(/[<>:"/\\|?*]/g, '') 
+                    .trim();
+            });
+
+            const pathParts = rawLevels.filter(v => v.trim() !== '');
+            const expDir = path.join(basePath, ...pathParts);
+
+            if (!fs.existsSync(expDir)) {
+                fs.mkdirSync(expDir, { recursive: true });
             }
-            if (backupExpDir) console.log("[BACKUP] ✅ Directorio de respaldo preparado:", backupExpDir);
-        }
+
+            let backupExpDir = null;
+            if (backupBasePath && backupBasePath.trim() !== '') {
+                backupExpDir = path.join(backupBasePath, ...pathParts);
+                if (!fs.existsSync(backupExpDir)) {
+                    try { fs.mkdirSync(backupExpDir, { recursive: true }); } 
+                    catch (e) { console.error("[BACKUP] Error creating dir:", e); backupExpDir = null; }
+                }
+            }
+
+            return { expDir, backupExpDir, pathParts };
+        };
 
         const sourcePath = req.file.path;
         let sourcePdfBytes = fs.readFileSync(sourcePath);
@@ -252,12 +241,44 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         const results = [];
         const documentDate = req.body.document_date || new Date().toISOString();
 
-        // Helper to generate filename: Adds sequential numbering before the typology name
+        const getTypologyOrderMap = async (seriesId, subseriesId) => {
+            return new Promise((resolve) => {
+                let q, params;
+                if (subseriesId) {
+                    q = "SELECT typology_name FROM trd_typologies WHERE subseries_id = ? ORDER BY id ASC";
+                    params = [subseriesId];
+                } else if (seriesId) {
+                    q = "SELECT typology_name FROM trd_typologies WHERE series_id = ? ORDER BY id ASC";
+                    params = [seriesId];
+                } else {
+                    return resolve({});
+                }
+                
+                db.all(q, params, (err, rows) => {
+                    const map = {};
+                    if (!err && rows) {
+                        rows.forEach((r, idx) => {
+                            map[r.typology_name] = idx + 1; // 1-based index
+                        });
+                    }
+                    resolve(map);
+                });
+            });
+        };
+
+        const typologyOrderMap = await getTypologyOrderMap(trdInfo?.series_id, trdInfo?.id);
+
+        // Helper to generate filename: Uses TRD order (e.g. 01_Acta, 02_Informe)
         const generateFilename = (typName, currentDocIndex) => {
             const safeName = typName.replace(/[^a-zA-Z0-9\s-_]/g, '').trim();
-            // Format number to be 2 digits (e.g., 01, 02)
-            const paddedIndex = String(currentDocIndex).padStart(2, '0');
-            return `${paddedIndex}_${safeName}.pdf`;
+            const trdOrder = typologyOrderMap[typName] || 99; // Fallback a 99 si no está en TRD
+            const paddedOrder = String(trdOrder).padStart(2, '0');
+            
+            // Si hay múltiples documentos de la misma tipología, se agrega un sufijo _2, _3
+            if (currentDocIndex > 1) {
+                return `${paddedOrder}_${safeName}_${currentDocIndex}.pdf`;
+            }
+            return `${paddedOrder}_${safeName}.pdf`;
         };
 
         // Helper to save document to DB
@@ -301,6 +322,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         };
 
         let typologyCounts = await getTypologyCountMap();
+        let firstExpDir = null;
 
         if (split === 'true' && typologies.length > 0) {
             // Processing Split
@@ -308,6 +330,12 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                 const rangeParts = typ.range.split('-').map(Number);
                 const start = rangeParts[0] - 1;
                 const end = (rangeParts[1] || rangeParts[0]) - 1;
+
+                const { expDir, backupExpDir, pathParts } = await buildPathsForTypology(typ.name);
+                if (!firstExpDir) firstExpDir = expDir;
+                
+                console.log(`[UPLOAD] ✅ Niveles resueltos (${typ.name}):`, pathParts.join(' > '));
+                console.log(`[UPLOAD] ✅ Directorio final (${typ.name}):`, expDir);
 
                 const newPdf = await PDFDocument.create();
                 const numPages = pdfDoc.getPageCount();
@@ -345,6 +373,12 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             // No Split - Save entire document (from pdfDoc to include any conversion)
             const mainTypology = typologies[0] ? typologies[0].name : 'Documento_General';
             
+            const { expDir, backupExpDir, pathParts } = await buildPathsForTypology(mainTypology);
+            firstExpDir = expDir;
+            
+            console.log(`[UPLOAD] ✅ Niveles resueltos (${mainTypology}):`, pathParts.join(' > '));
+            console.log(`[UPLOAD] ✅ Directorio final (${mainTypology}):`, expDir);
+            
             typologyCounts[mainTypology] = (typologyCounts[mainTypology] || 0) + 1;
             const filename = generateFilename(mainTypology, typologyCounts[mainTypology]);
             const outputPath = path.join(expDir, filename);
@@ -371,7 +405,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         // Clean up temp file
         fs.unlinkSync(sourcePath);
 
-        res.json({ success: true, files: results, storage_path: expDir });
+        res.json({ success: true, files: results, storage_path: firstExpDir });
 
     } catch (err) {
         console.error("Error processing document:", err);
