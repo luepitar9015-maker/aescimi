@@ -491,12 +491,123 @@ router.get('/expediente/:id', (req, res) => {
         SELECT d.id, d.filename, d.path, d.typology_name, d.document_date, d.status, d.created_at, d.origen
         FROM documents d
         WHERE d.expediente_id = ?
-        ORDER BY d.created_at DESC
+        ORDER BY d.filename ASC
     `;
     db.all(query, [req.params.id], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ data: rows });
     });
+});
+
+// GET /fix-names/:expedienteId - Run the rename script for a specific expediente via API
+router.get('/fix-names/:expedienteId', async (req, res) => {
+    const searchValue = req.params.expedienteId;
+    try {
+        const expedienteQuery = `
+            SELECT e.*, 
+                   sub.id as subseries_id, ser.id as series_id
+            FROM expedientes e
+            LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie LIKE '%-' || sub.subseries_code)
+            LEFT JOIN trd_series ser ON (e.subserie = ser.series_code OR e.subserie LIKE '%-' || ser.series_code OR sub.series_id = ser.id)
+            WHERE e.id::text = $1 OR e.title LIKE $2 OR e.expediente_code LIKE $2
+            LIMIT 1
+        `;
+        const likeParam = `%${searchValue}%`;
+        
+        // As database_pg uses pg, we use db.query which is exposed correctly if we use it via our adapter or directly.
+        // In documents.js, db.all is used for sqlite compat. Let's use db.all for compatibility.
+        // Wait, db.all uses ?, not $1.
+        const sqliteQuery = `
+            SELECT e.*, 
+                   sub.id as subseries_id, ser.id as series_id
+            FROM expedientes e
+            LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie LIKE '%-' || sub.subseries_code)
+            LEFT JOIN trd_series ser ON (e.subserie = ser.series_code OR e.subserie LIKE '%-' || ser.series_code OR sub.series_id = ser.id)
+            WHERE e.id = ? OR e.title LIKE ? OR e.expediente_code LIKE ?
+            LIMIT 1
+        `;
+        
+        const getExpediente = () => new Promise((resolve, reject) => {
+            // we try to parse it as int for e.id, if it's text we just pass 0
+            const idVal = isNaN(parseInt(searchValue)) ? 0 : parseInt(searchValue);
+            db.get(sqliteQuery, [idVal, likeParam, likeParam], (err, row) => {
+                if (err) reject(err); else resolve(row);
+            });
+        });
+        
+        const expediente = await getExpediente();
+        if (!expediente) return res.status(404).json({ error: 'Expediente no encontrado.' });
+
+        const getTypologyOrderMap = () => new Promise((resolve) => {
+            let q, params;
+            if (expediente.subseries_id) {
+                q = "SELECT typology_name FROM trd_typologies WHERE subseries_id = ? ORDER BY id ASC";
+                params = [expediente.subseries_id];
+            } else if (expediente.series_id) {
+                q = "SELECT typology_name FROM trd_typologies WHERE series_id = ? ORDER BY id ASC";
+                params = [expediente.series_id];
+            } else {
+                return resolve({});
+            }
+            db.all(q, params, (err, rows) => {
+                const map = {};
+                if (!err && rows) {
+                    rows.forEach((r, idx) => map[r.typology_name] = idx + 1);
+                }
+                resolve(map);
+            });
+        });
+        const typologyOrderMap = await getTypologyOrderMap();
+
+        const getDocs = () => new Promise((resolve) => {
+            db.all("SELECT id, filename, path, typology_name FROM documents WHERE expediente_id = ? ORDER BY id ASC", [expediente.id], (err, rows) => {
+                resolve(rows || []);
+            });
+        });
+        const docs = await getDocs();
+        
+        const resultsLog = [];
+        const typologyCounts = {};
+
+        for (const doc of docs) {
+            const typName = doc.typology_name || 'Documento_General';
+            typologyCounts[typName] = (typologyCounts[typName] || 0) + 1;
+            const currentDocIndex = typologyCounts[typName];
+
+            const safeName = typName.replace(/[^a-zA-Z0-9\s-_]/g, '').trim();
+            const trdOrder = typologyOrderMap[typName] || 99;
+            const paddedOrder = String(trdOrder).padStart(2, '0');
+            
+            let newFilename = currentDocIndex > 1 ? `${paddedOrder}_${safeName}_${currentDocIndex}.pdf` : `${paddedOrder}_${safeName}.pdf`;
+
+            if (doc.filename === newFilename) {
+                resultsLog.push(`Doc ${doc.id}: OK (${newFilename})`);
+                continue;
+            }
+
+            const oldPath = doc.path;
+            const dir = path.dirname(oldPath);
+            const newPath = path.join(dir, newFilename);
+
+            try {
+                if (fs.existsSync(oldPath)) fs.renameSync(oldPath, newPath);
+            } catch (err) {
+                resultsLog.push(`Doc ${doc.id}: Error físico -> ${err.message}`);
+                continue;
+            }
+
+            await new Promise((resolve) => {
+                db.run("UPDATE documents SET filename = ?, path = ? WHERE id = ?", [newFilename, newPath, doc.id], (err) => {
+                    if (err) resultsLog.push(`Doc ${doc.id}: Error BD -> ${err.message}`);
+                    else resultsLog.push(`Doc ${doc.id}: Renombrado a ${newFilename}`);
+                    resolve();
+                });
+            });
+        }
+        res.json({ success: true, message: 'Renombrado completado.', logs: resultsLog });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // PUT /:id - Update document details
