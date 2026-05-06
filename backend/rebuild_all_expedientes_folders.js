@@ -27,6 +27,7 @@ async function run() {
         });
 
         const globalStoragePath = await getSystemSetting('storage_path');
+        const backupBasePath = await getSystemSetting('backup_path');
         const globalHierarchyConfig = await getSystemSetting('folder_hierarchy');
 
         if (!globalStoragePath) {
@@ -35,6 +36,7 @@ async function run() {
         }
 
         console.log('Ruta Base:', globalStoragePath);
+        if (backupBasePath) console.log('Ruta Backup:', backupBasePath);
 
         // 2. Obtener TODOS los expedientes con su info de TRD
         const queryExp = `
@@ -134,6 +136,15 @@ async function run() {
                 createdFolders++;
             }
 
+            let backupExpDir = null;
+            if (backupBasePath && backupBasePath.trim() !== '') {
+                backupExpDir = path.join(backupBasePath, ...pathLevels);
+                if (!fs.existsSync(backupExpDir)) {
+                    try { fs.mkdirSync(backupExpDir, { recursive: true }); }
+                    catch(e) { console.error("Error creando backup dir:", e); backupExpDir = null; }
+                }
+            }
+
             // 3. Mover Documentos asociados a este expediente a esta nueva ruta
             const docs = await new Promise((resolve, reject) => {
                 db.all("SELECT id, filename, path FROM documents WHERE expediente_id = ?", [exp.id], (err, rows) => {
@@ -163,12 +174,27 @@ async function run() {
                             });
                         });
 
+                        if (backupExpDir) {
+                            try {
+                                const finalBackupPath = path.join(backupExpDir, doc.filename);
+                                fs.copyFileSync(finalPath, finalBackupPath);
+                            } catch(e) { console.error("Error copiando a backup:", e); }
+                        }
+
                         fs.unlinkSync(oldPath);
                         console.log(`    📄 Archivo Reubicado: ${doc.filename}`);
                         movedDocs++;
                     } catch (err) {
                         console.error(`    ❌ Error moviendo documento ${doc.id}:`, err.message);
                     }
+                } else if (oldPath && fs.existsSync(oldPath) && backupExpDir) {
+                     // Solo asegurar que exista en el backup
+                     try {
+                         const finalBackupPath = path.join(backupExpDir, doc.filename);
+                         if (!fs.existsSync(finalBackupPath)) {
+                             fs.copyFileSync(oldPath, finalBackupPath);
+                         }
+                     } catch(e) {}
                 }
             }
         }

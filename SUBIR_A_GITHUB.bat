@@ -9,7 +9,7 @@ git add .
 
 echo.
 echo [2/3] Creando punto de guardado (Commit)...
-git commit -m "Se actualiza el color de la pantalla de inicio a verde SENA vivo"
+git commit -m "Corrección en la creación de carpetas de backup y arreglo en el ordenamiento de tipologías de la TRD"
 
 echo.
 echo [3/3] Subiendo cambios a GitHub... (Esto puede tomar un momento dependiendo de tu conexion)

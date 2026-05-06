@@ -258,7 +258,8 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                     const map = {};
                     if (!err && rows) {
                         rows.forEach((r, idx) => {
-                            map[r.typology_name] = idx + 1; // 1-based index
+                            const normalized = r.typology_name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+                            map[normalized] = idx + 1; // 1-based index
                         });
                     }
                     resolve(map);
@@ -271,7 +272,8 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         // Helper to generate filename: Uses TRD order (e.g. 01_Acta, 02_Informe)
         const generateFilename = (typName, currentDocIndex) => {
             const safeName = typName.replace(/[^a-zA-Z0-9\s-_]/g, '').trim();
-            const trdOrder = typologyOrderMap[typName] || 99; // Fallback a 99 si no está en TRD
+            const normalizedTypName = typName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+            const trdOrder = typologyOrderMap[normalizedTypName] || 99; // Fallback a 99 si no está en TRD
             const paddedOrder = String(trdOrder).padStart(2, '0');
             
             // Si hay múltiples documentos de la misma tipología, se agrega un sufijo _2, _3
@@ -537,7 +539,10 @@ const fixExpedienteNames = async (searchValue) => {
             db.all(q, params, (err, rows) => {
                 const map = {};
                 if (!err && rows) {
-                    rows.forEach((r, idx) => map[r.typology_name] = idx + 1);
+                    rows.forEach((r, idx) => {
+                        const normalized = r.typology_name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+                        map[normalized] = idx + 1;
+                    });
                 }
                 resolve(map);
             });
@@ -560,7 +565,8 @@ const fixExpedienteNames = async (searchValue) => {
             const currentDocIndex = typologyCounts[typName];
 
             const safeName = typName.replace(/[^a-zA-Z0-9\s-_]/g, '').trim();
-            const trdOrder = typologyOrderMap[typName] || 99;
+            const normalizedTypName = typName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+            const trdOrder = typologyOrderMap[normalizedTypName] || 99;
             const paddedOrder = String(trdOrder).padStart(2, '0');
             
             let newFilename = currentDocIndex > 1 ? `${paddedOrder}_${safeName}_${currentDocIndex}.pdf` : `${paddedOrder}_${safeName}.pdf`;
@@ -579,6 +585,33 @@ const fixExpedienteNames = async (searchValue) => {
             } catch (err) {
                 resultsLog.push(`Doc ${doc.id}: Error físico -> ${err.message}`);
                 continue;
+            }
+
+            // Actualizar Backup también si existe
+            const getSystemSetting = (key) => new Promise((resolve) => {
+                db.get("SELECT value FROM system_settings WHERE key = ?", [key], (err, row) => {
+                    if (err || !row) resolve(null);
+                    else resolve(row.value);
+                });
+            });
+            const backupBasePath = await getSystemSetting('backup_path');
+            if (backupBasePath && backupBasePath.trim() !== '') {
+                const basePath = await getSystemSetting('storage_path');
+                // Intentar deducir la ruta relativa del backup comparando con storage_path
+                let relativePath = '';
+                if (oldPath.startsWith(basePath)) {
+                    relativePath = oldPath.substring(basePath.length);
+                } else if (oldPath.includes('uploads/Gestion_Documental')) {
+                    relativePath = oldPath.split('uploads/Gestion_Documental')[1];
+                }
+
+                if (relativePath) {
+                    const oldBackupPath = path.join(backupBasePath, relativePath);
+                    const newBackupPath = path.join(path.dirname(oldBackupPath), newFilename);
+                    try {
+                        if (fs.existsSync(oldBackupPath)) fs.renameSync(oldBackupPath, newBackupPath);
+                    } catch(e) { console.error("[BACKUP] Error renombrando:", e); }
+                }
             }
 
             await new Promise((resolve) => {
