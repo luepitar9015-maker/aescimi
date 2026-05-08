@@ -112,6 +112,49 @@ router.put('/table/:name/:id', async (req, res) => {
     }
 });
 
+// ──────────────────────────────────────────────────────────────────────────────
+// ELIMINACIÓN MASIVA DE EXPEDIENTES (solo superadmin)
+// ──────────────────────────────────────────────────────────────────────────────
+
+// POST /api/superuser/limpiar-expedientes
+// Elimina TODOS los expedientes + documentos y reinicia secuencias de IDs
+router.post('/limpiar-expedientes', async (req, res) => {
+    const { confirmacion } = req.body;
+    if (confirmacion !== 'ELIMINAR') {
+        return res.status(400).json({ error: 'Confirmación incorrecta. Se requiere: ELIMINAR' });
+    }
+
+    try {
+        // Contar antes de eliminar
+        const cntDocs = await pool.query('SELECT COUNT(*) AS total FROM documents');
+        const cntExp  = await pool.query('SELECT COUNT(*) AS total FROM expedientes');
+
+        const totalDocs = parseInt(cntDocs.rows[0].total, 10);
+        const totalExp  = parseInt(cntExp.rows[0].total, 10);
+
+        // Eliminar (documentos primero por dependencias FK)
+        await pool.query('DELETE FROM documents');
+        await pool.query('DELETE FROM expedientes');
+
+        // Reiniciar secuencias a 1
+        await pool.query("SELECT setval('documents_id_seq',  1, false)");
+        await pool.query("SELECT setval('expedientes_id_seq', 1, false)");
+
+        console.log(`[SUPERUSER] Limpieza masiva ejecutada por usuario ${req.user?.id}: ${totalExp} expedientes, ${totalDocs} documentos eliminados.`);
+
+        res.json({
+            message: 'Limpieza completada exitosamente.',
+            eliminados: {
+                expedientes: totalExp,
+                documentos: totalDocs
+            }
+        });
+    } catch (err) {
+        console.error('[SUPERUSER] Error en limpieza masiva:', err);
+        res.status(500).json({ error: 'Error al ejecutar la limpieza: ' + err.message });
+    }
+});
+
 // Update Expiration Date
 router.post('/set-expiration', (req, res) => {
     const { date } = req.body;

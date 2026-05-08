@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Database, Trash2, Edit2, Save, X, Calendar, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Database, Trash2, Edit2, Save, X, Calendar, AlertTriangle, RefreshCw, ShieldAlert, CheckCircle2 } from 'lucide-react';
 
 const API_URL = '/api/superuser';
 
@@ -13,6 +13,11 @@ const SuperuserModule = () => {
   const [editValues, setEditValues] = useState({});
   const [expirationDate, setExpirationDate] = useState('');
   const [message, setMessage] = useState({ type: '', text: '' });
+
+  // ── Estado para eliminación masiva ──────────────────────────
+  const [confirmText, setConfirmText] = useState('');
+  const [limpiandо, setLimpiando] = useState(false);
+  const [resultadoLimpieza, setResultadoLimpieza] = useState(null);
 
   const token = localStorage.getItem('token');
   const headers = { Authorization: `Bearer ${token}` };
@@ -83,6 +88,31 @@ const SuperuserModule = () => {
       showSuccess('Fecha de caducidad actualizada');
     } catch (err) {
       showError('Error al actualizar caducidad');
+    }
+  };
+
+  // ── Limpieza masiva de expedientes ──────────────────────────
+  const handleLimpiezaMasiva = async () => {
+    if (confirmText !== 'ELIMINAR') return;
+    setLimpiando(true);
+    setResultadoLimpieza(null);
+    try {
+      const res = await axios.post(
+        `${API_URL}/limpiar-expedientes`,
+        { confirmacion: 'ELIMINAR' },
+        { headers }
+      );
+      setResultadoLimpieza(res.data.eliminados);
+      setConfirmText('');
+      // Refrescar tabla activa si es expedientes o documents
+      if (selectedTable === 'expedientes' || selectedTable === 'documents') {
+        handleTableSelect(selectedTable);
+      }
+      showSuccess(`✓ ${res.data.eliminados.expedientes} expedientes y ${res.data.eliminados.documentos} documentos eliminados.`);
+    } catch (err) {
+      showError(err.response?.data?.error || 'Error al ejecutar la limpieza');
+    } finally {
+      setLimpiando(false);
     }
   };
 
@@ -233,6 +263,91 @@ const SuperuserModule = () => {
             )}
           </div>
         </div>
+
+        {/* ── ZONA PELIGROSA ─────────────────────────────────────────── */}
+        <div className="mt-8 bg-white rounded-2xl shadow-sm border border-red-100 overflow-hidden">
+          <div className="p-4 border-b border-red-100 bg-red-50 flex items-center gap-3">
+            <ShieldAlert size={20} className="text-red-600" />
+            <h2 className="font-bold text-red-700">Zona Peligrosa — Eliminación Masiva de Expedientes</h2>
+          </div>
+
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+
+              {/* Descripción */}
+              <div>
+                <p className="text-sm text-gray-600 mb-3">
+                  Esta acción eliminará <strong>todos los expedientes y documentos</strong> registrados
+                  en el sistema de forma permanente. Las secuencias de IDs serán reiniciadas a 1.
+                </p>
+                <ul className="text-sm text-gray-500 space-y-1 list-disc list-inside mb-4">
+                  <li>Se eliminarán todos los registros de la tabla <code className="bg-gray-100 px-1 rounded">expedientes</code></li>
+                  <li>Se eliminarán todos los registros de la tabla <code className="bg-gray-100 px-1 rounded">documents</code></li>
+                  <li>Los IDs volverán a comenzar desde 1</li>
+                  <li>Los archivos físicos en el servidor NO se eliminan por esta acción</li>
+                </ul>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex gap-2 text-sm text-amber-700">
+                  <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                  <span>Esta acción es <strong>irreversible</strong>. Asegúrate de tener un respaldo antes de continuar.</span>
+                </div>
+              </div>
+
+              {/* Panel de confirmación */}
+              <div className="bg-gray-50 rounded-xl p-5 border border-gray-200">
+                <p className="text-sm font-semibold text-gray-700 mb-3">
+                  Para confirmar, escribe <span className="font-mono text-red-600 bg-red-50 px-1 rounded">ELIMINAR</span> en el campo:
+                </p>
+                <input
+                  id="confirm-delete-input"
+                  type="text"
+                  className="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-red-400 focus:border-red-400 outline-none transition-colors mb-4"
+                  placeholder="Escribe ELIMINAR para confirmar"
+                  value={confirmText}
+                  onChange={(e) => setConfirmText(e.target.value)}
+                  disabled={limpiandо}
+                />
+                <button
+                  id="btn-limpiar-expedientes"
+                  onClick={handleLimpiezaMasiva}
+                  disabled={confirmText !== 'ELIMINAR' || limpiandо}
+                  className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                    confirmText === 'ELIMINAR' && !limpiandо
+                      ? 'bg-red-600 hover:bg-red-700 text-white shadow-md hover:shadow-lg'
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  {limpiandо ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      Eliminando...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={16} />
+                      Eliminar todos los expedientes
+                    </>
+                  )}
+                </button>
+
+                {/* Resultado */}
+                {resultadoLimpieza && (
+                  <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
+                    <CheckCircle2 size={20} className="text-green-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-green-700">Limpieza completada</p>
+                      <p className="text-sm text-green-600 mt-1">
+                        <strong>{resultadoLimpieza.expedientes}</strong> expedientes eliminados<br />
+                        <strong>{resultadoLimpieza.documentos}</strong> documentos eliminados<br />
+                        <span className="text-xs text-green-500">IDs reiniciados desde 1</span>
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );
