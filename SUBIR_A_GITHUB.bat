@@ -9,7 +9,7 @@ git add .
 
 echo.
 echo [2/3] Creando punto de guardado (Commit)...
-git commit -m "Corrección en la creación de carpetas de backup y arreglo en el ordenamiento de tipologías de la TRD"
+git commit -m "feat: agregar script LIMPIAR_EXPEDIENTES para eliminar expedientes y archivos del sistema"
 
 echo.
 echo [3/3] Subiendo cambios a GitHub... (Esto puede tomar un momento dependiendo de tu conexion)
