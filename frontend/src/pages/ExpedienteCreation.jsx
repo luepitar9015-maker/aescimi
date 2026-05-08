@@ -1176,6 +1176,7 @@ function ExpedienteCreation() {
                                                         <option value="">— Seleccionar —</option>
                                                         <option value="Fisico">Físico</option>
                                                         <option value="Digital">Digital</option>
+                                                        <option value="Electronico">Electrónico</option>
                                                         <option value="Hibrido">Híbrido</option>
                                                     </select>
                                                 </td>

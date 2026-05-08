@@ -310,6 +310,7 @@ function HojaControl() {
                                                         <select value={doc.soporte} onChange={e=>updateDocField(idx, 'soporte', e.target.value)} className="w-full p-1 text-xs border rounded outline-none focus:border-blue-500 bg-white">
                                                             <option value="FISICO">Físico</option>
                                                             <option value="ELECTRONICO">Electrónico</option>
+                                                            <option value="ELECTRONICO_ORIGINAL">Electrónico Original</option>
                                                         </select>
                                                     </td>
                                                     <td className="p-1 border"><input type="text" value={doc.folios} onChange={e=>updateDocField(idx, 'folios', e.target.value)} className="w-full p-1 text-xs border rounded outline-none focus:border-blue-500 text-center" placeholder="1 - 5" /></td>
