@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { LogOut, FileText, User, Settings as SettingsIcon, FolderKanban, Database, Play, Network, Folder, Cloud, Globe, Shield, FileSpreadsheet, Upload } from 'lucide-react';
+import { LogOut, FileText, User, Settings as SettingsIcon, FolderKanban, Database, Play, Network, Folder, Cloud, Globe, Shield, FileSpreadsheet, Upload, BarChart2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import CreationModule from './pages/CreationModule'; // New
 import ExpedienteCreation from './pages/ExpedienteCreation'; // New Module
@@ -20,6 +20,7 @@ import SuperuserModule from './pages/SuperuserModule'; // New
 import ExploradorDocumental from './pages/ExploradorDocumental'; // Explorador archivos
 import Formatos from './pages/Formatos'; // Nuevo módulo de Formatos
 import ComunicacionesProducidas from './pages/ComunicacionesProducidas'; // Nuevo módulo
+import SeguimientoExpedientes from './pages/SeguimientoExpedientes'; // Seguimiento
 import './App.css';
 
 // --- Global Axios Interceptors ---
@@ -521,6 +522,9 @@ function Layout({ children }) {
               <Link to="/explorador" className="nav-item" style={{ color: '#db2777' }}>
                 <Folder size={18} /> Explorador Archivos
               </Link>
+              <Link to="/seguimiento" className="nav-item" style={{ color: '#db2777' }}>
+                <BarChart2 size={18} /> Seguimiento Expedientes
+              </Link>
             </div>
           )}
         </nav>
@@ -593,6 +597,9 @@ function App() {
         } />
         <Route path="/explorador" element={
           <ProtectedRoute><Layout><ExploradorDocumental /></Layout></ProtectedRoute>
+        } />
+        <Route path="/seguimiento" element={
+          <ProtectedRoute><Layout><SeguimientoExpedientes /></Layout></ProtectedRoute>
         } />
 
         <Route path="*" element={<Navigate to="/login" replace />} />
