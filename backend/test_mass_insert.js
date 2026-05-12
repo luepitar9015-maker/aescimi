@@ -60,7 +60,7 @@ async function testMassInsert() {
                 exp.centro || null,
                 exp.dependencia || null,
                 exp.storage_type || null,
-                exp.title || 'Sin Título',
+                exp.title && exp.title.trim() !== '' ? exp.title.trim() : null,
                 JSON.stringify(exp.metadata_values || {})
             ];
 

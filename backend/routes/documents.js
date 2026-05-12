@@ -161,7 +161,11 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                 else if (type === 'sub_name') value = trdInfo?.subseries_name || 'SUBSERIE';
                 else if (type === 'sub_conc') value = `${regCode}${ctrCode}${serieSuffix}${subserieSuffix}`;
                 else if (type === 'typ_val') value = String(typValue || '');
-                else if (type === 'meta_1') value = expediente.title || metaValues['valor1'] || metaValues['Metadato 1'] || '';
+                else if (type === 'meta_1') {
+                    const raw = expediente.title || metaValues['valor1'] || metaValues['Metadato 1'] || '';
+                    // Bloquear el literal genérico — no debe ser un nombre de carpeta
+                    value = (raw.trim() === 'Sin Título') ? '' : raw;
+                }
                 else if (type.startsWith('meta_')) {
                     const idx = type.split('_')[1];
                     value = metaValues[`valor${idx}`] || metaValues[`Metadato ${idx}`] || '';
@@ -172,6 +176,18 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                     .replace(/[<>:"/\\|?*]/g, '') 
                     .trim();
             });
+
+            // ── GUARDIA CRÍTICA: Detectar si algún nivel obligatorio quedó vacío ──
+            // Si el nivel de título (meta_1) está vacío, el expediente no tiene nombre
+            // y se crearía una carpeta sin nombre o con nombre incorrecto en OneDrive.
+            const meta1Index = hierarchy.findIndex(h => h.type === 'meta_1');
+            if (meta1Index !== -1 && (!rawLevels[meta1Index] || rawLevels[meta1Index].trim() === '')) {
+                throw new Error(
+                    `El expediente "${expediente.title || '(sin título)'}" no tiene título válido. ` +
+                    `No se puede crear la carpeta en el almacenamiento. ` +
+                    `Edite el expediente y asigne un título antes de cargar documentos.`
+                );
+            }
 
             const pathParts = rawLevels.filter(v => v.trim() !== '');
             const expDir = path.join(basePath, ...pathParts);

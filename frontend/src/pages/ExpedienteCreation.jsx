@@ -231,6 +231,15 @@ function ExpedienteCreation() {
     const saveToBackend = async () => {
         if (expedientes.length === 0) return alert("No hay datos para guardar.");
         
+        // ── VALIDACIÓN CRÍTICA: Bloquear si hay expedientes sin título ──
+        const sinTitulo = expedientes.filter(e => !e.title || e.title.trim() === '' || e.title === 'Sin Título');
+        if (sinTitulo.length > 0) {
+            const lista = sinTitulo.slice(0, 5).map((e, i) => `• Fila ${i + 1}: sin título`).join('\n');
+            const moreMsg = sinTitulo.length > 5 ? `\n...y ${sinTitulo.length - 5} más.` : '';
+            alert(`❌ No se puede guardar. Los siguientes ${sinTitulo.length} expediente(s) no tienen título:\n\n${lista}${moreMsg}\n\nSin título, las carpetas en OneDrive se crearán como "Sin Título".\nCorrija los títulos en la tabla antes de guardar.`);
+            return;
+        }
+        
         setLoading(true);
         setStatus('Guardando...');
 
@@ -480,7 +489,7 @@ function ExpedienteCreation() {
                         opening_date: parseDate(colMap.opening_date ? row[colMap.opening_date] : ''),
                         subserie: colMap.subserie ? String(row[colMap.subserie] || '').trim() : '',
                         storage_type: colMap.storage_type ? String(row[colMap.storage_type] || '').trim() : 'Fisico',
-                        title: colMap.title ? String(row[colMap.title] || '').trim() : 'Sin Título',
+                        title: colMap.title ? String(row[colMap.title] || '').trim() : '',
                         metadata_values: metadata
                     };
                 });
@@ -593,9 +602,13 @@ function ExpedienteCreation() {
     const getRowWarnings = (exp) => {
         const w = [];
         if (!exp.subserie) w.push('Sin código TRD');
-        if (!exp.title || exp.title === 'Sin Título') w.push('Sin título');
+        if (!exp.title || exp.title.trim() === '' || exp.title === 'Sin Título') w.push('⚠️ Sin título — la carpeta se creará mal');
         if (!exp.opening_date) w.push('Sin fecha');
         return w;
+    };
+
+    const hasCriticalWarnings = (exp) => {
+        return !exp.title || exp.title.trim() === '' || exp.title === 'Sin Título';
     };
 
     // ── Edición inline en Vista Previa ──
@@ -1186,7 +1199,7 @@ function ExpedienteCreation() {
                                                     <input
                                                         style={{...cellInput, fontWeight: 500}}
                                                         value={exp.title === 'Sin Título' ? '' : (exp.title || '')}
-                                                        onChange={e => updatePreviewRow(rowIdx, 'title', e.target.value || 'Sin Título')}
+                                                        onChange={e => updatePreviewRow(rowIdx, 'title', e.target.value)}
                                                         placeholder="Sin título..."
                                                         title="Editar título"
                                                     />

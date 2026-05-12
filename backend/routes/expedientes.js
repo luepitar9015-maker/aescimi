@@ -321,6 +321,16 @@ router.post('/mass', async (req, res) => {
 
         for (let i = 0; i < expedientes.length; i++) {
             const exp = expedientes[i];
+            // Validar título — rechazar si está vacío o es el literal genérico
+            const tituloLimpio = (exp.title || '').trim();
+            if (!tituloLimpio || tituloLimpio === 'Sin Título') {
+                errors.push({
+                    expediente: exp.expediente_code || `Fila ${i + 1}`,
+                    error: 'El expediente no tiene título. Sin título la carpeta en OneDrive se crearía como "Sin Título". Corrija el Excel y vuelva a intentarlo.'
+                });
+                continue; // Saltar este registro completamente
+            }
+
             const params = [
                 exp.expediente_code || null,
                 exp.box_id || null,
@@ -330,7 +340,7 @@ router.post('/mass', async (req, res) => {
                 exp.centro || null,
                 exp.dependencia || null,
                 exp.storage_type || null,
-                exp.title || 'Sin Título',
+                tituloLimpio,
                 JSON.stringify(exp.metadata_values || {})
             ];
 

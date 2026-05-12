@@ -482,12 +482,18 @@ function CargueAes() {
                         opening_date: colMap.date ? String(row[colMap.date] || '').trim() : '',
                         subserie: colMap.sub ? String(row[colMap.sub] || '').trim() : '',
                         storage_type: colMap.storage ? String(row[colMap.storage] || '').trim() : 'Fisico',
-                        title: colMap.tit ? String(row[colMap.tit] || '').trim() : 'Sin Título',
+                        title: colMap.tit ? String(row[colMap.tit] || '').trim() : '',
                         metadata_values: metadata
                     };
                 });
+                // Advertir si hay filas sin título
+                const sinTit = newExps.filter(e => !e.title || e.title.trim() === '');
                 setExpedientes(prev => [...prev, ...newExps]);
-                alert(`${newExps.length} registros cargados.`);
+                if (sinTit.length > 0) {
+                    alert(`✅ ${newExps.length} registros cargados.\n\n⚠️ ATENCIÓN: ${sinTit.length} expediente(s) no tienen título. Las carpetas en OneDrive se crearían incorrectamente. Corríjalos antes de guardar.`);
+                } else {
+                    alert(`✅ ${newExps.length} registros cargados correctamente.`);
+                }
             } catch (err) {
                 console.error(err);
                 alert("Error al leer Excel.");
