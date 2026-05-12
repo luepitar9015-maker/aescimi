@@ -15,9 +15,31 @@ pool.query(`
         assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         estado TEXT DEFAULT 'Pendiente',
         observaciones TEXT,
+        paquete_id INTEGER,
         UNIQUE(expediente_id, user_id)
     )
 `).catch(e => console.warn('[SEGUIMIENTO] Table init error:', e.message));
+
+pool.query(`
+    CREATE TABLE IF NOT EXISTS expediente_paquetes (
+        id SERIAL PRIMARY KEY,
+        nombre TEXT NOT NULL,
+        descripcion TEXT,
+        user_id INTEGER NOT NULL,
+        created_by INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        estado TEXT DEFAULT 'Activo'
+    )
+`).catch(e => console.warn('[SEGUIMIENTO] paquetes table error:', e.message));
+
+pool.query(`
+    CREATE TABLE IF NOT EXISTS paquete_items (
+        id SERIAL PRIMARY KEY,
+        paquete_id INTEGER NOT NULL,
+        expediente_id INTEGER NOT NULL,
+        UNIQUE(paquete_id, expediente_id)
+    )
+`).catch(e => console.warn('[SEGUIMIENTO] paquete_items table error:', e.message));
 
 // ──────────────────────────────────────────────────────────────
 // GET /api/seguimiento/estadisticas
@@ -309,4 +331,146 @@ router.get('/expedientes-sin-asignar', requireAuth, requireAdmin, async (req, re
     }
 });
 
+// ──────────────────────────────────────────────────────────────
+// GET /api/seguimiento/paquetes
+// ──────────────────────────────────────────────────────────────
+router.get('/paquetes', requireAuth, async (req, res) => {
+    try {
+        const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
+        const result = await pool.query(
+            `SELECT p.id, p.nombre, p.descripcion, p.estado, p.created_at,
+                    u.full_name AS usuario_nombre,
+                    cb.full_name AS creado_por,
+                    COUNT(pi.expediente_id) AS total_expedientes
+             FROM expediente_paquetes p
+             JOIN users u ON u.id = p.user_id
+             LEFT JOIN users cb ON cb.id = p.created_by
+             LEFT JOIN paquete_items pi ON pi.paquete_id = p.id
+             ${isAdmin ? '' : 'WHERE p.user_id = $1'}
+             GROUP BY p.id, u.full_name, cb.full_name
+             ORDER BY p.created_at DESC`,
+            isAdmin ? [] : [req.user.id]
+        );
+        res.json({ data: result.rows });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/seguimiento/paquetes/:id/expedientes
+router.get('/paquetes/:id/expedientes', requireAuth, async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT e.id, e.expediente_code, e.title, e.dependencia, e.subserie,
+                   ea.estado AS estado_asignacion,
+                   (SELECT COUNT(*) FROM documents d WHERE d.expediente_id = e.id) AS doc_count,
+                   (SELECT COUNT(*) FROM documents d WHERE d.expediente_id = e.id AND d.status = 'Cargado') AS docs_cargados
+            FROM paquete_items pi
+            JOIN expedientes e ON e.id = pi.expediente_id
+            LEFT JOIN expediente_assignments ea ON ea.expediente_id = e.id AND ea.paquete_id = $1
+            WHERE pi.paquete_id = $1
+            ORDER BY e.expediente_code
+        `, [req.params.id]);
+        res.json({ data: result.rows });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/seguimiento/paquetes — Crear paquete y asignar al usuario
+router.post('/paquetes', requireAuth, requireAdmin, async (req, res) => {
+    const { nombre, descripcion, user_id, expediente_ids } = req.body;
+    if (!nombre || !user_id || !Array.isArray(expediente_ids) || expediente_ids.length === 0)
+        return res.status(400).json({ error: 'Se requiere nombre, user_id y expediente_ids.' });
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const pRes = await client.query(
+            `INSERT INTO expediente_paquetes (nombre, descripcion, user_id, created_by) VALUES ($1,$2,$3,$4) RETURNING id`,
+            [nombre, descripcion || null, user_id, req.user.id]
+        );
+        const paqueteId = pRes.rows[0].id;
+        for (const expId of expediente_ids) {
+            await client.query(
+                `INSERT INTO paquete_items (paquete_id, expediente_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`,
+                [paqueteId, expId]
+            );
+            await client.query(`
+                INSERT INTO expediente_assignments (expediente_id, user_id, assigned_by, paquete_id, observaciones)
+                VALUES ($1,$2,$3,$4,$5)
+                ON CONFLICT (expediente_id, user_id) DO UPDATE
+                    SET paquete_id = EXCLUDED.paquete_id, assigned_by = EXCLUDED.assigned_by, assigned_at = CURRENT_TIMESTAMP
+            `, [expId, user_id, req.user.id, paqueteId, `Paquete: ${nombre}`]);
+        }
+        await client.query('COMMIT');
+        res.json({ message: `Paquete "${nombre}" creado con ${expediente_ids.length} expedientes.`, paquete_id: paqueteId });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: err.message });
+    } finally { client.release(); }
+});
+
+// DELETE /api/seguimiento/paquetes/:id
+router.delete('/paquetes/:id', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        await pool.query('DELETE FROM paquete_items WHERE paquete_id = $1', [req.params.id]);
+        await pool.query('DELETE FROM expediente_paquetes WHERE id = $1', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/seguimiento/auto-asignar — Llamado al subir un documento
+router.post('/auto-asignar', requireAuth, async (req, res) => {
+    const { expediente_id, user_id } = req.body;
+    if (!expediente_id || !user_id) return res.json({ skipped: true });
+    try {
+        const pkg = await pool.query(`
+            SELECT p.id, p.nombre FROM paquete_items pi
+            JOIN expediente_paquetes p ON p.id = pi.paquete_id
+            WHERE pi.expediente_id = $1 AND p.user_id = $2 LIMIT 1
+        `, [expediente_id, user_id]);
+        if (pkg.rowCount === 0) return res.json({ skipped: true });
+        const paq = pkg.rows[0];
+        await pool.query(`
+            INSERT INTO expediente_assignments (expediente_id, user_id, assigned_by, paquete_id, estado, observaciones)
+            VALUES ($1,$2,$2,$3,'En Proceso','Auto-asignado al cargar documento')
+            ON CONFLICT (expediente_id, user_id) DO UPDATE SET estado = 'En Proceso', assigned_at = CURRENT_TIMESTAMP
+        `, [expediente_id, user_id, paq.id]);
+        res.json({ assigned: true, paquete: paq.nombre });
+    } catch (err) {
+        res.json({ skipped: true, error: err.message });
+    }
+});
+
+// GET /api/seguimiento/validar-primer-doc/:expediente_id
+// Valida si el primer documento de la serie/subserie ya fue cargado
+router.get('/validar-primer-doc/:expediente_id', requireAuth, async (req, res) => {
+    try {
+        const { pool: pg } = require('../database_pg');
+        // Obtener la primera tipología de la serie/subserie del expediente
+        const result = await pg.query(`
+            SELECT tt.typology_name,
+                   (SELECT COUNT(*) FROM documents d
+                    WHERE d.expediente_id = $1
+                      AND UPPER(UNACCENT(d.typology_name)) = UPPER(UNACCENT(tt.typology_name))
+                   ) AS ya_cargado
+            FROM expedientes e
+            LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie ILIKE '%-' || sub.subseries_code)
+            LEFT JOIN trd_series ser ON (sub.series_id = ser.id OR e.subserie = ser.series_code)
+            LEFT JOIN trd_typologies tt ON (tt.subseries_id = sub.id OR (tt.subseries_id IS NULL AND tt.series_id = ser.id))
+            WHERE e.id = $1
+            ORDER BY tt.id ASC
+            LIMIT 1
+        `, [req.params.expediente_id]);
+
+        if (result.rowCount === 0) return res.json({ valid: true, message: 'Sin tipologías configuradas.' });
+        const row = result.rows[0];
+        res.json({
+            valid: Number(row.ya_cargado) > 0,
+            primer_documento: row.typology_name,
+            ya_cargado: Number(row.ya_cargado) > 0
+        });
+    } catch (err) {
+        res.json({ valid: true, error: err.message }); // No bloquear si falla la validación
+    }
+});
+
 module.exports = router;
+

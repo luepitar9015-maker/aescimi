@@ -148,6 +148,29 @@ function CargueAes() {
 
         if (docsToProcess.length === 0) return alert("Los documentos seleccionados no son válidos o ya están cargados.");
 
+        // ── VALIDACIÓN: Primer documento obligatorio ──────────────────
+        const docsSinPrimerDoc = [];
+        for (const doc of docsToProcess) {
+            if (!doc.expediente_id) continue;
+            try {
+                const val = await axios.get(`/api/seguimiento/validar-primer-doc/${doc.expediente_id}`);
+                if (!val.data.valid && val.data.primer_documento) {
+                    docsSinPrimerDoc.push({
+                        filename: doc.filename,
+                        primer_doc: val.data.primer_documento
+                    });
+                }
+            } catch { /* no bloquear si falla la validación */ }
+        }
+        if (docsSinPrimerDoc.length > 0) {
+            const lista = docsSinPrimerDoc.map(d => `• ${d.filename} → falta: "${d.primer_doc}"`).join('\n');
+            const continuar = window.confirm(
+                `⚠️ ADVERTENCIA: Los siguientes expedientes NO tienen el primer documento obligatorio cargado:\n\n${lista}\n\n¿Desea continuar de todas formas?`
+            );
+            if (!continuar) return;
+        }
+        // ─────────────────────────────────────────────────────────────
+
         if (specificDocId) setConfigDoc(null); // Close modal if starting from there
         setAutomationLoading(true);
 

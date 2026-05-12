@@ -407,6 +407,29 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         // Clean up temp file
         fs.unlinkSync(sourcePath);
 
+        // AUTO-ASIGNACIÓN: si el usuario tiene el expediente en un paquete, asignarlo
+        if (req.user && expediente.id) {
+            try {
+                const { pool: pgPool } = require('../database_pg');
+                const pkg = await pgPool.query(`
+                    SELECT p.id FROM paquete_items pi
+                    JOIN expediente_paquetes p ON p.id = pi.paquete_id
+                    WHERE pi.expediente_id = $1 AND p.user_id = $2 LIMIT 1
+                `, [expediente.id, req.user.id]);
+                if (pkg.rowCount > 0) {
+                    const paqId = pkg.rows[0].id;
+                    await pgPool.query(`
+                        INSERT INTO expediente_assignments (expediente_id, user_id, assigned_by, paquete_id, estado, observaciones)
+                        VALUES ($1,$2,$2,$3,'En Proceso','Auto-asignado al cargar documento')
+                        ON CONFLICT (expediente_id, user_id) DO UPDATE SET estado='En Proceso', assigned_at=CURRENT_TIMESTAMP
+                    `, [expediente.id, req.user.id, paqId]);
+                    console.log(`[AUTO-ASIGN] Expediente ${expediente.id} auto-asignado a usuario ${req.user.id}`);
+                }
+            } catch (autoErr) {
+                console.warn('[AUTO-ASIGN] Error (no crítico):', autoErr.message);
+            }
+        }
+
         res.json({ success: true, files: results, storage_path: firstExpDir });
 
     } catch (err) {
