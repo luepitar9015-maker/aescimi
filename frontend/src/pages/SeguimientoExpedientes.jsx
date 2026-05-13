@@ -400,6 +400,18 @@ export default function SeguimientoExpedientes() {
                     <div><span style={{ color: '#9ca3af' }}>Usuario: </span><strong>{p.usuario_nombre}</strong></div>
                     <div><span style={{ color: '#9ca3af' }}>Expedientes: </span><strong>{p.total_expedientes}</strong></div>
                   </div>
+                  <div style={{ marginTop: 12, fontSize: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <span style={{ color: '#6b7280', fontWeight: 600 }}>Avance Lote (AES):</span>
+                      <strong style={{ color: '#39A900' }}>
+                        {p.total_docs > 0 ? Math.round((Number(p.docs_cargados) / Number(p.total_docs)) * 100) : 0}%
+                      </strong>
+                    </div>
+                    <ProgressBar value={p.total_docs > 0 ? (Number(p.docs_cargados) / Number(p.total_docs)) * 100 : 0} color="#39A900" />
+                    <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 4, textAlign: 'right' }}>
+                      {p.docs_cargados || 0} / {p.total_docs || 0} docs cargados
+                    </div>
+                  </div>
                   <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
                     Creado: {new Date(p.created_at).toLocaleDateString('es-CO')} por {p.creado_por || '—'}
                   </div>
@@ -426,13 +438,15 @@ export default function SeguimientoExpedientes() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ background: '#f9fafb' }}>
-                  {['Código','Título','Estado','Docs'].map(h => (
+                  {['Código','Título','Estado','Automatizador','AES','% Cargue'].map(h => (
                     <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e5e7eb' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {paqItems.map(e => (
+                {paqItems.map(e => {
+                  const pct = e.doc_count > 0 ? Math.round((Number(e.docs_cargados) / Number(e.doc_count)) * 100) : 0;
+                  return (
                   <tr key={e.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                     <td style={{ padding: '8px 12px', fontWeight: 600 }}>{e.expediente_code || `#${e.id}`}</td>
                     <td style={{ padding: '8px 12px', color: '#374151' }}>{e.title?.substring(0, 40)}</td>
@@ -442,9 +456,16 @@ export default function SeguimientoExpedientes() {
                         color: e.estado_asignacion === 'Completado' ? '#166534' : e.estado_asignacion === 'En Proceso' ? '#1d4ed8' : '#92400e'
                       }}>{e.estado_asignacion || 'Pendiente'}</span>
                     </td>
-                    <td style={{ padding: '8px 12px' }}>{e.doc_count}</td>
+                    <td style={{ padding: '8px 12px', color: '#111', fontWeight: 600 }}>{e.doc_count} <span style={{fontSize: 10, color:'#6b7280', fontWeight: 'normal'}}>docs</span></td>
+                    <td style={{ padding: '8px 12px', color: '#39A900', fontWeight: 600 }}>{e.docs_cargados || 0} <span style={{fontSize: 10, color:'#6b7280', fontWeight: 'normal'}}>docs</span></td>
+                    <td style={{ padding: '8px 12px', minWidth: 100 }}>
+                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div style={{ flex: 1 }}><ProgressBar value={pct} color={pct >= 100 ? '#39A900' : '#f59e0b'} /></div>
+                          <span style={{ fontSize: 11, fontWeight: 700 }}>{pct}%</span>
+                       </div>
+                    </td>
                   </tr>
-                ))}
+                )})}
                 {paqItems.length === 0 && (
                   <tr><td colSpan={4} style={{ padding: 24, textAlign: 'center', color: '#9ca3af' }}>Sin expedientes en este paquete.</td></tr>
                 )}

@@ -294,6 +294,7 @@ router.post('/mass', async (req, res) => {
     const { pool } = require('../database_pg');
     const client = await pool.connect();
     const errors = [];
+    const created_ids = [];
     let created = 0;
 
     try {
@@ -337,18 +338,18 @@ router.post('/mass', async (req, res) => {
                 JSON.stringify(exp.metadata_values || {})
             ];
 
-
             const savepointName = `sp_exp_${i}`;
             try {
                 await client.query(`SAVEPOINT ${savepointName}`);
-                await client.query(
+                const result = await client.query(
                     `INSERT INTO expedientes 
                      (expediente_code, box_id, opening_date, subserie, regional, centro, dependencia, storage_type, title, metadata_values) 
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
                     params
                 );
                 await client.query(`RELEASE SAVEPOINT ${savepointName}`);
                 created++;
+                if (result.rows[0]) created_ids.push(result.rows[0].id);
             } catch (err) {
                 await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
                 const errMsg = err.detail || err.message;
@@ -361,7 +362,8 @@ router.post('/mass', async (req, res) => {
         console.log(`[EXPEDIENTES] Completado. ${created} creados, ${errors.length} fallidos.`);
         res.json({
             message: `Procesado. ${created} creados, ${errors.length} fallidos.`,
-            errors
+            errors,
+            created_ids
         });
 
     } catch (fatalErr) {

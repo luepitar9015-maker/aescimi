@@ -57,6 +57,7 @@ function ExpedienteCreation() {
     const [expedientes, setExpedientes] = useState([]);
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState('');
+    const [autoLote, setAutoLote] = useState(true); // Nuevo estado para auto-lote
     
     // Form State
     const [formData, setFormData] = useState({
@@ -236,7 +237,7 @@ function ExpedienteCreation() {
 
         try {
             const res = await axios.post('/api/expedientes/mass', expedientes);
-            const { message, errors } = res.data;
+            const { message, errors, created_ids } = res.data;
             
             if (errors && errors.length > 0) {
                 // Hubo errores parciales
@@ -247,6 +248,39 @@ function ExpedienteCreation() {
             } else {
                 setStatus('✅ ¡Guardado exitoso en base de datos!');
                 setExpedientes([]);
+                
+                // Si el autoLote está activado y se crearon expedientes
+                if (autoLote && created_ids && created_ids.length > 0) {
+                    try {
+                        const token = localStorage.getItem('token');
+                        
+                        // Necesitamos el ID del usuario actual para asignarlo. Lo sacamos de /api/users o /api/auth/me
+                        // Como atajo seguro, llamamos a un endpoint especial o usamos el paquete endpoint modificado.
+                        // Usaremos un nombre dinámico para el lote
+                        const nombreLote = `Lote Excel - ${new Date().toLocaleString('es-CO')}`;
+                        
+                        // Obtener user_id (podemos intentar descodificar el token, pero mejor enviarlo si es posible)
+                        let userId = 1; // Fallback
+                        try {
+                           const payload = JSON.parse(atob(token.split('.')[1]));
+                           userId = payload.id;
+                        } catch(e) {}
+
+                        await axios.post('/api/seguimiento/paquetes', {
+                            nombre: nombreLote,
+                            descripcion: 'Lote creado automáticamente desde importación masiva',
+                            user_id: userId,
+                            expediente_ids: created_ids
+                        }, { headers: { Authorization: `Bearer ${token}` } });
+                        
+                        alert(`✅ ¡Guardado exitoso!\nSe creó automáticamente el paquete de seguimiento "${nombreLote}".`);
+                    } catch (loteErr) {
+                        console.error('Error creando lote automático:', loteErr);
+                        alert(`Los expedientes se guardaron, pero hubo un error al crear el lote de seguimiento: ${loteErr.response?.data?.error || loteErr.message}`);
+                    }
+                } else if (created_ids && created_ids.length > 0) {
+                    alert('✅ ¡Guardado exitoso en base de datos!');
+                }
             }
         } catch (err) {
             console.error(err);
@@ -643,10 +677,16 @@ function ExpedienteCreation() {
                         <Download size={16} />
                         <span>Exportar Actual</span>
                     </button>
-                    <button onClick={saveToBackend} disabled={loading || expedientes.length === 0} className="bg-green-800 hover:bg-green-900 text-white px-3 py-2 rounded-lg font-medium shadow transition-colors flex items-center gap-2 text-sm">
-                        <Save size={16} />
-                        <span>{loading ? 'Guardando...' : 'Guardar BD'}</span>
-                    </button>
+                    <div className="flex flex-col items-end gap-2">
+                        <button onClick={saveToBackend} disabled={loading || expedientes.length === 0} className="bg-green-800 hover:bg-green-900 text-white px-3 py-2 rounded-lg font-medium shadow transition-colors flex items-center gap-2 text-sm">
+                            <Save size={16} />
+                            <span>{loading ? 'Guardando...' : 'Guardar BD'}</span>
+                        </button>
+                        <label className="text-xs text-gray-600 flex items-center gap-1 cursor-pointer">
+                            <input type="checkbox" checked={autoLote} onChange={e => setAutoLote(e.target.checked)} className="accent-green-600" />
+                            Crear lote de seguimiento automático
+                        </label>
+                    </div>
                 </div>
             </div>
 

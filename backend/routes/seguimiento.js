@@ -341,7 +341,9 @@ router.get('/paquetes', requireAuth, async (req, res) => {
             `SELECT p.id, p.nombre, p.descripcion, p.estado, p.created_at,
                     u.full_name AS usuario_nombre,
                     cb.full_name AS creado_por,
-                    COUNT(pi.expediente_id) AS total_expedientes
+                    COUNT(DISTINCT pi.expediente_id) AS total_expedientes,
+                    (SELECT COUNT(*) FROM documents d JOIN paquete_items pi2 ON d.expediente_id = pi2.expediente_id WHERE pi2.paquete_id = p.id) AS total_docs,
+                    (SELECT COUNT(*) FROM documents d JOIN paquete_items pi2 ON d.expediente_id = pi2.expediente_id WHERE pi2.paquete_id = p.id AND d.status = 'Cargado') AS docs_cargados
              FROM expediente_paquetes p
              JOIN users u ON u.id = p.user_id
              LEFT JOIN users cb ON cb.id = p.created_by
