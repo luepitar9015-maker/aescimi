@@ -29,20 +29,22 @@ router.post('/chat', requireAuth, async (req, res) => {
         const { message, history } = req.body;
         if (!message) return res.status(400).json({ error: 'El mensaje es requerido.' });
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
-        // Prompt de contexto (System Prompt simulado)
-        const systemInstruction = `
-Eres un asistente experto en Gestión Documental y archivo, trabajando para un sistema llamado "SENA V2 / Enfoque Rosa". 
+        const model = genAI.getGenerativeModel({ 
+            model: 'gemini-1.5-flash',
+            systemInstruction: `Eres un asistente experto en Gestión Documental y archivo, trabajando para un sistema llamado "SENA V2 / Enfoque Rosa". 
 Tu objetivo es ayudar a los usuarios del sistema a entender cómo clasificar documentos, cómo usar los módulos (Creación Masiva, Seguimiento, Inventario) y responder preguntas sobre Tablas de Retención Documental (TRD).
 Responde siempre de forma amable, profesional, muy concisa y al grano. Usa formato Markdown para que sea fácil de leer.
-Nunca inventes códigos de TRD si no estás seguro, sugiere consultar el manual del sistema.
-`;
+Nunca inventes códigos de TRD si no estás seguro, sugiere consultar el manual del sistema.`
+        });
 
         // Preparar el historial en el formato de Gemini
         const formattedHistory = [];
         if (history && Array.isArray(history)) {
             for (const msg of history) {
+                // Omitir el saludo inicial del bot para que el historial comience siempre con el usuario y alterne correctamente
+                if (msg.role === 'model' && msg.content.includes('¡Hola! Soy tu asistente')) {
+                    continue; 
+                }
                 formattedHistory.push({
                     role: msg.role === 'user' ? 'user' : 'model',
                     parts: [{ text: msg.content }]
@@ -51,11 +53,7 @@ Nunca inventes códigos de TRD si no estás seguro, sugiere consultar el manual 
         }
 
         const chat = model.startChat({
-            history: [
-                { role: 'user', parts: [{ text: systemInstruction }] },
-                { role: 'model', parts: [{ text: 'Entendido. Estoy listo para ayudar con la gestión documental.' }] },
-                ...formattedHistory
-            ]
+            history: formattedHistory
         });
 
         const result = await chat.sendMessage(message);
