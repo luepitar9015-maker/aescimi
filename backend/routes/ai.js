@@ -30,7 +30,7 @@ router.post('/chat', requireAuth, async (req, res) => {
         if (!message) return res.status(400).json({ error: 'El mensaje es requerido.' });
 
         const model = genAI.getGenerativeModel({ 
-            model: 'gemini-pro'
+            model: 'gemini-flash-latest'
         });
 
         // Prompt de contexto
@@ -99,7 +99,7 @@ router.post('/classify-document', requireAuth, upload.single('file'), async (req
         const tipologiasResult = await db.pool.query('SELECT DISTINCT typology_name FROM trd_typologies WHERE typology_name IS NOT NULL');
         const tipologias = tipologiasResult.rows.map(r => r.typology_name).join(', ');
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 
         const prompt = `
 Eres un experto clasificador de documentos de archivo.
