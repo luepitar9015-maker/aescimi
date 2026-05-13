@@ -37,7 +37,17 @@ jobs:
           npm install
           npm run build
 
-          # 5. Reiniciar solo el backend con PM2 (backend sirve el frontend compilado)
+          # 5. Configurar API Key de Gemini en el .env del servidor
+          echo "=== Configurando Variables de Entorno ==="
+          cd ~/aescimi/backend
+          touch .env
+          if grep -q "^GEMINI_API_KEY=" .env; then
+            sed -i 's/^GEMINI_API_KEY=.*/GEMINI_API_KEY=AIzaSyA7CATIFBdR5hvbJJ7di8ghKboILPmVXUA/' .env
+          else
+            echo "GEMINI_API_KEY=AIzaSyA7CATIFBdR5hvbJJ7di8ghKboILPmVXUA" >> .env
+          fi
+
+          # 6. Reiniciar solo el backend con PM2 (backend sirve el frontend compilado)
           echo "=== Reiniciando PM2 ==="
           cd ~/aescimi
           pm2 restart sena-backend || pm2 start ecosystem.config.js --only sena-backend
