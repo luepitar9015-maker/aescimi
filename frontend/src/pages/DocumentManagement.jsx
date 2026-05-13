@@ -21,6 +21,7 @@ function DocumentManagement() {
     const [editingDoc, setEditingDoc] = useState(null);
     const [hybridStatus, setHybridStatus] = useState(null);
     const [backupLoading, setBackupLoading] = useState(false);
+    const [classifyingIdx, setClassifyingIdx] = useState(null); // Nuevo estado IA
 
     // Leer usuario actual del localStorage
     const currentUser = (() => { try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; } })();
@@ -277,6 +278,52 @@ function DocumentManagement() {
             });
             return { ...entry, ranges: newRanges };
         }));
+    };
+
+    // --- AUTO CLASIFICACIÓN CON IA ---
+    const handleAutoClassify = async (idx) => {
+        const fileEntry = files[idx];
+        if (!fileEntry || !fileEntry.file || fileEntry.file.type !== 'application/pdf') {
+            alert('Solo se pueden clasificar archivos PDF automáticamente.');
+            return;
+        }
+
+        setClassifyingIdx(idx);
+        try {
+            const formData = new FormData();
+            formData.append('file', fileEntry.file);
+
+            const token = localStorage.getItem('token');
+            const res = await axios.post('/api/ai/classify-document', formData, {
+                headers: { 
+                    'Content-Type': 'multipart/form-data',
+                    'Authorization': `Bearer ${token}` 
+                }
+            });
+
+            const sugerencia = res.data.tipologia_sugerida;
+            if (sugerencia && sugerencia !== 'Desconocida') {
+                // Buscar coincidencia en las tipologías cargadas
+                const matchedTyp = typologies.find(t => 
+                    t.name.toLowerCase() === sugerencia.toLowerCase() || 
+                    sugerencia.toLowerCase().includes(t.name.toLowerCase())
+                );
+                
+                if (matchedTyp) {
+                    updateFileTypology(idx, matchedTyp.id);
+                    // Opcional: mostrar confidencia (ej. alert(`IA Sugiere: ${sugerencia} (${res.data.confianza}%)`))
+                } else {
+                    alert(`La IA sugirió "${sugerencia}", pero no se encontró exactamente en las tipologías de esta subserie. Por favor seleccione manualmente.`);
+                }
+            } else {
+                alert('La IA no pudo determinar la tipología con seguridad. Seleccione manualmente.');
+            }
+        } catch (error) {
+            console.error('Error auto-clasificando:', error);
+            alert('Error al comunicarse con la Inteligencia Artificial. Revise consola o intente manualmente.');
+        } finally {
+            setClassifyingIdx(null);
+        }
     };
 
     // Submit / Save - sends each file individually
@@ -692,7 +739,19 @@ function DocumentManagement() {
                                                         {!entry.isSplit && (
                                                             <div className="mt-2 space-y-2">
                                                                 <div>
-                                                                    <label className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Tipología</label>
+                                                                    <div className="flex items-center justify-between mb-1">
+                                                                        <label className="text-[10px] text-gray-400 font-bold uppercase">Tipología</label>
+                                                                        {entry.file.type === 'application/pdf' && (
+                                                                            <button 
+                                                                                type="button" 
+                                                                                onClick={(e) => { e.stopPropagation(); handleAutoClassify(idx); }}
+                                                                                disabled={classifyingIdx === idx}
+                                                                                className="text-[9px] font-bold text-white bg-indigo-500 hover:bg-indigo-600 px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors"
+                                                                            >
+                                                                                {classifyingIdx === idx ? 'Procesando...' : '✨ Sugerir IA'}
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
                                                                     <select
                                                                         className={`w-full p-1.5 border rounded text-xs focus:ring-2 focus:ring-green-500 outline-none ${
                                                                             !entry.typologyId ? 'border-orange-300 bg-orange-50' : 'border-gray-300'

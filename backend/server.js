@@ -130,6 +130,7 @@ app.use('/api/settings', require('./routes/settings')); // Global Settings
 app.use('/api/permissions', permissionsRoutes);
 app.use('/api/superuser', require('./routes/superuser'));
 app.use('/api/seguimiento', require('./routes/seguimiento'));
+app.use('/api/ai', require('./routes/ai')); // AI Assistant & Classifier Routes
 app.use('/api/system', require('./routes/system')); // System Routes (Backup, etc)
 
 // ── RUTA TEMPORAL: Reproductor de video para análisis (SOLO USO LOCAL) ──

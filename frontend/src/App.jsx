@@ -21,6 +21,7 @@ import ExploradorDocumental from './pages/ExploradorDocumental'; // Explorador a
 import Formatos from './pages/Formatos'; // Nuevo módulo de Formatos
 import ComunicacionesProducidas from './pages/ComunicacionesProducidas'; // Nuevo módulo
 import SeguimientoExpedientes from './pages/SeguimientoExpedientes'; // Seguimiento
+import AIChatBot from './components/AIChatBot'; // IA Assistant
 import './App.css';
 
 // --- Global Axios Interceptors ---
@@ -538,6 +539,9 @@ function Layout({ children }) {
           <div className="p-8 text-center text-gray-500">Verificando permisos...</div>
         ) : children}
       </main>
+      
+      {/* Bot Chat de Inteligencia Artificial Flotante */}
+      <AIChatBot />
     </div>
   );
 }
