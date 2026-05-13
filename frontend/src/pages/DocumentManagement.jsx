@@ -22,6 +22,8 @@ function DocumentManagement() {
     const [hybridStatus, setHybridStatus] = useState(null);
     const [backupLoading, setBackupLoading] = useState(false);
     const [classifyingIdx, setClassifyingIdx] = useState(null); // Nuevo estado IA
+    const [expedienteSummary, setExpedienteSummary] = useState(null);
+    const [summaryLoading, setSummaryLoading] = useState(false);
 
     // Leer usuario actual del localStorage
     const currentUser = (() => { try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; } })();
@@ -326,6 +328,25 @@ function DocumentManagement() {
         }
     };
 
+    // --- RESUMEN DE EXPEDIENTE CON IA ---
+    const handleSummarizeExpediente = async () => {
+        if (!selectedExpediente) return;
+        setSummaryLoading(true);
+        setExpedienteSummary(null);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.get(`/api/ai/summarize-expediente/${selectedExpediente.id}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            setExpedienteSummary(res.data.summary);
+        } catch (error) {
+            console.error('Error resumiendo expediente:', error);
+            alert('Error al generar resumen del expediente con Inteligencia Artificial.');
+        } finally {
+            setSummaryLoading(false);
+        }
+    };
+
     // Submit / Save - sends each file individually
     const handleSave = async () => {
         if (files.length === 0 || !selectedExpediente) return;
@@ -591,8 +612,20 @@ function DocumentManagement() {
                         <div>
                             <h2 className="text-xl font-bold text-green-900 flex items-center gap-2">
                                 <FileText size={20} /> Gestionar Expediente: {selectedExpediente.title}
+                                <button
+                                    onClick={handleSummarizeExpediente}
+                                    disabled={summaryLoading}
+                                    className="ml-4 text-xs font-bold text-white bg-indigo-500 hover:bg-indigo-600 px-2 py-1 rounded flex items-center gap-1 transition-colors shadow-sm disabled:opacity-60"
+                                >
+                                    {summaryLoading ? 'Generando Resumen...' : '✨ Resumir con IA'}
+                                </button>
                             </h2>
-                            <div className="mt-2 grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 text-[11px] text-green-700 bg-white/60 p-3 rounded-lg border border-green-100 shadow-inner">
+                            {expedienteSummary && (
+                                <div className="mt-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-sm text-indigo-900 shadow-inner">
+                                    <strong>✨ Resumen IA:</strong> {expedienteSummary}
+                                </div>
+                            )}
+                            <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 text-[11px] text-green-700 bg-white/60 p-3 rounded-lg border border-green-100 shadow-inner">
                                 <div className="flex gap-2 border-b border-green-50 pb-1">
                                     <span className="font-bold uppercase opacity-60">Código Exp:</span>
                                     <span>{selectedExpediente.expediente_code || '-'}</span>
