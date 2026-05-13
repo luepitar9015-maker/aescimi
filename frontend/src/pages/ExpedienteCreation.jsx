@@ -231,15 +231,6 @@ function ExpedienteCreation() {
     const saveToBackend = async () => {
         if (expedientes.length === 0) return alert("No hay datos para guardar.");
         
-        // ── VALIDACIÓN CRÍTICA: Bloquear si hay expedientes sin título ──
-        const sinTitulo = expedientes.filter(e => !e.title || e.title.trim() === '' || e.title === 'Sin Título');
-        if (sinTitulo.length > 0) {
-            const lista = sinTitulo.slice(0, 5).map((e, i) => `• Fila ${i + 1}: sin título`).join('\n');
-            const moreMsg = sinTitulo.length > 5 ? `\n...y ${sinTitulo.length - 5} más.` : '';
-            alert(`❌ No se puede guardar. Los siguientes ${sinTitulo.length} expediente(s) no tienen título:\n\n${lista}${moreMsg}\n\nSin título, las carpetas en OneDrive se crearán como "Sin Título".\nCorrija los títulos en la tabla antes de guardar.`);
-            return;
-        }
-        
         setLoading(true);
         setStatus('Guardando...');
 
