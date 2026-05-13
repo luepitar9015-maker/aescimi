@@ -30,7 +30,7 @@ router.post('/chat', requireAuth, async (req, res) => {
         if (!message) return res.status(400).json({ error: 'El mensaje es requerido.' });
 
         const model = genAI.getGenerativeModel({ 
-            model: 'gemini-1.5-flash',
+            model: 'gemini-1.5-flash-latest',
             systemInstruction: `Eres un asistente experto en Gestión Documental y archivo, trabajando para un sistema llamado "SENA V2 / Enfoque Rosa". 
 Tu objetivo es ayudar a los usuarios del sistema a entender cómo clasificar documentos, cómo usar los módulos (Creación Masiva, Seguimiento, Inventario) y responder preguntas sobre Tablas de Retención Documental (TRD).
 Responde siempre de forma amable, profesional, muy concisa y al grano. Usa formato Markdown para que sea fácil de leer.
@@ -93,7 +93,7 @@ router.post('/classify-document', requireAuth, upload.single('file'), async (req
         const tipologiasResult = await db.pool.query('SELECT DISTINCT typology_name FROM trd_typologies WHERE typology_name IS NOT NULL');
         const tipologias = tipologiasResult.rows.map(r => r.typology_name).join(', ');
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
 
         const prompt = `
 Eres un experto clasificador de documentos de archivo.
