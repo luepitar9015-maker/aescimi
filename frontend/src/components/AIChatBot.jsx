@@ -43,9 +43,10 @@ export default function AIChatBot() {
       setMessages(prev => [...prev, { role: 'model', content: res.data.reply }]);
     } catch (error) {
       console.error('Error in chat:', error);
+      const serverErrorMsg = error.response?.data?.error || 'Hubo un error de conexión con la IA. Asegúrate de tener la clave API configurada.';
       setMessages(prev => [...prev, { 
         role: 'model', 
-        content: 'Hubo un error de conexión con la IA. Asegúrate de tener la clave API configurada.' 
+        content: `❌ Error: ${serverErrorMsg}` 
       }]);
     } finally {
       setIsLoading(false);

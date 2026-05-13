@@ -62,7 +62,7 @@ Nunca inventes códigos de TRD si no estás seguro, sugiere consultar el manual 
         res.json({ reply: responseText });
     } catch (error) {
         console.error('[AI CHAT ERROR]', error);
-        res.status(500).json({ error: 'Error al procesar la solicitud con la IA.' });
+        res.status(500).json({ error: error.message || 'Error al procesar la solicitud con la IA.' });
     }
 });
 
