@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Save, Globe, Shield, RefreshCw } from 'lucide-react';
+import { Save, Globe, Shield, RefreshCw, Brain } from 'lucide-react';
 
 function AesSettings() {
     const [settings, setSettings] = useState({
         ades_url: '',
         ades_username: '',
-        ades_password: ''
+        ades_password: '',
+        gemini_api_key: ''
     });
+    const [isAdmin, setIsAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState({ text: '', type: '' });
@@ -22,7 +24,8 @@ function AesSettings() {
             setSettings({
                 ades_url: res.data.ades_url || '',
                 ades_username: res.data.ades_username || '',
-                ades_password: res.data.ades_password || ''
+                ades_password: res.data.ades_password || '',
+                gemini_api_key: res.data.gemini_api_key || ''
             });
         } catch (err) {
             console.error("Error fetching AES settings:", err);
@@ -34,6 +37,12 @@ function AesSettings() {
 
     useEffect(() => {
         fetchSettings();
+        try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            setIsAdmin(user.role === 'admin' || user.role === 'superadmin');
+        } catch (e) {
+            console.error("Error loading user role in settings:", e);
+        }
     }, []);
 
     const handleChange = (e) => {
@@ -66,14 +75,14 @@ function AesSettings() {
 
     return (
         <div className="settings-container">
-            <h2>Configuración de AES (OnBase)</h2>
-            <p className="text-muted" style={{ marginBottom: '20px' }}>Establezca los parámetros de conexión para el cargue automático.</p>
+            <h2>Configuraciones del Sistema</h2>
+            <p className="text-muted" style={{ marginBottom: '20px' }}>Establezca los parámetros de conexión de automatización y claves de servicios.</p>
 
-            <form onSubmit={handleSave}>
+            <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 <div className="card" style={{ maxWidth: '600px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
-                        <Globe size={24} color="#4caf50" />
-                        <h3 style={{ margin: 0 }}>Acceso al Sistema</h3>
+                        <Globe size={24} color="#39a900" />
+                        <h3 style={{ margin: 0 }}>Acceso al Sistema ECM (OnBase / AES)</h3>
                     </div>
                     
                     <div className="form-group">
@@ -107,21 +116,44 @@ function AesSettings() {
                             onChange={handleChange} 
                         />
                     </div>
+                </div>
 
-                    {message.text && (
-                        <div className={`status ${message.type}`} style={{ marginTop: '15px' }}>
-                            {message.text}
+                {isAdmin && (
+                    <div className="card" style={{ maxWidth: '600px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
+                            <Brain size={24} color="#39a900" />
+                            <h3 style={{ margin: 0 }}>Inteligencia Artificial (Gemini)</h3>
                         </div>
-                    )}
-
-                    <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
-                        <button type="submit" className="btn btn-primary" disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Save size={18} /> {saving ? 'Guardando...' : 'Guardar Cambios'}
-                        </button>
-                        <button type="button" onClick={fetchSettings} className="btn btn-secondary" disabled={saving}>
-                            <RefreshCw size={18} /> Reestablecer
-                        </button>
+                        
+                        <div className="form-group">
+                            <label>Gemini API Key</label>
+                            <input 
+                                type="password" 
+                                name="gemini_api_key" 
+                                value={settings.gemini_api_key} 
+                                onChange={handleChange} 
+                                placeholder="AIzaSy..." 
+                            />
+                            <small style={{ color: '#666', marginTop: '6px', display: 'block', lineHeight: '1.4' }}>
+                                Obtenga una clave API gratuita en <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" style={{ color: '#39a900', fontWeight: 'bold', textDecoration: 'underline' }}>Google AI Studio</a> para habilitar las clasificaciones, resúmenes y asistente de chat de IA.
+                            </small>
+                        </div>
                     </div>
+                )}
+
+                {message.text && (
+                    <div className={`status ${message.type}`} style={{ maxWidth: '600px', padding: '10px', borderRadius: '8px', border: '1px solid' }}>
+                        {message.text}
+                    </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '10px', maxWidth: '600px' }}>
+                    <button type="submit" className="btn btn-primary" disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+                        <Save size={18} /> {saving ? 'Guardando...' : 'Guardar Configuraciones'}
+                    </button>
+                    <button type="button" onClick={fetchSettings} className="btn btn-secondary" disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+                        <RefreshCw size={18} /> Reestablecer
+                    </button>
                 </div>
             </form>
         </div>

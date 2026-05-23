@@ -9,12 +9,23 @@ const db = require('../database');
 // Configuración de multer (memoria para no guardar el PDF en disco temporalmente, o disco si es muy grande)
 const upload = multer({ storage: multer.memoryStorage() });
 
-// ──────────────────────────────────────────────────────────────
-// INICIALIZACIÓN DE GEMINI
-// ──────────────────────────────────────────────────────────────
-let genAI = null;
-if (process.env.GEMINI_API_KEY) {
-    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Función para obtener la API Key de Gemini dinámicamente de BD o de .env
+async function getGenAIInstance() {
+    try {
+        const result = await db.pool.query("SELECT value FROM system_settings WHERE key = 'gemini_api_key'");
+        const dbKey = result.rows[0] ? result.rows[0].value : null;
+        const apiKey = dbKey || process.env.GEMINI_API_KEY;
+        if (apiKey && apiKey.trim().length > 0) {
+            return new GoogleGenerativeAI(apiKey.trim());
+        }
+    } catch (e) {
+        console.warn('[AI Settings] Error cargando API key de base de datos:', e.message);
+    }
+    
+    if (process.env.GEMINI_API_KEY) {
+        return new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    }
+    return null;
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -22,14 +33,15 @@ if (process.env.GEMINI_API_KEY) {
 // ──────────────────────────────────────────────────────────────
 router.post('/chat', requireAuth, async (req, res) => {
     try {
-        if (!genAI) {
-            return res.status(503).json({ error: 'La API Key de Gemini no está configurada en el servidor (.env).' });
+        const activeGenAI = await getGenAIInstance();
+        if (!activeGenAI) {
+            return res.status(503).json({ error: 'La API Key de Gemini no está configurada en el sistema. Regístrela en la pestaña de configuración.' });
         }
 
         const { message, history } = req.body;
         if (!message) return res.status(400).json({ error: 'El mensaje es requerido.' });
 
-        const model = genAI.getGenerativeModel({ 
+        const model = activeGenAI.getGenerativeModel({ 
             model: 'gemini-flash-latest'
         });
 
@@ -78,8 +90,9 @@ Nunca inventes códigos ni rutas de configuración si no estás seguro.`;
 // ──────────────────────────────────────────────────────────────
 router.post('/classify-document', requireAuth, upload.single('file'), async (req, res) => {
     try {
-        if (!genAI) {
-            return res.status(503).json({ error: 'La API Key de Gemini no está configurada.' });
+        const activeGenAI = await getGenAIInstance();
+        if (!activeGenAI) {
+            return res.status(503).json({ error: 'La API Key de Gemini no está configurada. Regístrela en la pestaña de configuración.' });
         }
         if (!req.file) {
             return res.status(400).json({ error: 'No se subió ningún archivo PDF.' });
@@ -100,7 +113,7 @@ router.post('/classify-document', requireAuth, upload.single('file'), async (req
         const tipologiasResult = await db.pool.query('SELECT DISTINCT typology_name FROM trd_typologies WHERE typology_name IS NOT NULL');
         const tipologias = tipologiasResult.rows.map(r => r.typology_name).join(', ');
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
+        const model = activeGenAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 
         const prompt = `
 Eres un experto clasificador de documentos de archivo.
@@ -144,8 +157,9 @@ Reglas:
 // ──────────────────────────────────────────────────────────────
 router.get('/summarize-expediente/:id', requireAuth, async (req, res) => {
     try {
-        if (!genAI) {
-            return res.status(503).json({ error: 'La API Key de Gemini no está configurada.' });
+        const activeGenAI = await getGenAIInstance();
+        if (!activeGenAI) {
+            return res.status(503).json({ error: 'La API Key de Gemini no está configurada. Regístrela en la pestaña de configuración.' });
         }
 
         const expedienteId = req.params.id;
@@ -174,7 +188,7 @@ router.get('/summarize-expediente/:id', requireAuth, async (req, res) => {
             return res.json({ summary: 'Este expediente se encuentra vacío. No contiene ningún documento para analizar.' });
         }
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
+        const model = activeGenAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 
         const prompt = `
 Eres un asistente analista de archivos.
