@@ -41,6 +41,7 @@ export default function SeguimientoExpedientes() {
   const [tab, setTab] = useState('estadisticas');
   const [stats, setStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(false);
+  const [searchExpedienteTerm, setSearchExpedienteTerm] = useState('');
 
   /* Asignaciones */
   const [asignaciones, setAsignaciones] = useState([]);
@@ -349,6 +350,89 @@ export default function SeguimientoExpedientes() {
                         <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#9ca3af' }}>
                           Sin usuarios con expedientes asignados aún.
                         </td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Por Expediente */}
+              <div style={{ background: '#fff', borderRadius: 14, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,.07)', marginTop: 28 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+                  <h2 style={{ fontSize: 16, fontWeight: 700, color: '#111', margin: 0 }}>
+                    📁 Avance Detallado por Expediente
+                  </h2>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '6px 12px' }}>
+                    <Search size={14} style={{ color: '#9ca3af' }} />
+                    <input
+                      type="text"
+                      placeholder="Buscar por código o título..."
+                      value={searchExpedienteTerm}
+                      onChange={e => setSearchExpedienteTerm(e.target.value)}
+                      style={{ border: 'none', outline: 'none', fontSize: 13, width: 220 }}
+                    />
+                    {searchExpedienteTerm && (
+                      <button onClick={() => setSearchExpedienteTerm('')} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#9ca3af', padding: 0 }}>
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: '#f9fafb' }}>
+                        {['Código', 'Título', 'Dependencia', 'TRD', 'Documentos', '% Avance'].map(h => (
+                          <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e5e7eb' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(stats.expedientes || [])
+                        .filter(exp => {
+                          const term = searchExpedienteTerm.toLowerCase().trim();
+                          if (!term) return true;
+                          return (exp.expediente_code && exp.expediente_code.toLowerCase().includes(term)) ||
+                                 (exp.title && exp.title.toLowerCase().includes(term)) ||
+                                 (exp.dependencia && exp.dependencia.toLowerCase().includes(term)) ||
+                                 (exp.subserie && exp.subserie.toLowerCase().includes(term));
+                        })
+                        .map((exp) => {
+                          const pct = Number(exp.avance) || 0;
+                          return (
+                            <tr key={exp.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                              <td style={{ padding: '10px 12px', fontWeight: 600, color: '#111' }}>{exp.expediente_code || `ID: ${exp.id}`}</td>
+                              <td style={{ padding: '10px 12px', color: '#374151' }} title={exp.title}>{exp.title || 'Sin Título'}</td>
+                              <td style={{ padding: '10px 12px', color: '#6b7280' }}>{exp.dependencia || '—'}</td>
+                              <td style={{ padding: '10px 12px', color: '#6b7280' }}>{exp.subserie || '—'}</td>
+                              <td style={{ padding: '10px 12px', color: '#374151' }}>
+                                <span style={{ fontWeight: 600 }}>{exp.cargados}</span>
+                                <span style={{ color: '#9ca3af' }}> / {exp.total_requeridos}</span>
+                              </td>
+                              <td style={{ padding: '10px 12px', minWidth: 160 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <ProgressBar value={pct} color={pct >= 80 ? '#39A900' : pct >= 40 ? '#f59e0b' : '#ef4444'} />
+                                  <span style={{ fontSize: 12, fontWeight: 700, minWidth: 40 }}>{pct}%</span>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      }
+                      {(stats.expedientes || []).filter(exp => {
+                        const term = searchExpedienteTerm.toLowerCase().trim();
+                        if (!term) return true;
+                        return (exp.expediente_code && exp.expediente_code.toLowerCase().includes(term)) ||
+                               (exp.title && exp.title.toLowerCase().includes(term)) ||
+                               (exp.dependencia && exp.dependencia.toLowerCase().includes(term)) ||
+                               (exp.subserie && exp.subserie.toLowerCase().includes(term));
+                      }).length === 0 && (
+                        <tr>
+                          <td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#9ca3af' }}>
+                            No se encontraron expedientes coincidentes.
+                          </td>
+                        </tr>
                       )}
                     </tbody>
                   </table>

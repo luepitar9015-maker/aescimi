@@ -59,6 +59,15 @@ function ExpedienteCreation() {
     const [status, setStatus] = useState('');
     const [autoLote, setAutoLote] = useState(true); // Nuevo estado para auto-lote
     
+    // Asignación de Responsables State
+    const [activeUsers, setActiveUsers] = useState([]);
+    const [selectedResponsibles, setSelectedResponsibles] = useState([]);
+    const [userSearchText, setUserSearchText] = useState('');
+    const [showUserDropdown, setShowUserDropdown] = useState(false);
+    const [individualResponsible, setIndividualResponsible] = useState(null);
+    const [individualSearchText, setIndividualSearchText] = useState('');
+    const [showIndividualDropdown, setShowIndividualDropdown] = useState(false);
+    
     // Form State
     const [formData, setFormData] = useState({
         expediente_code: '',
@@ -126,7 +135,16 @@ function ExpedienteCreation() {
                 console.error("Error fetching subseries list:", err);
             }
         };
+        const fetchActiveUsers = async () => {
+            try {
+                const res = await axios.get('/api/users/active');
+                setActiveUsers(res.data.data || []);
+            } catch (err) {
+                console.error("Error fetching active users:", err);
+            }
+        };
         fetchSubseriesList();
+        fetchActiveUsers();
     }, []);
 
     const handleChange = (e) => {
@@ -172,6 +190,8 @@ function ExpedienteCreation() {
         const newExpediente = {
             ...formData,
             metadata_values: metadata,
+            assigned_user_id: individualResponsible ? individualResponsible.id : null,
+            assigned_user_name: individualResponsible ? individualResponsible.full_name : '',
             id: Date.now() // Temp ID for frontend list
         };
 
@@ -185,6 +205,8 @@ function ExpedienteCreation() {
             valor1: '', valor2: '', valor3: '', valor4: '',
             valor5: '', valor6: '', valor7: '', valor8: ''
         });
+        setIndividualResponsible(null);
+        setIndividualSearchText('');
     };
 
     const handleDelete = (index) => {
@@ -236,7 +258,10 @@ function ExpedienteCreation() {
         setStatus('Guardando...');
 
         try {
-            const res = await axios.post('/api/expedientes/mass', expedientes);
+            const res = await axios.post('/api/expedientes/mass', {
+                expedientes,
+                assigned_user_ids: selectedResponsibles.map(u => u.id)
+            });
             const { message, errors, created_ids } = res.data;
             
             if (errors && errors.length > 0) {
@@ -248,6 +273,7 @@ function ExpedienteCreation() {
             } else {
                 setStatus('✅ ¡Guardado exitoso en base de datos!');
                 setExpedientes([]);
+                setSelectedResponsibles([]);
                 
                 // Si el autoLote está activado y se crearon expedientes
                 if (autoLote && created_ids && created_ids.length > 0) {
@@ -458,6 +484,7 @@ function ExpedienteCreation() {
                         'Nombre del Trabajador', 'Trabajador', 'Funcionario',
                         'Contratista', 'Nombre Contratista', 'Denominacion'
                     ]),
+                    responsable: findHeader(['Responsable', 'Asignado a', 'AsignadoA', 'Responsables', 'Asignado'])
                 };
 
 
@@ -507,6 +534,21 @@ function ExpedienteCreation() {
                         metadata[`valor${i}`] = val.trim();
                     }
 
+                    let assigned_user_id = null;
+                    let assigned_user_name = '';
+                    if (colMap.responsable && row[colMap.responsable]) {
+                        const respVal = normalize(String(row[colMap.responsable]));
+                        const foundUser = activeUsers.find(u => 
+                            normalize(u.full_name) === respVal || 
+                            normalize(u.email) === respVal || 
+                            normalize(u.document_no) === respVal
+                        );
+                        if (foundUser) {
+                            assigned_user_id = foundUser.id;
+                            assigned_user_name = foundUser.full_name;
+                        }
+                    }
+
                     return {
                         id: Date.now() + index + Math.random(),
                         expediente_code: colMap.expediente_code ? String(row[colMap.expediente_code] || '').trim() : '',
@@ -515,7 +557,9 @@ function ExpedienteCreation() {
                         subserie: colMap.subserie ? String(row[colMap.subserie] || '').trim() : '',
                         storage_type: colMap.storage_type ? String(row[colMap.storage_type] || '').trim() : 'Fisico',
                         title: colMap.title ? String(row[colMap.title] || '').trim() : '',
-                        metadata_values: metadata
+                        metadata_values: metadata,
+                        assigned_user_id,
+                        assigned_user_name
                     };
                 });
 
@@ -678,6 +722,58 @@ function ExpedienteCreation() {
                         <span>Exportar Actual</span>
                     </button>
                     <div className="flex flex-col items-end gap-2">
+                        {/* Selector Global de Responsables */}
+                        <div className="relative w-64">
+                            <input
+                                type="text"
+                                placeholder="Asignar responsables al lote..."
+                                value={userSearchText}
+                                onChange={e => {
+                                    setUserSearchText(e.target.value);
+                                    setShowUserDropdown(true);
+                                }}
+                                onFocus={() => setShowUserDropdown(true)}
+                                onBlur={() => setTimeout(() => setShowUserDropdown(false), 250)}
+                                className="w-full border border-gray-300 rounded-lg p-2 text-xs focus:ring-1 focus:ring-green-500 outline-none"
+                            />
+                            {showUserDropdown && (
+                                <div className="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg w-full max-h-48 overflow-y-auto mt-1 right-0 text-left">
+                                    {activeUsers
+                                        .filter(u => {
+                                            const term = userSearchText.toLowerCase();
+                                            return !term || 
+                                                u.full_name.toLowerCase().includes(term) || 
+                                                (u.area && u.area.toLowerCase().includes(term));
+                                        })
+                                        .map(u => (
+                                            <div
+                                                key={u.id}
+                                                onMouseDown={() => {
+                                                    if (!selectedResponsibles.some(su => su.id === u.id)) {
+                                                        setSelectedResponsibles([...selectedResponsibles, u]);
+                                                    }
+                                                    setUserSearchText('');
+                                                    setShowUserDropdown(false);
+                                                }}
+                                                className="p-2 hover:bg-green-50 cursor-pointer text-[11px] border-b border-gray-100 transition-colors"
+                                            >
+                                                <strong>{u.full_name}</strong> <span className="text-gray-500">({u.area || 'Sin área'})</span>
+                                            </div>
+                                        ))
+                                    }
+                                </div>
+                            )}
+                        </div>
+                        {selectedResponsibles.length > 0 && (
+                            <div className="flex flex-wrap gap-1 max-w-xs justify-end">
+                                {selectedResponsibles.map(u => (
+                                    <span key={u.id} className="bg-green-100 text-green-800 text-[10px] px-2 py-0.5 rounded-full border border-green-300 flex items-center gap-1">
+                                        {u.full_name.split(' ')[0]}
+                                        <button type="button" onClick={() => setSelectedResponsibles(prev => prev.filter(x => x.id !== u.id))} className="text-red-500 hover:text-red-700 font-bold">×</button>
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                         <button onClick={saveToBackend} disabled={loading || expedientes.length === 0} className="bg-green-800 hover:bg-green-900 text-white px-3 py-2 rounded-lg font-medium shadow transition-colors flex items-center gap-2 text-sm">
                             <Save size={16} />
                             <span>{loading ? 'Guardando...' : 'Guardar BD'}</span>
@@ -802,6 +898,71 @@ function ExpedienteCreation() {
                             <input type="text" id="title" value={formData.title} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-green-500 outline-none" placeholder="Nombre descriptivo del expediente" />
                         </div>
 
+                        {/* Selector de Responsable Individual */}
+                        <div style={{ position: 'relative' }}>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Responsable del Expediente</label>
+                            <div className="flex gap-2">
+                                <div className="relative flex-grow">
+                                    <input
+                                        type="text"
+                                        placeholder="Buscar usuario por nombre o área..."
+                                        value={individualSearchText}
+                                        onChange={e => {
+                                            setIndividualSearchText(e.target.value);
+                                            setShowIndividualDropdown(true);
+                                        }}
+                                        onFocus={() => setShowIndividualDropdown(true)}
+                                        onBlur={() => setTimeout(() => setShowIndividualDropdown(false), 250)}
+                                        className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                                    />
+                                    {showIndividualDropdown && (
+                                        <div className="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg w-full max-h-60 overflow-y-auto mt-1">
+                                            {activeUsers
+                                                .filter(u => {
+                                                    const term = individualSearchText.toLowerCase();
+                                                    return !term || 
+                                                        u.full_name.toLowerCase().includes(term) || 
+                                                        (u.area && u.area.toLowerCase().includes(term));
+                                                })
+                                                .map(u => (
+                                                    <div
+                                                        key={u.id}
+                                                        onMouseDown={() => {
+                                                            setIndividualResponsible(u);
+                                                            setIndividualSearchText(u.full_name);
+                                                            setShowIndividualDropdown(false);
+                                                        }}
+                                                        className="p-2 hover:bg-green-50 cursor-pointer text-xs border-b border-gray-100 transition-colors"
+                                                    >
+                                                        <strong>{u.full_name}</strong> <span className="text-gray-500">({u.area || 'Sin área'} - {u.position || 'Sin cargo'})</span>
+                                                    </div>
+                                                ))
+                                            }
+                                            {activeUsers.filter(u => {
+                                                const term = individualSearchText.toLowerCase();
+                                                return !term || u.full_name.toLowerCase().includes(term) || (u.area && u.area.toLowerCase().includes(term));
+                                            }).length === 0 && (
+                                                <div className="p-3 text-center text-xs text-gray-400">No se encontraron usuarios activos</div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                                {individualResponsible && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIndividualResponsible(null);
+                                            setIndividualSearchText('');
+                                        }}
+                                        className="bg-red-100 hover:bg-red-200 text-red-600 px-3 rounded-md border border-red-300 flex items-center justify-center transition-colors"
+                                        title="Quitar responsable"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
                         {/* Valores Adicionales (Acordeón Simple) */}
                         <div className="pt-2">
                             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
@@ -853,6 +1014,7 @@ function ExpedienteCreation() {
                                     <th className="p-3 border-b">Código</th>
                                     <th className="p-3 border-b">Tipo</th>
                                     <th className="p-3 border-b">Título</th>
+                                    <th className="p-3 border-b">Responsable</th>
                                     {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
                                         <th key={i} className="p-3 border-b">{currentLabels[`meta_${i}`] || `Valor ${i}`}</th>
                                     ))}
@@ -876,6 +1038,7 @@ function ExpedienteCreation() {
                                                 <td className="p-3 text-gray-600">{exp.subserie}</td>
                                                 <td className="p-3"><span className="bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs">{exp.storage_type}</span></td>
                                                 <td className="p-3 font-medium text-green-900 max-w-xs truncate" title={exp.title}>{exp.title}</td>
+                                                <td className="p-3 text-xs text-gray-600 font-semibold">{exp.assigned_user_name || 'Sin asignar'}</td>
                                                 {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
                                                     <td key={i} className="p-3 text-xs text-gray-500">
                                                         {exp.metadata_values[`valor${i}`] || '-'}
@@ -1117,6 +1280,7 @@ function ExpedienteCreation() {
                                         <th className="px-3 py-3 font-bold" style={{minWidth: '180px'}}>Subserie / TRD 🗒️</th>
                                         <th className="px-3 py-3 font-bold">Tipo Almac.</th>
                                         <th className="px-3 py-3 font-bold" style={{minWidth: '200px'}}>Título</th>
+                                        <th className="px-3 py-3 font-bold" style={{minWidth: '150px'}}>Responsable</th>
                                         {Object.entries(previewLabels).map(([k, lbl]) => (
                                             <th key={k} className="px-3 py-3 font-bold" style={{color: '#3b82f6'}}>{lbl || k}</th>
                                         ))}
@@ -1234,6 +1398,25 @@ function ExpedienteCreation() {
                                                         placeholder="Sin título..."
                                                         title="Editar título"
                                                     />
+                                                </td>
+
+                                                {/* Responsable */}
+                                                <td className="px-2 py-1.5">
+                                                    <select
+                                                        style={{...cellInput, cursor: 'pointer', paddingRight: '4px', minWidth: '150px'}}
+                                                        value={exp.assigned_user_id || ''}
+                                                        onChange={e => {
+                                                            const val = e.target.value;
+                                                            const foundUser = activeUsers.find(u => u.id === parseInt(val));
+                                                            updatePreviewRow(rowIdx, 'assigned_user_id', foundUser ? foundUser.id : null);
+                                                            updatePreviewRow(rowIdx, 'assigned_user_name', foundUser ? foundUser.full_name : '');
+                                                        }}
+                                                    >
+                                                        <option value="">— Sin Responsable —</option>
+                                                        {activeUsers.map(u => (
+                                                            <option key={u.id} value={u.id}>{u.full_name} ({u.area || 'Sin área'})</option>
+                                                        ))}
+                                                    </select>
                                                 </td>
 
                                                 {/* Metadatos */}

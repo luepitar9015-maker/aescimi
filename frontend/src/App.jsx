@@ -494,7 +494,7 @@ function Layout({ children }) {
           {canView('expedientes') && <Link to="/expedientes" className="nav-item"><FolderKanban size={18} /> Crear Expedientes</Link>}
           {canView('documents') && <Link to="/documents" className="nav-item"><Folder size={18} /> Gestión Documental</Link>}
           {canView('query') && <Link to="/query" className="nav-item"><Globe size={18} /> Consulta de Documentos</Link>}
-          {canView('cargue-aes') && <Link to="/cargue-aes" className="nav-item"><Play size={18} /> Cargue AES</Link>}
+          {canView('cargue-aes') && (currentUser?.role === 'admin' || currentUser?.role === 'superadmin') && <Link to="/cargue-aes" className="nav-item"><Play size={18} /> Cargue AES</Link>}
           {canView('comunicaciones-producidas') && <Link to="/comunicaciones-producidas" className="nav-item"><Upload size={18} /> Com. Producidas</Link>}
           {canView('formatos') && <Link to="/formatos" className="nav-item"><FileSpreadsheet size={18} /> Formatos (FUID/Control)</Link>}
           {canView('trd_query') && <Link to="/trd-query" className="nav-item"><Database size={18} /> Consulta TRD</Link>}

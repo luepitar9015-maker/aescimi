@@ -283,13 +283,21 @@ router.post('/', (req, res) => {
 
 // POST mass create expedientes
 router.post('/mass', async (req, res) => {
-    const expedientes = req.body; // Array of objects
+    let expedientes = [];
+    let assignedUserIds = [];
 
-    if (!Array.isArray(expedientes) || expedientes.length === 0) {
+    if (Array.isArray(req.body)) {
+        expedientes = req.body;
+    } else {
+        expedientes = req.body.expedientes || [];
+        assignedUserIds = req.body.assigned_user_ids || [];
+    }
+
+    if (expedientes.length === 0) {
         return res.status(400).json({ error: 'No data provided' });
     }
 
-    console.log(`[EXPEDIENTES] Recibida solicitud masiva con ${expedientes.length} registros.`);
+    console.log(`[EXPEDIENTES] Recibida solicitud masiva con ${expedientes.length} registros. Asignaciones globales: ${assignedUserIds.length}`);
 
     const { pool } = require('../database_pg');
     const client = await pool.connect();
@@ -349,12 +357,38 @@ router.post('/mass', async (req, res) => {
                 );
                 await client.query(`RELEASE SAVEPOINT ${savepointName}`);
                 created++;
-                if (result.rows[0]) created_ids.push(result.rows[0].id);
+                if (result.rows[0]) {
+                    const newId = result.rows[0].id;
+                    created_ids.push(newId);
+                    
+                    // Asignación individual (Opción B: Excel)
+                    if (exp.assigned_user_id) {
+                        await client.query(`
+                            INSERT INTO expediente_assignments (expediente_id, user_id, assigned_by, observaciones)
+                            VALUES ($1, $2, $3, $4)
+                            ON CONFLICT (expediente_id, user_id) DO NOTHING
+                        `, [newId, exp.assigned_user_id, req.user?.id || null, 'Asignado en creación masiva (Excel)']);
+                    }
+                }
             } catch (err) {
                 await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
                 const errMsg = err.detail || err.message;
                 console.error(`[EXPEDIENTES] Error insertando "${exp.expediente_code || exp.title}": ${errMsg}`);
                 errors.push({ expediente: exp.expediente_code || exp.title || `Fila ${i + 1}`, error: errMsg });
+            }
+        }
+
+        // Asignación global (Opción A: Interfaz)
+        if (assignedUserIds.length > 0 && created_ids.length > 0) {
+            console.log(`[EXPEDIENTES] Insertando ${created_ids.length * assignedUserIds.length} asignaciones globales.`);
+            for (const userId of assignedUserIds) {
+                for (const expId of created_ids) {
+                    await client.query(`
+                        INSERT INTO expediente_assignments (expediente_id, user_id, assigned_by, observaciones)
+                        VALUES ($1, $2, $3, $4)
+                        ON CONFLICT (expediente_id, user_id) DO NOTHING
+                    `, [expId, userId, req.user?.id || null, 'Asignado en creación masiva (Global)']);
+                }
             }
         }
 

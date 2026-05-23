@@ -41,60 +41,116 @@ pool.query(`
     )
 `).catch(e => console.warn('[SEGUIMIENTO] paquete_items table error:', e.message));
 
-// ──────────────────────────────────────────────────────────────
-// GET /api/seguimiento/estadisticas
-// Retorna:
-//   - % cargue por dependencia (cuántos expedientes tienen documentos vs total)
-//   - % cargue por usuario (documentos cargados por usuario / total documentos)
-//   - Resumen general
-// ──────────────────────────────────────────────────────────────
+// ────────────────�// ──────────────────────────────────────────────────────────────
 router.get('/estadisticas', requireAuth, async (req, res) => {
     try {
-        // 1. Total expedientes y % con documentos por dependencia
+        // 1. Avance real por dependencia basado en tipologías requeridas
         const depStats = await pool.query(`
-            SELECT
-                COALESCE(e.dependencia, 'Sin dependencia') AS dependencia,
-                COUNT(DISTINCT e.id)                        AS total_expedientes,
-                COUNT(DISTINCT d.expediente_id)             AS expedientes_con_docs,
-                COUNT(d.id)                                 AS total_documentos,
+            WITH expediente_avance AS (
+                SELECT 
+                    e.id,
+                    e.dependencia,
+                    COUNT(DISTINCT tt.id) as total_requeridos,
+                    COUNT(DISTINCT CASE WHEN d.id IS NOT NULL THEN tt.id END) as cargados
+                FROM expedientes e
+                LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie ILIKE '%-' || sub.subseries_code)
+                LEFT JOIN trd_series ser ON (sub.series_id = ser.id OR e.subserie = ser.series_code)
+                LEFT JOIN trd_typologies tt ON (tt.subseries_id = sub.id OR (tt.subseries_id IS NULL AND tt.series_id = ser.id))
+                LEFT JOIN documents d ON d.expediente_id = e.id AND UPPER(UNACCENT(d.typology_name)) = UPPER(UNACCENT(tt.typology_name))
+                GROUP BY e.id, e.dependencia
+            )
+            SELECT 
+                COALESCE(dependencia, 'Sin dependencia') AS dependencia,
+                COUNT(id) AS total_expedientes,
+                SUM(CASE WHEN cargados > 0 THEN 1 ELSE 0 END) AS expedientes_con_docs,
                 ROUND(
-                    CASE WHEN COUNT(DISTINCT e.id) > 0
-                         THEN COUNT(DISTINCT d.expediente_id)::NUMERIC / COUNT(DISTINCT e.id) * 100
+                    CASE WHEN SUM(total_requeridos) > 0
+                         THEN SUM(cargados)::NUMERIC / SUM(total_requeridos) * 100
                          ELSE 0
                     END, 2
-                ) AS porcentaje_cargue
-            FROM expedientes e
-            LEFT JOIN documents d ON d.expediente_id = e.id
-            GROUP BY e.dependencia
+                ) AS porcentaje_cargue,
+                COALESCE((SELECT COUNT(*) FROM documents doc WHERE doc.expediente_id IN (SELECT id FROM expedientes exp WHERE COALESCE(exp.dependencia, 'Sin dependencia') = COALESCE(expediente_avance.dependencia, 'Sin dependencia'))), 0) AS total_documentos
+            FROM expediente_avance
+            GROUP BY dependencia
             ORDER BY total_expedientes DESC
         `);
 
-        // 2. % cargue por usuario (documentos cargados vinculados a expedientes asignados)
+        // 2. Avance real por usuario basado en tipologías completadas de sus expedientes asignados
         const userStats = await pool.query(`
+            WITH expediente_avance AS (
+                SELECT 
+                    e.id,
+                    COUNT(DISTINCT tt.id) as total_requeridos,
+                    COUNT(DISTINCT CASE WHEN d.id IS NOT NULL THEN tt.id END) as cargados
+                FROM expedientes e
+                LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie ILIKE '%-' || sub.subseries_code)
+                LEFT JOIN trd_series ser ON (sub.series_id = ser.id OR e.subserie = ser.series_code)
+                LEFT JOIN trd_typologies tt ON (tt.subseries_id = sub.id OR (tt.subseries_id IS NULL AND tt.series_id = ser.id))
+                LEFT JOIN documents d ON d.expediente_id = e.id AND UPPER(UNACCENT(d.typology_name)) = UPPER(UNACCENT(tt.typology_name))
+                GROUP BY e.id
+            )
             SELECT
                 u.id            AS user_id,
                 u.full_name     AS usuario,
                 u.area,
                 COUNT(DISTINCT ea.expediente_id)            AS expedientes_asignados,
-                COUNT(DISTINCT CASE WHEN d.expediente_id IS NOT NULL THEN ea.expediente_id END) AS expedientes_con_docs,
-                COUNT(d.id)                                 AS total_documentos,
+                COUNT(DISTINCT CASE WHEN ea_av.cargados > 0 THEN ea.expediente_id END) AS expedientes_con_docs,
                 ROUND(
-                    CASE WHEN COUNT(DISTINCT ea.expediente_id) > 0
-                         THEN COUNT(DISTINCT CASE WHEN d.expediente_id IS NOT NULL THEN ea.expediente_id END)::NUMERIC
-                              / COUNT(DISTINCT ea.expediente_id) * 100
+                    CASE WHEN SUM(CASE WHEN ea.expediente_id IS NOT NULL THEN total_requeridos ELSE 0 END) > 0
+                         THEN SUM(CASE WHEN ea.expediente_id IS NOT NULL THEN cargados ELSE 0 END)::NUMERIC 
+                               / SUM(CASE WHEN ea.expediente_id IS NOT NULL THEN total_requeridos ELSE 0 END) * 100
                          ELSE 0
                     END, 2
-                ) AS porcentaje_cargue
+                ) AS porcentaje_cargue,
+                COALESCE((SELECT COUNT(*) FROM documents doc WHERE doc.expediente_id IN (SELECT expediente_id FROM expediente_assignments WHERE user_id = u.id)), 0) AS total_documentos
             FROM users u
             LEFT JOIN expediente_assignments ea ON ea.user_id = u.id
-            LEFT JOIN documents d ON d.expediente_id = ea.expediente_id
+            LEFT JOIN expediente_avance ea_av ON ea_av.id = ea.expediente_id
             WHERE u.is_active = 1
             GROUP BY u.id, u.full_name, u.area
             ORDER BY expedientes_asignados DESC
         `);
 
-        // 3. Resumen global
+        // 3. Avance individual por expediente
+        const expAvance = await pool.query(`
+            SELECT 
+                e.id, 
+                e.expediente_code, 
+                e.title, 
+                e.dependencia, 
+                e.subserie,
+                COUNT(DISTINCT tt.id) as total_requeridos,
+                COUNT(DISTINCT CASE WHEN d.id IS NOT NULL THEN tt.id END) as cargados,
+                ROUND(
+                    CASE WHEN COUNT(DISTINCT tt.id) > 0
+                         THEN COUNT(DISTINCT CASE WHEN d.id IS NOT NULL THEN tt.id END)::NUMERIC / COUNT(DISTINCT tt.id) * 100
+                         ELSE 0
+                    END, 2
+                ) as avance
+            FROM expedientes e
+            LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie ILIKE '%-' || sub.subseries_code)
+            LEFT JOIN trd_series ser ON (sub.series_id = ser.id OR e.subserie = ser.series_code)
+            LEFT JOIN trd_typologies tt ON (tt.subseries_id = sub.id OR (tt.subseries_id IS NULL AND tt.series_id = ser.id))
+            LEFT JOIN documents d ON d.expediente_id = e.id AND UPPER(UNACCENT(d.typology_name)) = UPPER(UNACCENT(tt.typology_name))
+            GROUP BY e.id
+            ORDER BY e.created_at DESC
+            LIMIT 500
+        `);
+
+        // 4. Resumen global basado en tipologías requeridas vs cargadas
         const globalStats = await pool.query(`
+            WITH expediente_avance AS (
+                SELECT 
+                    e.id,
+                    COUNT(DISTINCT tt.id) as total_requeridos,
+                    COUNT(DISTINCT CASE WHEN d.id IS NOT NULL THEN tt.id END) as cargados
+                FROM expedientes e
+                LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie ILIKE '%-' || sub.subseries_code)
+                LEFT JOIN trd_series ser ON (sub.series_id = ser.id OR e.subserie = ser.series_code)
+                LEFT JOIN trd_typologies tt ON (tt.subseries_id = sub.id OR (tt.subseries_id IS NULL AND tt.series_id = ser.id))
+                LEFT JOIN documents d ON d.expediente_id = e.id AND UPPER(UNACCENT(d.typology_name)) = UPPER(UNACCENT(tt.typology_name))
+                GROUP BY e.id
+            )
             SELECT
                 (SELECT COUNT(*) FROM expedientes)                      AS total_expedientes,
                 (SELECT COUNT(DISTINCT expediente_id) FROM documents)   AS expedientes_con_docs,
@@ -102,15 +158,15 @@ router.get('/estadisticas', requireAuth, async (req, res) => {
                 (SELECT COUNT(*) FROM expediente_assignments)           AS total_asignaciones,
                 (SELECT COUNT(DISTINCT user_id) FROM expediente_assignments) AS usuarios_con_asignacion,
                 ROUND(
-                    CASE WHEN (SELECT COUNT(*) FROM expedientes) > 0
-                         THEN (SELECT COUNT(DISTINCT expediente_id) FROM documents)::NUMERIC
-                              / (SELECT COUNT(*) FROM expedientes) * 100
+                    CASE WHEN SUM(total_requeridos) > 0
+                         THEN SUM(cargados)::NUMERIC / SUM(total_requeridos) * 100
                          ELSE 0
                     END, 2
                 ) AS porcentaje_global
+            FROM expediente_avance
         `);
 
-        // 4. Tendencia de cargue por mes (últimos 6 meses)
+        // 5. Tendencia de cargue por mes (últimos 6 meses)
         const tendencia = await pool.query(`
             SELECT
                 TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') AS mes,
@@ -124,6 +180,7 @@ router.get('/estadisticas', requireAuth, async (req, res) => {
         res.json({
             dependencias: depStats.rows,
             usuarios: userStats.rows,
+            expedientes: expAvance.rows,
             global: globalStats.rows[0],
             tendencia: tendencia.rows
         });

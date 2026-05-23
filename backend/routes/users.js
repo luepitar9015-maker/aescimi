@@ -23,6 +23,19 @@ router.post('/change-password', requireAuth, async (req, res) => {
     }
 });
 
+// List active users for assignment (accessible by any authenticated user)
+router.get('/active', requireAuth, async (req, res) => {
+    try {
+        const result = await pool.query(
+            'SELECT id, full_name, area, position, document_no, email, role, organization_id FROM users WHERE is_active = 1 ORDER BY full_name'
+        );
+        res.json({ data: result.rows });
+    } catch (err) {
+        console.error('[USERS] GET active error:', err);
+        res.status(500).json({ error: 'Error al obtener usuarios activos.' });
+    }
+});
+
 // List all users
 router.get('/', requireAuth, requireAdmin, async (req, res) => {
     try {
