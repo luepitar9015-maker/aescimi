@@ -300,12 +300,12 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         };
 
         // Helper to save document to DB
-        const saveToDb = (filename, filePath, typologyName) => {
+        const saveToDb = (filename, filePath, typologyName, descriptionText = null) => {
             return new Promise((resolve, reject) => {
                 const query = `INSERT INTO documents (
                     organization_id, trd_series_id, trd_subseries_id, expediente_id,
-                    filename, path, typology_name, document_date, origen
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                    filename, path, typology_name, document_date, origen, metadata_values
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
                 
                 // Note: We use IDs from trdInfo if available, and expediente.id
                 db.run(query, [
@@ -317,7 +317,8 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                     filePath,
                     typologyName,
                     documentDate,
-                    origen
+                    origen,
+                    descriptionText ? JSON.stringify({ description: descriptionText }) : null
                 ], function(err) {
                     if (err) reject(err);
                     else resolve(this.lastID);
@@ -383,13 +384,14 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                 }
                 
                 // Save record to DB
-                await saveToDb(filename, outputPath, typ.name);
+                await saveToDb(filename, outputPath, typ.name, typ.description);
                 
                 results.push({ file: filename, path: outputPath });
             }
         } else {
             // No Split - Save entire document (from pdfDoc to include any conversion)
             const mainTypology = typologies[0] ? typologies[0].name : 'Documento_General';
+            const mainDescription = typologies[0] ? typologies[0].description : null;
             
             const { expDir, backupExpDir, pathParts } = await buildPathsForTypology(mainTypology);
             firstExpDir = expDir;
@@ -415,7 +417,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             }
             
             // Save record to DB
-            await saveToDb(filename, outputPath, mainTypology);
+            await saveToDb(filename, outputPath, mainTypology, mainDescription);
             
             results.push({ file: filename, path: outputPath });
         }
@@ -459,7 +461,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 router.get('/', (req, res) => {
     const query = `
         SELECT 
-            d.id, d.filename, d.path, d.typology_name, d.document_date, d.status, d.created_at, d.origen,
+            d.id, d.filename, d.path, d.typology_name, d.document_date, d.status, d.created_at, d.origen, d.metadata_values,
             d.expediente_id,
             e.title as expediente_title, e.expediente_code, e.subserie,
             sub.subseries_name, ser.series_name,
@@ -496,7 +498,7 @@ router.get('/', (req, res) => {
             
             const filteredQuery = `
                 SELECT 
-                    d.id, d.filename, d.path, d.typology_name, d.document_date, d.status, d.created_at, d.origen,
+                    d.id, d.filename, d.path, d.typology_name, d.document_date, d.status, d.created_at, d.origen, d.metadata_values,
                     d.expediente_id,
                     e.title as expediente_title, e.expediente_code, e.subserie,
                     sub.subseries_name, ser.series_name,
@@ -529,7 +531,7 @@ router.get('/', (req, res) => {
 // GET /expediente/:id - List documents belonging to a specific expediente
 router.get('/expediente/:id', (req, res) => {
     const query = `
-        SELECT d.id, d.filename, d.path, d.typology_name, d.document_date, d.status, d.created_at, d.origen
+        SELECT d.id, d.filename, d.path, d.typology_name, d.document_date, d.status, d.created_at, d.origen, d.metadata_values
         FROM documents d
         WHERE d.expediente_id = ?
         ORDER BY d.filename ASC
@@ -677,7 +679,7 @@ router.get('/fix-names/:expedienteId', async (req, res) => {
 // PUT /:id - Update document details
 router.put('/:id', async (req, res) => {
     const { id } = req.params;
-    const { filename, typology_name, document_date, origen, path: newDirectPath } = req.body;
+    const { filename, typology_name, document_date, origen, path: newDirectPath, metadata_values } = req.body;
 
     db.get("SELECT * FROM documents WHERE id = ?", [id], (err, doc) => {
         if (err || !doc) return res.status(404).json({ error: 'Documento no encontrado' });
@@ -695,9 +697,17 @@ router.put('/:id', async (req, res) => {
             resolvedFilename !== doc.filename;
 
         const doUpdate = () => {
-            const query = `UPDATE documents SET filename = ?, path = ?, typology_name = ?, document_date = ?, origen = ? WHERE id = ?`;
+            const query = `UPDATE documents SET filename = ?, path = ?, typology_name = ?, document_date = ?, origen = ?, metadata_values = ? WHERE id = ?`;
             db.run(query,
-                [resolvedFilename, resolvedPath, typology_name || doc.typology_name, document_date || doc.document_date, origen || doc.origen, id],
+                [
+                    resolvedFilename, 
+                    resolvedPath, 
+                    typology_name || doc.typology_name, 
+                    document_date || doc.document_date, 
+                    origen || doc.origen, 
+                    metadata_values !== undefined ? (typeof metadata_values === 'string' ? metadata_values : JSON.stringify(metadata_values)) : doc.metadata_values,
+                    id
+                ],
                 async function(err) {
                     if (err) return res.status(500).json({ error: err.message });
                     

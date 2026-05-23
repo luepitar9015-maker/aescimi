@@ -296,10 +296,16 @@ function CargueAes() {
         let meta = { ...(doc.expediente_metadata || {}), ...(doc.document_metadata || {}) };
 
         // Join metadata 1-8 by space
-        const joinedName = [1, 2, 3, 4, 5, 6, 7, 8]
+        let joinedName = [1, 2, 3, 4, 5, 6, 7, 8]
             .map(i => meta[`valor${i}`] || meta[`Metadato ${i}`])
             .filter(v => v)
             .join(' ');
+
+        // Append description/text if it exists
+        const docDesc = doc.document_metadata?.description;
+        if (docDesc) {
+            joinedName = `${joinedName} ${docDesc}`;
+        }
 
         setConfigDoc({
             ...doc,
@@ -1030,6 +1036,32 @@ function CargueAes() {
                                 />
                             </div>
 
+                            {/* TEXTO ADICIONAL DEL DOCUMENTO */}
+                            {editingModal ? (
+                                <div className="form-group">
+                                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#666', marginBottom: '5px' }}>TEXTO ADICIONAL DEL DOCUMENTO</label>
+                                    <textarea
+                                        value={modalEditFields.description ?? configDoc.document_metadata?.description ?? ''}
+                                        onChange={(e) => setModalEditFields(f => ({ ...f, description: e.target.value }))}
+                                        rows={2}
+                                        style={{ width: '100%', padding: '10px', border: '2px solid #e65100', borderRadius: '6px', backgroundColor: '#fff3e0', fontFamily: 'inherit', fontSize: '13px', resize: 'vertical' }}
+                                        placeholder="Escriba texto adicional si aplica..."
+                                    />
+                                </div>
+                            ) : (
+                                configDoc.document_metadata?.description && (
+                                    <div className="form-group">
+                                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#666', marginBottom: '5px' }}>TEXTO ADICIONAL DEL DOCUMENTO</label>
+                                        <textarea
+                                            value={configDoc.document_metadata.description}
+                                            readOnly
+                                            rows={2}
+                                            style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '6px', backgroundColor: '#f9f9f9', fontFamily: 'inherit', fontSize: '13px', resize: 'vertical' }}
+                                        />
+                                    </div>
+                                )
+                            )}
+
                             {/* Mostrar metadatos individuales */}
                             <div className="form-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
                                 {[1, 2, 3, 4, 5, 6, 7, 8].map(i => {
@@ -1094,9 +1126,35 @@ function CargueAes() {
                                             onClick={async () => {
                                                 try {
                                                     const authHeaders = { Authorization: `Bearer ${localStorage.getItem('token')}` };
-                                                    await axios.put(`/api/documents/${configDoc.id}`, modalEditFields, { headers: authHeaders });
+                                                    const { description, ...restFields } = modalEditFields;
+                                                    const payload = {
+                                                        ...restFields,
+                                                        metadata_values: JSON.stringify({ description: description || '' })
+                                                    };
+                                                    await axios.put(`/api/documents/${configDoc.id}`, payload, { headers: authHeaders });
                                                     // Actualizar configDoc localmente
-                                                    setConfigDoc(prev => ({ ...prev, ...modalEditFields, joinedName: modalEditFields.filename ?? prev.joinedName }));
+                                                    setConfigDoc(prev => {
+                                                        const updatedDoc = {
+                                                            ...prev,
+                                                            ...restFields,
+                                                            document_metadata: {
+                                                                ...(prev.document_metadata || {}),
+                                                                description: description || ''
+                                                            }
+                                                        };
+                                                        let meta = { ...(updatedDoc.expediente_metadata || {}), ...(updatedDoc.document_metadata || {}) };
+                                                        let joined = [1, 2, 3, 4, 5, 6, 7, 8]
+                                                            .map(i => meta[`valor${i}`] || meta[`Metadato ${i}`])
+                                                            .filter(v => v)
+                                                            .join(' ');
+                                                        
+                                                        const docDesc = updatedDoc.document_metadata?.description;
+                                                        if (docDesc) {
+                                                            joined = `${joined} ${docDesc}`;
+                                                        }
+                                                        updatedDoc.joinedName = restFields.filename ?? joined;
+                                                        return updatedDoc;
+                                                    });
                                                     setEditingModal(false);
                                                     setModalEditFields({});
                                                     fetchPending();
@@ -1126,7 +1184,8 @@ function CargueAes() {
                                                     typology_name: configDoc.typology_name || '',
                                                     filename: configDoc.joinedName || '',
                                                     document_date: configDoc.document_date ? configDoc.document_date.split('T')[0] : '',
-                                                    path: configDoc.path || ''
+                                                    path: configDoc.path || '',
+                                                    description: configDoc.document_metadata?.description || ''
                                                 });
                                             }}
                                             style={{ width: '100%', padding: '10px', background: '#fff3e0', color: '#e65100', border: '2px solid #e65100', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}

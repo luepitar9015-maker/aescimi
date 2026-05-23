@@ -1041,6 +1041,14 @@ exports.executeAutomation = async (req, res) => {
                 .map(i => meta[`valor${i}`] || meta[`Metadato ${i}`])
                 .filter(Boolean).join('_');
             docInfo.nombreDocumento = docInfo.expediente_title || metaJoined || docInfo.filename;
+
+            // Si el documento tiene descripción en sus metadatos (texto condicional), se anexa al final con un espacio
+            let docMeta = {};
+            try { if (docInfo.metadata_values) docMeta = JSON.parse(docInfo.metadata_values); } catch (e) { }
+            if (docMeta && docMeta.description) {
+                docInfo.nombreDocumento = `${docInfo.nombreDocumento.trim()} ${docMeta.description.trim()}`;
+            }
+
             docInfo.joinedName = docInfo.nombreDocumento;
             docInfo.parsedMeta = meta;
 

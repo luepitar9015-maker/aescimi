@@ -143,12 +143,20 @@ function DocumentManagement() {
     };
 
     const handleEditDoc = (doc) => {
+        let currentDesc = '';
+        if (doc.metadata_values) {
+            try {
+                const meta = typeof doc.metadata_values === 'string' ? JSON.parse(doc.metadata_values) : doc.metadata_values;
+                currentDesc = meta.description || '';
+            } catch(e) {}
+        }
         setEditingDoc({
             ...doc,
             newFilename: doc.filename.replace('.pdf', ''),
             newTypology: doc.typology_name,
             newDate: doc.document_date ? doc.document_date.substring(0, 16) : new Date().toISOString().substring(0, 16),
-            newOrigen: doc.origen || 'ELECTRONICO'
+            newOrigen: doc.origen || 'ELECTRONICO',
+            newDescription: currentDesc
         });
     };
 
@@ -160,7 +168,8 @@ function DocumentManagement() {
                 filename: editingDoc.newFilename,
                 typology_name: editingDoc.newTypology,
                 document_date: editingDoc.newDate,
-                origen: editingDoc.newOrigen
+                origen: editingDoc.newOrigen,
+                metadata_values: JSON.stringify({ description: editingDoc.newDescription })
             });
             alert("Documento actualizado correctamente");
             setEditingDoc(null);
@@ -212,8 +221,10 @@ function DocumentManagement() {
             typologyName: '',
             creationDate: new Date().toISOString().slice(0, 16), // YYYY-MM-DDTHH:mm
             origen: 'ELECTRONICO',
+            addTextOption: 'no',
+            documentText: '',
             isSplit: false,
-            ranges: [{ start: 1, end: 1, typologyId: '', typologyName: '' }],
+            ranges: [{ start: 1, end: 1, typologyId: '', typologyName: '', addTextOption: 'no', documentText: '' }],
             url: URL.createObjectURL(f)  // create preview URL
         }));
         setFiles(prev => {
@@ -256,7 +267,7 @@ function DocumentManagement() {
 
     const addRange = (fileIdx) => {
         setFiles(prev => prev.map((entry, i) =>
-            i === fileIdx ? { ...entry, ranges: [...entry.ranges, { start: 1, end: 1, typologyId: '', typologyName: '' }] } : entry
+            i === fileIdx ? { ...entry, ranges: [...entry.ranges, { start: 1, end: 1, typologyId: '', typologyName: '', addTextOption: 'no', documentText: '' }] } : entry
         ));
     };
 
@@ -357,6 +368,10 @@ function DocumentManagement() {
                 alert(`Por favor asigne una tipología al archivo: ${f.file.name}`);
                 return;
             }
+            if (!f.isSplit && f.addTextOption === 'si' && !f.documentText?.trim()) {
+                alert(`Por favor escriba el texto del documento para el archivo: ${f.file.name}`);
+                return;
+            }
             if (f.isSplit) {
                 if (f.ranges.length === 0) {
                     alert(`El archivo ${f.file.name} tiene división activa pero no hay rangos.`);
@@ -364,6 +379,10 @@ function DocumentManagement() {
                 }
                 if (f.ranges.some(r => !r.typologyName)) {
                     alert(`Todos los rangos en ${f.file.name} deben tener tipología.`);
+                    return;
+                }
+                if (f.ranges.some(r => r.addTextOption === 'si' && !r.documentText?.trim())) {
+                    alert(`Por favor escriba el texto para cada rango con texto activo en el archivo: ${f.file.name}`);
                     return;
                 }
             }
@@ -388,12 +407,17 @@ function DocumentManagement() {
                 formData.append('split', 'true');
                 const typs = entry.ranges.map(r => ({
                     name: r.typologyName,
-                    range: `${r.start}-${r.end}`
+                    range: `${r.start}-${r.end}`,
+                    description: r.addTextOption === 'si' ? r.documentText : ''
                 }));
                 formData.append('typology', JSON.stringify(typs));
             } else {
                 formData.append('split', 'false');
-                formData.append('typology', JSON.stringify([{ name: entry.typologyName, range: '1' }]));
+                formData.append('typology', JSON.stringify([{
+                    name: entry.typologyName,
+                    range: '1',
+                    description: entry.addTextOption === 'si' ? entry.documentText : ''
+                }]));
             }
 
             try {
@@ -558,7 +582,21 @@ function DocumentManagement() {
                                         savedDocs.map(doc => (
                                             <tr key={doc.id} className="hover:bg-gray-50">
                                                 <td className="px-4 py-3 font-medium text-gray-800"><FileText size={13} className="inline text-red-500 mr-1" />{doc.filename}</td>
-                                                <td className="px-4 py-3"><span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded">{doc.typology_name || '-'}</span></td>
+                                                <td className="px-4 py-3"><span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded">{doc.typology_name || '-'}</span>
+                                                    {doc.metadata_values && (() => {
+                                                        try {
+                                                            const meta = typeof doc.metadata_values === 'string' ? JSON.parse(doc.metadata_values) : doc.metadata_values;
+                                                            if (meta && meta.description) {
+                                                                return (
+                                                                    <div className="text-[11px] text-gray-500 italic mt-1 max-w-[200px] truncate" title={meta.description}>
+                                                                        📝 {meta.description}
+                                                                    </div>
+                                                                );
+                                                            }
+                                                        } catch(e) {}
+                                                        return null;
+                                                    })()}
+                                                </td>
                                                 <td className="px-4 py-3"><div className="font-medium">{doc.expediente_title || '-'}</div><div className="text-xs text-gray-400">{doc.expediente_code}</div></td>
                                                 <td className="px-4 py-3 text-xs">{doc.subserie || doc.subseries_name || '-'}</td>
                                                 <td className="px-4 py-3 text-xs">{doc.document_date ? new Date(doc.document_date).toLocaleDateString('es-CO') : '-'}</td>
@@ -798,6 +836,33 @@ function DocumentManagement() {
                                                                         ))}
                                                                     </select>
                                                                 </div>
+
+                                                                <div>
+                                                                    <label className="text-[10px] text-gray-400 font-bold uppercase block mb-1">¿Se agregará un texto para el documento?</label>
+                                                                    <select
+                                                                        className="w-full p-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-green-500 outline-none bg-white"
+                                                                        value={entry.addTextOption || 'no'}
+                                                                        onChange={(e) => {
+                                                                            const val = e.target.value;
+                                                                            setFiles(prev => prev.map((f, i) => i === idx ? { ...f, addTextOption: val, documentText: val === 'si' ? (f.documentText || '') : '' } : f));
+                                                                        }}
+                                                                    >
+                                                                        <option value="no">No</option>
+                                                                        <option value="si">Sí</option>
+                                                                    </select>
+                                                                    {entry.addTextOption === 'si' && (
+                                                                        <textarea
+                                                                            className="w-full p-1.5 border border-green-300 rounded text-xs focus:ring-2 focus:ring-green-500 outline-none mt-1.5 bg-white"
+                                                                            rows="2"
+                                                                            placeholder="Escriba el texto del documento aquí..."
+                                                                            value={entry.documentText || ''}
+                                                                            onChange={(e) => {
+                                                                                const txt = e.target.value;
+                                                                                setFiles(prev => prev.map((f, i) => i === idx ? { ...f, documentText: txt } : f));
+                                                                            }}
+                                                                        />
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         )}
 
@@ -805,7 +870,7 @@ function DocumentManagement() {
                                                         {entry.isSplit && (
                                                             <div className="mt-3 space-y-2 border-l-2 border-green-200 pl-2">
                                                                 {entry.ranges.map((range, ridx) => (
-                                                                    <div key={ridx} className="bg-white border rounded p-2 text-[10px] space-y-1 relative group">
+                                                                    <div key={ridx} className="bg-white border rounded p-2 text-[10px] space-y-2 relative group">
                                                                         <div className="flex items-center gap-1">
                                                                             <input 
                                                                                 type="number" 
@@ -832,6 +897,26 @@ function DocumentManagement() {
                                                                             </select>
                                                                             {entry.ranges.length > 1 && (
                                                                                 <button onClick={() => removeRange(idx, ridx)} className="text-red-400 hover:text-red-600 font-bold">×</button>
+                                                                            )}
+                                                                        </div>
+                                                                        <div>
+                                                                            <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">¿Agregar texto?</label>
+                                                                            <select
+                                                                                className="w-full p-1 border border-gray-300 rounded text-[9px] outline-none bg-white"
+                                                                                value={range.addTextOption || 'no'}
+                                                                                onChange={(e) => updateRange(idx, ridx, 'addTextOption', e.target.value)}
+                                                                            >
+                                                                                <option value="no">No</option>
+                                                                                <option value="si">Sí</option>
+                                                                            </select>
+                                                                            {range.addTextOption === 'si' && (
+                                                                                <textarea
+                                                                                    className="w-full p-1 border border-green-300 rounded text-[9px] outline-none mt-1 bg-white"
+                                                                                    rows="1"
+                                                                                    placeholder="Texto del rango..."
+                                                                                    value={range.documentText || ''}
+                                                                                    onChange={(e) => updateRange(idx, ridx, 'documentText', e.target.value)}
+                                                                                />
                                                                             )}
                                                                         </div>
                                                                     </div>
@@ -939,6 +1024,16 @@ function DocumentManagement() {
                                     className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                                     value={editingDoc.newDate}
                                     onChange={(e) => setEditingDoc({...editingDoc, newDate: e.target.value})}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Texto del Documento</label>
+                                <textarea 
+                                    className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                    rows="3"
+                                    placeholder="Texto adicional para el documento..."
+                                    value={editingDoc.newDescription || ''}
+                                    onChange={(e) => setEditingDoc({...editingDoc, newDescription: e.target.value})}
                                 />
                             </div>
                             <div>

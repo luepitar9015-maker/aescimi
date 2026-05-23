@@ -195,17 +195,32 @@ function DocumentQuery() {
                                                 </h4>
                                                 <div className="space-y-2 pl-4 border-l-2 border-indigo-100">
                                                     {docs.map(doc => (
-                                                        <div key={doc.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-100 hover:border-indigo-200 hover:shadow-sm transition-all group">
-                                                            <div className="flex items-center gap-3">
-                                                                <FileText size={18} className="text-gray-400 group-hover:text-indigo-500 transition-colors" />
-                                                                <p className="font-semibold text-gray-700 text-sm">{doc.filename}</p>
+                                                        <div key={doc.id} className="flex flex-col p-3 bg-white rounded-lg border border-gray-100 hover:border-indigo-200 hover:shadow-sm transition-all group space-y-2">
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center gap-3">
+                                                                    <FileText size={18} className="text-gray-400 group-hover:text-indigo-500 transition-colors" />
+                                                                    <p className="font-semibold text-gray-700 text-sm">{doc.filename}</p>
+                                                                </div>
+                                                                <button 
+                                                                    onClick={() => handleView(doc)}
+                                                                    className="flex items-center gap-2 text-indigo-600 bg-indigo-50 hover:bg-indigo-600 hover:text-white px-3 py-1.5 rounded-md text-xs font-bold transition-all"
+                                                                >
+                                                                    <Eye size={14} /> Visualizar
+                                                                </button>
                                                             </div>
-                                                            <button 
-                                                                onClick={() => handleView(doc)}
-                                                                className="flex items-center gap-2 text-indigo-600 bg-indigo-50 hover:bg-indigo-600 hover:text-white px-3 py-1.5 rounded-md text-xs font-bold transition-all"
-                                                            >
-                                                                <Eye size={14} /> Visualizar
-                                                            </button>
+                                                            {doc.metadata_values && (() => {
+                                                                try {
+                                                                    const meta = typeof doc.metadata_values === 'string' ? JSON.parse(doc.metadata_values) : doc.metadata_values;
+                                                                    if (meta && meta.description) {
+                                                                        return (
+                                                                            <p className="text-xs text-gray-500 italic border-t border-gray-100 pt-2 pl-7">
+                                                                                📝 {meta.description}
+                                                                            </p>
+                                                                        );
+                                                                    }
+                                                                } catch(e) {}
+                                                                return null;
+                                                            })()}
                                                         </div>
                                                     ))}
                                                 </div>
