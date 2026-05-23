@@ -22,6 +22,7 @@ import Formatos from './pages/Formatos'; // Nuevo módulo de Formatos
 import ComunicacionesProducidas from './pages/ComunicacionesProducidas'; // Nuevo módulo
 import SeguimientoExpedientes from './pages/SeguimientoExpedientes'; // Seguimiento
 import AIChatBot from './components/AIChatBot'; // IA Assistant
+import InteractivePresentation from './pages/InteractivePresentation'; // New
 import './App.css';
 
 // --- Global Axios Interceptors ---
@@ -526,6 +527,9 @@ function Layout({ children }) {
               <Link to="/seguimiento" className="nav-item" style={{ color: '#db2777' }}>
                 <BarChart2 size={18} /> Seguimiento Expedientes
               </Link>
+              <Link to="/ponencia" className="nav-item" style={{ color: '#db2777' }}>
+                <Play size={18} /> Ponencia e IA
+              </Link>
             </div>
           )}
         </nav>
@@ -604,6 +608,9 @@ function App() {
         } />
         <Route path="/seguimiento" element={
           <ProtectedRoute><Layout><SeguimientoExpedientes /></Layout></ProtectedRoute>
+        } />
+        <Route path="/ponencia" element={
+          <ProtectedRoute><Layout><InteractivePresentation /></Layout></ProtectedRoute>
         } />
 
         <Route path="*" element={<Navigate to="/login" replace />} />
