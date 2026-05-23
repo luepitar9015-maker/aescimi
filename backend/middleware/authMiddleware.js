@@ -12,11 +12,14 @@ if (!JWT_SECRET) {
  */
 const requireAuth = (req, res, next) => {
     const authHeader = req.headers['authorization'];
-    console.log(`[AUTH MIDDLEWARE] Path: ${req.path}, Method: ${req.method}, AuthHeader: ${authHeader ? 'PRESENT (starts with ' + authHeader.substring(0, 15) + '...)' : 'MISSING'}`);
-    const token = authHeader && authHeader.split(' ')[1];
+    let token = authHeader && authHeader.split(' ')[1];
+    if (!token && req.query.token) {
+        token = req.query.token;
+    }
+    console.log(`[AUTH MIDDLEWARE] Path: ${req.path}, Method: ${req.method}, Token: ${token ? 'PRESENT' : 'MISSING'}`);
 
     if (!token) {
-        console.log('[AUTH MIDDLEWARE] REJECTED - Missing token or AuthHeader');
+        console.log('[AUTH MIDDLEWARE] REJECTED - Missing token');
         return res.status(401).json({ error: 'Acceso no autorizado. Se requiere autenticación.' });
     }
 

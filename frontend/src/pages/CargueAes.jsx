@@ -212,7 +212,7 @@ function CargueAes() {
             setAutomationError(false);
 
             // START LIVE STREAM
-            const eventSource = new EventSource('/api/automation/stream');
+            const eventSource = new EventSource(`/api/automation/stream?token=${encodeURIComponent(token || '')}`);
             eventSource.onmessage = (event) => {
                 setLiveFrame(`data:image/jpeg;base64,${event.data}`);
             };
@@ -252,7 +252,11 @@ function CargueAes() {
                 }
             } catch (err) {
                 console.error("Automation error:", err);
-                setLogs(prev => [...prev, `Error: ${err.message || 'El proceso falló. Revise la conexión con OnBase.'}`]);
+                if (err.response && err.response.data && err.response.data.logs) {
+                    setLogs(prev => [...prev, ...err.response.data.logs]);
+                }
+                const errMsg = err.response?.data?.error || err.message || 'El proceso falló. Revise la conexión con OnBase.';
+                setLogs(prev => [...prev, `Error: ${errMsg}`]);
                 setAutomationError(true);
                 eventSource.close();
                 break; // Stop bulk processing

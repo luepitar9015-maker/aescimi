@@ -23,6 +23,53 @@ const safeEval = async (frameOrPage, fn, ...args) => {
 const getFrame = (page, urlPart) =>
     page.frames().find(f => f.url().includes(urlPart)) || null;
 
+/** Escribe texto en un selector con soporte para reintentos si el elemento se desprende del DOM */
+const safeType = async (page, selector, text, delay = 50) => {
+    for (let i = 0; i < 5; i++) {
+        try {
+            const element = await page.waitForSelector(selector, { timeout: 8000 });
+            if (element) {
+                const isAttached = await page.evaluate(el => el.isConnected, element).catch(() => false);
+                if (isAttached) {
+                    await element.click({ clickCount: 3 }).catch(() => {});
+                    await wait(200);
+                    await page.keyboard.down('Control');
+                    await page.keyboard.press('A');
+                    await page.keyboard.up('Control');
+                    await page.keyboard.press('Delete');
+                    await wait(200);
+                    await element.type(text, { delay });
+                    return true;
+                }
+            }
+        } catch (e) {
+            // Silencioso, reintenta
+        }
+        await wait(800);
+    }
+    return false;
+};
+
+/** Clic en un selector con soporte para reintentos si el elemento se desprende del DOM */
+const safeClick = async (page, selector) => {
+    for (let i = 0; i < 5; i++) {
+        try {
+            const element = await page.waitForSelector(selector, { timeout: 8000 });
+            if (element) {
+                const isAttached = await page.evaluate(el => el.isConnected, element).catch(() => false);
+                if (isAttached) {
+                    await element.click();
+                    return true;
+                }
+            }
+        } catch (e) {
+            // Silencioso, reintenta
+        }
+        await wait(800);
+    }
+    return false;
+};
+
 // ─────────────────────────────────────────────────────────────────
 // PASO 1: LOGIN
 // ─────────────────────────────────────────────────────────────────
@@ -30,52 +77,119 @@ async function paso1_login(page, url, username, password, logs) {
     logs.push('[PASO 1] Navegando a OnBase...');
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 })
         .catch(e => logs.push(`[PASO 1][WARN] goto: ${e.message}`));
-    await wait(2000);
+    await wait(3000);
 
-    // Esperar campo de usuario
-    const userField = await page.waitForSelector(
-        '#username, input[type="text"], input[name="username"]',
-        { timeout: 15000 }
-    ).catch(() => null);
+    // Detectar si estamos en Microsoft SSO
+    const isMicrosoftSSO = await page.evaluate(() => {
+        return window.location.href.includes('microsoftonline.com') || 
+               document.title.includes('Iniciar sesión') || 
+               document.title.includes('Sign in') || 
+               !!document.querySelector('input[name="loginfmt"]');
+    });
 
-    if (!userField) {
-        logs.push('[PASO 1][ERROR] Campo de usuario no encontrado');
-        return false;
-    }
+    if (isMicrosoftSSO) {
+        logs.push('[PASO 1] Detectado inicio de sesión de Microsoft (SSO)');
+        
+        let effectiveUsername = username;
+        if (!username.includes('@')) {
+            effectiveUsername = `${username}@sena.edu.co`;
+            logs.push(`[PASO 1] Nombre de usuario sin dominio en SSO. Auto-ajustado a: ${effectiveUsername}`);
+        }
 
-    // Limpiar y escribir usuario
-    await userField.click({ clickCount: 3 });
-    await userField.type(username, { delay: 60 });
-    logs.push('[PASO 1] Usuario escrito');
+        // 1. Escribir usuario/correo
+        logs.push('[PASO 1] Buscando campo de correo de Microsoft...');
+        const emailOk = await safeType(page, 'input[type="email"], input[name="loginfmt"], #i0116', effectiveUsername, 60);
+        if (!emailOk) {
+            logs.push('[PASO 1][ERROR] Campo de correo de Microsoft no encontrado o no interactuable');
+            return false;
+        }
+        logs.push('[PASO 1] Correo escrito');
+        
+        // Clic en Siguiente
+        logs.push('[PASO 1] Clic en "Siguiente" de Microsoft...');
+        const nextOk = await safeClick(page, 'input[type="submit"], #idSIButton9');
+        if (!nextOk) {
+            logs.push('[PASO 1][ERROR] Botón "Siguiente" de Microsoft no encontrado');
+            return false;
+        }
+        await wait(2000); // esperar animación de transición
+        
+        // 2. Esperar y escribir contraseña
+        logs.push('[PASO 1] Buscando campo de contraseña de Microsoft...');
+        const passOk = await safeType(page, 'input[type="password"], input[name="passwd"], #i0118', password, 60);
+        if (!passOk) {
+            const errMsg = await page.evaluate(() => {
+                const el = document.querySelector('#usernameError, #error, .error');
+                return el ? el.innerText.trim() : null;
+            }).catch(() => null);
+            logs.push(`[PASO 1][ERROR] Campo de contraseña de Microsoft no encontrado. Error en página: ${errMsg || 'Ninguno'}`);
+            return false;
+        }
+        logs.push('[PASO 1] Contraseña escrita');
+        
+        // Clic en Iniciar sesión
+        logs.push('[PASO 1] Clic en "Iniciar Sesión" (Microsoft)...');
+        const submitOk = await safeClick(page, 'input[type="submit"], #idSIButton9');
+        if (!submitOk) {
+            logs.push('[PASO 1][ERROR] Botón de envío de Microsoft no encontrado');
+            return false;
+        }
+        
+        // Esperar respuesta de Microsoft
+        await wait(5000);
+        
+        // 3. Comprobar si hay pantalla "¿Quiere mantener la sesión iniciada?"
+        const staySignedIn = await page.evaluate(() => {
+            const hasStayText = document.body.innerText.includes('mantener la sesión') || 
+                                document.body.innerText.includes('Stay signed in');
+            const hasNoBtn = !!document.querySelector('#idBtn_Back');
+            return hasStayText && hasNoBtn;
+        });
+        
+        if (staySignedIn) {
+            logs.push('[PASO 1] Detectada pantalla "Mantener sesión iniciada". Clic en "No"...');
+            const noBtn = await page.$('#idBtn_Back');
+            if (noBtn) {
+                await noBtn.click();
+            } else {
+                const yesBtn = await page.$('#idSIButton9');
+                if (yesBtn) await yesBtn.click();
+            }
+            await wait(5000);
+        }
 
-    // Campo contraseña
-    const passField = await page.waitForSelector(
-        '#password, input[type="password"]',
-        { timeout: 8000 }
-    ).catch(() => null);
-
-    if (!passField) {
-        logs.push('[PASO 1][ERROR] Campo de contraseña no encontrado');
-        return false;
-    }
-
-    await passField.click({ clickCount: 3 });
-    await passField.type(password, { delay: 60 });
-    logs.push('[PASO 1] Contraseña escrita');
-
-    // Botón login
-    const loginBtn = await page.$('#loginButton, button[type="submit"], input[type="submit"]');
-    if (loginBtn) {
-        await loginBtn.click();
     } else {
-        await page.keyboard.press('Enter');
-    }
-    logs.push('[PASO 1] Botón login presionado. Esperando navegación...');
+        logs.push('[PASO 1] Detectado formulario de login OnBase estándar');
+        
+        // Esperar campo de usuario
+        const userOk = await safeType(page, '#username, input[type="text"], input[name="username"]', username, 60);
+        if (!userOk) {
+            logs.push('[PASO 1][ERROR] Campo de usuario no encontrado');
+            return false;
+        }
+        logs.push('[PASO 1] Usuario escrito');
 
-    // Esperar resultado del login (max 25s)
-    await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 25000 })
-        .catch(() => { });
-    await wait(5000); // OnBase tarda en cargar el NavPanel
+        // Campo contraseña
+        const passOk = await safeType(page, '#password, input[type="password"]', password, 60);
+        if (!passOk) {
+            logs.push('[PASO 1][ERROR] Campo de contraseña no encontrado');
+            return false;
+        }
+        logs.push('[PASO 1] Contraseña escrita');
+
+        // Botón login
+        const loginBtn = await page.$('#loginButton, button[type="submit"], input[type="submit"]');
+        if (loginBtn) {
+            await loginBtn.click();
+        } else {
+            await page.keyboard.press('Enter');
+        }
+        logs.push('[PASO 1] Botón login presionado. Esperando navegación...');
+    }
+
+    // Esperar navegación final a OnBase
+    await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 25000 }).catch(() => { });
+    await wait(6000); // Darle tiempo para cargar el NavPanel
 
     const postUrl = page.url();
     logs.push(`[PASO 1] URL post-login: ${postUrl}`);
@@ -85,12 +199,12 @@ async function paso1_login(page, url, username, password, logs) {
         return true;
     }
 
-    // Revisar si hay mensaje de error
+    // Revisar si hay mensaje de error en la página actual
     const errMsg = await safeEval(page, () => {
-        const el = document.querySelector('#ErrorMessage, .error-message, [class*="error"]');
+        const el = document.querySelector('#ErrorMessage, .error-message, [class*="error"], #error-information, .error');
         return el ? el.innerText.trim() : null;
     });
-    logs.push(`[PASO 1][ERROR] Login falló. Error: ${errMsg || 'URL inesperada'}`);
+    logs.push(`[PASO 1][ERROR] Login falló. Error: ${errMsg || 'Usuario/Contraseña incorrectos o requiere verificación manual (MFA)'}`);
     return false;
 }
 
