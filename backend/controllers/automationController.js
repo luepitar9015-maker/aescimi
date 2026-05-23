@@ -1183,7 +1183,7 @@ exports.executeAutomation = async (req, res) => {
     const automationPromise = (async () => {
         try {
             browser = await puppeteer.launch({
-                headless: false,
+                headless: process.platform === 'linux' ? true : false,
                 args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
             });
 
@@ -1354,7 +1354,7 @@ exports.executeDiagnostic = async (req, res) => {
     let browser;
     try {
         browser = await puppeteer.launch({
-            headless: false,
+            headless: process.platform === 'linux' ? true : false,
             args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
         });
 
