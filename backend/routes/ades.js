@@ -4,6 +4,44 @@ const db = require('../database');
 const fs = require('fs');
 const { requireAuth } = require('../middleware/authMiddleware');
 
+// Helper to validate if an expediente has at least its first three typologies uploaded
+const validateExpedienteTypologies = (expedienteId, callback) => {
+    const trdQ = `
+        SELECT UPPER(UNACCENT(tt.typology_name)) as typology_name
+        FROM expedientes e
+        LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie ILIKE '%-' || sub.subseries_code)
+        LEFT JOIN trd_series ser ON (sub.series_id = ser.id OR e.subserie = ser.series_code)
+        LEFT JOIN trd_typologies tt ON (tt.subseries_id = sub.id OR (tt.subseries_id IS NULL AND tt.series_id = ser.id))
+        WHERE e.id = ?
+        ORDER BY tt.id ASC
+        LIMIT 3
+    `;
+    db.all(trdQ, [expedienteId], (err, typRows) => {
+        if (err || !typRows || typRows.length === 0) {
+            return callback(null, true); // Si no hay tipologías, pasa
+        }
+
+        const requiredTypologies = typRows.map(r => r.typology_name);
+
+        const docsQ = `
+            SELECT DISTINCT UPPER(UNACCENT(typology_name)) as typology_name 
+            FROM documents 
+            WHERE expediente_id = ?
+        `;
+        db.all(docsQ, [expedienteId], (err, docRows) => {
+            if (err || !docRows) {
+                return callback(null, true);
+            }
+
+            const uploadedTypologies = docRows.map(r => r.typology_name);
+
+            // Check if ALL required typologies are in uploadedTypologies
+            const hasAll = requiredTypologies.every(reqTyp => uploadedTypologies.includes(reqTyp));
+            callback(null, hasAll);
+        });
+    });
+};
+
 // Get documents for ADES load — acepta ?status=Pendiente|Cargado|Todos (default: Pendiente)
 router.get('/pending', requireAuth, (req, res) => {
     const { status } = req.query;
@@ -42,19 +80,55 @@ router.get('/pending', requireAuth, (req, res) => {
         ORDER BY ${activeStatus === 'Cargado' ? 'd.load_date DESC,' : ''} typology_order ASC, d.created_at ASC
         LIMIT 300
     `;
-    db.all(query, params, (err, rows) => {
+    db.all(query, params, async (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
-        const processed = rows.map(row => {
+
+        // Get unique expedientes
+        const expMap = new Map();
+        rows.forEach(r => {
+            if (r.expediente_id && !expMap.has(r.expediente_id)) {
+                expMap.set(r.expediente_id, true);
+            }
+        });
+
+        // Run validation for each unique expediente
+        const validationResults = {};
+        const isUserAdmin = req.user && (req.user.role === 'admin' || req.user.role === 'superadmin');
+
+        const validatePromise = Array.from(expMap.keys()).map((id) => {
+            return new Promise((resolve) => {
+                validateExpedienteTypologies(id, (err, hasAll) => {
+                    validationResults[id] = hasAll;
+                    resolve();
+                });
+            });
+        });
+
+        await Promise.all(validatePromise);
+
+        const processed = [];
+        rows.forEach(row => {
             let docMeta = {};
             let expMeta = {};
             try { if (row.metadata_values) docMeta = JSON.parse(row.metadata_values); } catch (e) {}
             try { if (row.expediente_metadata) expMeta = JSON.parse(row.expediente_metadata); } catch (e) {}
-            return {
+            
+            const expId = row.expediente_id;
+            const hasFirstThree = expId ? (validationResults[expId] ?? true) : true;
+
+            // If not admin/superadmin, and it doesn't have the first three, we omit it.
+            if (!isUserAdmin && !hasFirstThree) {
+                return; // skip
+            }
+
+            processed.push({
                 ...row,
                 document_metadata: docMeta && typeof docMeta === 'object' ? docMeta : {},
-                expediente_metadata: expMeta && typeof expMeta === 'object' ? expMeta : {}
-            };
+                expediente_metadata: expMeta && typeof expMeta === 'object' ? expMeta : {},
+                has_first_three_typologies: hasFirstThree
+            });
         });
+
         res.json(processed);
     });
 });

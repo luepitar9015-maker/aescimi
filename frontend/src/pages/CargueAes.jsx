@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
-import { Play, CheckCircle, Clock, AlertCircle, FileText, Search, RefreshCw, Monitor, X, Globe, Settings as SettingsIcon, Save, Download, Trash, Database, Eye } from 'lucide-react';
+import { Play, CheckCircle, Clock, AlertCircle, FileText, Search, RefreshCw, Monitor, X, Globe, Settings as SettingsIcon, Save, Download, Trash, Database, Eye, ChevronDown, ChevronRight } from 'lucide-react';
 
 function CargueAes() {
     const currentUser = (() => { try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; } })();
     const isAuthorized = currentUser.role === 'admin' || currentUser.role === 'superadmin';
 
     const [activeTab, setActiveTab] = useState('cargue'); // 'cargue' or 'creacion'
+    const [expandedExpedientes, setExpandedExpedientes] = useState([]);
 
     // Cargue AES State
     const [configDoc, setConfigDoc] = useState(null);
@@ -100,31 +101,8 @@ function CargueAes() {
         const activeFilter = filter !== undefined ? filter : statusFilter;
         setLoading(true);
         try {
-            let data = [];
-            if (activeFilter === 'Pendiente') {
-                // Use the specialized ADES endpoint with full expediente metadata
-                const res = await axios.get('/api/ades/pending');
-                data = res.data;
-            } else {
-                // Use /api/documents which always works — filter by status client-side
-                const res = await axios.get('/api/documents');
-                const allDocs = res.data?.data || res.data || [];
-                data = activeFilter === 'Todos'
-                    ? allDocs
-                    : allDocs.filter(d => d.status === activeFilter);
-                // Normalize keys to match ADES format
-                data = data.map(d => ({
-                    ...d,
-                    expediente_metadata: d.expediente_metadata || {},
-                    document_metadata: d.document_metadata || {},
-                    expediente_code: d.expediente_code || '',
-                    title: d.expediente_title || d.title || '',
-                    subserie: d.subserie || '',
-                    storage_type: d.storage_type || '',
-                    box_id: d.box_id || '',
-                    opening_date: d.opening_date || '',
-                }));
-            }
+            const res = await axios.get(`/api/ades/pending?status=${activeFilter}`);
+            const data = res.data || [];
             setDocuments(data);
             const codes = {};
             data.forEach(d => { codes[d.id] = d.expediente_code || ''; });
@@ -794,6 +772,45 @@ function CargueAes() {
         );
     }
 
+    const toggleExpediente = (expId) => {
+        setExpandedExpedientes(prev =>
+            prev.includes(expId) ? prev.filter(id => id !== expId) : [...prev, expId]
+        );
+    };
+
+    const handleSelectExpediente = (exp, checked) => {
+        const pendingDocIds = exp.documents.filter(d => d.status === 'Pendiente').map(d => d.id);
+        if (checked) {
+            setSelectedDocs(prev => [...new Set([...prev, ...pendingDocIds])]);
+        } else {
+            setSelectedDocs(prev => prev.filter(id => !pendingDocIds.includes(id)));
+        }
+    };
+
+    // Group filteredDocs by expediente
+    const groupedExpedientes = [];
+    const expGroupMap = {};
+
+    filteredDocs.forEach(doc => {
+        const expId = doc.expediente_id || 999999;
+        if (!expGroupMap[expId]) {
+            expGroupMap[expId] = {
+                expediente_id: doc.expediente_id,
+                expediente_code: doc.expediente_code || '',
+                title: doc.title || 'Expediente Sin Título',
+                subserie: doc.subserie || '',
+                box_id: doc.box_id || '',
+                storage_type: doc.storage_type || '',
+                opening_date: doc.opening_date || '',
+                expediente_metadata: doc.expediente_metadata || {},
+                has_first_three_typologies: doc.has_first_three_typologies ?? true,
+                documents: []
+            };
+            groupedExpedientes.push(expGroupMap[expId]);
+        }
+        expGroupMap[expId].documents.push(doc);
+    });
+
     return (
         <div className="cargue-ades-container" style={{ padding: '20px', width: '100%', maxWidth: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -862,8 +879,8 @@ function CargueAes() {
                             <div style={{ overflowX: 'auto' }}>
                                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                                     <thead>
-                                        <tr style={{ backgroundColor: '#f5f5f5', textAlign: 'left' }}>
-                                            <th style={{ padding: '12px', width: '40px', textAlign: 'center' }}>
+                                        <tr style={{ backgroundColor: '#e8f5e9', textAlign: 'left', borderBottom: '2px solid #2e7d32' }}>
+                                            <th style={{ padding: '12px', width: '70px', textAlign: 'center' }}>
                                                 <input
                                                     type="checkbox"
                                                     onChange={(e) => {
@@ -872,156 +889,260 @@ function CargueAes() {
                                                         else setSelectedDocs([]);
                                                     }}
                                                     checked={filteredDocs.filter(d => d.status === 'Pendiente').length > 0 && selectedDocs.length === filteredDocs.filter(d => d.status === 'Pendiente').length}
+                                                    style={{ transform: 'scale(1.2)', cursor: 'pointer' }}
                                                 />
                                             </th>
-                                            <th style={{ padding: '12px', width: '140px' }}>Asignar Código</th>
-                                            <th style={{ padding: '12px' }}>Información Detallada del Expediente</th>
-                                            <th style={{ padding: '12px', width: '180px' }}>Archivo Original</th>
-                                            <th style={{ padding: '12px', width: '130px' }}>Tipología</th>
-                                            <th style={{ padding: '12px', width: '90px' }}>Fecha</th>
-                                            <th style={{ padding: '12px', width: '90px' }}>Estado</th>
-                                            <th style={{ padding: '12px', textAlign: 'center', width: '60px' }}>Acc.</th>
+                                            <th style={{ padding: '12px', width: '140px' }}>Código Expediente</th>
+                                            <th style={{ padding: '12px' }}>Detalle de Expediente</th>
+                                            <th style={{ padding: '12px', width: '150px' }}>Cant. Documentos</th>
+                                            <th style={{ padding: '12px', width: '150px' }}>Subserie TRD</th>
+                                            <th style={{ padding: '12px', width: '220px', textAlign: 'center' }}>Seguimiento / Estado</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {filteredDocs.length > 0 ? filteredDocs.map(doc => (
-                                            <tr key={doc.id} style={{ borderTop: '1px solid #eee', backgroundColor: selectedDocs.includes(doc.id) ? '#f1f8e9' : 'transparent' }}>
-                                                <td style={{ padding: '10px', textAlign: 'center' }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedDocs.includes(doc.id)}
-                                                        disabled={doc.status === 'Cargado'}
-                                                        onChange={(e) => {
-                                                            if (e.target.checked) setSelectedDocs(prev => [...prev, doc.id]);
-                                                            else setSelectedDocs(prev => prev.filter(id => id !== doc.id));
-                                                        }}
-                                                        style={{ transform: 'scale(1.2)', cursor: doc.status === 'Cargado' ? 'not-allowed' : 'pointer' }}
-                                                    />
-                                                </td>
-                                                <td style={{ padding: '10px' }}>
-                                                    <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
-                                                        <input
-                                                            type="text"
-                                                            value={editingCode[doc.id] || ''}
-                                                            onChange={(e) => {
-                                                                const val = e.target.value;
-                                                                setEditingCode(prev => ({ ...prev, [doc.id]: val }));
-                                                            }}
-                                                            onBlur={async () => {
-                                                                try {
-                                                                    await axios.put(`/api/expedientes/${doc.expediente_id}`, {
-                                                                        expediente_code: editingCode[doc.id]
-                                                                    });
-                                                                    setDocuments(prev => prev.map(d => d.expediente_id === doc.expediente_id ? { ...d, expediente_code: editingCode[doc.id] } : d));
-                                                                } catch (err) { console.error(err); }
-                                                            }}
-                                                            style={{ width: '100px', padding: '6px', border: '2px solid #39a900', borderRadius: '4px', fontSize: '13px', fontWeight: 'bold', color: '#1b5e20', outline: 'none' }}
-                                                            placeholder="M-00XX"
-                                                        />
-                                                    </div>
-                                                </td>
-                                                <td style={{ padding: '12px' }}>
-                                                    <div style={{ backgroundColor: '#e8f5e9', padding: '12px', borderRadius: '10px', border: '1px solid #c8e6c9', boxShadow: '0 2px 4px rgba(0,0,0,0.03)' }}>
-                                                        <div style={{ fontWeight: 'bold', fontSize: '15px', color: '#1b5e20', marginBottom: '10px', borderBottom: '2px solid #c8e6c9', paddingBottom: '5px', display: 'flex', justifyContent: 'space-between' }}>
-                                                            <span>{doc.title || 'Expediente Sin Título'}</span>
-                                                            <span style={{ fontSize: '10px', color: '#666', fontWeight: 'normal' }}>ID: {doc.expediente_id}</span>
-                                                        </div>
-                                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px', fontSize: '12px' }}>
-                                                            <div style={{ display: 'flex', gap: '5px' }}><strong style={{ color: '#2e7d32' }}>Subserie:</strong> <span style={{ wordBreak: 'break-all' }}>{doc.subserie || '-'}</span></div>
-                                                            <div style={{ display: 'flex', gap: '5px' }}><strong style={{ color: '#2e7d32' }}>Caja ID:</strong> <span>{doc.box_id || '-'}</span></div>
-                                                            <div style={{ display: 'flex', gap: '5px' }}><strong style={{ color: '#2e7d32' }}>Tipo Almac.:</strong> <span>{doc.storage_type || '-'}</span></div>
-                                                            <div style={{ display: 'flex', gap: '5px' }}><strong style={{ color: '#2e7d32' }}>Apertura:</strong> <span>{doc.opening_date || '-'}</span></div>
-                                                            {(() => {
-                                                                const mExp = doc.expediente_metadata || {};
-                                                                const mDoc = doc.document_metadata || {};
-                                                                const allMeta = { ...mDoc, ...mExp };
-                                                                return Object.entries(allMeta)
-                                                                    .filter(([, v]) => v && v.toString().trim() !== '')
-                                                                    .map(([k, v]) => (
-                                                                        <div key={k} style={{ display: 'flex', gap: '5px' }}>
-                                                                            <strong style={{ color: '#2e7d32', textTransform: 'capitalize' }}>{k.replace('valor', 'Valor ')}:</strong>
-                                                                            <span style={{ color: '#000' }}>{v}</span>
-                                                                        </div>
-                                                                    ));
-                                                            })()}
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td style={{ padding: '10px' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                        <FileText size={14} color="#1976d2" />
-                                                        {doc.filename}
-                                                    </div>
-                                                </td>
-                                                <td style={{ padding: '10px' }}>{doc.typology_name}</td>
-                                                <td style={{ padding: '10px' }}>{new Date(doc.document_date).toLocaleDateString()}</td>
-                                                <td style={{ padding: '10px' }}>
-                                                    <span style={{
-                                                        padding: '2px 8px',
-                                                        borderRadius: '10px',
-                                                        fontSize: '11px',
-                                                        backgroundColor: doc.status === 'Cargado' ? '#e8f5e9' : '#fff3e0',
-                                                        color: doc.status === 'Cargado' ? '#2e7d32' : '#ef6c00',
-                                                        border: `1px solid ${doc.status === 'Cargado' ? '#c8e6c9' : '#ffe0b2'}`
-                                                    }}>
-                                                        {doc.status}
-                                                    </span>
-                                                </td>
-                                                <td style={{ padding: '10px', textAlign: 'center' }}>
-                                                    <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
-                                                        <button
-                                                            onClick={() => handleView(doc)}
-                                                            title="Visualizar Archivo"
-                                                            style={{ padding: '6px', background: '#e8f5e9', border: '1px solid #c8e6c9', borderRadius: '4px', color: '#2e7d32', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                                        >
-                                                            <Eye size={14} />
-                                                        </button>
-                                                        {doc.status === 'Cargado' ? (
-                                                            <>
-                                                                <div title="Ya cargado en OnBase" style={{ padding: '5px 10px', background: '#e8f5e9', border: '1px solid #c8e6c9', borderRadius: '4px', color: '#2e7d32', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', fontWeight: 'bold' }}>
-                                                                    <CheckCircle size={14} /> Cargado
-                                                                </div>
-                                                                <button
-                                                                    title="Revertir a Pendiente"
-                                                                    onClick={async () => {
-                                                                        if (!window.confirm(`¿Revertir "${doc.typology_name}" a estado Pendiente?`)) return;
-                                                                        try {
-                                                                            const token = localStorage.getItem('token');
-                                                                            await axios.post('/api/ades/update-status',
-                                                                                { id: doc.id, status: 'Pendiente', ades_id: null },
-                                                                                { headers: { Authorization: `Bearer ${token}` } }
-                                                                            );
-                                                                            alert(`✅ Documento "${doc.typology_name}" revertido a Pendiente. Mostrando lista de Pendientes.`);
-                                                                            setStatusFilter('Pendiente');
+                                        {groupedExpedientes.length > 0 ? groupedExpedientes.map(exp => {
+                                            const isExpanded = expandedExpedientes.includes(exp.expediente_id);
+                                            const firstDoc = exp.documents[0];
+                                            const firstDocId = firstDoc?.id;
+                                            const pendingDocs = exp.documents.filter(d => d.status === 'Pendiente');
+                                            const isAllSelected = pendingDocs.length > 0 && pendingDocs.every(d => selectedDocs.includes(d.id));
+                                            const isSomeSelected = !isAllSelected && pendingDocs.some(d => selectedDocs.includes(d.id));
 
-                                                                        } catch (err) {
-                                                                            alert('Error al revertir: ' + (err.response?.data?.error || err.message));
-                                                                        }
-                                                                    }}
-                                                                    style={{ padding: '5px 10px', background: '#fff3e0', border: '1px solid #ffcc02', borderRadius: '4px', color: '#e65100', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', fontWeight: 'bold' }}
-                                                                >
-                                                                    <RefreshCw size={13} /> Revertir
-                                                                </button>
-                                                            </>
-                                                        ) : (
+                                            return (
+                                                <Fragment key={exp.expediente_id || Math.random()}>
+                                                    {/* Parent Row */}
+                                                    <tr style={{ 
+                                                        borderTop: '1px solid #c8e6c9', 
+                                                        backgroundColor: isAllSelected ? '#f1f8e9' : isExpanded ? '#f9fbe7' : 'transparent',
+                                                        transition: 'background-color 0.2s'
+                                                    }}>
+                                                        <td style={{ padding: '12px', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isAllSelected}
+                                                                disabled={pendingDocs.length === 0}
+                                                                ref={el => {
+                                                                    if (el) el.indeterminate = isSomeSelected;
+                                                                }}
+                                                                onChange={(e) => handleSelectExpediente(exp, e.target.checked)}
+                                                                style={{ transform: 'scale(1.2)', cursor: pendingDocs.length === 0 ? 'not-allowed' : 'pointer' }}
+                                                            />
                                                             <button
-                                                                onClick={() => handleConfig(doc)}
-                                                                className="btn-config"
-                                                                title="Formulario de Configuración"
-                                                                style={{ padding: '5px 10px', background: '#e3f2fd', border: '1px solid #90caf9', borderRadius: '4px', color: '#1976d2', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                                                onClick={() => toggleExpediente(exp.expediente_id)}
+                                                                style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px', color: '#2e7d32' }}
+                                                                title={isExpanded ? "Contraer" : "Expandir"}
                                                             >
-                                                                <SettingsIcon size={14} /> Config
+                                                                {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                                                             </button>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )) : (
+                                                        </td>
+                                                        <td style={{ padding: '12px' }}>
+                                                            {firstDocId ? (
+                                                                <input
+                                                                    type="text"
+                                                                    value={editingCode[firstDocId] || ''}
+                                                                    onChange={(e) => {
+                                                                        const val = e.target.value;
+                                                                        setEditingCode(prev => ({ ...prev, [firstDocId]: val }));
+                                                                    }}
+                                                                    onBlur={() => saveExpedienteCode(firstDocId)}
+                                                                    style={{ width: '110px', padding: '6px', border: '2px solid #39a900', borderRadius: '6px', fontSize: '13px', fontWeight: 'bold', color: '#1b5e20', outline: 'none' }}
+                                                                    placeholder="Código"
+                                                                />
+                                                            ) : '-'}
+                                                        </td>
+                                                        <td style={{ padding: '12px' }}>
+                                                            <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#1b5e20', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                                <span>{exp.title}</span>
+                                                                {!exp.has_first_three_typologies && (
+                                                                    <span style={{
+                                                                        padding: '2px 8px',
+                                                                        borderRadius: '12px',
+                                                                        fontSize: '11px',
+                                                                        backgroundColor: '#ffebee',
+                                                                        color: '#c62828',
+                                                                        border: '1px solid #ffcdd2',
+                                                                        fontWeight: 'bold',
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '4px'
+                                                                    }}>
+                                                                        <AlertCircle size={12} /> Falta 3 primeras tipologías (Seguimiento)
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+                                                                ID Caja: {exp.box_id || '-'} | Almacenamiento: {exp.storage_type || '-'} | Apertura: {exp.opening_date ? new Date(exp.opening_date).toLocaleDateString() : '-'}
+                                                            </div>
+                                                        </td>
+                                                        <td style={{ padding: '12px', fontWeight: 'bold', color: '#555' }}>
+                                                            <span style={{ 
+                                                                padding: '4px 10px', 
+                                                                borderRadius: '12px', 
+                                                                backgroundColor: '#e0f2f1', 
+                                                                color: '#00695c',
+                                                                fontSize: '12px' 
+                                                            }}>
+                                                                {exp.documents.length} documento(s)
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ padding: '12px', color: '#333', fontSize: '12px' }}>
+                                                            {exp.subserie || '-'}
+                                                        </td>
+                                                        <td style={{ padding: '12px', textAlign: 'center' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                                                <span style={{
+                                                                    padding: '4px 10px',
+                                                                    borderRadius: '10px',
+                                                                    fontSize: '11px',
+                                                                    fontWeight: 'bold',
+                                                                    backgroundColor: pendingDocs.length === 0 ? '#e8f5e9' : '#fff3e0',
+                                                                    color: pendingDocs.length === 0 ? '#2e7d32' : '#ef6c00',
+                                                                    border: `1px solid ${pendingDocs.length === 0 ? '#c8e6c9' : '#ffe0b2'}`
+                                                                }}>
+                                                                    {pendingDocs.length === 0 ? 'Completado' : `${pendingDocs.length} pendiente(s)`}
+                                                                </span>
+                                                                <button
+                                                                    onClick={() => toggleExpediente(exp.expediente_id)}
+                                                                    style={{ 
+                                                                        padding: '6px 12px', 
+                                                                        background: '#f5f5f5', 
+                                                                        border: '1px solid #ccc', 
+                                                                        borderRadius: '6px', 
+                                                                        cursor: 'pointer', 
+                                                                        fontSize: '12px', 
+                                                                        fontWeight: 'bold',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '4px'
+                                                                    }}
+                                                                >
+                                                                    {isExpanded ? 'Ocultar' : 'Ver Documentos'}
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+
+                                                    {/* Child Row (Expanded Documents List) */}
+                                                    {isExpanded && (
+                                                        <tr style={{ backgroundColor: '#fafafa' }}>
+                                                            <td colSpan="6" style={{ padding: '15px 15px 15px 50px', borderTop: '1px dashed #c8e6c9', borderBottom: '1px solid #e0e0e0' }}>
+                                                                <div style={{ 
+                                                                    backgroundColor: '#fff', 
+                                                                    borderRadius: '8px', 
+                                                                    border: '1px solid #e0e0e0', 
+                                                                    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)',
+                                                                    overflow: 'hidden'
+                                                                }}>
+                                                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                                                                        <thead>
+                                                                            <tr style={{ backgroundColor: '#f5f5f5', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>
+                                                                                <th style={{ padding: '8px 12px', width: '40px', textAlign: 'center' }}></th>
+                                                                                <th style={{ padding: '8px 12px' }}>Archivo Original</th>
+                                                                                <th style={{ padding: '8px 12px' }}>Tipología</th>
+                                                                                <th style={{ padding: '8px 12px', width: '110px' }}>Fecha</th>
+                                                                                <th style={{ padding: '8px 12px', width: '110px' }}>Estado</th>
+                                                                                <th style={{ padding: '8px 12px', width: '160px', textAlign: 'center' }}>Acciones</th>
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody>
+                                                                            {exp.documents.map(doc => (
+                                                                                <tr key={doc.id} style={{ borderBottom: '1px solid #f0f0f0', backgroundColor: selectedDocs.includes(doc.id) ? '#f1f8e9' : 'transparent' }}>
+                                                                                    <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                                                                                        <input
+                                                                                            type="checkbox"
+                                                                                            checked={selectedDocs.includes(doc.id)}
+                                                                                            disabled={doc.status === 'Cargado'}
+                                                                                            onChange={(e) => {
+                                                                                                if (e.target.checked) setSelectedDocs(prev => [...prev, doc.id]);
+                                                                                                else setSelectedDocs(prev => prev.filter(id => id !== doc.id));
+                                                                                            }}
+                                                                                            style={{ transform: 'scale(1.1)', cursor: doc.status === 'Cargado' ? 'not-allowed' : 'pointer' }}
+                                                                                        />
+                                                                                    </td>
+                                                                                    <td style={{ padding: '8px 12px' }}>
+                                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '500' }}>
+                                                                                            <FileText size={14} color="#1976d2" />
+                                                                                            <span style={{ wordBreak: 'break-all' }}>{doc.filename}</span>
+                                                                                        </div>
+                                                                                    </td>
+                                                                                    <td style={{ padding: '8px 12px', color: '#555' }}>
+                                                                                        {doc.typology_name}
+                                                                                    </td>
+                                                                                    <td style={{ padding: '8px 12px', color: '#666' }}>
+                                                                                        {new Date(doc.document_date).toLocaleDateString()}
+                                                                                    </td>
+                                                                                    <td style={{ padding: '8px 12px' }}>
+                                                                                        <span style={{
+                                                                                            padding: '2px 8px',
+                                                                                            borderRadius: '10px',
+                                                                                            fontSize: '11px',
+                                                                                            backgroundColor: doc.status === 'Cargado' ? '#e8f5e9' : '#fff3e0',
+                                                                                            color: doc.status === 'Cargado' ? '#2e7d32' : '#ef6c00',
+                                                                                            border: `1px solid ${doc.status === 'Cargado' ? '#c8e6c9' : '#ffe0b2'}`
+                                                                                        }}>
+                                                                                            {doc.status}
+                                                                                        </span>
+                                                                                    </td>
+                                                                                    <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                                                                                        <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
+                                                                                            <button
+                                                                                                onClick={() => handleView(doc)}
+                                                                                                title="Visualizar Archivo"
+                                                                                                style={{ padding: '5px', background: '#e8f5e9', border: '1px solid #c8e6c9', borderRadius: '4px', color: '#2e7d32', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                                                                            >
+                                                                                                <Eye size={13} />
+                                                                                            </button>
+                                                                                            {doc.status === 'Cargado' ? (
+                                                                                                <>
+                                                                                                    <button
+                                                                                                        title="Revertir a Pendiente"
+                                                                                                        onClick={async () => {
+                                                                                                            if (!window.confirm(`¿Revertir "${doc.typology_name}" a estado Pendiente?`)) return;
+                                                                                                            try {
+                                                                                                                const token = localStorage.getItem('token');
+                                                                                                                await axios.post('/api/ades/update-status',
+                                                                                                                    { id: doc.id, status: 'Pendiente', ades_id: null },
+                                                                                                                    { headers: { Authorization: `Bearer ${token}` } }
+                                                                                                                );
+                                                                                                                alert(`✅ Documento "${doc.typology_name}" revertido a Pendiente.`);
+                                                                                                                fetchPending();
+                                                                                                            } catch (err) {
+                                                                                                                alert('Error al revertir: ' + (err.response?.data?.error || err.message));
+                                                                                                            }
+                                                                                                        }}
+                                                                                                        style={{ padding: '3px 8px', background: '#fff3e0', border: '1px solid #ffcc02', borderRadius: '4px', color: '#e65100', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '3px' }}
+                                                                                                    >
+                                                                                                        <RefreshCw size={11} /> Revertir
+                                                                                                    </button>
+                                                                                                </>
+                                                                                            ) : (
+                                                                                                <button
+                                                                                                    onClick={() => handleConfig(doc)}
+                                                                                                    className="btn-config"
+                                                                                                    title="Formulario de Configuración"
+                                                                                                    style={{ padding: '3px 8px', background: '#e3f2fd', border: '1px solid #90caf9', borderRadius: '4px', color: '#1976d2', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '3px' }}
+                                                                                                >
+                                                                                                    <SettingsIcon size={12} /> Config
+                                                                                                </button>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    </td>
+                                                                                </tr>
+                                                                            ))}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </Fragment>
+                                            );
+                                        }) : (
                                             <tr>
-                                                <td colSpan="7" style={{ padding: '60px', textAlign: 'center' }}>
+                                                <td colSpan="6" style={{ padding: '60px', textAlign: 'center' }}>
                                                     <div style={{ color: '#999', fontSize: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                                                         {loading ? (
-                                                            <p>Cargando documentos...</p>
+                                                            <p>Cargando expedientes...</p>
                                                         ) : searchTerm ? (
                                                             <>
                                                                 <Search size={40} style={{ marginBottom: '15px', opacity: 0.3 }} />
@@ -1036,7 +1157,7 @@ function CargueAes() {
                                                         ) : (
                                                             <>
                                                                 <FileText size={40} style={{ marginBottom: '15px', opacity: 0.3 }} />
-                                                                <p>No hay documentos pendientes de cargue.</p>
+                                                                <p>No hay expedientes con documentos pendientes de cargue.</p>
                                                             </>
                                                         )}
                                                     </div>
@@ -1055,7 +1176,7 @@ function CargueAes() {
                                         disabled={automationLoading}
                                         style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px' }}
                                     >
-                                        {automationLoading ? 'Ejecutando proceso en OnBase...' : <><Play size={18} /> Iniciar Cargue AES ({filteredDocs.length} Docs)</>}
+                                        {automationLoading ? 'Ejecutando proceso en OnBase...' : <><Play size={18} /> Iniciar Cargue AES ({selectedDocs.length} de {filteredDocs.filter(d => d.status === 'Pendiente').length} Docs seleccionados)</>}
                                     </button>
                                 </div>
                             )}
