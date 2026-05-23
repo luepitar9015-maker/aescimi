@@ -1,10 +1,11 @@
+require('dotenv').config();
 const https = require('https');
 
 function testModels() {
     console.log('--- TEST DE MODELOS DE GEMINI ---');
-    const apiKey = 'AIzaSyA7CATIFBdR5hvbJJ7di8ghKboILPmVXUA'; // Llave del usuario
+    const apiKey = process.env.GEMINI_API_KEY;
     
-    console.log('Llamando a la API de Google para listar modelos...');
+    console.log('Llamando a la API de Google para listar modelos con la nueva clave...');
     
     https.get(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, (res) => {
         let data = '';
