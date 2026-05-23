@@ -42,9 +42,9 @@ jobs:
           cd ~/aescimi/backend
           touch .env
           if grep -q "^GEMINI_API_KEY=" .env; then
-            sed -i 's/^GEMINI_API_KEY=.*/GEMINI_API_KEY=AIzaSyA7CATIFBdR5hvbJJ7di8ghKboILPmVXUA/' .env
+            sed -i 's/^GEMINI_API_KEY=.*/GEMINI_API_KEY=AIzaSyBO2sxsxDxHrBRwAah0RAryfKHntXgwY64/' .env
           else
-            echo "GEMINI_API_KEY=AIzaSyA7CATIFBdR5hvbJJ7di8ghKboILPmVXUA" >> .env
+            echo "GEMINI_API_KEY=AIzaSyBO2sxsxDxHrBRwAah0RAryfKHntXgwY64" >> .env
           fi
 
           # 6. Reiniciar solo el backend con PM2 (backend sirve el frontend compilado)
