@@ -42,10 +42,16 @@ jobs:
           cd ~/aescimi/backend
           touch .env
           if grep -q "^GEMINI_API_KEY=" .env; then
-            sed -i 's/^GEMINI_API_KEY=.*/GEMINI_API_KEY=AIzaSyBO2sxsxDxHrBRwAah0RAryfKHntXgwY64/' .env
+            sed -i 's/^GEMINI_API_KEY=.*/GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}/' .env
           else
-            echo "GEMINI_API_KEY=AIzaSyBO2sxsxDxHrBRwAah0RAryfKHntXgwY64" >> .env
+            echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
           fi
+
+          # 5.5 Actualizar la clave de Gemini en la base de datos PostgreSQL
+          echo "=== Actualizando la clave en la base de datos ==="
+          node update_gemini_key.js
+
+
 
           # 6. Reiniciar solo el backend con PM2 (backend sirve el frontend compilado)
           echo "=== Reiniciando PM2 ==="
