@@ -984,19 +984,48 @@ async function paso4_llenarCampos(formPage, formFrame, docInfo, logs) {
 // ─────────────────────────────────────────────────────────────────
 async function paso5_adjuntarPDF(page, allFramesFn, docInfo, logs) {
     // VIDEO CONFIRMADO: el archivo viene de la ruta OneDrive (storage_path).
-    // Prioridad: storage_path (OneDrive) → path (uploads/ del servidor)
+    // Prioridad: LOCAL_STORAGE_PATH → storage_path (OneDrive) → path (uploads/ del servidor)
     let filePath = null;
-    if (docInfo?.storage_path && fs.existsSync(docInfo.storage_path)) {
-        filePath = docInfo.storage_path;
-        logs.push(`[PASO 5] Usando ruta OneDrive: ${filePath}`);
-    } else if (docInfo?.path && fs.existsSync(docInfo.path)) {
-        filePath = docInfo.path;
-        logs.push(`[PASO 5] Usando ruta servidor (fallback): ${filePath}`);
-    } else {
-        logs.push(`[PASO 5][ERROR] Archivo no encontrado.`);
-        logs.push(`[PASO 5][ERROR]   storage_path: ${docInfo?.storage_path || 'N/A'}`);
-        logs.push(`[PASO 5][ERROR]   path: ${docInfo?.path || 'N/A'}`);
-        return false;
+    let primaryPath = docInfo?.storage_path || docInfo?.path;
+
+    // Si tenemos local storage path, intentar mapear el path de la BD a local
+    if (primaryPath && process.env.LOCAL_STORAGE_PATH) {
+        try {
+            const dbStoragePath = await new Promise((resolve) => {
+                db.get("SELECT value FROM system_settings WHERE key = 'storage_path'", [], (err, row) => {
+                    resolve(row?.value || null);
+                });
+            });
+            if (dbStoragePath) {
+                const normDbPath = primaryPath.replace(/\\/g, '/');
+                const normDbStorage = dbStoragePath.replace(/\\/g, '/');
+                if (normDbPath.startsWith(normDbStorage)) {
+                    const relative = normDbPath.substring(normDbStorage.length);
+                    const resolved = path.join(process.env.LOCAL_STORAGE_PATH, relative);
+                    if (fs.existsSync(resolved)) {
+                        filePath = resolved;
+                        logs.push(`[PASO 5] Mapeado de BD a local: ${filePath}`);
+                    }
+                }
+            }
+        } catch (e) {
+            logs.push(`[PASO 5][WARN] Error al mapear path local: ${e.message}`);
+        }
+    }
+
+    if (!filePath) {
+        if (docInfo?.storage_path && fs.existsSync(docInfo.storage_path)) {
+            filePath = docInfo.storage_path;
+            logs.push(`[PASO 5] Usando ruta OneDrive: ${filePath}`);
+        } else if (docInfo?.path && fs.existsSync(docInfo.path)) {
+            filePath = docInfo.path;
+            logs.push(`[PASO 5] Usando ruta servidor (fallback): ${filePath}`);
+        } else {
+            logs.push(`[PASO 5][ERROR] Archivo no encontrado.`);
+            logs.push(`[PASO 5][ERROR]   storage_path: ${docInfo?.storage_path || 'N/A'}`);
+            logs.push(`[PASO 5][ERROR]   path: ${docInfo?.path || 'N/A'}`);
+            return false;
+        }
     }
     logs.push(`[PASO 5] Adjuntando: ${filePath}`);
     // Sobrescribir docInfo.path con la ruta efectiva para el fileChooser

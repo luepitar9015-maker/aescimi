@@ -110,8 +110,42 @@ router.post('/classify-document', requireAuth, upload.single('file'), async (req
         }
 
         // Obtener tipologías válidas de la base de datos para darle opciones a la IA
-        const tipologiasResult = await db.pool.query('SELECT DISTINCT typology_name FROM trd_typologies WHERE typology_name IS NOT NULL');
-        const tipologias = tipologiasResult.rows.map(r => r.typology_name).join(', ');
+        // Permitir filtrar por subserie si viene en query o body para mejorar la precisión
+        const subserie = req.query.subserie || req.body.subserie;
+        let tipologiasList = [];
+
+        if (subserie && subserie.trim().length > 0) {
+            const decodedSub = decodeURIComponent(subserie);
+            const exact = decodedSub;
+            const like = `%${decodedSub}%`;
+            const endsWith = `%-${decodedSub}`;
+            const endsWithDot = `%.${decodedSub}`;
+
+            // Consultar base de datos PostgreSQL filtrando por subserie/serie
+            const q = `
+                SELECT DISTINCT t.typology_name 
+                FROM trd_typologies t
+                LEFT JOIN trd_subseries sub ON t.subseries_id = sub.id
+                LEFT JOIN trd_series sr ON (sub.series_id = sr.id OR t.series_id = sr.id)
+                WHERE (sub.subseries_code = $1 OR sub.subseries_code ILIKE $2 OR sub.subseries_code ILIKE $3 OR sub.subseries_name ILIKE $4
+                   OR sr.series_code = $5 OR sr.series_code ILIKE $6 OR sr.series_code ILIKE $7 OR sr.series_name ILIKE $8)
+                   AND t.typology_name IS NOT NULL
+            `;
+            try {
+                const result = await db.pool.query(q, [exact, endsWith, endsWithDot, like, exact, endsWith, endsWithDot, like]);
+                tipologiasList = result.rows.map(r => r.typology_name);
+            } catch (dbErr) {
+                console.warn('[AI CLASSIFY] Error al buscar tipologías para subserie:', dbErr.message);
+            }
+        }
+
+        // Fallback a todas las tipologías si no se especificó subserie o si la consulta específica no arrojó resultados
+        if (tipologiasList.length === 0) {
+            const tipologiasResult = await db.pool.query('SELECT DISTINCT typology_name FROM trd_typologies WHERE typology_name IS NOT NULL');
+            tipologiasList = tipologiasResult.rows.map(r => r.typology_name);
+        }
+
+        const tipologias = tipologiasList.join(', ');
 
         const model = activeGenAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 

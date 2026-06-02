@@ -185,6 +185,9 @@ const db_main  = require('../database'); // para leer storage_path de settings
 
 /** Obtiene la ruta raíz del almacenamiento desde system_settings o por defecto */
 const getStoragePath = () => new Promise((resolve) => {
+    if (process.env.LOCAL_STORAGE_PATH) {
+        return resolve(process.env.LOCAL_STORAGE_PATH);
+    }
     db_main.get("SELECT value FROM system_settings WHERE key = 'storage_path'", [], (err, row) => {
         resolve(row?.value || path.join(__dirname, '../uploads/Gestion_Documental'));
     });

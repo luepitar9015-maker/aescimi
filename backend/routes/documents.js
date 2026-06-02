@@ -134,7 +134,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         const serieSuffix = getCleanSuffix(trdInfo?.series_code, '-');
         const subserieSuffix = getCleanSuffix(trdInfo?.subseries_code, '.');
 
-        const basePath = (await getSystemSetting('storage_path')) || trdInfo?.storage_path || path.join(__dirname, '../uploads/Gestion_Documental');
+        const basePath = process.env.LOCAL_STORAGE_PATH || (await getSystemSetting('storage_path')) || trdInfo?.storage_path || path.join(__dirname, '../uploads/Gestion_Documental');
         const backupBasePath = await getSystemSetting('backup_path');
 
         // Function to build path dynamically based on typology name
@@ -855,12 +855,36 @@ router.get('/stats/dashboard', (req, res) => {
 router.get('/file/:id', async (req, res) => {
     const { id } = req.params;
 
-    db.get('SELECT path, filename FROM documents WHERE id = ?', [id], (err, doc) => {
+    db.get('SELECT path, filename FROM documents WHERE id = ?', [id], async (err, doc) => {
         if (err) return res.status(500).json({ error: 'Error al consultar la base de datos.' });
         if (!doc) return res.status(404).json({ error: 'Documento no encontrado.' });
 
-        const primaryPath = doc.path;
+        let primaryPath = doc.path;
         const filename = doc.filename;
+
+        // Si tenemos local storage path, intentar mapear el path de la BD a local
+        if (primaryPath && process.env.LOCAL_STORAGE_PATH) {
+            try {
+                const dbStoragePath = await new Promise((resolve) => {
+                    db.get("SELECT value FROM system_settings WHERE key = 'storage_path'", [], (err, row) => {
+                        resolve(row?.value || null);
+                    });
+                });
+                if (dbStoragePath) {
+                    const normDbPath = primaryPath.replace(/\\/g, '/');
+                    const normDbStorage = dbStoragePath.replace(/\\/g, '/');
+                    if (normDbPath.startsWith(normDbStorage)) {
+                        const relative = normDbPath.substring(normDbStorage.length);
+                        const resolved = path.join(process.env.LOCAL_STORAGE_PATH, relative);
+                        if (fs.existsSync(resolved)) {
+                            primaryPath = resolved;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('[file/:id] Error al mapear path local:', e.message);
+            }
+        }
 
         // Helper para servir el archivo
         const serveFile = (filePath, source) => {

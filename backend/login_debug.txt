@@ -91,3 +91,11 @@
 [AUTH] validPassword=true, hash=$2b$12$Yq.ScOOi2lqNkUybJ85NhOr4x2YvgAGf53ly.K2i44P2TMobu6RTa
 [AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
 [AUTH] validPassword=true, hash=$2b$12$Q6M5vvBQpMd05P3f5mm2vOZ4615hZGWgkA7sYH3WQSaayHEHbzV4m
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] Recv doc: "admin", pass: "admin", length: 5
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] Recv doc: "1098680638", pass: "Santander2026**", length: 15
+[AUTH] validPassword=true, hash=$2b$12$Yq.ScOOi2lqNkUybJ85NhOr4x2YvgAGf53ly.K2i44P2TMobu6RTa
