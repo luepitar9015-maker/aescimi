@@ -12,7 +12,8 @@ const upload = multer({ storage: multer.memoryStorage() });
 // Función para obtener la API Key de Gemini dinámicamente de BD o de .env
 async function getGenAIInstance() {
     try {
-        const result = await db.pool.query("SELECT value FROM system_settings WHERE key = 'gemini_api_key'");
+        const pgPool = db.pool || require('../database_pg').pool;
+        const result = await pgPool.query("SELECT value FROM system_settings WHERE key = 'gemini_api_key'");
         const dbKey = result.rows[0] ? result.rows[0].value : null;
         const apiKey = dbKey || process.env.GEMINI_API_KEY;
         if (apiKey && apiKey.trim().length > 0) {
@@ -103,7 +104,7 @@ router.post('/classify-document', requireAuth, upload.single('file'), async (req
 
         // Extraer texto del PDF usando pdf-parse (máximo 3 páginas para ahorrar tokens y tiempo)
         const pdfData = await pdfParse(req.file.buffer, { max: 3 });
-        const extractedText = pdfData.text.substring(0, 15000); // Limitar a aprox 15k caracteres
+        const extractedText = (pdfData.text || '').substring(0, 15000); // Limitar a aprox 15k caracteres
 
         if (!extractedText || extractedText.trim().length === 0) {
             return res.status(400).json({ error: 'El PDF parece estar escaneado como imagen o no tiene texto extraíble.' });
@@ -114,8 +115,16 @@ router.post('/classify-document', requireAuth, upload.single('file'), async (req
         const subserie = req.query.subserie || req.body.subserie;
         let tipologiasList = [];
 
+        const pgPool = db.pool || require('../database_pg').pool;
+
         if (subserie && subserie.trim().length > 0) {
-            const decodedSub = decodeURIComponent(subserie);
+            let decodedSub = subserie;
+            try {
+                decodedSub = decodeURIComponent(subserie);
+            } catch (e) {
+                console.warn('[AI CLASSIFY] Error decoding subserie URL param:', e.message);
+            }
+            
             const exact = decodedSub;
             const like = `%${decodedSub}%`;
             const endsWith = `%-${decodedSub}`;
@@ -132,7 +141,7 @@ router.post('/classify-document', requireAuth, upload.single('file'), async (req
                    AND t.typology_name IS NOT NULL
             `;
             try {
-                const result = await db.pool.query(q, [exact, endsWith, endsWithDot, like, exact, endsWith, endsWithDot, like]);
+                const result = await pgPool.query(q, [exact, endsWith, endsWithDot, like, exact, endsWith, endsWithDot, like]);
                 tipologiasList = result.rows.map(r => r.typology_name);
             } catch (dbErr) {
                 console.warn('[AI CLASSIFY] Error al buscar tipologías para subserie:', dbErr.message);
@@ -141,13 +150,20 @@ router.post('/classify-document', requireAuth, upload.single('file'), async (req
 
         // Fallback a todas las tipologías si no se especificó subserie o si la consulta específica no arrojó resultados
         if (tipologiasList.length === 0) {
-            const tipologiasResult = await db.pool.query('SELECT DISTINCT typology_name FROM trd_typologies WHERE typology_name IS NOT NULL');
-            tipologiasList = tipologiasResult.rows.map(r => r.typology_name);
+            try {
+                const tipologiasResult = await pgPool.query('SELECT DISTINCT typology_name FROM trd_typologies WHERE typology_name IS NOT NULL');
+                tipologiasList = tipologiasResult.rows.map(r => r.typology_name);
+            } catch (fallbackErr) {
+                console.error('[AI CLASSIFY] Fallback query error:', fallbackErr.message);
+            }
         }
 
         const tipologias = tipologiasList.join(', ');
 
-        const model = activeGenAI.getGenerativeModel({ model: 'gemini-flash-latest' });
+        const model = activeGenAI.getGenerativeModel({ 
+            model: 'gemini-flash-latest',
+            generationConfig: { responseMimeType: 'application/json' }
+        });
 
         const prompt = `
 Eres un experto clasificador de documentos de archivo.
@@ -166,18 +182,40 @@ Reglas:
 1. Responde ÚNICAMENTE con un objeto JSON válido con este formato: 
 {"tipologia_sugerida": "Nombre de la Tipologia", "confianza": 95, "razon": "Breve justificación de por qué elegiste esta tipología en 1 línea."}
 2. Si ninguna tipología parece encajar, pon "tipologia_sugerida": "Desconocida".
-3. No incluyas markdown como \`\`\`json, solo el JSON raw.
+3. No incluyas markdown como \`\`\`json o \`\`\`, solo el JSON raw.
 `;
 
         const result = await model.generateContent(prompt);
         let textResponse = result.response.text().trim();
         
-        // Limpiar el markdown de bloques de código si la IA lo incluyó por error
-        if (textResponse.startsWith('```json')) textResponse = textResponse.replace(/```json/g, '');
-        if (textResponse.startsWith('```')) textResponse = textResponse.replace(/```/g, '');
-        textResponse = textResponse.trim();
+        // Limpieza robusta de la respuesta en caso de que contenga markdown JSON u otros caracteres
+        let cleanText = textResponse;
+        const jsonBlockRegex = /```json\s*([\s\S]*?)\s*```/i;
+        const match = cleanText.match(jsonBlockRegex);
+        if (match) {
+            cleanText = match[1].trim();
+        } else {
+            const generalBlockRegex = /```\s*([\s\S]*?)\s*```/i;
+            const genMatch = cleanText.match(generalBlockRegex);
+            if (genMatch) {
+                cleanText = genMatch[1].trim();
+            } else {
+                const firstBrace = cleanText.indexOf('{');
+                const lastBrace = cleanText.lastIndexOf('}');
+                if (firstBrace !== -1 && lastBrace !== -1 && lastBrace >= firstBrace) {
+                    cleanText = cleanText.substring(firstBrace, lastBrace + 1);
+                }
+            }
+        }
 
-        const jsonResponse = JSON.parse(textResponse);
+        let jsonResponse;
+        try {
+            jsonResponse = JSON.parse(cleanText);
+        } catch (parseErr) {
+            console.error('[AI CLASSIFY ERROR] No se pudo parsear el JSON. Respuesta original:', textResponse, 'Texto limpio:', cleanText);
+            throw new Error('La respuesta de la IA no tiene el formato JSON esperado.');
+        }
+
         res.json(jsonResponse);
 
     } catch (error) {
@@ -201,19 +239,20 @@ router.get('/summarize-expediente/:id', requireAuth, async (req, res) => {
             return res.status(400).json({ error: 'Falta el ID del expediente.' });
         }
 
-        // Obtener la información principal del expediente
-        const expResult = await db.pool.query('SELECT expediente_name, user_owner_id, date_created FROM expedientes WHERE id = $1', [expedienteId]);
+        const pgPool = db.pool || require('../database_pg').pool;
+
+        // Obtener la información principal del expediente (con nombres correctos de columna)
+        const expResult = await pgPool.query('SELECT title, created_at FROM expedientes WHERE id = $1', [expedienteId]);
         if (expResult.rows.length === 0) {
             return res.status(404).json({ error: 'Expediente no encontrado.' });
         }
         const expediente = expResult.rows[0];
 
-        // Obtener la lista de archivos asociados a este expediente (solo metadatos, sin descargar el PDF)
-        const filesResult = await db.pool.query(`
-            SELECT f.original_name, t.typology_name
-            FROM expediente_files f
-            LEFT JOIN trd_typologies t ON f.typology_id = t.id
-            WHERE f.expediente_id = $1
+        // Obtener la lista de archivos asociados a este expediente (desde la tabla documents)
+        const filesResult = await pgPool.query(`
+            SELECT filename, typology_name
+            FROM documents
+            WHERE expediente_id = $1
         `, [expedienteId]);
         
         const files = filesResult.rows;
@@ -230,12 +269,12 @@ Genera un breve resumen en UN SÓLO PÁRRAFO sobre el contenido general del sigu
 No hagas listas largas ni bullets, solo redacta un párrafo profesional y fácil de leer.
 
 DATOS DEL EXPEDIENTE:
-- Nombre: ${expediente.expediente_name}
-- Fecha de Creación: ${expediente.date_created}
+- Nombre: ${expediente.title}
+- Fecha de Creación: ${expediente.created_at}
 - Total Documentos: ${files.length}
 
 DOCUMENTOS CONTENIDOS:
-${files.map((f, i) => `${i+1}. ${f.original_name} (Tipología: ${f.typology_name || 'No especificada'})`).join('\n')}
+${files.map((f, i) => `${i+1}. ${f.filename} (Tipología: ${f.typology_name || 'No especificada'})`).join('\n')}
 `;
 
         const result = await model.generateContent(prompt);
