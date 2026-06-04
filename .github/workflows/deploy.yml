@@ -19,9 +19,13 @@ jobs:
           npm -v
           pm2 -v
 
+          # 0. Corregir permisos
+          echo "=== Corrigiendo permisos ==="
+          echo "Aut0m4t1z4d0r2026%*" | sudo -S chown -R cimi:cimi /home/cimi/aescimi || true
+          
           # 1. Bajar cambios del repositorio
           echo "=== Actualizando código ==="
-          cd ~/aescimi
+          cd /home/cimi/aescimi
           rm -f .git/index.lock || true
           git stash || true
           git clean -fd || true
