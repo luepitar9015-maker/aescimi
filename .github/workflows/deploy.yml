@@ -54,14 +54,23 @@ jobs:
             systemctl status postgresql || service postgresql status || true
           " >> diagnostics.txt 2>&1 || echo "SSH connection failed" >> diagnostics.txt
           
+          # Push diagnostics.txt
+          git config --global user.name "SENA Deployer"
+          git config --global user.email "deployer@sena.edu.co"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/luepitar9015-maker/aescimi.git
+          git add diagnostics.txt
+          git commit -m "chore: diagnostics [skip ci]" || true
+          git push origin HEAD:main || true
+
           # Crear directorio temporal para servir
           mkdir -p temp_serve
           cp diagnostics.txt temp_serve/diagnostics.txt
           
           # Liberar puerto 3000 y servir temporalmente con Python en segundo plano
-          echo "Liberando puerto 3000..."
-          fuser -k 3000/tcp || true
+          echo "Liberando puerto 3000 con fuerza..."
           pm2 stop sena-backend || true
+          pm2 kill || true
+          fuser -k -9 3000/tcp || true
           
           echo "Iniciando servidor HTTP temporal en puerto 3000..."
           cd temp_serve
@@ -72,7 +81,7 @@ jobs:
           sleep 90
           
           # Limpiar
-          kill \$PYTHON_PID || true
+          kill -9 \$PYTHON_PID || true
           cd ..
           rm -rf temp_serve
 
