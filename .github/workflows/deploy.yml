@@ -11,6 +11,7 @@ jobs:
     runs-on: self-hosted
     permissions:
       contents: write
+      issues: write
     steps:
       - name: Actualizar Código y Reiniciar Servicios
         run: |
@@ -132,6 +133,9 @@ jobs:
             echo "=== DESPLIEGUE FINALIZADO ==="
           ) > setup_log.txt 2>&1
           
+          # Publicar log en GitHub Issues para lectura facil sin auth
+          GITHUB_TOKEN=${{ github.token }} node create_issue.js || true
+
           # Push setup_log.txt a GitHub
           git config --global user.name "SENA Deployer"
           git config --global user.email "deployer@sena.edu.co"

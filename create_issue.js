@@ -2,7 +2,7 @@ const fs = require('fs');
 const https = require('https');
 
 try {
-    const diagnostics = fs.readFileSync('diagnostics.txt', 'utf8');
+    const diagnostics = fs.readFileSync('setup_log.txt', 'utf8');
 
     const postData = JSON.stringify({
         title: `Diagnostics ${new Date().toISOString()}`,
