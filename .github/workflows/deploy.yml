@@ -47,13 +47,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 cimi@192.168.8.164 "echo 'Conexión SSH exitosa a la BD'" >> diagnostics.txt 2>&1 || echo "SSH a la BD falló" >> diagnostics.txt
           
           # Crear issue con diagnostics.txt usando la API de GitHub
-          JSON_BODY=$(jq -n --arg title "Diagnostics $(date)" --arg body "$(cat diagnostics.txt)" '{title: $title, body: $body}')
-          curl -s -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            -d "$JSON_BODY" \
-            https://api.github.com/repos/luepitar9015-maker/aescimi/issues || true
+          GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" node create_issue.js || true
 
           # 2. Verificar y liberar el puerto 3000 si está ocupado
           echo "=== Verificando puerto 3000 ==="
