@@ -14,126 +14,128 @@ jobs:
     steps:
       - name: Actualizar Código y Reiniciar Servicios
         run: |
-          echo "=== Versiones del entorno ==="
-          node -v
-          npm -v
-          pm2 -v
-
-          # 0. Corregir permisos
-          echo "=== Corrigiendo permisos ==="
-          echo "Aut0m4t1z4d0r2026%*" | sudo -S chown -R cimi:cimi /home/cimi/aescimi || true
+          set +e
+          (
+            echo "=== INICIANDO DESPLIEGUE Y DIAGNOSTICOS ==="
+            echo "Fecha: $(date)"
+            echo "Usuario: $(whoami)"
+            echo "Ruta actual: $(pwd)"
+            echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
+            
+            echo "=== VERSIONES DE ENTORNO ==="
+            node -v 2>&1
+            npm -v 2>&1
+            pm2 -v 2>&1
+            
+            echo "=== CORRIGIENDO PERMISOS ==="
+            echo "Aut0m4t1z4d0r2026%*" | sudo -S chown -R cimi:cimi /home/cimi/aescimi 2>&1
+            
+            echo "=== CONFIGURACION DE GIT LOCAL ==="
+            rm -f .git/index.lock || true
+            git stash || true
+            git clean -fd || true
+            
+            echo "=== ACTUALIZANDO CODIGO EN PRODUCCION ==="
+            if [ -d "/home/cimi/aescimi" ]; then
+              cd /home/cimi/aescimi
+              rm -f .git/index.lock || true
+              git stash || true
+              git clean -fd || true
+              git fetch origin main 2>&1
+              git reset --hard origin/main 2>&1
+              cd $GITHUB_WORKSPACE
+            else
+              echo "⚠ /home/cimi/aescimi no existe"
+            fi
+            
+            echo "=== PRUEBAS DE CONECTIVIDAD ==="
+            echo "Ping a base de datos (192.168.8.164):"
+            ping -c 3 192.168.8.164 2>&1
+            echo "Verificando puerto 5432 en 192.168.8.164:"
+            nc -zv -w 3 192.168.8.164 5432 2>&1
+            
+            echo "=== COMPROBACION DE PUERTOS LOCALES ==="
+            ss -tlnp 2>&1
+            
+            echo "=== INTENTANDO ARRANCAR POSTGRESQL LOCAL ==="
+            echo "Aut0m4t1z4d0r2026%*" | sudo -S systemctl start postgresql 2>&1
+            echo "Aut0m4t1z4d0r2026%*" | sudo -S systemctl status postgresql 2>&1
+            
+            echo "=== INSTALACION DE SSHPASS ==="
+            echo "Aut0m4t1z4d0r2026%*" | sudo -S apt-get update -y 2>&1
+            echo "Aut0m4t1z4d0r2026%*" | sudo -S apt-get install -y sshpass 2>&1
+            
+            echo "=== INTENTANDO SSH Y CONTROL DE POSTGRESQL REMOTO ==="
+            sshpass -p "Aut0m4t1z4d0r2026%*" ssh -o StrictHostKeyChecking=no cimi@192.168.8.164 "
+              echo '--- DB Hostname & IP ---'
+              hostname -I
+              echo '--- DB PostgreSQL Status ---'
+              systemctl status postgresql || service postgresql status || true
+              echo '--- DB Listening Ports ---'
+              ss -tlnp | grep 5432 || netstat -tlnp | grep 5432 || true
+              echo '--- DB Start PostgreSQL ---'
+              echo 'Aut0m4t1z4d0r2026%*' | sudo -S systemctl start postgresql || echo 'Aut0m4t1z4d0r2026%*' | sudo -S service postgresql start
+              echo '--- DB PostgreSQL Status Post-arranque ---'
+              systemctl status postgresql || service postgresql status || true
+            " 2>&1
+            
+            echo "=== ACTUALIZANDO BACKEND ==="
+            if [ -d "/home/cimi/aescimi/backend" ]; then
+              cd /home/cimi/aescimi/backend
+              npm install --omit=dev 2>&1
+              cd $GITHUB_WORKSPACE
+            else
+              echo "⚠ Directorio backend no encontrado"
+            fi
+            
+            echo "=== ACTUALIZANDO FRONTEND ==="
+            if [ -d "/home/cimi/aescimi/frontend" ]; then
+              cd /home/cimi/aescimi/frontend
+              npm install 2>&1
+              npm run build 2>&1
+              cd $GITHUB_WORKSPACE
+            else
+              echo "⚠ Directorio frontend no encontrado"
+            fi
+            
+            echo "=== CONFIGURACION DE ENTORNO Y GEMINI KEY ==="
+            if [ -d "/home/cimi/aescimi/backend" ]; then
+              cd /home/cimi/aescimi/backend
+              touch .env
+              if grep -q '^GEMINI_API_KEY=' .env; then
+                sed -i 's/^GEMINI_API_KEY=.*/GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}/' .env
+              else
+                echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
+              fi
+              echo "Ejecutando script de actualizacion de Gemini Key..."
+              node update_gemini_key.js 2>&1
+              cd $GITHUB_WORKSPACE
+            fi
+            
+            echo "=== LIBERANDO PUERTO 3000 ==="
+            pm2 stop sena-backend || true
+            pm2 kill || true
+            fuser -k -9 3000/tcp || true
+            
+            echo "=== REINICIANDO PM2 ==="
+            if [ -d "/home/cimi/aescimi" ]; then
+              cd /home/cimi/aescimi
+              pm2 start ecosystem.config.js --only sena-backend 2>&1
+              pm2 save 2>&1
+              cd $GITHUB_WORKSPACE
+            fi
+            
+            echo "=== RECARGANDO NGINX ==="
+            sudo nginx -t 2>&1
+            sudo systemctl reload nginx 2>&1
+            
+            echo "=== DESPLIEGUE FINALIZADO ==="
+          ) > setup_log.txt 2>&1
           
-          # 1. Bajar cambios del repositorio
-          echo "=== Actualizando código ==="
-          cd /home/cimi/aescimi
-          rm -f .git/index.lock || true
-          git stash || true
-          git clean -fd || true
-          git fetch origin main
-          git reset --hard origin/main
-
-          # 1.5. Ejecutar Diagnósticos y Servirlos temporalmente
-          echo "=== Ejecutando Diagnósticos ==="
-          echo "=== DIAGNOSTICS ===" > diagnostics.txt
-          echo "Fecha: \$(date)" >> diagnostics.txt
-          echo "Usuario: \$(whoami)" >> diagnostics.txt
-          
-          echo "=== CONECTIVIDAD ===" >> diagnostics.txt
-          echo "Ping to DB (192.168.8.164):" >> diagnostics.txt
-          ping -c 3 192.168.8.164 >> diagnostics.txt 2>&1 || true
-          echo "NC to DB 5432:" >> diagnostics.txt
-          nc -zv -w 3 192.168.8.164 5432 >> diagnostics.txt 2>&1 || true
-          
-          # Instalar sshpass si no está
-          echo "Aut0m4t1z4d0r2026%*" | sudo -S apt-get install -y sshpass >/dev/null 2>&1
-          
-          echo "=== SSH TO DB SERVER ===" >> diagnostics.txt
-          sshpass -p "Aut0m4t1z4d0r2026%*" ssh -o StrictHostKeyChecking=no cimi@192.168.8.164 "
-            echo '--- Hostname & IP ---'
-            hostname -I
-            echo '--- PostgreSQL Service Status ---'
-            systemctl status postgresql || service postgresql status || true
-            echo '--- Listening Ports ---'
-            ss -tlnp | grep 5432 || netstat -tlnp | grep 5432 || true
-            echo '--- Attempting to start PostgreSQL ---'
-            echo 'Aut0m4t1z4d0r2026%*' | sudo -S systemctl start postgresql || echo 'Aut0m4t1z4d0r2026%*' | sudo -S service postgresql start
-            echo '--- PostgreSQL Status after start ---'
-            systemctl status postgresql || service postgresql status || true
-          " >> diagnostics.txt 2>&1 || echo "SSH connection failed" >> diagnostics.txt
-          
-          # Push diagnostics.txt
+          # Push setup_log.txt a GitHub
           git config --global user.name "SENA Deployer"
           git config --global user.email "deployer@sena.edu.co"
           git remote set-url origin https://x-access-token:${{ github.token }}@github.com/luepitar9015-maker/aescimi.git
-          git add diagnostics.txt
-          git commit -m "chore: diagnostics [skip ci]" || true
-          git push origin HEAD:main > push_output.txt 2>&1 || true
-
-          # Crear directorio temporal para servir
-          mkdir -p temp_serve
-          cp diagnostics.txt temp_serve/diagnostics.txt
-          cp push_output.txt temp_serve/push_output.txt || true
-          
-          # Liberar puerto 3000 y servir temporalmente con Python en segundo plano
-          echo "Liberando puerto 3000 con fuerza..."
-          pm2 stop sena-backend || true
-          pm2 kill || true
-          fuser -k -9 3000/tcp || true
-          
-          echo "Iniciando servidor HTTP temporal con Node en puerto 3000..."
-          cd temp_serve
-          node -e "const http = require('http'), fs = require('fs'), path = require('path'); http.createServer((req, res) => { const filePath = path.join('.', req.url); fs.readFile(filePath, (err, data) => { if (err) { res.writeHead(404); res.end('Not Found'); } else { res.writeHead(200); res.end(data); } }); }).listen(3000);" &
-          NODE_PID=\$!
-          
-          # Mantener el servidor HTTP vivo durante 300 segundos (5 minutos)
-          sleep 300
-          
-          # Limpiar
-          kill -9 \$NODE_PID || true
-          cd ..
-          rm -rf temp_serve
-
-          # 2. Verificar y liberar el puerto 3000 si está ocupado
-          echo "=== Verificando puerto 3000 ==="
-          fuser -k 3000/tcp 2>/dev/null && echo "⚠ Puerto 3000 liberado" || echo "✔ Puerto 3000 libre"
-
-          # 3. Actualizar BACKEND (sin SSL — Nginx maneja HTTPS)
-          echo "=== Actualizando Backend (HTTP puro) ==="
-          cd ~/aescimi/backend
-          npm install --omit=dev
-
-          # 4. Actualizar FRONTEND (Vite está en devDependencies, requiere npm install completo)
-          echo "=== Actualizando y compilando Frontend ==="
-          cd ~/aescimi/frontend
-          npm install
-          npm run build
-
-          # 5. Configurar API Key de Gemini en el .env del servidor
-          echo "=== Configurando Variables de Entorno ==="
-          cd ~/aescimi/backend
-          touch .env
-          if grep -q "^GEMINI_API_KEY=" .env; then
-            sed -i 's/^GEMINI_API_KEY=.*/GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}/' .env
-          else
-            echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
-          fi
-
-          # 5.5 Actualizar la clave de Gemini en la base de datos PostgreSQL
-          echo "=== Actualizando la clave en la base de datos ==="
-          node update_gemini_key.js
-
-
-
-          # 6. Reiniciar solo el backend con PM2 (backend sirve el frontend compilado)
-          echo "=== Reiniciando PM2 ==="
-          cd ~/aescimi
-          pm2 restart sena-backend || pm2 start ecosystem.config.js --only sena-backend
-          pm2 delete sena-frontend 2>/dev/null || true
-          pm2 save
-
-          # 6. Recargar Nginx para asegurar configuración vigente
-          echo "=== Recargando Nginx ==="
-          sudo nginx -t && sudo systemctl reload nginx || echo "⚠ Revisar configuración de Nginx"
-
-          echo "=== ✅ Deploy completado exitosamente ==="
-          echo "=== Backend HTTP en localhost:3000 — Nginx sirve en 80/443 ==="
+          git add setup_log.txt
+          git commit -m "chore: push setup_log [skip ci]" || true
+          git push origin HEAD:main || true
