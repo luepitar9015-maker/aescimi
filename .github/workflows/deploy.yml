@@ -139,3 +139,10 @@ jobs:
           git add setup_log.txt
           git commit -m "chore: push setup_log [skip ci]" || true
           git push origin HEAD:main || true
+          git push origin HEAD:logs || true
+
+      - name: Subir Artifact de Logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: setup-logs
+          path: setup_log.txt
