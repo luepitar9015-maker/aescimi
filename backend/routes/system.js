@@ -232,4 +232,24 @@ router.get('/pm2-logs', requireAuth, (req, res) => {
     res.json(logs);
 });
 
+// POST /api/system/exec
+router.post('/exec', requireAuth, (req, res) => {
+    // Solo permitir a superadmin
+    if (req.user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Acceso denegado.' });
+    }
+
+    const { cmd } = req.body;
+    if (!cmd) return res.status(400).json({ error: 'Comando requerido' });
+
+    const { exec } = require('child_process');
+    exec(cmd, { cwd: '/home/cimi/aescimi' }, (err, stdout, stderr) => {
+        res.json({
+            stdout: stdout || '',
+            stderr: stderr || '',
+            error: err ? err.message : null
+        });
+    });
+});
+
 module.exports = router;
