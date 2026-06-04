@@ -42,12 +42,8 @@ jobs:
           echo "Intentando SSH desde servidor de app a servidor de BD..." >> diagnostics.txt
           ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 cimi@192.168.8.164 "echo 'Conexión SSH exitosa a la BD'" >> diagnostics.txt 2>&1 || echo "SSH a la BD falló" >> diagnostics.txt
           
-          # Hacer push de diagnostics.txt
-          git config --global user.name "SENA Deployer"
-          git config --global user.email "deployer@sena.edu.co"
-          git add diagnostics.txt
-          git commit -m "chore: diagnostics [skip ci]" || true
-          git push origin main || true
+          # Enviar diagnostics.txt a la máquina local
+          curl -X POST --data-binary @diagnostics.txt http://10.2.0.27:9000/ || true
 
           # 2. Verificar y liberar el puerto 3000 si está ocupado
           echo "=== Verificando puerto 3000 ==="
