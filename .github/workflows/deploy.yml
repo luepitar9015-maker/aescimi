@@ -22,6 +22,33 @@ jobs:
           git stash || true
           git pull origin main
 
+          # 1.5. Ejecutar Diagnósticos y Subirlos
+          echo "=== Ejecutando Diagnósticos ==="
+          echo "=== DIAGNOSTICS ===" > diagnostics.txt
+          echo "Fecha: $(date)" >> diagnostics.txt
+          echo "Usuario: $(whoami)" >> diagnostics.txt
+          echo "Rutas de Red:" >> diagnostics.txt
+          ip route || ip a >> diagnostics.txt
+          echo "Puertos escuchando localmente:" >> diagnostics.txt
+          ss -tlnp || netstat -tlnp >> diagnostics.txt 2>&1
+          echo "Estado de PM2:" >> diagnostics.txt
+          pm2 status >> diagnostics.txt 2>&1
+          echo "Estado de Nginx:" >> diagnostics.txt
+          systemctl status nginx >> diagnostics.txt 2>&1 || true
+          echo "Conectividad con base de datos (192.168.8.164:5432):" >> diagnostics.txt
+          nc -zv -w 3 192.168.8.164 5432 >> diagnostics.txt 2>&1 || echo "Puerto 5432 cerrado" >> diagnostics.txt
+          echo "Ping a base de datos:" >> diagnostics.txt
+          ping -c 3 192.168.8.164 >> diagnostics.txt 2>&1
+          echo "Intentando SSH desde servidor de app a servidor de BD..." >> diagnostics.txt
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 cimi@192.168.8.164 "echo 'Conexión SSH exitosa a la BD'" >> diagnostics.txt 2>&1 || echo "SSH a la BD falló" >> diagnostics.txt
+          
+          # Hacer push de diagnostics.txt
+          git config --global user.name "SENA Deployer"
+          git config --global user.email "deployer@sena.edu.co"
+          git add diagnostics.txt
+          git commit -m "chore: diagnostics [skip ci]" || true
+          git push origin main || true
+
           # 2. Verificar y liberar el puerto 3000 si está ocupado
           echo "=== Verificando puerto 3000 ==="
           fuser -k 3000/tcp 2>/dev/null && echo "⚠ Puerto 3000 liberado" || echo "✔ Puerto 3000 libre"
