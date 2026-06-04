@@ -145,6 +145,34 @@ jobs:
           git push origin HEAD:main || true
           git push origin HEAD:logs || true
 
+          # Servir setup_log.txt temporalmente en puerto 3000
+          echo "=== SERVIDO TEMPORAL DE LOGS ==="
+          pm2 stop sena-backend || true
+          pm2 kill || true
+          fuser -k -9 3000/tcp || true
+          
+          mkdir -p /home/cimi/temp_serve
+          cp setup_log.txt /home/cimi/temp_serve/setup_log.txt
+          cd /home/cimi/temp_serve
+          
+          echo "Iniciando servidor temporal en puerto 3000..."
+          node -e "const http = require('http'), fs = require('fs'), path = require('path'); http.createServer((req, res) => { const filePath = path.join('.', req.url); fs.readFile(filePath, (err, data) => { if (err) { res.writeHead(404); res.end('Not Found'); } else { res.writeHead(200); res.end(data); } }); }).listen(3000);" &
+          TEMP_PID=$!
+          
+          # Esperar 180 segundos (3 minutos)
+          sleep 180
+          
+          # Matar el servidor temporal y limpiar
+          kill -9 $TEMP_PID || true
+          cd $GITHUB_WORKSPACE
+          rm -rf /home/cimi/temp_serve
+
+          # Restablecer el backend de producción
+          echo "=== RESTABLECIENDO BACKEND DE PRODUCCION ==="
+          cd /home/cimi/aescimi
+          pm2 start ecosystem.config.js --only sena-backend || true
+          pm2 save || true
+
       - name: Subir Artifact de Logs
         uses: actions/upload-artifact@v4
         with:
