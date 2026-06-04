@@ -12,14 +12,17 @@ jobs:
     steps:
       - name: Actualizar Código y Reiniciar Servicios
         run: |
+          set +e
           echo "=== Versiones del entorno ==="
           node -v
           npm -v
           pm2 -v
 
-          # 0. Corregir permisos
+          # 0. Corregir permisos y configurar safe.directory en git
           echo "=== Corrigiendo permisos ==="
           echo "Aut0m4t1z4d0r2026%*" | sudo -S chown -R cimi:cimi /home/cimi/aescimi || true
+          git config --global --add safe.directory /home/cimi/aescimi || true
+          git config --global --add safe.directory $GITHUB_WORKSPACE || true
           
           # 1. Bajar cambios del repositorio
           echo "=== Actualizando código ==="
