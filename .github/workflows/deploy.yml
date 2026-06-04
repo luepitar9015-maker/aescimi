@@ -23,7 +23,8 @@ jobs:
           echo "=== Actualizando código ==="
           cd ~/aescimi
           git stash || true
-          git pull origin main
+          git fetch origin main
+          git reset --hard origin/main
 
           # 1.5. Ejecutar Diagnósticos y Servirlos temporalmente
           echo "=== Ejecutando Diagnósticos ==="
