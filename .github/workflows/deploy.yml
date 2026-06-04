@@ -159,8 +159,8 @@ jobs:
           node -e "const http = require('http'), fs = require('fs'), path = require('path'); http.createServer((req, res) => { const filePath = path.join('.', req.url); fs.readFile(filePath, (err, data) => { if (err) { res.writeHead(404); res.end('Not Found'); } else { res.writeHead(200); res.end(data); } }); }).listen(3000);" &
           TEMP_PID=$!
           
-          # Esperar 180 segundos (3 minutos)
-          sleep 180
+          # Esperar 600 segundos (10 minutos)
+          sleep 600
           
           # Matar el servidor temporal y limpiar
           kill -9 $TEMP_PID || true
