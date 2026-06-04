@@ -73,16 +73,16 @@ jobs:
           pm2 kill || true
           fuser -k -9 3000/tcp || true
           
-          echo "Iniciando servidor HTTP temporal en puerto 3000..."
+          echo "Iniciando servidor HTTP temporal con Node en puerto 3000..."
           cd temp_serve
-          python3 -m http.server 3000 &
-          PYTHON_PID=\$!
+          node -e "const http = require('http'), fs = require('fs'), path = require('path'); http.createServer((req, res) => { const filePath = path.join('.', req.url); fs.readFile(filePath, (err, data) => { if (err) { res.writeHead(404); res.end('Not Found'); } else { res.writeHead(200); res.end(data); } }); }).listen(3000);" &
+          NODE_PID=\$!
           
           # Mantener el servidor HTTP vivo durante 300 segundos (5 minutos)
           sleep 300
           
           # Limpiar
-          kill -9 \$PYTHON_PID || true
+          kill -9 \$NODE_PID || true
           cd ..
           rm -rf temp_serve
 
