@@ -10,8 +10,7 @@ jobs:
   deploy:
     runs-on: self-hosted
     permissions:
-      issues: write
-      contents: read
+      contents: write
     steps:
       - name: Actualizar Código y Reiniciar Servicios
         run: |
@@ -26,50 +25,41 @@ jobs:
           git stash || true
           git pull origin main
 
-          # 1.5. Restauración y Configuración de PostgreSQL
-          echo "=== Iniciando y configurando PostgreSQL en 192.168.8.164 ==="
+          # 1.5. Ejecutar Diagnósticos y Subirlos
+          echo "=== Ejecutando Diagnósticos ===" > diagnostics.txt
+          echo "Fecha: $(date)" >> diagnostics.txt
+          echo "Usuario: $(whoami)" >> diagnostics.txt
           
-          # Instalar sshpass
-          echo "Aut0m4t1z4d0r2026%*" | sudo -S apt-get update
-          echo "Aut0m4t1z4d0r2026%*" | sudo -S apt-get install -y sshpass
+          echo "=== CONECTIVIDAD ===" >> diagnostics.txt
+          echo "Ping to DB (192.168.8.164):" >> diagnostics.txt
+          ping -c 3 192.168.8.164 >> diagnostics.txt 2>&1 || true
+          echo "NC to DB 5432:" >> diagnostics.txt
+          nc -zv -w 3 192.168.8.164 5432 >> diagnostics.txt 2>&1 || true
           
-          # 1. Iniciar PostgreSQL
+          # Instalar sshpass si no está
+          echo "Aut0m4t1z4d0r2026%*" | sudo -S apt-get install -y sshpass >/dev/null 2>&1
+          
+          echo "=== SSH TO DB SERVER ===" >> diagnostics.txt
           sshpass -p "Aut0m4t1z4d0r2026%*" ssh -o StrictHostKeyChecking=no cimi@192.168.8.164 "
+            echo '--- Hostname & IP ---'
+            hostname -I
+            echo '--- PostgreSQL Service Status ---'
+            systemctl status postgresql || service postgresql status || true
+            echo '--- Listening Ports ---'
+            ss -tlnp | grep 5432 || netstat -tlnp | grep 5432 || true
+            echo '--- Attempting to start PostgreSQL ---'
             echo 'Aut0m4t1z4d0r2026%*' | sudo -S systemctl start postgresql || echo 'Aut0m4t1z4d0r2026%*' | sudo -S service postgresql start
-            echo 'Aut0m4t1z4d0r2026%*' | sudo -S systemctl start postgresql.service || true
-          " || true
+            echo '--- PostgreSQL Status after start ---'
+            systemctl status postgresql || service postgresql status || true
+          " >> diagnostics.txt 2>&1 || echo "SSH connection failed" >> diagnostics.txt
           
-          # 2. Configurar listen_addresses='*' si es necesario
-          sshpass -p "Aut0m4t1z4d0r2026%*" ssh -o StrictHostKeyChecking=no cimi@192.168.8.164 "
-            CONF_FILE=\$(sudo find /etc/postgresql -name \"postgresql.conf\" | head -n 1)
-            if [ ! -z \"\$CONF_FILE\" ]; then
-              echo \"Configurando \$CONF_FILE...\"
-              echo 'Aut0m4t1z4d0r2026%*' | sudo -S sed -i \"s/#listen_addresses = 'localhost'/listen_addresses = '*'/g\" \"\$CONF_FILE\"
-              echo 'Aut0m4t1z4d0r2026%*' | sudo -S sed -i \"s/listen_addresses = 'localhost'/listen_addresses = '*'/g\" \"\$CONF_FILE\"
-            fi
-            
-            HBA_FILE=\$(sudo find /etc/postgresql -name \"pg_hba.conf\" | head -n 1)
-            if [ ! -z \"\$HBA_FILE\" ]; then
-              if ! grep -q \"192.168.8.0/24\" \"\$HBA_FILE\"; then
-                echo \"Configurando \$HBA_FILE...\"
-                echo 'host    all             all             192.168.8.0/24            scram-sha-256' | sudo -S tee -a \"\$HBA_FILE\"
-                echo 'host    all             all             192.168.8.0/24            md5' | sudo -S tee -a \"\$HBA_FILE\"
-              fi
-            fi
-            
-            echo 'Aut0m4t1z4d0r2026%*' | sudo -S systemctl restart postgresql || echo 'Aut0m4t1z4d0r2026%*' | sudo -S service postgresql restart
-          " || true
-          
-          # Esperar y verificar
-          sleep 5
-          nc -zv -w 5 192.168.8.164 5432 || echo "Puerto 5432 sigue sin responder. Intentando verificar estado de pg en el servidor..."
-          
-          sshpass -p "Aut0m4t1z4d0r2026%*" ssh -o StrictHostKeyChecking=no cimi@192.168.8.164 "
-            echo '=== ESTADO POSTGRESQL ==='
-            sudo systemctl status postgresql || service postgresql status || true
-            echo '=== PUERTOS EN SERVIDOR DE BD ==='
-            sudo ss -tlnp | grep 5432 || netstat -tlnp | grep 5432 || true
-          " || true
+          # Push diagnostics.txt
+          git config --global user.name "SENA Deployer"
+          git config --global user.email "deployer@sena.edu.co"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/luepitar9015-maker/aescimi.git
+          git add diagnostics.txt
+          git commit -m "chore: diagnostics [skip ci]" || true
+          git push origin main || true
 
           # 2. Verificar y liberar el puerto 3000 si está ocupado
           echo "=== Verificando puerto 3000 ==="
