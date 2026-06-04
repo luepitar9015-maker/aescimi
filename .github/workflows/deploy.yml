@@ -22,7 +22,9 @@ jobs:
           # 1. Bajar cambios del repositorio
           echo "=== Actualizando código ==="
           cd ~/aescimi
+          rm -f .git/index.lock || true
           git stash || true
+          git clean -fd || true
           git fetch origin main
           git reset --hard origin/main
 
