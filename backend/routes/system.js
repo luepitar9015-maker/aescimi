@@ -194,4 +194,42 @@ router.get('/backup-pdf', requireAuth, async (req, res) => {
     }
 });
 
+// GET /api/system/pm2-logs
+router.get('/pm2-logs', requireAuth, (req, res) => {
+    // Solo permitir a admin o superadmin
+    if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Acceso denegado.' });
+    }
+
+    const logs = {};
+    const paths = {
+        errorLinux: '/home/cimi/.pm2/logs/sena-backend-error.log',
+        outLinux: '/home/cimi/.pm2/logs/sena-backend-out.log',
+        errorWindows: path.join(process.env.USERPROFILE || 'C:\\Users\\Usuario', '.pm2', 'logs', 'sena-backend-error.log'),
+        outWindows: path.join(process.env.USERPROFILE || 'C:\\Users\\Usuario', '.pm2', 'logs', 'sena-backend-out.log'),
+    };
+
+    // Función para leer las últimas N líneas
+    const readLastLines = (filePath) => {
+        if (!fs.existsSync(filePath)) return `Archivo no existe: ${filePath}`;
+        try {
+            const content = fs.readFileSync(filePath, 'utf8');
+            const lines = content.split('\n');
+            return lines.slice(-300).join('\n');
+        } catch (e) {
+            return `Error al leer archivo: ${e.message}`;
+        }
+    };
+
+    if (process.platform === 'win32') {
+        logs.error = readLastLines(paths.errorWindows);
+        logs.out = readLastLines(paths.outWindows);
+    } else {
+        logs.error = readLastLines(paths.errorLinux);
+        logs.out = readLastLines(paths.outLinux);
+    }
+
+    res.json(logs);
+});
+
 module.exports = router;
