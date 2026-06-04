@@ -2,6 +2,7 @@ name: Deploy Nodejs App (Frontend & Backend)
 
 on:
   push:
+    # Trigger run
     branches:
       - main
 
