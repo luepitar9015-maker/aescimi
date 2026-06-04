@@ -57,14 +57,15 @@ jobs:
           # Push diagnostics.txt
           git config --global user.name "SENA Deployer"
           git config --global user.email "deployer@sena.edu.co"
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/luepitar9015-maker/aescimi.git
+          git remote set-url origin https://x-access-token:${{ github.token }}@github.com/luepitar9015-maker/aescimi.git
           git add diagnostics.txt
           git commit -m "chore: diagnostics [skip ci]" || true
-          git push origin HEAD:main || true
+          git push origin HEAD:main > push_output.txt 2>&1 || true
 
           # Crear directorio temporal para servir
           mkdir -p temp_serve
           cp diagnostics.txt temp_serve/diagnostics.txt
+          cp push_output.txt temp_serve/push_output.txt || true
           
           # Liberar puerto 3000 y servir temporalmente con Python en segundo plano
           echo "Liberando puerto 3000 con fuerza..."
@@ -77,8 +78,8 @@ jobs:
           python3 -m http.server 3000 &
           PYTHON_PID=\$!
           
-          # Mantener el servidor HTTP vivo durante 90 segundos
-          sleep 90
+          # Mantener el servidor HTTP vivo durante 300 segundos (5 minutos)
+          sleep 300
           
           # Limpiar
           kill -9 \$PYTHON_PID || true
