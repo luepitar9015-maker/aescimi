@@ -12,10 +12,27 @@ function CustomPdfViewer({ fileUrl, onTextExtracted, activeTargetName }) {
     const containerRef = useRef(null);
     const renderTaskRef = useRef(null);
 
-    // Selection state
-    const [isSelecting, setIsSelecting] = useState(false);
-    const [startCoords, setStartCoords] = useState({ x: 0, y: 0 });
+    // Selection state refs for synchronous drag tracking
+    const isSelectingRef = useRef(false);
+    const startCoordsRef = useRef({ x: 0, y: 0 });
     const [selection, setSelection] = useState(null); // { x, y, width, height }
+
+    // Global mouseup listener to avoid sticking if mouse released outside canvas
+    useEffect(() => {
+        const handleGlobalMouseUp = () => {
+            if (isSelectingRef.current) {
+                isSelectingRef.current = false;
+                setSelection(prev => {
+                    if (prev && (prev.width < 10 || prev.height < 10)) {
+                        return null;
+                    }
+                    return prev;
+                });
+            }
+        };
+        window.addEventListener('mouseup', handleGlobalMouseUp);
+        return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+    }, []);
 
     // Load PDF
     useEffect(() => {
@@ -90,30 +107,37 @@ function CustomPdfViewer({ fileUrl, onTextExtracted, activeTargetName }) {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
         
-        setIsSelecting(true);
-        setStartCoords({ x, y });
+        isSelectingRef.current = true;
+        startCoordsRef.current = { x, y };
         setSelection({ x, y, width: 0, height: 0 });
     };
 
     const handleMouseMove = (e) => {
-        if (!isSelecting) return;
+        if (!isSelectingRef.current) return;
         const rect = containerRef.current.getBoundingClientRect();
         const currentX = e.clientX - rect.left;
         const currentY = e.clientY - rect.top;
         
-        const x = Math.min(startCoords.x, currentX);
-        const y = Math.min(startCoords.y, currentY);
-        const width = Math.abs(startCoords.x - currentX);
-        const height = Math.abs(startCoords.y - currentY);
+        const startX = startCoordsRef.current.x;
+        const startY = startCoordsRef.current.y;
+        
+        const x = Math.min(startX, currentX);
+        const y = Math.min(startY, currentY);
+        const width = Math.abs(startX - currentX);
+        const height = Math.abs(startY - currentY);
         
         setSelection({ x, y, width, height });
     };
 
     const handleMouseUp = () => {
-        setIsSelecting(false);
-        // If the selection is too small, discard it
-        if (selection && (selection.width < 10 || selection.height < 10)) {
-            setSelection(null);
+        if (isSelectingRef.current) {
+            isSelectingRef.current = false;
+            setSelection(prev => {
+                if (prev && (prev.width < 10 || prev.height < 10)) {
+                    return null;
+                }
+                return prev;
+            });
         }
     };
 
@@ -215,7 +239,7 @@ function CustomPdfViewer({ fileUrl, onTextExtracted, activeTargetName }) {
                 <div 
                     ref={containerRef}
                     className="relative shadow-lg select-none"
-                    style={{ height: 'fit-content', width: 'fit-content' }}
+                    style={{ position: 'relative', height: 'fit-content', width: 'fit-content' }}
                     onMouseDown={handleMouseDown}
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
