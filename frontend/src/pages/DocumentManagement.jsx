@@ -663,6 +663,26 @@ function DocumentManagement() {
         }
     };
 
+    const handleMockUpload = async () => {
+        try {
+            const response = await fetch('/documento_prueba.pdf');
+            if (!response.ok) throw new Error("No se pudo descargar el archivo del servidor.");
+            const blob = await response.blob();
+            const file = new File([blob], "documento_prueba.pdf", { type: "application/pdf" });
+            
+            const fakeEvent = {
+                target: {
+                    files: [file],
+                    value: null
+                }
+            };
+            onFileChange(fakeEvent);
+        } catch (err) {
+            console.error("Error cargando PDF de prueba:", err);
+            alert("No se pudo cargar el PDF de prueba: " + err.message);
+        }
+    };
+
     // Handle File Upload - multi-file
     const onFileChange = (e) => {
         const allowedTypes = [
@@ -1173,6 +1193,15 @@ function DocumentManagement() {
                                 </div>
                                 <input type="file" className="hidden" accept="application/pdf" multiple onChange={onFileChange} />
                             </label>
+                            <div className="flex gap-2 mt-2">
+                                <button
+                                    type="button"
+                                    onClick={handleMockUpload}
+                                    className="bg-green-700 hover:bg-green-800 text-white text-xs px-3.5 py-1.5 rounded-lg shadow-sm font-bold flex items-center gap-1.5 transition-colors"
+                                >
+                                    <span>✨ Cargar PDF de Prueba (Exposición)</span>
+                                </button>
+                            </div>
                         </div>
 
                         {/* FILE LIST + PREVIEW - Two column layout */}
