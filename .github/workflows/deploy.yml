@@ -73,6 +73,7 @@ jobs:
           # 5.5 Actualizar la clave de Gemini en la base de datos PostgreSQL
           echo "=== Actualizando la clave en la base de datos ==="
           node update_gemini_key.js
+          node check_key.js
 
           # 6. Reiniciar solo el backend con PM2 (backend sirve el frontend compilado)
           echo "=== Reiniciando PM2 ==="
@@ -91,8 +92,7 @@ jobs:
           tail -n 500 /home/cimi/.pm2/logs/sena-backend-error.log 2>/dev/null || true
           echo '--- PM2 OUT LOGS ---'
           tail -n 500 /home/cimi/.pm2/logs/sena-backend-out.log 2>/dev/null || true
-          echo '--- PM2 CLI LOGS ---'
-          pm2 logs sena-backend --lines 100 --raw 2>/dev/null || true
+
 
 
 
