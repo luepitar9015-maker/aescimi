@@ -1,6 +1,275 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Search, Upload, FileText, Save, Eye, X, Check, Folder, Pencil, Edit, Trash2, Download } from 'lucide-react';
+
+function CustomPdfViewer({ fileUrl, onTextExtracted, activeTargetName }) {
+    const [pdf, setPdf] = useState(null);
+    const [pageNumber, setPageNumber] = useState(1);
+    const [numPages, setNumPages] = useState(0);
+    const [scale, setScale] = useState(1.2);
+    const [isOcrLoading, setIsOcrLoading] = useState(false);
+    const canvasRef = useRef(null);
+    const containerRef = useRef(null);
+    const renderTaskRef = useRef(null);
+
+    // Selection state
+    const [isSelecting, setIsSelecting] = useState(false);
+    const [startCoords, setStartCoords] = useState({ x: 0, y: 0 });
+    const [selection, setSelection] = useState(null); // { x, y, width, height }
+
+    // Load PDF
+    useEffect(() => {
+        if (!fileUrl) return;
+        setPageNumber(1);
+        setSelection(null);
+        
+        const checkAndLoadPdf = () => {
+            if (!window.pdfjsLib) {
+                setTimeout(checkAndLoadPdf, 100);
+                return;
+            }
+
+            const loadingTask = window.pdfjsLib.getDocument(fileUrl);
+            loadingTask.promise.then(
+                (loadedPdf) => {
+                    setPdf(loadedPdf);
+                    setNumPages(loadedPdf.numPages);
+                },
+                (error) => {
+                    console.error("Error loading PDF: ", error);
+                }
+            );
+        };
+
+        checkAndLoadPdf();
+    }, [fileUrl]);
+
+    // Render Page
+    useEffect(() => {
+        if (!pdf) return;
+        
+        pdf.getPage(pageNumber).then((page) => {
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+            const context = canvas.getContext('2d');
+            
+            const viewport = page.getViewport({ scale });
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            // Cancel previous render task if exists
+            if (renderTaskRef.current) {
+                renderTaskRef.current.cancel();
+            }
+
+            const renderContext = {
+                canvasContext: context,
+                viewport: viewport
+            };
+            
+            const renderTask = page.render(renderContext);
+            renderTaskRef.current = renderTask;
+            
+            renderTask.promise.then(
+                () => {
+                    renderTaskRef.current = null;
+                },
+                (error) => {
+                    if (error.name !== 'RenderingCancelledException') {
+                        console.error("Render error: ", error);
+                    }
+                }
+            );
+        });
+    }, [pdf, pageNumber, scale]);
+
+    const handleMouseDown = (e) => {
+        if (isOcrLoading) return;
+        const rect = containerRef.current.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        setIsSelecting(true);
+        setStartCoords({ x, y });
+        setSelection({ x, y, width: 0, height: 0 });
+    };
+
+    const handleMouseMove = (e) => {
+        if (!isSelecting) return;
+        const rect = containerRef.current.getBoundingClientRect();
+        const currentX = e.clientX - rect.left;
+        const currentY = e.clientY - rect.top;
+        
+        const x = Math.min(startCoords.x, currentX);
+        const y = Math.min(startCoords.y, currentY);
+        const width = Math.abs(startCoords.x - currentX);
+        const height = Math.abs(startCoords.y - currentY);
+        
+        setSelection({ x, y, width, height });
+    };
+
+    const handleMouseUp = () => {
+        setIsSelecting(false);
+        // If the selection is too small, discard it
+        if (selection && (selection.width < 10 || selection.height < 10)) {
+            setSelection(null);
+        }
+    };
+
+    const handleExtract = async () => {
+        if (!selection || !canvasRef.current) return;
+        
+        setIsOcrLoading(true);
+        try {
+            const canvas = canvasRef.current;
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            const cropCanvas = document.createElement('canvas');
+            cropCanvas.width = selection.width * scaleX;
+            cropCanvas.height = selection.height * scaleY;
+            const cropCtx = cropCanvas.getContext('2d');
+
+            cropCtx.drawImage(
+                canvas,
+                selection.x * scaleX,
+                selection.y * scaleY,
+                selection.width * scaleX,
+                selection.height * scaleY,
+                0,
+                0,
+                cropCanvas.width,
+                cropCanvas.height
+            );
+
+            const base64Image = cropCanvas.toDataURL('image/jpeg', 0.95);
+            
+            const token = localStorage.getItem('token');
+            const response = await axios.post('/api/ai/ocr-image', { image: base64Image }, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (response.data.text) {
+                onTextExtracted(response.data.text);
+            }
+            // Clear selection after successful extraction
+            setSelection(null);
+        } catch (error) {
+            console.error("OCR error: ", error);
+            alert("Error al extraer texto del PDF con la IA.");
+        } finally {
+            setIsOcrLoading(false);
+        }
+    };
+
+    const handleClearSelection = () => {
+        setSelection(null);
+    };
+
+    return (
+        <div className="flex flex-col bg-gray-100 rounded-lg overflow-hidden border border-gray-200" style={{ height: '620px' }}>
+            {/* Toolbar */}
+            <div className="bg-gray-800 text-white px-4 py-2 flex items-center justify-between text-xs select-none">
+                <div className="flex items-center gap-2">
+                    <button 
+                        disabled={pageNumber <= 1}
+                        onClick={() => { setPageNumber(prev => prev - 1); setSelection(null); }}
+                        className="bg-gray-700 hover:bg-gray-600 disabled:opacity-50 px-2 py-1 rounded font-bold"
+                    >
+                        Anterior
+                    </button>
+                    <span>Pág {pageNumber} de {numPages}</span>
+                    <button 
+                        disabled={pageNumber >= numPages}
+                        onClick={() => { setPageNumber(prev => prev + 1); setSelection(null); }}
+                        className="bg-gray-700 hover:bg-gray-600 disabled:opacity-50 px-2 py-1 rounded font-bold"
+                    >
+                        Siguiente
+                    </button>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button onClick={() => setScale(s => Math.max(s - 0.1, 0.5))} className="bg-gray-700 px-2 py-0.5 rounded font-bold text-base">-</button>
+                    <span>{Math.round(scale * 100)}%</span>
+                    <button onClick={() => setScale(s => Math.min(s + 0.1, 3.0))} className="bg-gray-700 px-2 py-0.5 rounded font-bold text-base">+</button>
+                </div>
+            </div>
+
+            {/* Subtitle about Capture Target */}
+            <div className="bg-green-50 border-b border-green-200 px-4 py-1.5 text-[11px] text-green-800 font-medium flex items-center justify-between">
+                <span className="truncate max-w-[80%]">
+                    {activeTargetName 
+                        ? `📌 Destino activo: ${activeTargetName}`
+                        : "⚠️ Seleccione una casilla de texto a la izquierda para habilitar la captura."}
+                </span>
+                {selection && (
+                    <button onClick={handleClearSelection} className="text-red-500 hover:text-red-700 underline font-bold shrink-0">
+                        Quitar selección
+                    </button>
+                )}
+            </div>
+
+            {/* PDF View Container */}
+            <div className="flex-1 overflow-auto p-4 flex justify-center relative bg-gray-500">
+                <div 
+                    ref={containerRef}
+                    className="relative shadow-lg select-none"
+                    style={{ height: 'fit-content', width: 'fit-content' }}
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                >
+                    <canvas ref={canvasRef} className="block select-none pointer-events-none" />
+                    
+                    {/* Render Selection Rect */}
+                    {selection && (
+                        <>
+                            <div 
+                                style={{
+                                    position: 'absolute',
+                                    left: selection.x + 'px',
+                                    top: selection.y + 'px',
+                                    width: selection.width + 'px',
+                                    height: selection.height + 'px',
+                                    border: '2px dashed #22c55e',
+                                    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+                                    pointerEvents: 'none'
+                                }}
+                            />
+                            {/* Floating Action Button */}
+                            <button
+                                style={{
+                                    position: 'absolute',
+                                    left: Math.max(0, selection.x + selection.width / 2 - 50) + 'px',
+                                    top: (selection.y + selection.height + 6) + 'px',
+                                    zIndex: 50,
+                                }}
+                                disabled={isOcrLoading || !activeTargetName}
+                                onClick={handleExtract}
+                                className={`px-2.5 py-1 text-[11px] font-bold text-white rounded shadow-md flex items-center gap-1 transition-all ${
+                                    activeTargetName 
+                                        ? 'bg-green-600 hover:bg-green-700' 
+                                        : 'bg-gray-400 cursor-not-allowed opacity-75'
+                                }`}
+                            >
+                                {isOcrLoading ? (
+                                    <>
+                                        <div className="w-2.5 h-2.5 border border-white border-t-transparent rounded-full animate-spin"></div>
+                                        <span>Procesando...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span>✨ Extraer texto</span>
+                                    </>
+                                )}
+                            </button>
+                        </>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
 
 function DocumentManagement() {
     // State
@@ -24,6 +293,58 @@ function DocumentManagement() {
     const [classifyingIdx, setClassifyingIdx] = useState(null); // Nuevo estado IA
     const [expedienteSummary, setExpedienteSummary] = useState(null);
     const [summaryLoading, setSummaryLoading] = useState(false);
+
+    const [activeTextTarget, setActiveTextTarget] = useState(null);
+
+    const handleOcrTextExtracted = (extractedText) => {
+        if (!activeTextTarget) return;
+
+        if (activeTextTarget.type === 'single') {
+            const { fileIdx } = activeTextTarget;
+            setFiles(prev => prev.map((f, i) => {
+                if (i !== fileIdx) return f;
+                const currentText = f.documentText || '';
+                const newText = currentText ? `${currentText}\n${extractedText}` : extractedText;
+                return { ...f, documentText: newText };
+            }));
+        } else if (activeTextTarget.type === 'split') {
+            const { fileIdx, rangeIdx } = activeTextTarget;
+            setFiles(prev => prev.map((f, i) => {
+                if (i !== fileIdx) return f;
+                const newRanges = f.ranges.map((r, ri) => {
+                    if (ri !== rangeIdx) return r;
+                    const currentText = r.documentText || '';
+                    const newText = currentText ? `${currentText}\n${extractedText}` : extractedText;
+                    return { ...r, documentText: newText };
+                });
+                return { ...f, ranges: newRanges };
+            }));
+        } else if (activeTextTarget.type === 'edit') {
+            setEditingDoc(prev => {
+                if (!prev) return null;
+                const currentText = prev.newDescription || '';
+                const newText = currentText ? `${currentText}\n${extractedText}` : extractedText;
+                return { ...prev, newDescription: newText };
+            });
+        }
+    };
+
+    const getActiveTargetName = () => {
+        if (!activeTextTarget) return null;
+        if (activeTextTarget.type === 'single') {
+            const file = files[activeTextTarget.fileIdx];
+            return file ? `Documento "${file.file.name}"` : 'Texto de documento';
+        }
+        if (activeTextTarget.type === 'split') {
+            const file = files[activeTextTarget.fileIdx];
+            const range = file?.ranges?.[activeTextTarget.rangeIdx];
+            return file && range ? `Rango ${range.start}-${range.end} de "${file.file.name}"` : 'Texto de rango';
+        }
+        if (activeTextTarget.type === 'edit') {
+            return editingDoc ? `Editar descripción de "${editingDoc.filename}"` : 'Editar descripción';
+        }
+        return null;
+    };
 
     // Leer usuario actual del localStorage
     const currentUser = (() => { try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; } })();
@@ -939,16 +1260,28 @@ function DocumentManagement() {
                                                                         <option value="si">Sí</option>
                                                                     </select>
                                                                     {entry.addTextOption === 'si' && (
-                                                                        <textarea
-                                                                            className="w-full p-1.5 border border-green-300 rounded text-xs focus:ring-2 focus:ring-green-500 outline-none mt-1.5 bg-white"
-                                                                            rows="2"
-                                                                            placeholder="Escriba el texto del documento aquí..."
-                                                                            value={entry.documentText || ''}
-                                                                            onChange={(e) => {
-                                                                                const txt = e.target.value;
-                                                                                setFiles(prev => prev.map((f, i) => i === idx ? { ...f, documentText: txt } : f));
-                                                                            }}
-                                                                        />
+                                                                        <div className="mt-1.5 relative">
+                                                                            <textarea
+                                                                                className={`w-full p-1.5 border rounded text-xs focus:ring-2 focus:ring-green-500 outline-none bg-white transition-all ${
+                                                                                    activeTextTarget && activeTextTarget.type === 'single' && activeTextTarget.fileIdx === idx
+                                                                                        ? 'border-green-600 ring-2 ring-green-200'
+                                                                                        : 'border-green-300'
+                                                                                }`}
+                                                                                rows="2"
+                                                                                placeholder="Escriba el texto del documento aquí..."
+                                                                                value={entry.documentText || ''}
+                                                                                onFocus={() => setActiveTextTarget({ type: 'single', fileIdx: idx })}
+                                                                                onChange={(e) => {
+                                                                                    const txt = e.target.value;
+                                                                                    setFiles(prev => prev.map((f, i) => i === idx ? { ...f, documentText: txt } : f));
+                                                                                }}
+                                                                            />
+                                                                            {activeTextTarget && activeTextTarget.type === 'single' && activeTextTarget.fileIdx === idx && (
+                                                                                <div className="absolute top-1 right-2 bg-green-600 text-white text-[9px] font-bold px-1 py-0.5 rounded shadow-sm">
+                                                                                    Captura activa
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
                                                                     )}
                                                                 </div>
                                                             </div>
@@ -998,13 +1331,25 @@ function DocumentManagement() {
                                                                                 <option value="si">Sí</option>
                                                                             </select>
                                                                             {range.addTextOption === 'si' && (
-                                                                                <textarea
-                                                                                    className="w-full p-1 border border-green-300 rounded text-[9px] outline-none mt-1 bg-white"
-                                                                                    rows="1"
-                                                                                    placeholder="Texto del rango..."
-                                                                                    value={range.documentText || ''}
-                                                                                    onChange={(e) => updateRange(idx, ridx, 'documentText', e.target.value)}
-                                                                                />
+                                                                                <div className="mt-1 relative">
+                                                                                    <textarea
+                                                                                        className={`w-full p-1 border rounded text-[9px] outline-none bg-white transition-all ${
+                                                                                            activeTextTarget && activeTextTarget.type === 'split' && activeTextTarget.fileIdx === idx && activeTextTarget.rangeIdx === ridx
+                                                                                                ? 'border-green-600 ring-1 ring-green-200'
+                                                                                                : 'border-green-300'
+                                                                                        }`}
+                                                                                        rows="1"
+                                                                                        placeholder="Texto del rango..."
+                                                                                        value={range.documentText || ''}
+                                                                                        onFocus={() => setActiveTextTarget({ type: 'split', fileIdx: idx, rangeIdx: ridx })}
+                                                                                        onChange={(e) => updateRange(idx, ridx, 'documentText', e.target.value)}
+                                                                                    />
+                                                                                    {activeTextTarget && activeTextTarget.type === 'split' && activeTextTarget.fileIdx === idx && activeTextTarget.rangeIdx === ridx && (
+                                                                                        <div className="absolute top-0.5 right-1.5 bg-green-600 text-white text-[8px] font-bold px-1 rounded shadow-sm">
+                                                                                            Captura activa
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
                                                                             )}
                                                                         </div>
                                                                     </div>
@@ -1045,19 +1390,18 @@ function DocumentManagement() {
                                 {/* RIGHT: PDF Preview */}
                                 <div className="sticky top-4">
                                     {previewIdx !== null && files[previewIdx] ? (
-                                        <div className="border-2 border-green-300 rounded-lg overflow-hidden shadow-lg">
+                                        <div className="border-2 border-green-300 rounded-lg overflow-hidden shadow-lg bg-white">
                                             <div className="bg-green-50 border-b border-green-200 px-3 py-2 flex items-center justify-between">
                                                 <span className="text-xs font-bold text-green-800 flex items-center gap-1">
                                                     <Eye size={13} /> Vista Previa — {files[previewIdx].file.name}
                                                 </span>
                                                 <span className="text-xs text-green-600">{previewIdx + 1} / {files.length}</span>
                                             </div>
-                                            <iframe
+                                            <CustomPdfViewer
                                                 key={previewIdx}
-                                                src={files[previewIdx].url}
-                                                className="w-full"
-                                                style={{ height: '620px' }}
-                                                title="Vista previa PDF"
+                                                fileUrl={files[previewIdx].url}
+                                                onTextExtracted={handleOcrTextExtracted}
+                                                activeTargetName={getActiveTargetName()}
                                             />
                                         </div>
                                     ) : (
@@ -1116,13 +1460,25 @@ function DocumentManagement() {
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Texto del Documento</label>
-                                <textarea 
-                                    className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                    rows="3"
-                                    placeholder="Texto adicional para el documento..."
-                                    value={editingDoc.newDescription || ''}
-                                    onChange={(e) => setEditingDoc({...editingDoc, newDescription: e.target.value})}
-                                />
+                                <div className="relative">
+                                    <textarea 
+                                        className={`w-full border rounded-lg p-3 text-sm focus:ring-2 outline-none transition-all ${
+                                            activeTextTarget && activeTextTarget.type === 'edit'
+                                                ? 'border-green-600 ring-2 ring-green-200 focus:ring-green-500'
+                                                : 'border-gray-300 focus:ring-blue-500'
+                                        }`}
+                                        rows="3"
+                                        placeholder="Texto adicional para el documento..."
+                                        value={editingDoc.newDescription || ''}
+                                        onFocus={() => setActiveTextTarget({ type: 'edit' })}
+                                        onChange={(e) => setEditingDoc({...editingDoc, newDescription: e.target.value})}
+                                    />
+                                    {activeTextTarget && activeTextTarget.type === 'edit' && (
+                                        <div className="absolute top-2 right-3 bg-green-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm">
+                                            Captura activa
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Soporte</label>

@@ -288,4 +288,49 @@ ${files.map((f, i) => `${i+1}. ${f.filename} (Tipología: ${f.typology_name || '
     }
 });
 
+// ──────────────────────────────────────────────────────────────
+// 4. OCR DE IMAGEN / RECORTE (POST /api/ai/ocr-image)
+// ──────────────────────────────────────────────────────────────
+router.post('/ocr-image', requireAuth, async (req, res) => {
+    try {
+        const activeGenAI = await getGenAIInstance();
+        if (!activeGenAI) {
+            return res.status(503).json({ error: 'La API Key de Gemini no está configurada. Regístrela en la pestaña de configuración.' });
+        }
+        
+        const { image } = req.body;
+        if (!image) {
+            return res.status(400).json({ error: 'No se recibió ninguna imagen para procesar.' });
+        }
+
+        // El formato de la imagen puede ser una URI de datos (data:image/jpeg;base64,...)
+        const base64Data = image.includes(',') ? image.split(',')[1] : image;
+        const mimeType = image.includes(',') ? image.split(',')[0].split(':')[1].split(';')[0] : 'image/jpeg';
+
+        const model = activeGenAI.getGenerativeModel({ 
+            model: 'gemini-1.5-flash'
+        });
+
+        const prompt = 'Extrae y transcribe de forma exacta todo el texto visible que aparezca en esta imagen. Devuelve ÚNICAMENTE la transcripción del texto sin explicaciones, sin comentarios introductorios, sin agregar formato adicional, y respetando los saltos de línea lógicos si los hay.';
+
+        const result = await model.generateContent([
+            {
+                inlineData: {
+                    data: base64Data,
+                    mimeType: mimeType
+                }
+            },
+            prompt
+        ]);
+
+        const text = result.response.text().trim();
+        res.json({ text });
+
+    } catch (error) {
+        console.error('[AI OCR ERROR]', error);
+        res.status(500).json({ error: 'Error al procesar el OCR de la imagen: ' + error.message });
+    }
+});
+
 module.exports = router;
+
