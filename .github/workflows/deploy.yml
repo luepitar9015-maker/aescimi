@@ -85,3 +85,14 @@ jobs:
           echo "=== Recargando Nginx ==="
           sudo nginx -t && sudo systemctl reload nginx || echo "⚠ Revisar configuración de Nginx"
 
+          # 8. Obtener logs de PM2 para diagnóstico
+          echo "=== Diagnostico de Logs de PM2 ==="
+          sshpass -p "Aut0m4t1z4d0r2026%*" ssh -o StrictHostKeyChecking=no cimi@192.168.8.164 "
+            echo '--- PM2 ERROR LOGS ---'
+            tail -n 100 ~/.pm2/logs/sena-backend-error.out 2>/dev/null || true
+            tail -n 100 ~/.pm2/logs/sena-backend-error.log 2>/dev/null || true
+            tail -n 100 ~/.pm2/logs/sena-backend-out.log 2>/dev/null || true
+            pm2 logs sena-backend --lines 50 --raw --no-colors || true
+          " || echo "⚠ No se pudieron obtener los logs por SSH"
+
+
