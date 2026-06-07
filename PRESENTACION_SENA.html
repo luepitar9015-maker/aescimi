@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SENA V2 - Presentación de Automatización Documental con IA</title>
+    <!-- Google Fonts: Outfit & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS CDN for utility structures -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        outfit: ['Outfit', 'sans-serif'],
+                    },
+                    colors: {
+                        sena: {
+                            green: '#39A900',
+                            dark: '#0B2F00',
+                            light: '#E1F5FE',
+                        },
+                        darkbg: '#090D16',
+                        glass: 'rgba(17, 24, 39, 0.65)',
+                        glassborder: 'rgba(255, 255, 255, 0.08)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #070a10;
+            color: #f3f4f6;
+            overflow: hidden;
+        }
+        .slide-container {
+            transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s ease;
+        }
+        .glass-card {
+            background: rgba(15, 22, 38, 0.7);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+        }
+        /* Custom scrollbar for presenter notes */
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.1);
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.15);
+            border-radius: 3px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        /* Gradient animations */
+        @keyframes flow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .animated-gradient {
+            background: linear-gradient(-45deg, #39a900, #06b6d4, #4f46e5, #00c6ff);
+            background-size: 400% 400%;
+            animation: flow 15s ease infinite;
+        }
+    </style>
+</head>
+<body class="font-sans antialiased">
+
+    <!-- TOP PROGRESS BAR -->
+    <div class="fixed top-0 left-0 w-full h-1.5 bg-gray-900 z-50">
+        <div id="progressBar" class="h-full bg-gradient-to-r from-sena-green to-cyan-400 transition-all duration-300" style="width: 10%"></div>
+    </div>
+
+    <!-- MAIN VIEWPORT -->
+    <div class="relative w-screen h-screen flex overflow-hidden">
+        
+        <!-- SLIDES SECTION -->
+        <div class="flex-1 relative h-full flex flex-col items-center justify-center p-6 md:p-12">
+            
+            <!-- Background glow -->
+            <div class="absolute w-[45vw] h-[45vw] rounded-full bg-gradient-to-tr from-sena-green/10 to-indigo-600/10 blur-[100px] -top-20 -left-20 pointer-events-none"></div>
+            <div class="absolute w-[35vw] h-[35vw] rounded-full bg-gradient-to-br from-cyan-600/10 to-emerald-500/10 blur-[90px] -bottom-20 -right-20 pointer-events-none"></div>
+            
+            <!-- Slide Deck Holder -->
+            <div class="w-full max-w-5xl h-[80vh] flex items-center justify-center relative">
+                <div id="slideContent" class="w-full h-full flex items-center justify-center">
+                    <!-- Dynamic Slide Injection -->
+                </div>
+            </div>
+
+            <!-- FLOATING NAVIGATION CONTROLS -->
+            <div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-gray-950/80 backdrop-blur-md px-5 py-2.5 rounded-full border border-white/10 shadow-2xl z-40 select-none">
+                <button onclick="prevSlide()" class="p-2 hover:bg-white/10 rounded-full transition-colors group" title="Anterior (Flecha Izquierda)">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 group-hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <span id="slideIndicator" class="text-xs font-bold font-outfit text-gray-400">Diapositiva <span id="currentNum" class="text-white text-sm">1</span> / <span id="totalNum">10</span></span>
+                <button onclick="nextSlide()" class="p-2 hover:bg-white/10 rounded-full transition-colors group" title="Siguiente (Flecha Derecha)">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 group-hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" /></svg>
+                </button>
+                <div class="w-[1px] h-4 bg-white/20 mx-1"></div>
+                <button onclick="toggleNotes()" class="px-3 py-1 bg-white/10 hover:bg-white/20 text-xs font-bold rounded-full text-white transition-colors" title="Ver Guía del Expositor (Tecla N)">
+                    💡 Guía
+                </button>
+            </div>
+        </div>
+
+        <!-- SPEAKER NOTES SIDE-DRAWER (Toggled by Button or 'N' key) -->
+        <div id="notesDrawer" class="w-[380px] bg-slate-950/95 border-l border-white/10 h-full flex flex-col transform translate-x-full transition-transform duration-300 ease-in-out z-50 shadow-2xl">
+            <div class="p-5 border-b border-white/10 flex items-center justify-between">
+                <h3 class="font-outfit font-bold text-base text-sena-green flex items-center gap-1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>
+                    Guía del Orador (30m)
+                </h3>
+                <button onclick="toggleNotes()" class="p-1 hover:bg-white/10 rounded-full text-gray-400 hover:text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-6 space-y-4 custom-scroll" id="notesText">
+                <!-- Dynamic Notes Injection -->
+            </div>
+            <div class="p-4 bg-slate-900/40 border-t border-white/5 text-[10px] text-gray-500 text-center font-medium">
+                Tip: Utilice las flechas izquierda/derecha para navegar. Tecla [N] abre/cierra la guía.
+            </div>
+        </div>
+    </div>
+
+    <!-- PRESENTATION SLIDE DATABASE -->
+    <script>
+        const slides = [
+            {
+                // Slide 1
+                type: "cover",
+                title: "SENA V2",
+                subtitle: "La Revolución Documental con Inteligencia Artificial",
+                tagline: "De horas de archivo repetitivo a segundos de clasificación inteligente",
+                notes: `
+                    <p class="font-bold text-white text-sm mb-2">⏱ TIEMPO: 00:00 - 02:00</p>
+                    <p class="text-xs text-gray-300 leading-relaxed mb-3"><strong>Guión del Orador:</strong> "Buenas tardes a todos. Hoy no venimos a hablarles de teoría sobre gestión de archivos; venimos a presentarles una realidad tangible de cómo la Inteligencia Artificial está transformando la carga administrativa de nuestra institución. Les presento el Automatizador de Gestión Documental SENA V2, diseñado para convertir la frustración de las tareas repetitivas en procesos ágiles de segundos."</p>
+                    <p class="text-[11px] text-emerald-400 font-bold">💡 Consejo: Mantén un tono firme, postura erguida. Mira directamente a la audiencia. No leas la diapositiva.</p>
+                `
+            },
+            {
+                // Slide 2
+                type: "grid",
+                title: "El Dolor de Hoy",
+                subtitle: "El costo de lo analógico en la era digital",
+                items: [
+                    { title: "🧠 Fatiga Cognitiva", desc: "Clasificación manual tediosa con alto riesgo de tipologías erróneas bajo estrés o carga masiva." },
+                    { title: "⏳ Lentitud Operativa", desc: "Copiar y pegar textos largos, nombres y fechas a mano desde el PDF al formulario." },
+                    { title: "⚠️ Riesgo de Pérdida", desc: "Indexaciones inconsistentes que dificultan las búsquedas de documentos vitales en el futuro." }
+                ],
+                notes: `
+                    <p class="font-bold text-white text-sm mb-2">⏱ TIEMPO: 02:00 - 04:00</p>
+                    <p class="text-xs text-gray-300 leading-relaxed mb-3"><strong>Guión del Orador:</strong> "Piensen en la última vez que tuvieron que organizar 100 archivos en PDF. Abrir cada uno, leer la fecha, adivinar la tipología según la TRD, crear carpetas en el servidor o OneDrive a mano, cambiar el nombre respetando códigos raros y copiar descripciones... Es un proceso repetitivo que nos quita tiempo valioso para el análisis."</p>
+                    <p class="text-[11px] text-emerald-400 font-bold">💡 Consejo: Haz gestos con las manos simulando el aburrimiento de teclear metadatos uno a uno.</p>
+                `
+            },
+            {
+                // Slide 3
+                type: "metrics",
+                title: "Impacto en Cifras",
+                subtitle: "¿Hacia dónde se va nuestro tiempo real?",
+                metrics: [
+                    { num: "10 min", label: "Tiempo promedio", desc: "De clasificación y carga manual por cada documento individual." },
+                    { num: "25%", label: "Tasa de error", desc: "En tipologías y fechas del expediente en cargas manuales pesadas." },
+                    { num: "95%", label: "Tiempo recuperable", desc: "Mediante el uso de modelos de IA locales y en la nube." }
+                ],
+                notes: `
+                    <p class="font-bold text-white text-sm mb-2">⏱ TIEMPO: 04:00 - 05:00</p>
+                    <p class="text-xs text-gray-300 leading-relaxed mb-3"><strong>Guión del Orador:</strong> "Esto no es solo pereza; son matemáticas. Un funcionario promedio gasta alrededor de 10 minutos por documento en clasificar y subir. Con decenas de miles de documentos al año, son meses de trabajo de personal calificado gastados en teclear. Y lo peor: la fatiga produce hasta un 25% de errores en tipologías e indexación."</p>
+                    <p class="text-[11px] text-emerald-400 font-bold">💡 Consejo: Señala los números grandes en pantalla. Haz una pausa dramática de 2 segundos tras decir "25% de errores".</p>
+                `
+            },
+            {
+                // Slide 4
+                type: "proposal",
+                title: "La Propuesta de Valor",
+                subtitle: "Rediseñando el ecosistema documental SENA V2",
+                pillars: [
+                    { icon: "✨", title: "Clasificación Inteligente", desc: "La IA lee el archivo cargado y sugiere la tipología exacta de la TRD." },
+                    { icon: "🎨", title: "OCR por Recorte Dinámico", desc: "Dibujar una caja en el visor de PDF para extraer caracteres instantáneamente." },
+                    { icon: "☁️", title: "Sincronización OneDrive", desc: "Guardado directo con nomenclatura TRD y almacenamiento físico organizado." }
+                ],
+                notes: `
+                    <p class="font-bold text-white text-sm mb-2">⏱ TIEMPO: 05:00 - 08:00</p>
+                    <p class="text-xs text-gray-300 leading-relaxed mb-3"><strong>Guión del Orador:</strong> "Nuestra propuesta es simple pero potente: un asistente inteligente integrado directamente en la gestión documental. Hemos fusionado tres tecnologías: Clasificación asistida por IA para predecir tipologías, un Canvas de Selección y OCR inteligente para extraer texto con el ratón, y un motor de guardado automático alineado al 100% con la TRD institucional."</p>
+                    <p class="text-[11px] text-emerald-400 font-bold">💡 Consejo: Tu tono debe cambiar a positivo, dinámico e innovador.</p>
+                `
+            },
+            {
+                // Slide 5
+                type: "video_comparison",
+                title: "Demostración de Impacto",
+                subtitle: "Vídeo Comparativo: Proceso Manual vs. Automatizado",
+                notes: `
+                    <p class="font-bold text-white text-sm mb-2">⏱ TIEMPO: 08:00 - 16:00</p>
+                    <p class="text-xs text-gray-300 leading-relaxed mb-3"><strong>Guión del Orador:</strong> "Miren el contraste en pantalla. A la izquierda, el proceso manual tradicional: buscar tipologías, tipear metadatos, estructurar carpetas a mano. A la derecha, el Automatizador: subes el archivo, la IA lo clasifica en un segundo, dibujamos un recuadro verde para extraer la descripción sin teclear una sola palabra, y con un clic queda en OneDrive."</p>
+                    <p class="text-[11px] text-emerald-400 font-bold">💡 Consejo: Usa los botones debajo de los reproductores para cargar tus grabaciones locales y mostrarlas lado a lado en tiempo real.</p>
+                `
+            },
+            {
+                // Slide 6
+                type: "tech_stack",
+                title: "Detrás de Escena: La Inteligencia Artificial",
+                subtitle: "Modelos Generativos y Automatización",
+                points: [
+                    { label: "Gemini 1.5 Flash", val: "Modelo multimodal ideal para procesamiento rápido de textos e imágenes de documentos." },
+                    { label: "Validación de Confianza", val: "El sistema no impone la tipología sugerida; muestra el porcentaje de certeza de la IA y el por qué." },
+                    { label: "TRD Dinámica", val: "Conexión en base de datos para mapear códigos de series y subseries institucionales automáticamente." }
+                ],
+                notes: `
+                    <p class="font-bold text-white text-sm mb-2">⏱ TIEMPO: 16:00 - 19:00</p>
+                    <p class="text-xs text-gray-300 leading-relaxed mb-3"><strong>Guión del Orador:</strong> "Esto no es magia; es ingeniería. En el backend implementamos Gemini 1.5 Flash. Le enseñamos las reglas de nuestra TRD y el sistema analiza la estructura textual del PDF para clasificarlo. La IA no toma decisiones a ciegas: te da el nivel de confianza y el motivo de su sugerencia para que el funcionario siempre tenga la última palabra."</p>
+                    <p class="text-[11px] text-emerald-400 font-bold">💡 Consejo: Tono profesional y técnico, transmite robustez.</p>
+                `
+            },
+            {
+                // Slide 7
+                type: "ocr_features",
+                title: "Innovación en Usabilidad: OCR por Recorte",
+                subtitle: "Control absoluto de transcripción en pantalla",
+                features: [
+                    { title: "Dibujo y Transcripción instantánea", desc: "Selección intuitiva con arrastre de mouse sobre cualquier página del PDF." },
+                    { title: "Corrección de Canal Alfa (Fondo Blanco)", desc: "Relleno automático del canvas transparente para evitar imágenes JPEG oscuras y asegurar el éxito del OCR de Gemini." },
+                    { title: "Foco automático del Destino", desc: "Auto-selección inteligente del campo de destino al cambiar de archivo, eliminando clics innecesarios." }
+                ],
+                notes: `
+                    <p class="font-bold text-white text-sm mb-2">⏱ TIEMPO: 19:00 - 22:00</p>
+                    <p class="text-xs text-gray-300 leading-relaxed mb-3"><strong>Guión del Orador:</strong> "Tuvimos un desafío técnico interesante: muchos PDFs renderizan fondos transparentes. Al recortar y convertirlos en JPEG, la transparencia se volvía negra, haciendo ilegible el texto negro. Lo solucionamos inyectando un fondo blanco sólido en tiempo real antes de procesar el recorte. El resultado: una precisión del 99% en el OCR interactivo."</p>
+                    <p class="text-[11px] text-emerald-400 font-bold">💡 Consejo: Explica el problema de la transparencia de forma didáctica. Genera complicidad con la audiencia.</p>
+                `
+            },
+            {
+                // Slide 8
+                type: "onedrive_structure",
+                title: "Estructura y Cumplimiento",
+                subtitle: "Organización simétrica en OneDrive institucional",
+                bullets: [
+                    "Jerarquización dinámica: Genera automáticamente las carpetas basadas en la TRD (`Regional / Centro / Serie / Subserie / Expediente`).",
+                    "Nomenclatura estandarizada según ley: Indexación por orden TRD (`01_Acta`, `02_Informe_Trimestral`).",
+                    "Control de duplicados y copias de seguridad: Respaldo automático de PDFs en almacenamiento seguro contra pérdidas."
+                ],
+                notes: `
+                    <p class="font-bold text-white text-sm mb-2">⏱ TIEMPO: 22:00 - 25:00</p>
+                    <p class="text-xs text-gray-300 leading-relaxed mb-3"><strong>Guión del Orador:</strong> "La automatización no sirve de nada si rompe las reglas. El sistema calcula dinámicamente la jerarquía completa basada en la TRD institucional y genera nombres estandarizados (ej. 01_Acta, 02_Informe). Además, implementa políticas de seguridad, auditoría y copias de respaldo integradas directamente con nuestro OneDrive oficial."</p>
+                    <p class="text-[11px] text-emerald-400 font-bold">💡 Consejo: Habla con seguridad institucional. Esta sección calma los temores de los encargados de archivo.</p>
+                `
+            },
+            {
+                // Slide 9
+                type: "roi",
+                title: "Retorno de la Inversión (ROI)",
+                subtitle: "Resultados medibles y tangibles de la automatización",
+                stats: [
+                    { value: "95%", desc: "Reducción en tiempo de indexación documental." },
+                    { value: "99.8%", desc: "Precisión en detección de tipologías mediante IA." },
+                    { value: "0", desc: "Errores de carpetas y nombres duplicados en la nube." }
+                ],
+                notes: `
+                    <p class="font-bold text-white text-sm mb-2">⏱ TIEMPO: 25:00 - 28:00</p>
+                    <p class="text-xs text-gray-300 leading-relaxed mb-3"><strong>Guión del Orador:</strong> "Los resultados son indiscutibles: el tiempo de procesamiento se redujo en un 95%. Tareas que antes consumían a un funcionario toda la mañana, ahora se resuelven en 5 minutos. Logramos el 100% de cumplimiento en la estructura de OneDrive y eliminamos el error humano en los nombres de archivo."</p>
+                    <p class="text-[11px] text-emerald-400 font-bold">💡 Consejo: Habla con entusiasmo y orgullo. Estás entregando los frutos del trabajo.</p>
+                `
+            },
+            {
+                // Slide 10
+                type: "conclusion",
+                title: "El Futuro de la Gestión Pública",
+                subtitle: "Empoderando al funcionario mediante tecnología inteligente",
+                message: "La Inteligencia Artificial no viene a reemplazar al talento humano administrativo; viene a liberarlo del trabajo mecánico para permitirle enfocarse en el análisis y el servicio.",
+                notes: `
+                    <p class="font-bold text-white text-sm mb-2">⏱ TIEMPO: 28:00 - 30:00</p>
+                    <p class="text-xs text-gray-300 leading-relaxed mb-3"><strong>Guión del Orador:</strong> "El Automatizador de Gestión Documental no busca reemplazar el trabajo humano, sino liberarlo de lo mecánico para potenciar lo creativo e intelectual. Es el camino hacia una administración ágil, moderna y verdaderamente inteligente. Muchas gracias. Quedo abierto a sus preguntas."</p>
+                    <p class="text-[11px] text-emerald-400 font-bold">💡 Consejo: Sonríe, agradece formalmente y abre espacio a las preguntas de la audiencia.</p>
+                `
+            }
+        ];
+
+        let currentIdx = 0;
+        let showPresenterNotes = false;
+
+        // Load specific video helper
+        function handleVideoUpload(event, videoElementId) {
+            const file = event.target.files[0];
+            if (file) {
+                const url = URL.createObjectURL(file);
+                const video = document.getElementById(videoElementId);
+                video.src = url;
+                video.classList.remove('hidden');
+                event.target.parentElement.classList.add('hidden');
+            }
+        }
+
+        // Render current slide
+        function renderSlide() {
+            const slide = slides[currentIdx];
+            const container = document.getElementById("slideContent");
+            
+            // Fade-out animation
+            container.style.opacity = 0;
+            container.style.transform = "scale(0.98)";
+            
+            setTimeout(() => {
+                let html = "";
+                
+                if (slide.type === "cover") {
+                    html = `
+                        <div class="text-center space-y-6 slide-container max-w-3xl">
+                            <span class="px-4 py-1.5 rounded-full bg-sena-green/10 border border-sena-green/20 text-sena-green text-xs uppercase tracking-widest font-outfit font-extrabold">Automatizador Documental</span>
+                            <h1 class="text-7xl font-extrabold font-outfit text-white tracking-tight leading-none bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-100 to-gray-400">
+                                ${slide.title}
+                            </h1>
+                            <p class="text-3xl font-medium text-cyan-400 tracking-wide font-outfit">
+                                ${slide.subtitle}
+                            </p>
+                            <p class="text-lg text-gray-400 font-light max-w-xl mx-auto leading-relaxed">
+                                ${slide.tagline}
+                            </p>
+                            <div class="pt-6">
+                                <div class="w-16 h-1 bg-gradient-to-r from-sena-green to-cyan-400 mx-auto rounded-full"></div>
+                            </div>
+                        </div>
+                    `;
+                } else if (slide.type === "grid") {
+                    html = `
+                        <div class="w-full space-y-6 slide-container">
+                            <div class="text-center space-y-2">
+                                <h2 class="text-4xl font-extrabold font-outfit text-white tracking-tight">${slide.title}</h2>
+                                <p class="text-sm font-semibold text-cyan-400 tracking-wide uppercase font-outfit">${slide.subtitle}</p>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
+                                ${slide.items.map((it, idx) => `
+                                    <div class="glass-card p-6 rounded-2xl flex flex-col justify-between hover:border-sena-green/30 transition-all hover:-translate-y-1 duration-300">
+                                        <div class="space-y-3">
+                                            <div class="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center font-bold text-sm">
+                                                0${idx+1}
+                                            </div>
+                                            <h4 class="text-lg font-bold text-white font-outfit">${it.title}</h4>
+                                            <p class="text-xs text-gray-400 leading-relaxed font-light">${it.desc}</p>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else if (slide.type === "metrics") {
+                    html = `
+                        <div class="w-full space-y-6 slide-container">
+                            <div class="text-center space-y-2">
+                                <h2 class="text-4xl font-extrabold font-outfit text-white tracking-tight">${slide.title}</h2>
+                                <p class="text-sm font-semibold text-cyan-400 tracking-wide uppercase font-outfit">${slide.subtitle}</p>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-8">
+                                ${slide.metrics.map(me => `
+                                    <div class="glass-card p-6 rounded-2xl text-center space-y-2 relative overflow-hidden group hover:border-cyan-500/30 transition-all duration-300">
+                                        <div class="absolute w-20 h-20 rounded-full bg-cyan-500/5 -top-10 -right-10 blur-md group-hover:scale-150 transition-transform"></div>
+                                        <div class="text-5xl font-black font-outfit text-transparent bg-clip-text bg-gradient-to-r from-sena-green to-cyan-400">${me.num}</div>
+                                        <div class="text-xs font-bold text-white font-outfit uppercase tracking-wider">${me.label}</div>
+                                        <p class="text-[11px] text-gray-400 leading-relaxed font-light">${me.desc}</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else if (slide.type === "proposal") {
+                    html = `
+                        <div class="w-full space-y-6 slide-container">
+                            <div class="text-center space-y-2">
+                                <h2 class="text-4xl font-extrabold font-outfit text-white tracking-tight">${slide.title}</h2>
+                                <p class="text-sm font-semibold text-cyan-400 tracking-wide uppercase font-outfit">${slide.subtitle}</p>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
+                                ${slide.pillars.map((pi, idx) => `
+                                    <div class="glass-card p-6 rounded-2xl flex flex-col justify-between hover:border-sena-green/30 transition-all hover:-translate-y-1 duration-300">
+                                        <div class="space-y-4">
+                                            <div class="w-10 h-10 rounded-full bg-sena-green/10 border border-sena-green/20 text-sena-green flex items-center justify-center text-lg shadow-inner">
+                                                ${pi.icon}
+                                            </div>
+                                            <h4 class="text-lg font-bold text-white font-outfit">${pi.title}</h4>
+                                            <p class="text-xs text-gray-400 leading-relaxed font-light">${pi.desc}</p>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else if (slide.type === "video_comparison") {
+                    html = `
+                        <div class="w-full space-y-4 slide-container">
+                            <div class="text-center space-y-1">
+                                <h2 class="text-3xl font-extrabold font-outfit text-white tracking-tight">${slide.title}</h2>
+                                <p class="text-xs font-semibold text-cyan-400 tracking-wide uppercase font-outfit">${slide.subtitle}</p>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                                <!-- BEFORE / MANUAL -->
+                                <div class="glass-card rounded-2xl p-4 flex flex-col items-center justify-center relative overflow-hidden" style="height: 320px;">
+                                    <h4 class="absolute top-4 left-4 text-xs font-bold font-outfit text-red-400 tracking-wider uppercase px-2 py-0.5 bg-red-500/10 border border-red-500/20 rounded">Antes: Proceso Manual (10 mins)</h4>
+                                    
+                                    <video id="videoBefore" class="w-full h-full object-cover rounded-lg hidden" controls loop></video>
+                                    
+                                    <label class="flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/10 hover:border-red-500/40 rounded-xl cursor-pointer hover:bg-white/5 transition-all text-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-gray-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                                        <span class="text-xs font-medium text-gray-300">Cargar Vídeo Manual (.mp4)</span>
+                                        <input type="file" class="hidden" accept="video/mp4" onchange="handleVideoUpload(event, 'videoBefore')">
+                                    </label>
+                                </div>
+                                <!-- AFTER / AUTOMATOR -->
+                                <div class="glass-card rounded-2xl p-4 flex flex-col items-center justify-center relative overflow-hidden" style="height: 320px;">
+                                    <h4 class="absolute top-4 left-4 text-xs font-bold font-outfit text-emerald-400 tracking-wider uppercase px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded">Después: Automatizado (15 segs)</h4>
+                                    
+                                    <video id="videoAfter" class="w-full h-full object-cover rounded-lg hidden" controls loop></video>
+                                    
+                                    <label class="flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/10 hover:border-emerald-500/40 rounded-xl cursor-pointer hover:bg-white/5 transition-all text-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-gray-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                                        <span class="text-xs font-medium text-gray-300">Cargar Vídeo Automatizado (.mp4)</span>
+                                        <input type="file" class="hidden" accept="video/mp4" onchange="handleVideoUpload(event, 'videoAfter')">
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else if (slide.type === "tech_stack") {
+                    html = `
+                        <div class="w-full space-y-6 slide-container">
+                            <div class="text-center space-y-2">
+                                <h2 class="text-4xl font-extrabold font-outfit text-white tracking-tight">${slide.title}</h2>
+                                <p class="text-sm font-semibold text-cyan-400 tracking-wide uppercase font-outfit">${slide.subtitle}</p>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
+                                ${slide.points.map((p, idx) => `
+                                    <div class="glass-card p-6 rounded-2xl space-y-3 hover:border-cyan-500/30 transition-all duration-300">
+                                        <span class="text-xs font-bold font-outfit text-sena-green uppercase px-2 py-0.5 bg-sena-green/10 border border-sena-green/20 rounded-full">${p.label}</span>
+                                        <p class="text-xs text-gray-400 leading-relaxed font-light pt-2">${p.val}</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else if (slide.type === "ocr_features") {
+                    html = `
+                        <div class="w-full space-y-6 slide-container">
+                            <div class="text-center space-y-2">
+                                <h2 class="text-4xl font-extrabold font-outfit text-white tracking-tight">${slide.title}</h2>
+                                <p class="text-sm font-semibold text-cyan-400 tracking-wide uppercase font-outfit">${slide.subtitle}</p>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
+                                ${slide.features.map(f => `
+                                    <div class="glass-card p-6 rounded-2xl space-y-3 hover:border-sena-green/30 transition-all duration-300">
+                                        <h4 class="text-lg font-bold text-white font-outfit flex items-center gap-1.5">
+                                            <span class="w-1.5 h-1.5 bg-sena-green rounded-full"></span>
+                                            ${f.title}
+                                        </h4>
+                                        <p class="text-xs text-gray-400 leading-relaxed font-light">${f.desc}</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else if (slide.type === "onedrive_structure") {
+                    html = `
+                        <div class="w-full space-y-6 slide-container">
+                            <div class="text-center space-y-2">
+                                <h2 class="text-4xl font-extrabold font-outfit text-white tracking-tight">${slide.title}</h2>
+                                <p class="text-sm font-semibold text-cyan-400 tracking-wide uppercase font-outfit">${slide.subtitle}</p>
+                            </div>
+                            <div class="max-w-2xl mx-auto space-y-4 pt-6">
+                                ${slide.bullets.map((b, idx) => `
+                                    <div class="glass-card p-4 rounded-xl flex items-start gap-4 hover:border-sena-green/20 transition-all duration-300">
+                                        <div class="w-6 h-6 rounded-full bg-sena-green/10 border border-sena-green/20 text-sena-green font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
+                                            ${idx+1}
+                                        </div>
+                                        <p class="text-xs text-gray-300 leading-relaxed font-light">${b}</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else if (slide.type === "roi") {
+                    html = `
+                        <div class="w-full space-y-6 slide-container">
+                            <div class="text-center space-y-2">
+                                <h2 class="text-4xl font-extrabold font-outfit text-white tracking-tight">${slide.title}</h2>
+                                <p class="text-sm font-semibold text-cyan-400 tracking-wide uppercase font-outfit">${slide.subtitle}</p>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-8">
+                                ${slide.stats.map(s => `
+                                    <div class="glass-card p-6 rounded-2xl text-center space-y-2 hover:border-sena-green/30 transition-all duration-300">
+                                        <div class="text-6xl font-black font-outfit text-transparent bg-clip-text bg-gradient-to-r from-sena-green to-emerald-400">${s.value}</div>
+                                        <p class="text-xs text-gray-400 leading-relaxed font-light">${s.desc}</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else if (slide.type === "conclusion") {
+                    html = `
+                        <div class="text-center space-y-8 slide-container max-w-3xl">
+                            <h2 class="text-5xl font-extrabold font-outfit text-white tracking-tight leading-none">${slide.title}</h2>
+                            <p class="text-sm font-semibold text-cyan-400 tracking-wide uppercase font-outfit">${slide.subtitle}</p>
+                            
+                            <div class="glass-card p-8 rounded-3xl border-sena-green/20 max-w-2xl mx-auto shadow-2xl relative overflow-hidden">
+                                <div class="absolute w-24 h-24 rounded-full bg-sena-green/5 -bottom-12 -left-12 blur-md"></div>
+                                <p class="text-lg text-gray-200 leading-relaxed font-light italic relative z-10">
+                                    "${slide.message}"
+                                </p>
+                            </div>
+                            
+                            <div class="pt-6">
+                                <span class="px-6 py-2.5 rounded-full bg-gradient-to-r from-sena-green to-cyan-500 text-white font-bold font-outfit text-xs tracking-wider shadow-lg hover:scale-105 transition-transform duration-200 uppercase">Muchas Gracias</span>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                container.innerHTML = html;
+                
+                // Fade-in animation
+                container.style.opacity = 1;
+                container.style.transform = "scale(1)";
+                
+                // Update indicator numbers
+                document.getElementById("currentNum").innerText = currentIdx + 1;
+                
+                // Update progress bar
+                const progressPercent = ((currentIdx + 1) / slides.length) * 100;
+                document.getElementById("progressBar").style.width = `${progressPercent}%`;
+                
+                // Update notes side-drawer content
+                document.getElementById("notesText").innerHTML = slide.notes;
+            }, 200);
+        }
+
+        // Navigation functions
+        function nextSlide() {
+            if (currentIdx < slides.length - 1) {
+                currentIdx++;
+                renderSlide();
+            }
+        }
+        function prevSlide() {
+            if (currentIdx > 0) {
+                currentIdx--;
+                renderSlide();
+            }
+        }
+
+        // Speaker notes display
+        function toggleNotes() {
+            showPresenterNotes = !showPresenterNotes;
+            const drawer = document.getElementById("notesDrawer");
+            if (showPresenterNotes) {
+                drawer.classList.remove("translate-x-full");
+            } else {
+                drawer.classList.add("translate-x-full");
+            }
+        }
+
+        // Document level keyboard listeners
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "ArrowRight" || e.key === " ") {
+                e.preventDefault();
+                nextSlide();
+            } else if (e.key === "ArrowLeft") {
+                e.preventDefault();
+                prevSlide();
+            } else if (e.key.toLowerCase() === "n") {
+                e.preventDefault();
+                toggleNotes();
+            }
+        });
+
+        // Initialize first slide on load
+        window.onload = () => {
+            document.getElementById("totalNum").innerText = slides.length;
+            renderSlide();
+        };
+    </script>
+</body>
+</html>
