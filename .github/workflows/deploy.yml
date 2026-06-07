@@ -88,11 +88,11 @@ jobs:
           # 8. Obtener logs de PM2 para diagnóstico
           echo "=== Diagnostico de Logs de PM2 ==="
           echo '--- PM2 ERROR LOGS ---'
-          tail -n 100 /home/cimi/.pm2/logs/sena-backend-error.log 2>/dev/null || true
+          tail -n 500 /home/cimi/.pm2/logs/sena-backend-error.log 2>/dev/null || true
           echo '--- PM2 OUT LOGS ---'
-          tail -n 100 /home/cimi/.pm2/logs/sena-backend-out.log 2>/dev/null || true
+          tail -n 500 /home/cimi/.pm2/logs/sena-backend-out.log 2>/dev/null || true
           echo '--- PM2 CLI LOGS ---'
-          pm2 logs sena-backend --lines 100 --raw --no-colors || true
+          pm2 logs sena-backend --lines 100 --raw 2>/dev/null || true
 
 
 
