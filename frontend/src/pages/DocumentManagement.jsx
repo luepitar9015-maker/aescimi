@@ -156,6 +156,10 @@ function CustomPdfViewer({ fileUrl, onTextExtracted, activeTargetName }) {
             cropCanvas.height = selection.height * scaleY;
             const cropCtx = cropCanvas.getContext('2d');
 
+            // Rellenar con fondo blanco para evitar que las transparencias del PDF se conviertan en negro al usar JPEG
+            cropCtx.fillStyle = '#FFFFFF';
+            cropCtx.fillRect(0, 0, cropCanvas.width, cropCanvas.height);
+
             cropCtx.drawImage(
                 canvas,
                 selection.x * scaleX,
@@ -175,14 +179,17 @@ function CustomPdfViewer({ fileUrl, onTextExtracted, activeTargetName }) {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             
-            if (response.data.text) {
-                onTextExtracted(response.data.text);
+            if (response.data.text && response.data.text.trim()) {
+                onTextExtracted(response.data.text.trim());
+                // Clear selection after successful extraction
+                setSelection(null);
+            } else {
+                alert("La IA no pudo detectar texto en la zona seleccionada. Por favor, asegúrese de seleccionar una región con texto claro.");
             }
-            // Clear selection after successful extraction
-            setSelection(null);
         } catch (error) {
             console.error("OCR error: ", error);
-            alert("Error al extraer texto del PDF con la IA.");
+            const errMsg = error.response?.data?.error || error.message;
+            alert("Error al extraer texto del PDF con la IA: " + errMsg);
         } finally {
             setIsOcrLoading(false);
         }
@@ -269,12 +276,18 @@ function CustomPdfViewer({ fileUrl, onTextExtracted, activeTargetName }) {
                                     top: (selection.y + selection.height + 6) + 'px',
                                     zIndex: 50,
                                 }}
-                                disabled={isOcrLoading || !activeTargetName}
-                                onClick={handleExtract}
+                                disabled={isOcrLoading}
+                                onClick={() => {
+                                    if (!activeTargetName) {
+                                        alert("Por favor, active la opción '¿Se agregará un texto?' en la columna de la izquierda y haga clic dentro del cuadro de texto correspondiente para indicar dónde quiere copiar el texto extraído.");
+                                        return;
+                                    }
+                                    handleExtract();
+                                }}
                                 className={`px-2.5 py-1 text-[11px] font-bold text-white rounded shadow-md flex items-center gap-1 transition-all ${
                                     activeTargetName 
                                         ? 'bg-green-600 hover:bg-green-700' 
-                                        : 'bg-gray-400 cursor-not-allowed opacity-75'
+                                        : 'bg-orange-500 hover:bg-orange-600 animate-pulse'
                                 }`}
                             >
                                 {isOcrLoading ? (
@@ -284,7 +297,7 @@ function CustomPdfViewer({ fileUrl, onTextExtracted, activeTargetName }) {
                                     </>
                                 ) : (
                                     <>
-                                        <span>✨ Extraer texto</span>
+                                        <span>{activeTargetName ? '✨ Extraer texto' : '⚠️ Sin destino activo'}</span>
                                     </>
                                 )}
                             </button>
@@ -320,6 +333,42 @@ function DocumentManagement() {
     const [summaryLoading, setSummaryLoading] = useState(false);
 
     const [activeTextTarget, setActiveTextTarget] = useState(null);
+
+    // Automatically set active text target when previewed file changes or text options change
+    useEffect(() => {
+        if (previewIdx === null || !files[previewIdx]) {
+            setActiveTextTarget(null);
+            return;
+        }
+        
+        const entry = files[previewIdx];
+        if (!entry.isSplit) {
+            if (entry.addTextOption === 'si') {
+                setActiveTextTarget(prev => {
+                    if (prev && prev.type === 'single' && prev.fileIdx === previewIdx) return prev;
+                    return { type: 'single', fileIdx: previewIdx };
+                });
+            } else {
+                setActiveTextTarget(prev => {
+                    if (prev && prev.type === 'single' && prev.fileIdx === previewIdx) return null;
+                    return prev;
+                });
+            }
+        } else {
+            const firstActiveRangeIdx = entry.ranges.findIndex(r => r.addTextOption === 'si');
+            if (firstActiveRangeIdx !== -1) {
+                setActiveTextTarget(prev => {
+                    if (prev && prev.type === 'split' && prev.fileIdx === previewIdx && prev.rangeIdx === firstActiveRangeIdx) return prev;
+                    return { type: 'split', fileIdx: previewIdx, rangeIdx: firstActiveRangeIdx };
+                });
+            } else {
+                setActiveTextTarget(prev => {
+                    if (prev && prev.type === 'split' && prev.fileIdx === previewIdx) return null;
+                    return prev;
+                });
+            }
+        }
+    }, [previewIdx, files[previewIdx]?.addTextOption, files[previewIdx]?.isSplit]);
 
     const handleOcrTextExtracted = (extractedText) => {
         if (!activeTextTarget) return;
