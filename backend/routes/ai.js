@@ -308,7 +308,7 @@ router.post('/ocr-image', requireAuth, async (req, res) => {
         const mimeType = image.includes(',') ? image.split(',')[0].split(':')[1].split(';')[0] : 'image/jpeg';
 
         const model = activeGenAI.getGenerativeModel({ 
-            model: 'gemini-1.5-flash'
+            model: 'gemini-flash-latest'
         });
 
         const prompt = 'Extrae y transcribe de forma exacta todo el texto visible que aparezca en esta imagen. Devuelve ÚNICAMENTE la transcripción del texto sin explicaciones, sin comentarios introductorios, sin agregar formato adicional, y respetando los saltos de línea lógicos si los hay.';

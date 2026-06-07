@@ -85,6 +85,7 @@ function CustomPdfViewer({ fileUrl, onTextExtracted, activeTargetName }) {
 
     const handleMouseDown = (e) => {
         if (isOcrLoading) return;
+        e.preventDefault(); // Previene la selección/arrastre nativo del navegador para dibujar el área
         const rect = containerRef.current.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
