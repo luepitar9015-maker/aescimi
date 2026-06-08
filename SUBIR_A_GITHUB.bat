@@ -4,20 +4,30 @@ echo ==========================================================
 echo        SUBIENDO NUEVA ACTUALIZACION A GITHUB
 echo ==========================================================
 echo.
-echo [1/3] Preparando los archivos modificados...
+echo [1/4] Compilando el Frontend localmente (Vite)...
+cd /d "%~dp0frontend"
+call npm run build
+cd /d "%~dp0"
+
+echo.
+echo [2/4] Preparando los archivos modificados...
 git add .
 
 echo.
-echo [2/3] Creando punto de guardado (Commit)...
-git commit -m "feat: agregar script LIMPIAR_EXPEDIENTES para eliminar expedientes y archivos del sistema"
+echo [3/4] Creando punto de guardado (Commit)...
+set "commit_msg="
+set /p commit_msg="Escribe la descripcion de los cambios (presiona Enter para usar default): "
+if "%commit_msg%"=="" set commit_msg="Actualizacion automatica con frontend compilado"
+
+git commit -m "%commit_msg%"
 
 echo.
-echo [3/3] Subiendo cambios a GitHub... (Esto puede tomar un momento dependiendo de tu conexion)
+echo [4/4] Subiendo cambios a GitHub... (Esto puede tomar un momento)
 git push origin main
 
 echo.
 echo ==========================================================
 echo SUBIDA A GITHUB COMPLETADA
 echo ==========================================================
-echo Ahora debes entrar a tu servidor Linux y descargar esta actualización.
+echo Ahora puedes ir a tu servidor Linux y aplicar la actualizacion.
 pause

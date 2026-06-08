@@ -10,7 +10,7 @@ backend/.env
 frontend/.env
 
 # Build y carpetas temporales
-frontend/dist/
+# frontend/dist/ (Permitir subir el frontend compilado para evitar compilación lenta en el servidor)
 backend/ssl/
 *.zip
 

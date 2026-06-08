@@ -15,11 +15,8 @@ cd backend
 npm install
 cd ..
 
-echo "[3/4] Instalando dependencias del Frontend y compilando..."
-cd frontend
-npm install
-npm run build
-cd ..
+echo "[3/4] Usando Frontend precompilado..."
+echo "El frontend ya viene precompilado en frontend/dist desde GitHub."
 
 echo "[4/4] Reiniciando servicios en segundo plano..."
 # Si PM2 ya está instalado y ejecutando la app, solo la reiniciamos. Si no, la iniciamos.

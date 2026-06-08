@@ -8,7 +8,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
+# dist (Permitir subir el frontend compilado para evitar compilación lenta en el servidor)
 dist-ssr
 *.local
 

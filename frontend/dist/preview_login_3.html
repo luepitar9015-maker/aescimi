@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Propuesta 3 — Minimalista Institucional</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', sans-serif; min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    background: #f9fafb;
+    background-image:
+      linear-gradient(rgba(57,169,0,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(57,169,0,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    position: relative;
+  }
+
+  /* Barra superior institucional */
+  .top-bar {
+    position: fixed; top: 0; left: 0; right: 0; height: 4px;
+    background: linear-gradient(90deg, #39A900, #2d8c00, #39A900);
+  }
+
+  /* Logo flotante arriba */
+  .logo-wrap {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 10px;
+    background: white; padding: 10px 20px; border-radius: 30px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+  }
+  .logo-icon { font-size: 20px; }
+  .logo-text { font-size: 13px; font-weight: 700; color: #39A900; }
+
+  .card {
+    background: white; border-radius: 20px; padding: 48px 44px;
+    box-shadow: 0 2px 30px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04);
+    width: 100%; max-width: 420px; position: relative;
+  }
+
+  /* Decoración esquina */
+  .card::before {
+    content: ''; position: absolute; top: 0; right: 0;
+    width: 80px; height: 80px; background: #39A900;
+    border-radius: 0 20px 0 80px; opacity: 0.06;
+  }
+
+  .head { margin-bottom: 36px; }
+  .head-top { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+  .head-icon {
+    width: 52px; height: 52px; background: #f0fdf4; border: 2px solid #bbf7d0;
+    border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 24px;
+  }
+  .head-titles h2 { font-size: 22px; font-weight: 800; color: #111827; }
+  .head-titles p { font-size: 13px; color: #6b7280; margin-top: 2px; }
+  .tag-line {
+    background: #f0fdf4; border-left: 3px solid #39A900;
+    padding: 8px 14px; border-radius: 0 8px 8px 0;
+    font-size: 11px; font-weight: 700; color: #15803d;
+    letter-spacing: 1px; text-transform: uppercase;
+    display: inline-block; margin-top: 12px;
+  }
+
+  .section-title {
+    font-size: 11px; font-weight: 700; color: #9ca3af;
+    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: #f3f4f6; }
+
+  .field { margin-bottom: 18px; }
+  label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 7px; }
+  input {
+    width: 100%; padding: 12px 15px; font-size: 14px; font-family: 'Inter', sans-serif;
+    border: 1.5px solid #e5e7eb; border-radius: 10px; outline: none; color: #111827;
+    transition: all 0.2s; background: #fafafa;
+  }
+  input:focus { border-color: #39A900; background: white; box-shadow: 0 0 0 3px rgba(57,169,0,0.08); }
+  input::placeholder { color: #9ca3af; }
+  .pw-wrap { position: relative; }
+  .pw-wrap input { padding-right: 46px; }
+  .eye { position: absolute; right: 13px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 17px; }
+
+  .btn {
+    width: 100%; padding: 13px; font-size: 15px; font-weight: 700; font-family: 'Inter', sans-serif;
+    background: #39A900; color: white;
+    border: none; border-radius: 10px; cursor: pointer; margin-top: 8px;
+    transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn:hover { background: #2d8c00; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(57,169,0,0.3); }
+
+  .divider { height: 1px; background: #f3f4f6; margin: 24px 0; }
+
+  .footer-note { text-align: center; font-size: 11px; color: #9ca3af; margin-top: 20px; }
+
+  .bottom-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: white; border-top: 1px solid #f3f4f6;
+    padding: 10px 24px; display: flex; justify-content: center; align-items: center;
+    font-size: 11px; color: #9ca3af; gap: 6px;
+  }
+</style>
+</head>
+<body>
+  <div class="top-bar"></div>
+
+  <div class="logo-wrap">
+    <span class="logo-icon">📄</span>
+    <span class="logo-text">Automatizador de Gestión Documental</span>
+  </div>
+
+  <div class="card">
+    <div class="head">
+      <div class="head-top">
+        <div class="head-icon">🔐</div>
+        <div class="head-titles">
+          <h2>Iniciar Sesión</h2>
+          <p>Sistema de Gestión Documental</p>
+        </div>
+      </div>
+      <div class="tag-line">✦ Gestión Documental Inteligente</div>
+    </div>
+
+    <div class="section-title">Credenciales de Acceso</div>
+
+    <div class="field">
+      <label>No. Consumo (Usuario)</label>
+      <input type="text" placeholder="Ingrese su número de documento">
+    </div>
+    <div class="field">
+      <label>Contraseña</label>
+      <div class="pw-wrap">
+        <input type="password" placeholder="Ingrese su contraseña">
+        <button class="eye">👁️</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <button class="btn">
+      <span>🔓</span> Ingresar al Sistema
+    </button>
+
+    <p class="footer-note">Sistema de uso institucional — Acceso restringido</p>
+  </div>
+
+  <div class="bottom-bar">
+    🔒 Conexión segura &nbsp;·&nbsp; Automatizador de Gestión Documental
+  </div>
+</body>
+</html>
