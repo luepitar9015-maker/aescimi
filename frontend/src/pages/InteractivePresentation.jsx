@@ -293,27 +293,79 @@ export default function InteractivePresentation() {
       subtitle: 'El impacto invisible del trabajo manual y repetitivo',
       speakerNotes: 'Explicar que un empleado dedica horas a abrir archivos PDF, interpretarlos uno por uno, adivinar su tipo de trámite, abrir un portal corporativo, pasar por el login, escribir la misma información e indexar el archivo. Esto genera cansancio y alta tasa de errores en tipologías e indexación. Mencionar la directriz del Archivo General de la Nación (AGN).',
       content: (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl p-2 text-left animate-[fadeIn_0.5s_ease-out]">
-          <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between hover:border-[#39A900]/20 transition-all">
-            <div className="space-y-3">
-              <span className="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center font-bold text-xs">01</span>
-              <h4 className="text-base font-black text-white font-outfit">Fatiga Cognitiva</h4>
-              <p className="text-xs text-slate-400 leading-relaxed font-medium">Leer individualmente cientos de archivos de múltiples páginas para deducir qué tipología representa según la norma.</p>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center w-full max-w-5xl p-2 text-left animate-[fadeIn_0.5s_ease-out]">
+          {/* Left: cards (5 cols) */}
+          <div className="lg:col-span-5 space-y-4">
+            <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl flex gap-3 items-start hover:border-red-500/20 transition-all">
+              <div className="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center font-bold text-xs flex-shrink-0">01</div>
+              <div>
+                <h4 className="text-xs font-black text-white font-outfit">Fatiga Cognitiva</h4>
+                <p className="text-[10px] text-slate-400 leading-relaxed font-medium">Leer individualmente cientos de archivos de múltiples páginas para deducir qué tipología representa según la norma.</p>
+              </div>
+            </div>
+            <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl flex gap-3 items-start hover:border-red-500/20 transition-all">
+              <div className="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center font-bold text-xs flex-shrink-0">02</div>
+              <div>
+                <h4 className="text-xs font-black text-white font-outfit">Ineficiencia Manual</h4>
+                <p className="text-[10px] text-slate-400 leading-relaxed font-medium">Copiar, transcribir y pegar nombres completos, identificaciones, fechas y asuntos del PDF al formulario del sistema.</p>
+              </div>
+            </div>
+            <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl flex gap-3 items-start hover:border-red-500/20 transition-all">
+              <div className="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center font-bold text-xs flex-shrink-0">03</div>
+              <div>
+                <h4 className="text-xs font-black text-white font-outfit">Inconsistencia Crítica</h4>
+                <p className="text-[10px] text-slate-400 leading-relaxed font-medium">Equivocaciones en nombres o cédulas que imposibilitan búsquedas futuras, rompiendo la integridad del expediente.</p>
+              </div>
             </div>
           </div>
-          <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between hover:border-[#39A900]/20 transition-all">
-            <div className="space-y-3">
-              <span className="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center font-bold text-xs">02</span>
-              <h4 className="text-base font-black text-white font-outfit">Ineficiencia Manual</h4>
-              <p className="text-xs text-slate-400 leading-relaxed font-medium">Copiar, transcribir y pegar nombres completos, identificaciones, fechas y asuntos del PDF al formulario del sistema.</p>
-            </div>
-          </div>
-          <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between hover:border-[#39A900]/20 transition-all">
-            <div className="space-y-3">
-              <span className="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center font-bold text-xs">03</span>
-              <h4 className="text-base font-black text-white font-outfit">Riesgo de Inconsistencia</h4>
-              <p className="text-xs text-slate-400 leading-relaxed font-medium">Equivocaciones en nombres o cédulas que imposibilitan búsquedas futuras, rompiendo la integridad de la TRD institucional.</p>
-            </div>
+          
+          {/* Right: SVG Bottleneck (7 cols) */}
+          <div className="lg:col-span-7 bg-slate-950 border border-slate-900 rounded-3xl p-6 h-[320px] flex flex-col justify-between shadow-2xl relative overflow-hidden">
+            <h4 className="text-xs font-black text-red-400 uppercase tracking-widest mb-2 font-outfit">Embudo de Fricción Manual de Indexación</h4>
+            <svg viewBox="0 0 400 200" className="w-full h-full text-white font-sans">
+              <defs>
+                <marker id="arrow-red" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#ef4444" />
+                </marker>
+                <linearGradient id="grad-red-react" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#ef4444" />
+                  <stop offset="100%" stopColor="#f43f5e" />
+                </linearGradient>
+              </defs>
+
+              {/* Step 1: Ingest */}
+              <rect x="10" y="70" width="70" height="50" rx="6" fill="url(#grad-red-react)" opacity="0.85" />
+              <text x="45" y="90" textAnchor="middle" fontSize="8" fontWeight="bold" fill="#fff">1. Ingesta</text>
+              <text x="45" y="103" textAnchor="middle" fontSize="6" fill="#fff" opacity="0.8">PDF Descargado</text>
+              
+              {/* Arrow 1 */}
+              <path d="M 80 95 L 110 95" fill="none" stroke="#ef4444" strokeWidth="1.5" markerEnd="url(#arrow-red)" />
+
+              {/* Step 2: Reading */}
+              <rect x="120" y="60" width="75" height="70" rx="6" fill="#1e293b" stroke="#ef4444" strokeWidth="1" />
+              <text x="157" y="80" textAnchor="middle" fontSize="8" fontWeight="bold" fill="#fff">2. Lectura</text>
+              <text x="157" y="93" textAnchor="middle" fontSize="6" fill="#ef4444" fontWeight="bold">FATIGA COGNITIVA</text>
+              <text x="157" y="103" textAnchor="middle" fontSize="5.5" fill="#94a3b8">Búsqueda de Datos</text>
+              <text x="157" y="113" textAnchor="middle" fontSize="5.5" fill="#94a3b8">150-300 segs / doc</text>
+
+              {/* Arrow 2 */}
+              <path d="M 195 95 L 225 95" fill="none" stroke="#ef4444" strokeWidth="1.5" markerEnd="url(#arrow-red)" />
+
+              {/* Step 3: Digitation */}
+              <rect x="235" y="60" width="75" height="70" rx="6" fill="#1e293b" stroke="#ef4444" strokeWidth="1" />
+              <text x="272" y="80" textAnchor="middle" fontSize="8" fontWeight="bold" fill="#fff">3. Digitación</text>
+              <text x="272" y="93" textAnchor="middle" fontSize="6" fill="#ef4444" fontWeight="bold">ERROR DE DATO</text>
+              <text x="272" y="103" textAnchor="middle" fontSize="5.5" fill="#94a3b8">Nombres y Cédulas</text>
+              <text x="272" y="113" textAnchor="middle" fontSize="5.5" fill="#94a3b8">Digitado manual</text>
+
+              {/* Arrow 3 */}
+              <path d="M 310 95 L 335 95" fill="none" stroke="#ef4444" strokeWidth="1.5" markerEnd="url(#arrow-red)" />
+
+              {/* Step 4: Storage */}
+              <rect x="345" y="70" width="45" height="50" rx="6" fill="#1e293b" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+              <text x="367" y="90" textAnchor="middle" fontSize="7" fontWeight="bold" fill="#94a3b8">4. OneDrive</text>
+              <text x="367" y="103" textAnchor="middle" fontSize="5.5" fill="#f43f5e">Desorden</text>
+            </svg>
           </div>
         </div>
       )
@@ -433,10 +485,35 @@ export default function InteractivePresentation() {
               </div>
             </div>
 
+            {/* Comparative Bar Chart */}
+            <div className="space-y-3 border-t border-slate-900/60 pt-3">
+              <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider font-outfit">Comparativa de Velocidad</span>
+              
+              <div className="space-y-1">
+                <div className="flex justify-between text-[8px] font-bold text-red-400 font-mono">
+                  <span>Procesamiento Manual</span>
+                  <span>{manualTime} mins</span>
+                </div>
+                <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
+                  <div className="bg-gradient-to-r from-red-500 to-rose-450 h-full rounded-full transition-all duration-300" style={{ width: '100%' }}></div>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex justify-between text-[8px] font-bold text-sena-green font-mono">
+                  <span>Procesamiento SENA V2</span>
+                  <span>{autoTime} secs</span>
+                </div>
+                <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
+                  <div className="bg-gradient-to-r from-sena-green to-emerald-400 h-full rounded-full transition-all duration-300" style={{ width: `${Math.min((autoTime / (manualTime * 60)) * 100, 100)}%` }}></div>
+                </div>
+              </div>
+            </div>
+
             <div className="bg-[#39A900]/5 border border-[#39A900]/20 p-3.5 rounded-2xl text-center">
               <p className="text-xs text-slate-350">
                 Liberas <strong className="text-[#39A900] text-sm">{timeSavedHours.toFixed(1)} horas/día</strong> del personal. 
-                <span className="block text-[10px] text-slate-450 mt-1">Ahorras <strong className="text-[#39A900]">{monthlySavedDays.toFixed(1)} días laborales</strong> al mes.</span>
+                <span className="block text-[10px] text-slate-455 mt-1">Ahorras <strong className="text-[#39A900]">{monthlySavedDays.toFixed(1)} días laborales</strong> al mes.</span>
               </p>
             </div>
           </div>
@@ -449,34 +526,50 @@ export default function InteractivePresentation() {
       subtitle: 'La sinergia de cerebro y manos trabajando en conjunto',
       speakerNotes: 'Explicar que la IA de Gemini actúa como el cerebro cognitivo (extrae, lee, razona semánticamente), y el robot RPA actúa como los brazos (ejecuta el inicio de sesión y teclea los metadatos en el ECM institucional). Esto permite tolerar formatos variables de documentos.',
       content: (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl text-left animate-[fadeIn_0.5s_ease-out]">
-          <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-3xl flex gap-4 hover:border-[#39A900]/25 transition-all">
-            <div className="bg-[#39A900]/10 p-3 rounded-2xl h-fit border border-[#39A900]/20 text-[#39A900]">🧠</div>
-            <div className="space-y-1">
-              <h4 className="text-base font-black text-white font-outfit">El Cerebro (Inteligencia Artificial)</h4>
-              <span className="inline-block text-[8px] font-bold text-[#39A900] bg-[#39A900]/10 px-2 py-0.5 rounded uppercase">Gemini 1.5 Flash</span>
-              <ul className="text-[11px] text-slate-400 space-y-1.5 list-disc list-inside pt-2 font-medium">
-                <li>Lectura y extracción de PDFs escaneados y digitales.</li>
-                <li>Clasificación de tipologías documentales según TRD.</li>
-                <li>Deducción lógica de metadatos (identificación, asunto).</li>
-                <li>Generación de resúmenes cognitivos automáticos.</li>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center w-full max-w-5xl p-2 text-left animate-[fadeIn_0.5s_ease-out]">
+          
+          {/* Left: IA */}
+          <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between hover:border-[#39A900]/25 transition-all h-[300px]">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🧠</span>
+                <h4 className="text-sm font-black text-white font-outfit">Cerebro (IA)</h4>
+              </div>
+              <span className="inline-block text-[8px] font-bold text-[#39A900] bg-[#39A900]/10 px-2 py-0.5 rounded uppercase font-outfit">Gemini 1.5 Flash</span>
+              <ul className="text-[10px] text-slate-400 space-y-1.5 list-disc list-inside pt-1 font-medium leading-normal">
+                <li>Lectura cognitiva de PDFs.</li>
+                <li>Deducción de tipología TRD.</li>
+                <li>Extracción lógica de campos.</li>
+                <li>Resúmenes automáticos.</li>
               </ul>
             </div>
           </div>
 
-          <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-3xl flex gap-4 hover:border-cyan-500/25 transition-all">
-            <div className="bg-cyan-500/10 p-3 rounded-2xl h-fit border border-cyan-500/20 text-cyan-400">🦾</div>
-            <div className="space-y-1">
-              <h4 className="text-base font-black text-white font-outfit">Los Brazos (Robot RPA)</h4>
-              <span className="inline-block text-[8px] font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded uppercase">Puppeteer Browser Engine</span>
-              <ul className="text-[11px] text-slate-400 space-y-1.5 list-disc list-inside pt-2 font-medium">
-                <li>Control y navegación automatizada en navegadores.</li>
-                <li>Redirección y login seguro con Microsoft SSO institucional.</li>
-                <li>Digitación ultra rápida en los formularios del ECM.</li>
-                <li>Sincronización y jerarquización de carpetas de OneDrive.</li>
+          {/* Center Image */}
+          <div className="relative rounded-3xl overflow-hidden border border-slate-800 shadow-2xl h-[300px] flex items-center justify-center bg-slate-950">
+            <img src="/assets/images/digital_worker_concept.png" className="w-full h-full object-cover opacity-85 hover:scale-105 transition-transform duration-500" alt="Trabajador Digital Concept" />
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent p-3 text-center">
+              <span className="text-[9px] font-bold text-white uppercase tracking-widest bg-slate-900/80 px-2.5 py-1 rounded-full border border-slate-800 font-outfit">SENA V2: RPA + IA</span>
+            </div>
+          </div>
+
+          {/* Right: RPA */}
+          <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between hover:border-cyan-500/25 transition-all h-[300px]">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🦾</span>
+                <h4 className="text-sm font-black text-white font-outfit">Brazos (RPA)</h4>
+              </div>
+              <span className="inline-block text-[8px] font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded uppercase font-outfit">Puppeteer Engine</span>
+              <ul className="text-[10px] text-slate-400 space-y-1.5 list-disc list-inside font-medium pt-1 leading-normal">
+                <li>Navegación web autónoma.</li>
+                <li>Ingreso seguro SSO Microsoft.</li>
+                <li>Digitación en formulario ECM.</li>
+                <li>Orden secuencial en OneDrive.</li>
               </ul>
             </div>
           </div>
+
         </div>
       )
     },
@@ -486,37 +579,68 @@ export default function InteractivePresentation() {
       subtitle: 'Componentes del ecosistema de hiperautomatización',
       speakerNotes: 'Explicar las capas de la arquitectura. El cliente React dibuja y captura, el backend Express procesa la TRD de PostgreSQL, orquesta el RPA mediante Puppeteer y consulta la API corporativa de Gemini 1.5 Flash.',
       content: (
-        <div className="w-full max-w-4xl text-center space-y-4 animate-[fadeIn_0.5s_ease-out]">
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-3 pt-2">
-            <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl flex flex-col justify-between items-center text-center">
-              <span className="text-xl mb-1">💻</span>
-              <h5 class="text-[10px] font-bold text-white font-outfit uppercase">Cliente React</h5>
-              <span class="text-[8px] text-slate-500 mt-1">Interfaz Gráfica</span>
-            </div>
-            <div className="flex items-center justify-center text-slate-600 font-bold hidden md:flex text-sm">➔</div>
-            
-            <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl flex flex-col justify-between items-center text-center">
-              <span className="text-xl mb-1">⚙️</span>
-              <h5 class="text-[10px] font-bold text-white font-outfit uppercase">Backend Node</h5>
-              <span class="text-[8px] text-slate-500 mt-1">Express API</span>
-            </div>
-            <div className="flex items-center justify-center text-slate-600 font-bold hidden md:flex text-sm">➔</div>
-            
-            <div className="bg-slate-900/40 border border-[#39A900]/25 p-4 rounded-xl flex flex-col justify-between items-center text-center">
-              <span className="text-xl mb-1">✨</span>
-              <h5 class="text-[10px] font-bold text-[#39A900] font-outfit uppercase">Google Gemini</h5>
-              <span class="text-[8px] text-slate-500 mt-1">Análisis Cognitivo</span>
-            </div>
-            <div className="flex items-center justify-center text-slate-600 font-bold hidden md:flex text-sm">➔</div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center w-full max-w-5xl text-left animate-[fadeIn_0.5s_ease-out]">
+          {/* SVG Diagram */}
+          <div className="lg:col-span-7 bg-slate-950 border border-slate-900 rounded-3xl p-4 h-[300px] flex items-center justify-center shadow-2xl relative overflow-hidden">
+            <svg viewBox="0 0 500 240" className="w-full h-full text-white font-sans">
+              <defs>
+                <marker id="arrow-react" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#39A900" />
+                </marker>
+                <marker id="arrow-blue-react" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#06b6d4" />
+                </marker>
+                <linearGradient id="grad-dark-react" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#1e293b" />
+                  <stop offset="100%" stopColor="#0f172a" />
+                </linearGradient>
+              </defs>
 
-            <div className="bg-slate-900/40 border border-cyan-500/25 p-4 rounded-xl flex flex-col justify-between items-center text-center">
-              <span className="text-xl mb-1">🤖</span>
-              <h5 class="text-[10px] font-bold text-cyan-400 font-outfit uppercase">RPA Puppeteer</h5>
-              <span class="text-[8px] text-slate-500 mt-1">Ingreso & Carga</span>
-            </div>
+              {/* Node 1: React UI */}
+              <rect x="20" y="80" width="100" height="65" rx="8" fill="url(#grad-dark-react)" stroke="rgba(255,255,255,0.08)" strokeWidth="1.5" />
+              <text x="70" y="105" textAnchor="middle" fontSize="10" fontWeight="bold" fill="#fff">INTERFAZ (React)</text>
+              <text x="70" y="120" textAnchor="middle" fontSize="8" fill="#94a3b8">Frontend & Visor</text>
+              <text x="70" y="132" textAnchor="middle" fontSize="7" fill="#39A900" fontWeight="bold">Control de Recorte</text>
+
+              {/* Arrows from UI to Node Backend */}
+              <path d="M 120 112 L 170 112" fill="none" stroke="#39A900" strokeWidth="2" markerEnd="url(#arrow-react)" />
+              
+              {/* Node 2: Node.js Backend */}
+              <rect x="180" y="80" width="110" height="65" rx="8" fill="url(#grad-dark-react)" stroke="rgba(255,255,255,0.08)" strokeWidth="1.5" />
+              <text x="235" y="105" textAnchor="middle" fontSize="10" fontWeight="bold" fill="#fff">BACKEND (Node/Express)</text>
+              <text x="235" y="120" textAnchor="middle" fontSize="8" fill="#94a3b8">Orquestador de Flujo</text>
+              <text x="235" y="132" textAnchor="middle" fontSize="7" fill="#06b6d4" fontWeight="bold">PostgreSQL DB</text>
+
+              {/* Paths from Backend to IA & RPA */}
+              <path d="M 290 100 L 350 50" fill="none" stroke="#39A900" strokeWidth="1.5" markerEnd="url(#arrow-react)" />
+              <path d="M 290 125 L 350 175" fill="none" stroke="#06b6d4" strokeWidth="1.5" markerEnd="url(#arrow-blue-react)" />
+
+              {/* Node 3: Gemini IA */}
+              <rect x="360" y="20" width="110" height="55" rx="8" fill="url(#grad-dark-react)" stroke="rgba(57,169,0,0.3)" strokeWidth="1" />
+              <text x="415" y="42" textAnchor="middle" fontSize="10" fontWeight="bold" fill="#39A900">✨ Google Gemini</text>
+              <text x="415" y="56" textAnchor="middle" fontSize="8" fill="#94a3b8">Clasificación & OCR</text>
+
+              {/* Node 4: Puppeteer RPA */}
+              <rect x="360" y="150" width="110" height="55" rx="8" fill="url(#grad-dark-react)" stroke="rgba(6,182,212,0.3)" strokeWidth="1" />
+              <text x="415" y="172" textAnchor="middle" fontSize="10" fontWeight="bold" fill="#06b6d4">🤖 Puppeteer RPA</text>
+              <text x="415" y="186" textAnchor="middle" fontSize="8" fill="#94a3b8">Ingreso a ECM / Cloud</text>
+
+              {/* Return path to Backend */}
+              <path d="M 360 45 L 250 45 L 250 80" fill="none" stroke="#39A900" strokeWidth="1" strokeDasharray="3,3" />
+              <path d="M 360 180 L 220 180 L 220 145" fill="none" stroke="#06b6d4" strokeWidth="1" strokeDasharray="3,3" />
+            </svg>
           </div>
-          <div className="bg-slate-950 border border-slate-850 p-4 rounded-2xl max-w-xl mx-auto text-[11px] text-slate-400 text-left font-medium leading-relaxed">
-            🛡️ <strong>Seguridad y Privacidad:</strong> La infraestructura utiliza la API privada empresarial, garantizando que la información sensible no sea guardada de forma temporal o expuesta a entrenamientos públicos de Inteligencia Artificial.
+
+          {/* Right points */}
+          <div className="lg:col-span-5 space-y-4">
+            <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl hover:border-sena-green/10 transition-all">
+              <h4 className="text-xs font-bold text-white font-outfit mb-0.5">Seguridad Extrema</h4>
+              <p className="text-[10px] text-slate-400 leading-relaxed font-medium">La comunicación con la API de Gemini es empresarial, lo que garantiza que los folios no se usan para re-entrenar modelos públicos.</p>
+            </div>
+            <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl hover:border-sena-green/10 transition-all">
+              <h4 className="text-xs font-bold text-white font-outfit mb-0.5">Orquestación Desacoplada</h4>
+              <p className="text-[10px] text-slate-400 leading-relaxed font-medium">El backend Node/Express recibe el recorte, delega la lógica a la IA, y luego dispara el robot de Puppeteer en hilos independientes.</p>
+            </div>
           </div>
         </div>
       )
@@ -847,23 +971,55 @@ export default function InteractivePresentation() {
       content: (
         <div className="w-full max-w-4xl text-left space-y-4 animate-[fadeIn_0.5s_ease-out]">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
-            <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl text-center space-y-3 hover:border-[#39A900]/30 relative overflow-hidden group">
-              <div className="text-5xl font-black font-outfit text-transparent bg-clip-text bg-gradient-to-r from-[#39A900] to-emerald-400">95%</div>
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider font-outfit">Ahorro en Tiempos</h4>
-              <p className="text-[11px] text-slate-400 leading-relaxed font-medium">Reducción del tiempo total de radicación e indexación de folios individuales en las bandejas del gestor.</p>
+            
+            {/* Radial Circle 1: 95% */}
+            <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl text-center flex flex-col items-center justify-between hover:border-[#39A900]/30 relative overflow-hidden group">
+              <div className="relative w-28 h-28 flex items-center justify-center">
+                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.03)" strokeWidth="8" fill="transparent" />
+                  <circle cx="50" cy="50" r="40" stroke="#39A900" strokeWidth="8" fill="transparent" 
+                    strokeDasharray="251.2" strokeDashoffset="12.56" className="transition-all duration-1000 ease-out" />
+                </svg>
+                <span className="absolute text-2xl font-black font-outfit text-white">95%</span>
+              </div>
+              <div className="space-y-1 mt-4">
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider font-outfit">Reducción de Tiempo</h4>
+                <p className="text-[10px] text-slate-400 leading-relaxed font-medium">De 10 minutos por indexación manual a solo 15 segundos mediante la clasificación automática.</p>
+              </div>
             </div>
             
-            <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl text-center space-y-3 hover:border-[#39A900]/30 relative overflow-hidden group">
-              <div className="text-5xl font-black font-outfit text-transparent bg-clip-text bg-gradient-to-r from-[#39A900] to-cyan-400">99.8%</div>
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider font-outfit">Precisión de Tipologías</h4>
-              <p className="text-[11px] text-slate-400 leading-relaxed font-medium">Asignación correcta del código TRD de series y subseries mediante el entendimiento del contexto semántico de la IA.</p>
+            {/* Radial Circle 2: 99.8% */}
+            <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl text-center flex flex-col items-center justify-between hover:border-[#39A900]/30 relative overflow-hidden group">
+              <div className="relative w-28 h-28 flex items-center justify-center">
+                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.03)" strokeWidth="8" fill="transparent" />
+                  <circle cx="50" cy="50" r="40" stroke="#06b6d4" stroke-width="8" fill="transparent" 
+                    strokeDasharray="251.2" strokeDashoffset="0.5" className="transition-all duration-1000 ease-out" />
+                </svg>
+                <span className="absolute text-2xl font-black font-outfit text-white">99.8%</span>
+              </div>
+              <div className="space-y-1 mt-4">
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider font-outfit">Precisión de Indexación</h4>
+                <p className="text-[10px] text-slate-400 leading-relaxed font-medium">La IA identifica la tipología TRD de forma semántica basada en el contexto completo del folio.</p>
+              </div>
             </div>
             
-            <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl text-center space-y-3 hover:border-[#39A900]/30 relative overflow-hidden group">
-              <div className="text-5xl font-black font-outfit text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400">0%</div>
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider font-outfit">Errores de Digitación</h4>
-              <p className="text-[11px] text-slate-400 leading-relaxed font-medium">Transcripción e inyección directa de caracteres al ECM eliminando descuidos tipográficos en identificaciones o nombres.</p>
+            {/* Radial Circle 3: 0% */}
+            <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl text-center flex flex-col items-center justify-between hover:border-[#39A900]/30 relative overflow-hidden group">
+              <div className="relative w-28 h-28 flex items-center justify-center">
+                <svg className="w-full h-full transform -rotate-95" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.03)" strokeWidth="8" fill="transparent" />
+                  <circle cx="50" cy="50" r="40" stroke="#10b981" stroke-width="8" fill="transparent" 
+                    strokeDasharray="251.2" strokeDashoffset="251.2" className="transition-all duration-1000 ease-out" />
+                </svg>
+                <span className="absolute text-2xl font-black font-outfit text-white">0%</span>
+              </div>
+              <div className="space-y-1 mt-4">
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider font-outfit">Errores de Digitación</h4>
+                <p className="text-[10px] text-slate-400 leading-relaxed font-medium">Inyección directa de metadatos del PDF al ECM mediante Puppeteer sin error tipográfico humano.</p>
+              </div>
             </div>
+            
           </div>
         </div>
       )
