@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Zap, Brain, Keyboard, Smartphone, Play, CheckCircle, 
   Calculator, Clock, ArrowRight, ChevronRight, 
@@ -59,6 +59,16 @@ export default function InteractivePresentation() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showNotes, setShowNotes] = useState(true);
+  const containerRef = useRef(null);
+
+  // Sync fullscreen state when exiting with Escape
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   // --- CALCULATOR STATE (Slide 4) ---
   const [dailyDocs, setDailyDocs] = useState(300);
@@ -904,7 +914,7 @@ export default function InteractivePresentation() {
   const slide = slides[currentSlide];
 
   return (
-    <div className="min-h-[calc(100vh-80px)] bg-slate-950 text-slate-200 p-4 md:p-6 flex flex-col font-sans select-none rounded-2xl border border-slate-900 relative overflow-hidden">
+    <div ref={containerRef} className="min-h-[calc(100vh-80px)] bg-slate-950 text-slate-200 p-4 md:p-6 flex flex-col font-sans select-none rounded-2xl border border-slate-900 relative overflow-hidden">
       
       {/* Background drift animations */}
       <div className="absolute w-[400px] h-[400px] rounded-full bg-[#39A900]/10 filter blur-[90px] -top-20 -left-20 pointer-events-none animate-pulse"></div>
@@ -938,7 +948,15 @@ export default function InteractivePresentation() {
 
           {/* Fullscreen Toggle */}
           <button
-            onClick={() => setIsFullscreen(!isFullscreen)}
+            onClick={() => {
+              if (!document.fullscreenElement) {
+                containerRef.current.requestFullscreen().catch(err => {
+                  console.error("Error al entrar a pantalla completa:", err);
+                });
+              } else {
+                document.exitFullscreen();
+              }
+            }}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
               isFullscreen 
                 ? 'bg-[#39A900] text-white' 

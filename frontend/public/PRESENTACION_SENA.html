@@ -987,18 +987,40 @@
 
         // --- FULLSCREEN TOGGLER ---
         function toggleFullscreen() {
+            const elem = document.documentElement;
             if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().then(() => {
-                    isFullscreen = true;
-                }).catch(err => {
-                    console.error("Error al activar modo proyector: ", err);
-                });
+                if (elem.requestFullscreen) {
+                    elem.requestFullscreen().catch(err => {
+                        console.error("Error al activar modo proyector: ", err);
+                    });
+                } else if (elem.webkitRequestFullscreen) {
+                    elem.webkitRequestFullscreen();
+                } else if (elem.msRequestFullscreen) {
+                    elem.msRequestFullscreen();
+                }
             } else {
-                document.exitFullscreen().then(() => {
-                    isFullscreen = false;
-                });
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                } else if (document.msExitFullscreen) {
+                    document.msExitFullscreen();
+                }
             }
         }
+
+        // Sincronizar estado cuando se sale con la tecla Escape
+        document.addEventListener('fullscreenchange', () => {
+            isFullscreen = !!document.fullscreenElement;
+            const icon = document.getElementById("fullscreenIcon");
+            if (icon) {
+                if (isFullscreen) {
+                    icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 14h6v6m10-6h-6v6M4 10h6V4m10 6h-6V4" />`;
+                } else {
+                    icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />`;
+                }
+            }
+        });
 
         // --- INTERACTIVE CALCULATOR ENGINE (Slide 4) ---
         function updateCalculator() {
@@ -1443,6 +1465,21 @@
 
         // Initialize presentation on load
         window.onload = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const notesParam = urlParams.get('notes');
+            if (notesParam === 'true') {
+                showPresenterNotes = true;
+                const drawer = document.getElementById("notesDrawer");
+                if (drawer) drawer.classList.remove("translate-x-full");
+                const btnText = document.getElementById("notesBtnText");
+                if (btnText) btnText.innerText = "Ocultar Notas";
+            } else {
+                showPresenterNotes = false;
+                const drawer = document.getElementById("notesDrawer");
+                if (drawer) drawer.classList.add("translate-x-full");
+                const btnText = document.getElementById("notesBtnText");
+                if (btnText) btnText.innerText = "Ver Notas";
+            }
             renderSlide();
         };
     </script>
