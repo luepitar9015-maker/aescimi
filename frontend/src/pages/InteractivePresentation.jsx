@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { 
   Zap, Brain, Keyboard, Smartphone, Play, CheckCircle, 
-  AlertCircle, Calculator, Clock, ArrowRight, ChevronRight, 
-  ChevronLeft, FileText, Maximize2, Minimize2, Check, Info, ShieldAlert
+  Calculator, Clock, ArrowRight, ChevronRight, 
+  ChevronLeft, FileText, Maximize2, Minimize2, Check, Info, ShieldAlert,
+  Folder, Network, Database, FolderPlus, Server, Eye, FileCheck
 } from 'lucide-react';
 
 // --- MOCK DOCUMENTS FOR THE SIMULATOR ---
@@ -59,12 +60,12 @@ export default function InteractivePresentation() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showNotes, setShowNotes] = useState(true);
 
-  // Calculator State
-  const [dailyDocs, setDailyDocs] = useState(200);
+  // --- CALCULATOR STATE (Slide 4) ---
+  const [dailyDocs, setDailyDocs] = useState(300);
   const [manualTime, setManualTime] = useState(4); // minutes per doc
   const [autoTime, setAutoTime] = useState(15); // seconds per doc
 
-  // Simulator State
+  // --- SIMULATOR STATE (Slide 7) ---
   const [selectedDocId, setSelectedDocId] = useState('peticion');
   const [simStep, setSimStep] = useState(0); // 0: Idle, 1: IA scanning, 2: SSO credentials, 3: MFA Phone, 4: RPA Typing ECM, 5: Done
   const [typedEmail, setTypedEmail] = useState('');
@@ -75,13 +76,15 @@ export default function InteractivePresentation() {
 
   const selectedDoc = MOCK_DOCUMENTS.find(d => d.id === selectedDocId) || MOCK_DOCUMENTS[0];
 
-  // --- KEYBOARD CONTROLS FOR SLIDES ---
+  // --- KEYBOARD CONTROLS ---
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'ArrowRight') {
         nextSlide();
       } else if (e.key === 'ArrowLeft') {
         prevSlide();
+      } else if (e.key.toLowerCase() === 'n') {
+        setShowNotes(n => !n);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -91,27 +94,24 @@ export default function InteractivePresentation() {
   const nextSlide = () => {
     if (currentSlide < slides.length - 1) {
       setCurrentSlide(c => c + 1);
-      // Reset simulator if moving slides
-      setSimStep(0);
-      setMfaApproved(false);
-      setTypedEmail('');
-      setTypedPass('');
-      setUploadProgress(0);
-      setSimLogs([]);
+      resetSimulatorState();
     }
   };
 
   const prevSlide = () => {
     if (currentSlide > 0) {
       setCurrentSlide(c => c - 1);
-      // Reset simulator
-      setSimStep(0);
-      setMfaApproved(false);
-      setTypedEmail('');
-      setTypedPass('');
-      setUploadProgress(0);
-      setSimLogs([]);
+      resetSimulatorState();
     }
+  };
+
+  const resetSimulatorState = () => {
+    setSimStep(0);
+    setMfaApproved(false);
+    setTypedEmail('');
+    setTypedPass('');
+    setUploadProgress(0);
+    setSimLogs([]);
   };
 
   // --- CALCULATOR MATHS ---
@@ -130,7 +130,7 @@ export default function InteractivePresentation() {
     setUploadProgress(0);
     setSimLogs(['[IA] Iniciando lectura de archivo: ' + selectedDoc.title, '[IA] Leyendo contenido y estructura del PDF...']);
 
-    // Step 1: Scanning (2.5s)
+    // Step 1: Scanning (2s)
     setTimeout(() => {
       setSimStep(2);
       setSimLogs(prev => [
@@ -144,11 +144,11 @@ export default function InteractivePresentation() {
       
       // Step 2: Typing credentials (SSO)
       typeCredentials();
-    }, 2800);
+    }, 2000);
   };
 
   const typeCredentials = () => {
-    const email = 'exposicion.ia@organizacion.gov.co';
+    const email = 'orador.sena@sena.edu.co';
     const pass = 'HiperAutomatizacion2026*';
     
     // Simulate typing email
@@ -180,12 +180,12 @@ export default function InteractivePresentation() {
                   '[SEGURIDAD] Bloqueado por MFA corporativo.', 
                   '[SEGURIDAD] Esperando aprobación en dispositivo móvil del expositor...'
                 ]);
-              }, 800);
+              }, 600);
             }
-          }, 40);
-        }, 600);
+          }, 30);
+        }, 500);
       }
-    }, 45);
+    }, 30);
   };
 
   const approveMfa = () => {
@@ -221,24 +221,24 @@ export default function InteractivePresentation() {
               ...prev,
               '[RPA] Carga del documento completada.',
               '[RPA] Radicación ejecutada de forma exitosa en el Repositorio Central.',
-              `[IA] Resumen automático: "${selectedDoc.metadata.asunto} correspondiente a ${selectedDoc.metadata.solicitante} con fecha ${selectedDoc.metadata.fecha}."`,
-              '[SISTEMA] Flujo de automatización terminado en 12.4 segundos.'
+              `[IA] Resumen automático: "${selectedDoc.metadata.asunto} correspondiente a ${selectedDoc.solicitante} con fecha ${selectedDoc.metadata.fecha}."`,
+              '[SISTEMA] Flujo de automatización terminado en 12.8 segundos.'
             ]);
-          }, 800);
+          }, 600);
         }
-      }, 150);
-    }, 1500);
+      }, 100);
+    }, 1200);
   };
 
-
-  // --- PRESENTATION SLIDES DEFINITION ---
+  // --- PRESENTATION SLIDES DEFINITION (12 slides) ---
   const slides = [
     {
-      title: 'El Trabajador Digital e Hiperautomatización',
-      subtitle: 'El Futuro de la Gestión Documental Corporativa',
+      // Diapositiva 1
+      title: 'SENA V2',
+      subtitle: 'La Revolución Documental con Inteligencia Artificial',
       speakerNotes: 'Comenzar dando la bienvenida al público. Aclarar que la gestión documental es el corazón de la administración pública y privada, pero suele consumir miles de horas humanas en tareas de copiar y pegar. Introducir el concepto de "Trabajador Digital" como una combinación de Inteligencia Artificial (cerebro/ojos) y Robots (brazos/manos) para librar a los funcionarios de la rutina repetitiva.',
       content: (
-        <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-6">
+        <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-6 animate-[fadeIn_0.5s_ease-out]">
           <div className="relative">
             <div className="absolute inset-0 bg-[#39A900] blur-3xl opacity-20 rounded-full w-48 h-48 mx-auto -top-4"></div>
             <div className="relative bg-slate-900 border border-slate-700/60 p-6 rounded-3xl inline-flex items-center justify-center shadow-2xl">
@@ -246,110 +246,175 @@ export default function InteractivePresentation() {
             </div>
           </div>
           <div className="space-y-3">
-            <span className="text-xs font-bold tracking-[0.2em] text-[#39A900] uppercase">Ponencia de 40 Minutos</span>
-            <h2 className="text-3xl md:text-5xl font-black text-white tracking-tight leading-tight">
-              EL TRABAJADOR DIGITAL
+            <span className="text-xs font-bold tracking-[0.2em] text-[#39A900] uppercase">Proyecto de Innovación Digital</span>
+            <h2 className="text-4xl md:text-5xl font-black text-white tracking-tight leading-tight font-outfit">
+              SENA V2
             </h2>
-            <p className="text-slate-400 text-base md:text-lg max-w-xl mx-auto font-medium">
-              Cómo la sinergia de Inteligencia Artificial y RPA elimina el trabajo aburrido y transforma la eficiencia de la organización.
+            <p className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 font-bold text-xl md:text-2xl max-w-xl mx-auto font-outfit">
+              Gestión Documental con IA e Hiperautomatización
+            </p>
+            <p className="text-slate-400 text-sm max-w-lg mx-auto font-medium">
+              De horas de transcripción manual a segundos de clasificación estructurada y sincronización automatizada.
             </p>
           </div>
-          <div className="flex gap-3 justify-center pt-4">
-            <span className="bg-slate-800 text-slate-300 border border-slate-700 text-xs px-4 py-2 rounded-full font-bold">📂 100% Sin Papel</span>
-            <span className="bg-slate-800 text-slate-300 border border-slate-700 text-xs px-4 py-2 rounded-full font-bold">🤖 Robots de Software</span>
-            <span className="bg-slate-800 text-[#39A900] border border-[#39A900]/30 text-xs px-4 py-2 rounded-full font-bold">✨ Gemini 1.5 Flash</span>
+          <div className="flex gap-3 justify-center pt-2">
+            <span className="bg-slate-900/80 border border-slate-800 text-slate-350 text-[10px] px-3.5 py-1.5 rounded-full font-bold">✨ Gemini 1.5 Flash</span>
+            <span className="bg-slate-900/80 border border-slate-800 text-slate-350 text-[10px] px-3.5 py-1.5 rounded-full font-bold">🤖 Robots Puppeteer</span>
+            <span className="bg-slate-900/80 border border-slate-800 text-[#39A900] border-[#39A900]/30 text-[10px] px-3.5 py-1.5 rounded-full font-bold">📂 Cumplimiento TRD</span>
           </div>
         </div>
       )
     },
     {
-      title: 'El Desafío: La Pesadilla Administrativa',
+      // Diapositiva 2
+      title: 'El Desafío de la Gestión Documental Pública',
       subtitle: 'El impacto invisible del trabajo manual y repetitivo',
-      speakerNotes: 'Aquí contamos la historia de "María". Explicar que un empleado dedica el 100% de su tiempo a abrir archivos PDF en la nube, leerlos uno por uno, deducir su tipo de trámite, abrir un portal corporativo, pasar por el login, escribir la misma información e indexar el archivo. Esto toma de 3 a 5 minutos por archivo. Invitar al público a participar usando la calculadora interactiva en pantalla para cuantificar el costo real.',
+      speakerNotes: 'Explicar que un empleado dedica horas a abrir archivos PDF, interpretarlos uno por uno, adivinar su tipo de trámite, abrir un portal corporativo, pasar por el login, escribir la misma información e indexar el archivo. Esto genera cansancio y alta tasa de errores en tipologías e indexación. Mencionar la directriz del Archivo General de la Nación (AGN).',
       content: (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center h-full p-2">
-          <div className="space-y-5 text-left">
-            <div className="inline-flex items-center gap-2 bg-red-950/40 border border-red-900/50 text-red-400 px-3 py-1.5 rounded-xl text-xs font-bold">
-              <ShieldAlert size={14} /> Fricción Operativa y Cansancio Humano
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl p-2 text-left animate-[fadeIn_0.5s_ease-out]">
+          <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between hover:border-[#39A900]/20 transition-all">
+            <div className="space-y-3">
+              <span className="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center font-bold text-xs">01</span>
+              <h4 className="text-base font-black text-white font-outfit">Fatiga Cognitiva</h4>
+              <p className="text-xs text-slate-400 leading-relaxed font-medium">Leer individualmente cientos de archivos de múltiples páginas para deducir qué tipología representa según la norma.</p>
             </div>
-            <h3 className="text-2xl md:text-3xl font-black text-white leading-tight">
-              La historia de la indexación manual
-            </h3>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              Diligenciar metadatos de documentos, clasificarlos de forma subjetiva y cargarlos a los repositorios centrales uno a uno es la mayor fuente de ineficiencia y errores tipográficos en los archivos corporativos.
-            </p>
+          </div>
+          <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between hover:border-[#39A900]/20 transition-all">
+            <div className="space-y-3">
+              <span className="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center font-bold text-xs">02</span>
+              <h4 className="text-base font-black text-white font-outfit">Ineficiencia Manual</h4>
+              <p className="text-xs text-slate-400 leading-relaxed font-medium">Copiar, transcribir y pegar nombres completos, identificaciones, fechas y asuntos del PDF al formulario del sistema.</p>
+            </div>
+          </div>
+          <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between hover:border-[#39A900]/20 transition-all">
+            <div className="space-y-3">
+              <span className="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center font-bold text-xs">03</span>
+              <h4 className="text-base font-black text-white font-outfit">Riesgo de Inconsistencia</h4>
+              <p className="text-xs text-slate-400 leading-relaxed font-medium">Equivocaciones en nombres o cédulas que imposibilitan búsquedas futuras, rompiendo la integridad de la TRD institucional.</p>
+            </div>
+          </div>
+        </div>
+      )
+    },
+    {
+      // Diapositiva 3
+      title: 'La Fricción Operativa - Anatomía del Trabajo Repetitivo',
+      subtitle: 'El calvario diario del funcionario de archivo',
+      speakerNotes: 'Detallar los cinco pasos de la indexación manual. Hacer mímica de transcribir texto al aire al hablar de digitación. Señalar los riesgos asociados a cada paso (sesión caída, equivocaciones en cédulas, nomenclatura desordenada).',
+      content: (
+        <div className="w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/25 p-2 animate-[fadeIn_0.5s_ease-out]">
+          <div className="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="bg-slate-900 border-b border-slate-800 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  <th class="p-3">Paso</th>
+                  <th class="p-3">Operación Manual</th>
+                  <th class="p-3 text-red-400">Riesgos y Limitantes</th>
+                  <th class="p-3 text-[#39A900]">Solución Automática</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/60 text-left">
+                <tr>
+                  <td class="p-3 font-bold text-slate-350">1. Descarga</td>
+                  <td class="p-3 text-slate-400">Descargar archivos PDF desde correos o OneDrive locales.</td>
+                  <td class="p-3 text-slate-400">Desorden, archivos duplicados.</td>
+                  <td class="p-3 text-[#39A900] font-bold">API Ingesta Directa</td>
+                </tr>
+                <tr>
+                  <td class="p-3 font-bold text-slate-350">2. Lectura</td>
+                  <td class="p-3 text-slate-400">Leer y deducir la tipología según la TRD.</td>
+                  <td class="p-3 text-slate-400">Clasificación subjetiva/errónea.</td>
+                  <td class="p-3 text-[#39A900] font-bold">Modelado Cognitivo IA</td>
+                </tr>
+                <tr>
+                  <td class="p-3 font-bold text-slate-350">3. Login</td>
+                  <td class="p-3 text-slate-400">Superar Microsoft SSO y alertas de MFA corporativas.</td>
+                  <td class="p-3 text-slate-400">Pérdida por sesiones caídas.</td>
+                  <td class="p-3 text-[#39A900] font-bold">Automáta Puppeteer</td>
+                </tr>
+                <tr>
+                  <td class="p-3 font-bold text-slate-350">4. Digitación</td>
+                  <td class="p-3 text-slate-400">Digitar nombres, cédulas y fechas del expediente.</td>
+                  <td class="p-3 text-slate-400">Errores tipográficos humanos.</td>
+                  <td class="p-3 text-[#39A900] font-bold">OCR por Recorte Dinámico</td>
+                </tr>
+                <tr>
+                  <td class="p-3 font-bold text-slate-350">5. OneDrive</td>
+                  <td class="p-3 text-slate-400">Crear carpetas y renombrar PDFs a mano.</td>
+                  <td class="p-3 text-slate-400">Inconsistencia en la nomenclatura.</td>
+                  <td class="p-3 text-[#39A900] font-bold">Estructura Simétrica</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )
+    },
+    {
+      // Diapositiva 4: Calculadora interactiva
+      title: 'Cuantificación del Dolor - Calculadora de Tiempos',
+      subtitle: 'Ajuste los valores para estimar el ahorro neto mensual de su equipo',
+      speakerNotes: 'Invitar al público a participar en pantalla. Modificar las variables (documentos diarios por procesar, tiempo manual, etc.) para ver cómo se traduce en horas de labor humana liberada y días laborales ahorrados al mes.',
+      content: (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center w-full max-w-4xl text-left animate-[fadeIn_0.5s_ease-out]">
+          <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-4 space-y-4">
+            <div>
+              <div className="flex justify-between text-xs font-bold text-slate-400 mb-1.5">
+                <span>Documentos diarios a procesar:</span>
+                <span className="text-[#39A900] font-black text-sm bg-slate-950 px-2.5 py-0.5 rounded">{dailyDocs}</span>
+              </div>
+              <input 
+                type="range" min="10" max="1000" step="10"
+                value={dailyDocs} onChange={(e) => setDailyDocs(parseInt(e.target.value))}
+                className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-[#39A900] outline-none"
+              />
+            </div>
             
-            {/* Steps card */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
-              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">El Calvario del Usuario (3-5 minutos por archivo):</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <div className="flex gap-2 text-slate-400"><span className="text-red-500 font-bold">1.</span> Leer e interpretar el PDF.</div>
-                <div className="flex gap-2 text-slate-400"><span className="text-red-500 font-bold">2.</span> Ingresar al ECM con Microsoft SSO.</div>
-                <div className="flex gap-2 text-slate-400"><span className="text-red-500 font-bold">3.</span> Digitar metadatos uno por uno.</div>
-                <div className="flex gap-2 text-slate-400"><span className="text-red-500 font-bold">4.</span> Arrastrar, subir y archivar.</div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Minutos Manuales / doc:</label>
+                <input 
+                  type="number" min="1" max="15" 
+                  value={manualTime} onChange={(e) => setManualTime(parseFloat(e.target.value) || 0)}
+                  className="w-full bg-slate-950 border border-slate-850 text-xs text-slate-200 p-2 rounded-xl focus:border-[#39A900] outline-none font-bold"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Segundos Robot / doc:</label>
+                <input 
+                  type="number" min="5" max="60" 
+                  value={autoTime} onChange={(e) => setAutoTime(parseFloat(e.target.value) || 0)}
+                  className="w-full bg-slate-950 border border-slate-850 text-xs text-slate-200 p-2 rounded-xl focus:border-[#39A900] outline-none font-bold"
+                />
               </div>
             </div>
           </div>
 
-          {/* Interactive Calculator */}
-          <div className="bg-slate-900/60 border border-slate-800 backdrop-blur-md rounded-3xl p-6 space-y-4">
-            <div className="flex items-center gap-2 text-[#39A900]">
-              <Calculator size={18} />
-              <span className="text-sm font-bold uppercase tracking-wider text-slate-200">Calculadora de Ahorro Real</span>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-400 mb-1">Documentos diarios por procesar:</label>
-                <div className="flex items-center gap-3">
-                  <input 
-                    type="range" min="10" max="1000" step="10"
-                    value={dailyDocs} onChange={(e) => setDailyDocs(parseInt(e.target.value))}
-                    className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-[#39A900]"
-                  />
-                  <span className="text-sm font-black text-[#39A900] bg-slate-950 px-2 py-1 rounded w-16 text-center">{dailyDocs}</span>
-                </div>
+          <div className="bg-slate-950/80 border border-slate-850 rounded-3xl p-5 space-y-4">
+            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#39A900] animate-ping"></span>
+              Retorno Operativo Estimado
+            </h4>
+            
+            <div className="grid grid-cols-3 gap-2.5">
+              <div className="bg-slate-900/40 p-3.5 rounded-2xl border border-slate-850 text-center">
+                <span className="block text-[9px] font-bold text-slate-500 uppercase">Tiempo Manual</span>
+                <span className="text-base font-black text-red-400 block mt-1">{dailyManualHours.toFixed(1)} hrs</span>
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-400 mb-1">Minutos manuales / doc:</label>
-                  <input 
-                    type="number" min="1" max="15" 
-                    value={manualTime} onChange={(e) => setManualTime(parseFloat(e.target.value) || 0)}
-                    className="w-full bg-slate-950 border border-slate-800 text-sm text-slate-200 p-2 rounded-xl focus:border-[#39A900] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-400 mb-1">Segundos robot / doc:</label>
-                  <input 
-                    type="number" min="5" max="60" 
-                    value={autoTime} onChange={(e) => setAutoTime(parseFloat(e.target.value) || 0)}
-                    className="w-full bg-slate-950 border border-slate-800 text-sm text-slate-200 p-2 rounded-xl focus:border-[#39A900] outline-none"
-                  />
-                </div>
+              <div className="bg-slate-900/40 p-3.5 rounded-2xl border border-slate-850 text-center">
+                <span className="block text-[9px] font-bold text-slate-500 uppercase">Tiempo Robot</span>
+                <span className="text-base font-black text-green-400 block mt-1">{(dailyAutoHours * 60).toFixed(1)} mins</span>
+              </div>
+              <div className="bg-slate-900/40 p-3.5 rounded-2xl border border-slate-850 text-center">
+                <span className="block text-[9px] font-bold text-slate-500 uppercase">Aumento Vel.</span>
+                <span className="text-base font-black text-[#39A900] block mt-1">{relativeSpeed}x</span>
               </div>
             </div>
 
-            {/* Results Grid */}
-            <div className="grid grid-cols-3 gap-2 bg-slate-950/80 p-3 rounded-2xl border border-slate-850">
-              <div className="text-center p-2">
-                <span className="block text-xs font-bold text-slate-400">T. Manual</span>
-                <span className="text-sm font-black text-red-500">{dailyManualHours.toFixed(1)} hrs</span>
-              </div>
-              <div className="text-center p-2 border-x border-slate-850">
-                <span className="block text-xs font-bold text-slate-400">T. Robot</span>
-                <span className="text-sm font-black text-green-500">{(dailyAutoHours * 60).toFixed(1)} mins</span>
-              </div>
-              <div className="text-center p-2">
-                <span className="block text-xs font-bold text-slate-400">Velocidad</span>
-                <span className="text-sm font-black text-[#39A900]">{relativeSpeed}x</span>
-              </div>
-            </div>
-
-            <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-800/60 text-center">
-              <p className="text-xs text-slate-300">
-                Liberas <strong className="text-[#39A900]">{timeSavedHours.toFixed(1)} horas/día</strong> del personal. Ahorras <strong className="text-[#39A900]">{monthlySavedDays.toFixed(1)} días laborales</strong> al mes.
+            <div className="bg-[#39A900]/5 border border-[#39A900]/20 p-3.5 rounded-2xl text-center">
+              <p className="text-xs text-slate-350">
+                Liberas <strong className="text-[#39A900] text-sm">{timeSavedHours.toFixed(1)} horas/día</strong> del personal. 
+                <span className="block text-[10px] text-slate-450 mt-1">Ahorras <strong className="text-[#39A900]">{monthlySavedDays.toFixed(1)} días laborales</strong> al mes.</span>
               </p>
             </div>
           </div>
@@ -357,91 +422,95 @@ export default function InteractivePresentation() {
       )
     },
     {
+      // Diapositiva 5
       title: 'Hiperautomatización: RPA + Inteligencia Artificial',
-      subtitle: 'La conjunción de manos y cerebro en un solo sistema',
-      speakerNotes: 'Explicar la diferencia entre Automatización Tradicional (RPA) e Hiperautomatización. La automatización tradicional es ciega: pulsa botones mecánicamente. Si hay un documento en un formato nuevo, no sabe qué hacer. Con la Hiperautomatización, unimos RPA con Inteligencia Artificial. La IA lee y comprende, y le pasa los datos estructurados al robot de software. Así el robot actúa como los brazos (clics y escritura) y la IA actúa como el cerebro y ojos (clasificación e indexación).',
+      subtitle: 'La sinergia de cerebro y manos trabajando en conjunto',
+      speakerNotes: 'Explicar que la IA de Gemini actúa como el cerebro cognitivo (extrae, lee, razona semánticamente), y el robot RPA actúa como los brazos (ejecuta el inicio de sesión y teclea los metadatos en el ECM institucional). Esto permite tolerar formatos variables de documentos.',
       content: (
-        <div className="flex flex-col justify-center h-full space-y-6 p-2">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Brain Card */}
-            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 hover:border-[#39A900]/30 transition-all flex gap-4 text-left">
-              <div className="bg-[#39A900]/10 p-3 rounded-2xl h-fit">
-                <Brain size={28} className="text-[#39A900]" />
-              </div>
-              <div className="space-y-2">
-                <h4 className="text-base font-black text-white">El Cerebro (Inteligencia Artificial)</h4>
-                <span className="inline-block text-[10px] uppercase font-bold text-[#39A900] bg-[#39A900]/15 px-2 py-0.5 rounded">Gemini 1.5 Flash</span>
-                <ul className="text-xs text-slate-400 space-y-1.5 list-disc list-inside">
-                  <li>Lee y extrae texto de PDFs escaneados y digitales.</li>
-                  <li>Clasifica la tipología documental con razonamiento cognitivo.</li>
-                  <li>Deduce metadatos implícitos (cédulas, nombres, fechas).</li>
-                  <li>Resume expedientes completos al instante.</li>
-                </ul>
-              </div>
-            </div>
-
-            {/* Arms Card */}
-            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 hover:border-[#39A900]/30 transition-all flex gap-4 text-left">
-              <div className="bg-blue-500/10 p-3 rounded-2xl h-fit">
-                <Zap size={28} className="text-blue-400" />
-              </div>
-              <div className="space-y-2">
-                <h4 className="text-base font-black text-white">Los Brazos (Robot RPA)</h4>
-                <span className="inline-block text-[10px] uppercase font-bold text-blue-400 bg-blue-500/15 px-2 py-0.5 rounded">Puppeteer Browser Engine</span>
-                <ul className="text-xs text-slate-400 space-y-1.5 list-disc list-inside">
-                  <li>Controla el navegador web de forma autónoma.</li>
-                  <li>Resuelve el inicio de sesión corporativo (Microsoft SSO).</li>
-                  <li>Inserta datos, navega y selecciona opciones en el ECM.</li>
-                  <li>Sube archivos directamente desde repositorios en la nube.</li>
-                </ul>
-              </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl text-left animate-[fadeIn_0.5s_ease-out]">
+          <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-3xl flex gap-4 hover:border-[#39A900]/25 transition-all">
+            <div className="bg-[#39A900]/10 p-3 rounded-2xl h-fit border border-[#39A900]/20 text-[#39A900]">🧠</div>
+            <div className="space-y-1">
+              <h4 className="text-base font-black text-white font-outfit">El Cerebro (Inteligencia Artificial)</h4>
+              <span className="inline-block text-[8px] font-bold text-[#39A900] bg-[#39A900]/10 px-2 py-0.5 rounded uppercase">Gemini 1.5 Flash</span>
+              <ul className="text-[11px] text-slate-400 space-y-1.5 list-disc list-inside pt-2 font-medium">
+                <li>Lectura y extracción de PDFs escaneados y digitales.</li>
+                <li>Clasificación de tipologías documentales según TRD.</li>
+                <li>Deducción lógica de metadatos (identificación, asunto).</li>
+                <li>Generación de resúmenes cognitivos automáticos.</li>
+              </ul>
             </div>
           </div>
 
-          {/* Workflow Flowchart in text form */}
-          <div className="bg-slate-950 border border-slate-850 p-4 rounded-2xl">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center mb-3">Flujo del Proceso Automatizado</h4>
-            <div className="flex flex-wrap md:flex-nowrap justify-between items-center gap-2 text-xs">
-              <div className="bg-slate-900 border border-slate-800 p-2.5 rounded-xl w-full text-center">
-                <FileText size={14} className="mx-auto mb-1 text-slate-400" />
-                <span className="font-bold text-slate-300">1. Documento PDF</span>
-              </div>
-              <ChevronRight size={14} className="text-slate-600 hidden md:block" />
-              <div className="bg-slate-900 border border-slate-800 p-2.5 rounded-xl w-full text-center">
-                <Brain size={14} className="mx-auto mb-1 text-[#39A900]" />
-                <span className="font-bold text-[#39A900]">2. Clasificación IA</span>
-              </div>
-              <ChevronRight size={14} className="text-slate-600 hidden md:block" />
-              <div className="bg-slate-900 border border-slate-800 p-2.5 rounded-xl w-full text-center">
-                <Smartphone size={14} className="mx-auto mb-1 text-yellow-400" />
-                <span className="font-bold text-yellow-400">3. Login + MFA</span>
-              </div>
-              <ChevronRight size={14} className="text-slate-600 hidden md:block" />
-              <div className="bg-slate-900 border border-slate-800 p-2.5 rounded-xl w-full text-center">
-                <Keyboard size={14} className="mx-auto mb-1 text-blue-400" />
-                <span className="font-bold text-blue-400">4. Digitación RPA</span>
-              </div>
-              <ChevronRight size={14} className="text-slate-600 hidden md:block" />
-              <div className="bg-slate-900 border border-[#39A900]/30 p-2.5 rounded-xl w-full text-center">
-                <CheckCircle size={14} className="mx-auto mb-1 text-[#39A900]" />
-                <span className="font-bold text-slate-300">5. Éxito Radicado</span>
-              </div>
+          <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-3xl flex gap-4 hover:border-cyan-500/25 transition-all">
+            <div className="bg-cyan-500/10 p-3 rounded-2xl h-fit border border-cyan-500/20 text-cyan-400">🦾</div>
+            <div className="space-y-1">
+              <h4 className="text-base font-black text-white font-outfit">Los Brazos (Robot RPA)</h4>
+              <span className="inline-block text-[8px] font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded uppercase">Puppeteer Browser Engine</span>
+              <ul className="text-[11px] text-slate-400 space-y-1.5 list-disc list-inside pt-2 font-medium">
+                <li>Control y navegación automatizada en navegadores.</li>
+                <li>Redirección y login seguro con Microsoft SSO institucional.</li>
+                <li>Digitación ultra rápida en los formularios del ECM.</li>
+                <li>Sincronización y jerarquización de carpetas de OneDrive.</li>
+              </ul>
             </div>
           </div>
         </div>
       )
     },
     {
-      title: 'Simulador del Trabajador Digital',
-      subtitle: 'Vea el procesamiento inteligente en tiempo real',
-      speakerNotes: 'Esta es la demostración en vivo más importante. Explicarle a la audiencia lo que pasará: Primero, seleccionaremos uno de los tres archivos de ejemplo. El simulador representará cada una de las fases en vivo. En el paso 1, la IA escaneará el documento e identificará los datos. En el paso 2, el robot emulará el inicio de sesión institucional escribiendo en pantalla. En el paso 3, simulará el sistema de MFA requiriendo que hagamos clic en el celular para aprobar. En el paso 4, veremos al robot digitar a toda velocidad los campos del Gestor Documental y finalmente veremos el resultado. Iniciar la simulación en pantalla.',
+      // Diapositiva 6
+      title: 'Arquitectura Técnica de la Solución',
+      subtitle: 'Componentes del ecosistema de hiperautomatización',
+      speakerNotes: 'Explicar las capas de la arquitectura. El cliente React dibuja y captura, el backend Express procesa la TRD de PostgreSQL, orquesta el RPA mediante Puppeteer y consulta la API corporativa de Gemini 1.5 Flash.',
       content: (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 h-full p-1 text-left">
+        <div className="w-full max-w-4xl text-center space-y-4 animate-[fadeIn_0.5s_ease-out]">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-3 pt-2">
+            <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl flex flex-col justify-between items-center text-center">
+              <span className="text-xl mb-1">💻</span>
+              <h5 class="text-[10px] font-bold text-white font-outfit uppercase">Cliente React</h5>
+              <span class="text-[8px] text-slate-500 mt-1">Interfaz Gráfica</span>
+            </div>
+            <div className="flex items-center justify-center text-slate-600 font-bold hidden md:flex text-sm">➔</div>
+            
+            <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl flex flex-col justify-between items-center text-center">
+              <span className="text-xl mb-1">⚙️</span>
+              <h5 class="text-[10px] font-bold text-white font-outfit uppercase">Backend Node</h5>
+              <span class="text-[8px] text-slate-500 mt-1">Express API</span>
+            </div>
+            <div className="flex items-center justify-center text-slate-600 font-bold hidden md:flex text-sm">➔</div>
+            
+            <div className="bg-slate-900/40 border border-[#39A900]/25 p-4 rounded-xl flex flex-col justify-between items-center text-center">
+              <span className="text-xl mb-1">✨</span>
+              <h5 class="text-[10px] font-bold text-[#39A900] font-outfit uppercase">Google Gemini</h5>
+              <span class="text-[8px] text-slate-500 mt-1">Análisis Cognitivo</span>
+            </div>
+            <div className="flex items-center justify-center text-slate-600 font-bold hidden md:flex text-sm">➔</div>
+
+            <div className="bg-slate-900/40 border border-cyan-500/25 p-4 rounded-xl flex flex-col justify-between items-center text-center">
+              <span className="text-xl mb-1">🤖</span>
+              <h5 class="text-[10px] font-bold text-cyan-400 font-outfit uppercase">RPA Puppeteer</h5>
+              <span class="text-[8px] text-slate-500 mt-1">Ingreso & Carga</span>
+            </div>
+          </div>
+          <div className="bg-slate-950 border border-slate-850 p-4 rounded-2xl max-w-xl mx-auto text-[11px] text-slate-400 text-left font-medium leading-relaxed">
+            🛡️ <strong>Seguridad y Privacidad:</strong> La infraestructura utiliza la API privada empresarial, garantizando que la información sensible no sea guardada de forma temporal o expuesta a entrenamientos públicos de Inteligencia Artificial.
+          </div>
+        </div>
+      )
+    },
+    {
+      // Diapositiva 7: Live Simulator Widget
+      title: 'Demostración en Vivo: Simulador del Trabajador Digital',
+      subtitle: 'Observe la cooperación en tiempo real de la IA y el Robot',
+      speakerNotes: 'Esta es la demo más impactante. Explicar las fases en la pantalla. Seleccionar un documento, correr la simulación, simular la digitación de contraseñas, detenerse en la pantalla de MFA para dar clic en Aprobar, y ver la digitación automática en el ECM.',
+      content: (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 w-full max-w-5xl text-left animate-[fadeIn_0.5s_ease-out]">
           
-          {/* Doc selector and preview (3 cols) */}
-          <div className="lg:col-span-3 space-y-3">
-            <h4 className="text-xs font-black text-slate-300 uppercase tracking-wider">1. Seleccione Documento</h4>
-            <div className="space-y-2">
+          {/* Menu Selector */}
+          <div className="lg:col-span-3 space-y-2">
+            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">1. Documento</h4>
+            <div className="space-y-1.5">
               {MOCK_DOCUMENTS.map((doc) => (
                 <button
                   key={doc.id}
@@ -455,290 +524,184 @@ export default function InteractivePresentation() {
                   className={`w-full p-2.5 rounded-xl border text-left text-xs transition-all ${
                     selectedDocId === doc.id 
                       ? 'bg-slate-900 border-[#39A900] text-white shadow-md' 
-                      : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700'
+                      : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-800'
                   }`}
                 >
-                  <div className="flex items-center gap-2">
-                    <FileText size={14} className={selectedDocId === doc.id ? 'text-[#39A900]' : 'text-slate-500'} />
-                    <span className="font-bold truncate">{doc.title}</span>
-                  </div>
-                  <span className="block text-[10px] text-slate-500 mt-1 uppercase font-semibold">TIPO: {doc.type}</span>
+                  <span className="font-bold truncate block">{doc.title}</span>
+                  <span className="block text-[9px] text-slate-500 font-semibold uppercase mt-0.5">TIPO: {doc.type}</span>
                 </button>
               ))}
             </div>
-
-            {/* Quick Action */}
+            
             <div className="pt-2">
               {simStep === 0 || simStep === 5 ? (
                 <button
                   onClick={startSimulation}
-                  className="w-full bg-[#39A900] text-white hover:bg-[#329600] font-black text-xs p-3 rounded-xl shadow-lg shadow-[#39A900]/20 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+                  className="w-full bg-[#39A900] text-white hover:bg-[#329600] font-black text-xs p-2.5 rounded-xl shadow-lg flex items-center justify-center gap-1.5 active:scale-95 transition-all"
                 >
-                  <Play size={14} /> Iniciar Simulación
+                  <Play size={12} /> Correr Simulación
                 </button>
               ) : (
                 <button
-                  onClick={() => setSimStep(0)}
-                  className="w-full bg-slate-800 text-slate-300 hover:bg-slate-750 font-bold text-xs p-3 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  onClick={resetSimulatorState}
+                  className="w-full bg-slate-800 text-slate-350 hover:bg-slate-700 font-bold text-xs p-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all"
                 >
                   Reiniciar
                 </button>
               )}
             </div>
-
-            {/* Document Content Preview */}
-            <div className="bg-slate-950 border border-slate-850 rounded-xl p-3 h-32 overflow-y-auto font-mono text-[9px] text-slate-500 leading-normal relative">
-              <span className="absolute top-1 right-2 bg-slate-900 px-1.5 py-0.5 rounded text-[8px] uppercase font-bold text-slate-400">PDF original</span>
-              {selectedDoc.textPreview}
-            </div>
           </div>
 
-          {/* Active Phase Canvas (5 cols) */}
-          <div className="lg:col-span-5 bg-slate-950 border border-slate-850 rounded-3xl p-4 flex flex-col h-[360px] relative overflow-hidden">
-            <h4 className="text-xs font-black text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#39A900] animate-ping"></span>
-              2. Visualizador del Proceso
-            </h4>
+          {/* Canvas View */}
+          <div className="lg:col-span-5 bg-slate-950 border border-slate-850 rounded-2xl p-4 flex flex-col h-[320px] relative overflow-hidden justify-center items-center">
+            {simStep === 0 && (
+              <div className="text-center space-y-2">
+                <div className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-lg text-sena-green mx-auto">🤖</div>
+                <h5 className="text-xs font-bold text-slate-350">Simulador Listo</h5>
+                <p className="text-[10px] text-slate-500 max-w-xs mx-auto">Selecciona un archivo a la izquierda y presiona el botón verde.</p>
+              </div>
+            )}
 
-            {/* Simulation Canvas states */}
-            <div className="flex-grow flex flex-col justify-center items-center relative">
-              
-              {/* STATE 0: Idle */}
-              {simStep === 0 && (
-                <div className="text-center space-y-3">
-                  <div className="bg-slate-900 p-4 rounded-full inline-block border border-slate-800">
-                    <Zap size={32} className="text-[#39A900]" />
+            {simStep === 1 && (
+              <div className="w-full h-full flex flex-col justify-center items-center space-y-3 p-2 relative">
+                <div className="w-32 h-40 bg-slate-900 border border-slate-750 rounded-lg p-3 relative overflow-hidden shadow-2xl flex flex-col justify-between">
+                  <div className="absolute left-0 right-0 h-0.5 bg-green-400 shadow-[0_0_8px_#4ade80] animate-[laser-move_2s_ease-in-out_infinite] top-0"></div>
+                  <div className="space-y-1.5">
+                    <div className="h-1.5 w-1/3 bg-slate-700 rounded"></div>
+                    <div className="h-1 w-full bg-slate-800 rounded"></div>
+                    <div className="h-1 w-5/6 bg-slate-850 rounded"></div>
                   </div>
-                  <h5 className="text-sm font-bold text-slate-300">Esperando Inicio de Simulación</h5>
-                  <p className="text-xs text-slate-500 max-w-xs mx-auto">Seleccione uno de los archivos del menú de la izquierda y presione el botón verde para correr la demo.</p>
-                </div>
-              )}
-
-              {/* STATE 1: IA Scanning */}
-              {simStep === 1 && (
-                <div className="w-full h-full flex flex-col justify-center items-center space-y-4 p-2 relative">
-                  {/* Mock PDF Container with laser line */}
-                  <div className="w-48 h-56 bg-slate-900 border border-slate-750 rounded-lg p-3 relative overflow-hidden shadow-2xl flex flex-col justify-between">
-                    {/* LASER LINE */}
-                    <div className="absolute left-0 right-0 h-0.5 bg-green-400 shadow-[0_0_8px_#4ade80] animate-laser"></div>
-                    
-                    <div className="space-y-2">
-                      <div className="h-2 w-1/3 bg-slate-700 rounded"></div>
-                      <div className="h-1.5 w-full bg-slate-800 rounded"></div>
-                      <div className="h-1.5 w-5/6 bg-slate-850 rounded"></div>
-                      <div className="h-1.5 w-full bg-slate-850 rounded"></div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      {/* Highlight marks matching extracted metadata */}
-                      <div className="h-3 w-1/2 bg-[#39A900]/20 border border-[#39A900]/40 rounded p-1 text-[7px] text-[#39A900] font-black truncate flex items-center gap-1">
-                        <Check size={8} /> {selectedDoc.metadata.solicitante}
-                      </div>
-                      <div className="h-3 w-2/3 bg-blue-500/20 border border-blue-500/40 rounded p-1 text-[7px] text-blue-400 font-black truncate flex items-center gap-1">
-                        <Check size={8} /> {selectedDoc.metadata.cedula}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-center space-y-1 z-15">
-                    <span className="text-xs font-black text-[#39A900] bg-[#39A900]/10 px-2.5 py-1 rounded-full uppercase tracking-widest">IA Escaneando PDF</span>
-                    <span className="block text-[10px] text-slate-500">Ejecutando visión por computadora y análisis semántico...</span>
+                  <div className="space-y-1">
+                    <div className="h-2.5 w-full bg-[#39A900]/15 border border-[#39A900]/30 rounded p-0.5 text-[6px] text-[#39A900] font-black truncate flex items-center gap-0.5">✓ {selectedDoc.metadata.solicitante}</div>
+                    <div className="h-2.5 w-5/6 bg-blue-500/15 border border-blue-500/30 rounded p-0.5 text-[6px] text-blue-400 font-black truncate flex items-center gap-0.5">✓ {selectedDoc.metadata.cedula}</div>
                   </div>
                 </div>
-              )}
+                <span className="text-[9px] font-black text-[#39A900] bg-[#39A900]/10 px-2 py-0.5 rounded-full uppercase tracking-wider">IA Leyendo PDF</span>
+              </div>
+            )}
 
-              {/* STATE 2: RPA SSO login typing */}
-              {simStep === 2 && (
-                <div className="w-full h-full flex flex-col justify-center items-center p-3">
-                  {/* Mock SSO browser card */}
-                  <div className="w-full max-w-sm bg-white text-slate-800 rounded-2xl p-4 shadow-2xl border border-slate-200 text-xs space-y-3">
-                    <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
-                      <div className="w-2.5 h-2.5 rounded-full bg-red-400"></div>
-                      <div className="w-2.5 h-2.5 rounded-full bg-yellow-400"></div>
-                      <div className="w-2.5 h-2.5 rounded-full bg-green-400"></div>
-                      <span className="text-[10px] font-bold text-slate-400 font-mono tracking-tight truncate">login.microsoftonline.com/auth</span>
+            {simStep === 2 && (
+              <div className="w-full h-full flex flex-col justify-center items-center p-2">
+                <div className="w-full max-w-xs bg-white text-slate-800 rounded-xl p-3 shadow-xl border border-slate-200 text-[9px] space-y-1.5">
+                  <div className="flex items-center gap-1 border-b border-slate-100 pb-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-400"></div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-yellow-400"></div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-400"></div>
+                    <span className="text-[7px] text-slate-400 font-mono truncate">login.microsoftonline.com/auth</span>
+                  </div>
+                  <div className="text-center font-bold text-slate-700">Inicio de Sesión Corporativo</div>
+                  <div className="space-y-1 text-left">
+                    <div>
+                      <span className="text-[7px] text-slate-500 font-bold block">Usuario:</span>
+                      <div className="bg-slate-50 border border-slate-200 p-1 rounded font-mono min-h-[18px] text-slate-700 font-semibold">{typedEmail}<span className="animate-pulse">|</span></div>
                     </div>
-                    
-                    <div className="text-center space-y-1 pt-1">
-                      <span className="text-[14px] font-black tracking-tight text-slate-700">Inicio de Sesión Corporativo</span>
-                      <span className="block text-[9px] text-slate-400">Redirección automática por Single Sign-On (SSO)</span>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div>
-                        <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Correo Institucional:</label>
-                        <div className="bg-slate-50 border border-slate-200 p-1.5 rounded-lg text-[10px] font-semibold text-slate-700 font-mono min-h-[26px]">
-                          {typedEmail}
-                          <span className="animate-blink">|</span>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Contraseña:</label>
-                        <div className="bg-slate-50 border border-slate-200 p-1.5 rounded-lg text-[10px] font-semibold text-slate-700 font-mono min-h-[26px]">
-                          {'•'.repeat(typedPass.length)}
-                          {typedEmail.length >= 30 && <span className="animate-blink">|</span>}
-                        </div>
-                      </div>
+                    <div>
+                      <span className="text-[7px] text-slate-500 font-bold block">Contraseña:</span>
+                      <div className="bg-slate-50 border border-slate-200 p-1 rounded font-mono min-h-[18px] text-slate-700 font-semibold">{'•'.repeat(typedPass.length)}{typedEmail.length >= 20 && <span className="animate-pulse">|</span>}</div>
                     </div>
                   </div>
-                  <span className="block text-[10px] text-slate-400 mt-3 font-semibold">Robot digitando credenciales del usuario expositor...</span>
                 </div>
-              )}
+                <span class="block text-[8px] text-slate-500 mt-2 font-bold uppercase">Robot RPA digitando credenciales...</span>
+              </div>
+            )}
 
-              {/* STATE 3: MFA Phone screen */}
-              {simStep === 3 && (
-                <div className="w-full h-full flex flex-col justify-center items-center p-2">
-                  <div className="flex gap-6 items-center">
-                    
-                    {/* Visual laptop mock */}
-                    <div className="w-36 h-28 bg-slate-900 border border-slate-700 rounded-lg p-2 flex flex-col justify-between opacity-60">
-                      <div className="h-1 bg-red-400/40 rounded w-1/2"></div>
-                      <div className="space-y-1">
-                        <div className="h-1 bg-slate-800 rounded"></div>
-                        <div className="h-1 bg-slate-800 rounded"></div>
-                      </div>
-                      <div className="h-3 bg-yellow-500/20 border border-yellow-500/40 rounded text-[6px] text-center text-yellow-400 font-black">
-                        Bloqueado por MFA
-                      </div>
-                    </div>
-
-                    {/* Arrow */}
-                    <ArrowRight size={20} className="text-slate-600 animate-pulse" />
-
-                    {/* Visual Cell Phone Mock */}
-                    <div className={`w-36 h-56 bg-slate-900 border border-slate-750 rounded-2xl p-2 relative shadow-2xl flex flex-col justify-between ${!mfaApproved ? 'animate-vibrate' : ''}`}>
-                      <div className="w-10 h-3 bg-slate-950 rounded-full mx-auto mb-1"></div>
-                      
-                      <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-2 flex-grow flex flex-col justify-between text-center space-y-2">
-                        <div className="space-y-1 pt-2">
-                          <span className="text-[8px] bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 px-1.5 py-0.5 rounded-full font-bold uppercase">MFA Alerta</span>
-                          <span className="block text-[8px] font-black text-slate-300">¿Desea aprobar inicio de sesión?</span>
-                          <span className="block text-[6px] text-slate-500">Ubicación: Bogotá, Colombia</span>
-                        </div>
-
-                        {!mfaApproved ? (
-                          <button
-                            onClick={approveMfa}
-                            className="bg-green-600 hover:bg-green-700 text-white font-black text-[9px] py-1.5 px-2 rounded-lg cursor-pointer transition-all active:scale-90"
-                          >
-                            ✓ APROBAR LOGIN
-                          </button>
-                        ) : (
-                          <div className="bg-green-950/40 border border-green-900 text-green-400 font-black text-[9px] py-1 rounded-lg">
-                            ✓ APROBADO
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
+            {simStep === 3 && (
+              <div className="w-full h-full flex flex-col justify-center items-center p-2">
+                <div className="flex gap-4 items-center">
+                  <div className="w-28 h-20 bg-slate-900 border border-slate-750 rounded p-1.5 flex flex-col justify-between opacity-50 text-[5px]">
+                    <div className="h-0.5 bg-red-400/40 rounded w-1/3"></div>
+                    <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-0.5 text-center text-yellow-400 font-black">MFA Bloqueado</div>
                   </div>
-                  <span className="block text-[10px] text-yellow-400 mt-4 font-bold animate-pulse text-center">
-                    {!mfaApproved ? 'HAGA CLIC en "APROBAR" en el celular virtual para continuar' : 'Autenticación completada. El robot continúa.'}
-                  </span>
-                </div>
-              )}
-
-              {/* STATE 4: RPA typing into ECM */}
-              {simStep === 4 && (
-                <div className="w-full h-full flex flex-col justify-center items-center p-3">
+                  <ArrowRight size={14} className="text-slate-600 animate-pulse" />
                   
-                  {/* Mock ECM Portal */}
-                  <div className="w-full bg-slate-900 border border-slate-700/60 rounded-xl p-3 shadow-2xl text-[9px] space-y-2">
-                    <div className="bg-slate-950 p-1.5 border-b border-slate-800 flex justify-between items-center">
-                      <span className="font-bold text-slate-400">GESTOR DOCUMENTAL CORPORATIVO (ECM)</span>
-                      <span className="text-[#39A900] font-black uppercase text-[7px] bg-[#39A900]/10 px-1.5 py-0.5 rounded">Robot Procesando...</span>
+                  <div className={`w-28 h-44 bg-slate-900 border border-slate-750 rounded-xl p-2 relative flex flex-col justify-between ${!mfaApproved ? 'animate-[vibrate_0.5s_linear_infinite]' : ''}`}>
+                    <div className="w-6 h-1.5 bg-slate-950 rounded-full mx-auto mb-1"></div>
+                    <div className="bg-slate-950 border border-slate-800 rounded-lg p-1.5 flex-grow flex flex-col justify-between text-center space-y-1 text-[7px]">
+                      <div className="space-y-0.5">
+                        <span className="block text-[5px] bg-yellow-500/15 text-yellow-400 px-1 py-0.2 rounded-full w-fit mx-auto font-bold uppercase">MFA Alerta</span>
+                        <span className="block font-black text-slate-350">¿Aprobar inicio de sesión?</span>
+                      </div>
+                      {!mfaApproved ? (
+                        <button onClick={approveMfa} className="bg-green-600 hover:bg-green-700 text-white font-black text-[7px] py-1 px-1.5 rounded cursor-pointer transition-all active:scale-90">✓ APROBAR</button>
+                      ) : (
+                        <div className="bg-green-950/40 border border-green-900 text-green-400 font-black py-0.5 rounded">✓ APROBADO</div>
+                      )}
                     </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-left">
-                      <div>
-                        <span className="block text-[8px] text-slate-500 font-bold">EXPEDIENTE:</span>
-                        <div className="bg-slate-950 border border-slate-800 p-1 rounded font-semibold text-slate-300 font-mono">
-                          {selectedDoc.metadata.expediente}
-                        </div>
-                      </div>
-                      <div>
-                        <span className="block text-[8px] text-slate-500 font-bold">TIPOLOGÍA DOCUMENTAL:</span>
-                        <div className="bg-slate-950 border border-[#39A900]/40 p-1 rounded font-semibold text-[#39A900] font-mono">
-                          {selectedDoc.type}
-                        </div>
-                      </div>
-                      <div>
-                        <span className="block text-[8px] text-slate-500 font-bold">SOLICITANTE / TITULAR:</span>
-                        <div className="bg-slate-950 border border-slate-800 p-1 rounded font-semibold text-slate-300 font-mono truncate">
-                          {selectedDoc.metadata.solicitante}
-                        </div>
-                      </div>
-                      <div>
-                        <span className="block text-[8px] text-slate-500 font-bold">IDENTIFICACIÓN / NIT:</span>
-                        <div className="bg-slate-950 border border-slate-800 p-1 rounded font-semibold text-slate-300 font-mono">
-                          {selectedDoc.metadata.cedula}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Progress upload visual */}
-                    <div className="space-y-1 border-t border-slate-800 pt-2 text-left">
-                      <div className="flex justify-between text-[8px] font-bold text-slate-400">
-                        <span>Adjuntando archivo: {selectedDoc.title}</span>
-                        <span>{uploadProgress}%</span>
-                      </div>
-                      <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden">
-                        <div className="bg-[#39A900] h-full transition-all duration-150" style={{ width: `${uploadProgress}%` }}></div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <span className="block text-[9px] text-slate-500 mt-3 font-semibold">Robot Puppeteer digitando metadatos y subiendo PDF al Gestor Documental.</span>
-                </div>
-              )}
-
-              {/* STATE 5: Done */}
-              {simStep === 5 && (
-                <div className="w-full h-full flex flex-col justify-center items-center space-y-3 p-2">
-                  <div className="bg-green-500/10 p-3 rounded-full border border-green-500/20 text-green-400">
-                    <CheckCircle size={36} />
-                  </div>
-                  <div className="text-center space-y-1">
-                    <span className="text-xs font-black text-green-400 bg-green-500/10 px-2.5 py-1 rounded-full uppercase tracking-wider">Radicado con Éxito</span>
-                    <span className="block text-[10px] text-slate-500">Documento indexado y archivado de manera automática</span>
-                  </div>
-
-                  {/* IA summary box */}
-                  <div className="bg-slate-900 border border-slate-800/80 rounded-xl p-3 text-left w-full text-xs space-y-1">
-                    <div className="flex items-center gap-1.5 text-[#39A900] font-bold">
-                      <Brain size={12} />
-                      <span className="text-[10px] uppercase font-black">Resumen Cognitivo de Gemini:</span>
-                    </div>
-                    <p className="text-slate-400 leading-normal text-[10px]">
-                      "{selectedDoc.metadata.asunto} correspondiente al ciudadano/entidad {selectedDoc.metadata.solicitante} con número de identificación {selectedDoc.metadata.cedula}. El documento ha sido clasificado e indexado en el expediente {selectedDoc.metadata.expediente} con un 0% de errores de digitación."
-                    </p>
                   </div>
                 </div>
-              )}
+                <span className="block text-[8px] text-yellow-400 mt-3 font-bold animate-pulse text-center">
+                  {!mfaApproved ? 'Haga clic en "APROBAR" en el celular virtual para continuar' : 'Login aprobado. El robot continúa.'}
+                </span>
+              </div>
+            )}
 
-            </div>
+            {simStep === 4 && (
+              <div className="w-full h-full flex flex-col justify-center items-center p-2">
+                <div className="w-full bg-slate-900 border border-slate-750 rounded-xl p-3 shadow-2xl text-[8px] space-y-1.5">
+                  <div className="bg-slate-950 border-b border-slate-850 p-1 flex justify-between items-center text-[6px]">
+                    <span className="font-bold text-slate-450">GESTOR DOCUMENTAL CORPORATIVO (ECM)</span>
+                    <span className="text-[#39A900] font-black uppercase text-[5px] bg-[#39A900]/10 px-1 rounded animate-pulse">Robot Digitalizando...</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5 text-left font-mono">
+                    <div>
+                      <span className="block text-[6px] text-slate-500 font-bold">EXPEDIENTE:</span>
+                      <div className="bg-slate-950 border border-slate-800 p-0.5 rounded text-slate-350">{selectedDoc.metadata.expediente}</div>
+                    </div>
+                    <div>
+                      <span className="block text-[6px] text-slate-500 font-bold">TIPOLOGÍA:</span>
+                      <div className="bg-slate-950 border border-[#39A900]/30 p-0.5 rounded text-[#39A900]">{selectedDoc.type}</div>
+                    </div>
+                    <div>
+                      <span className="block text-[6px] text-slate-500 font-bold">SOLICITANTE:</span>
+                      <div className="bg-slate-950 border border-slate-800 p-0.5 rounded text-slate-350 truncate">{selectedDoc.metadata.solicitante}</div>
+                    </div>
+                    <div>
+                      <span className="block text-[6px] text-slate-500 font-bold">IDENTIFICACIÓN:</span>
+                      <div className="bg-slate-950 border border-slate-800 p-0.5 rounded text-slate-350">{selectedDoc.metadata.cedula}</div>
+                    </div>
+                  </div>
+                  <div className="space-y-0.5 border-t border-slate-800 pt-1.5 text-left">
+                    <div className="flex justify-between text-[6px] text-slate-400 font-bold">
+                      <span>Subiendo: {selectedDoc.title}</span>
+                      <span>{uploadProgress}%</span>
+                    </div>
+                    <div className="w-full bg-slate-950 h-1 rounded-full overflow-hidden">
+                      <div className="bg-[#39A900] h-full transition-all duration-100" style={{ width: `${uploadProgress}%` }}></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {simStep === 5 && (
+              <div className="w-full h-full flex flex-col justify-center items-center space-y-2 p-2">
+                <div className="bg-green-500/10 p-2.5 rounded-full border border-green-500/20 text-green-400"><CheckCircle size={28} /></div>
+                <span className="text-[10px] font-black text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">Radicado con Éxito</span>
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-left w-full text-[8px] space-y-0.5 font-mono">
+                  <span className="text-[#39A900] font-bold block uppercase tracking-wide">Resumen IA (Gemini):</span>
+                  <p className="text-slate-400">"{selectedDoc.metadata.asunto} de {selectedDoc.metadata.solicitante}. Indexación y orden TRD completados al 100%."</p>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Execution logs / Terminal (4 cols) */}
-          <div className="lg:col-span-4 bg-slate-900/60 border border-slate-800 backdrop-blur-md rounded-3xl p-4 flex flex-col h-[360px]">
-            <h4 className="text-xs font-black text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-              3. Consola de Ejecución en Vivo
-            </h4>
-            
-            <div className="flex-grow bg-slate-950 rounded-2xl p-3 font-mono text-[9px] text-slate-400 overflow-y-auto space-y-1.5 border border-slate-850 leading-relaxed">
+          {/* Logs View */}
+          <div className="lg:col-span-4 bg-slate-900/60 border border-slate-800 backdrop-blur-md rounded-2xl p-4 flex flex-col h-[320px]">
+            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">3. Logs de Consola</h4>
+            <div className="flex-grow bg-slate-950 rounded-xl p-3 font-mono text-[9px] text-slate-400 overflow-y-auto space-y-1 border border-slate-850 leading-relaxed text-left custom-scroll">
               {simLogs.length === 0 ? (
-                <span className="text-slate-600 italic block text-center pt-20">Ninguna simulación activa. Presione "Iniciar Simulación" para ver la consola.</span>
+                <span className="text-slate-600 italic block text-center pt-24">Consola inactiva.</span>
               ) : (
                 simLogs.map((log, index) => {
                   let colorClass = 'text-slate-400';
                   if (log.includes('[IA]')) colorClass = 'text-green-400';
-                  else if (log.includes('[RPA]')) colorClass = 'text-blue-400';
+                  else if (log.includes('[RPA]')) colorClass = 'text-cyan-400';
                   else if (log.includes('[SEGURIDAD]')) colorClass = 'text-yellow-400';
                   else if (log.includes('[SISTEMA]')) colorClass = 'text-emerald-400 font-bold';
 
                   return (
                     <div key={index} className={`${colorClass} whitespace-pre-wrap`}>
-                      <span className="text-slate-600 select-none mr-1.5">&gt;</span>
+                      <span className="text-slate-655 mr-1.5">&gt;</span>
                       {log}
                     </div>
                   );
@@ -751,94 +714,185 @@ export default function InteractivePresentation() {
       )
     },
     {
-      title: 'Métricas de Impacto Operativo',
-      subtitle: 'Beneficios tangibles de la hiperautomatización con IA',
-      speakerNotes: 'Concluir mostrando las métricas del sistema. Destacar los 4 grandes beneficios: 1. Tiempo: Reducción de minutos a segundos por archivo. 2. Precisión: Eliminación de equivocaciones al tipear cédulas o nombres (que en archivos físicos/digitales causa pérdidas). 3. Disponibilidad: Procesamiento nocturno continuado sin cansancio. 4. Satisfacción: El personal ya no hace labores de copiar y pegar, permitiéndoles dedicarse al verdadero análisis documental y atención al usuario.',
+      // Diapositiva 8
+      title: 'Innovación en Usabilidad: OCR por Recorte Dinámico',
+      subtitle: 'Control y extracción visual interactiva del texto',
+      speakerNotes: 'Explicar cómo funciona el recorte de texto para archivos sin capa digital (escaneos o fotocopias). Detallar que el backend corrige el canal alfa inyectando un fondo blanco sólido para garantizar que el texto no se vuelva ilegible sobre fondos transparentes.',
       content: (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 h-full items-center p-2">
-          {/* Card 1 */}
-          <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 hover:scale-[1.02] hover:border-[#39A900]/30 transition-all text-left space-y-3">
-            <div className="bg-[#39A900]/10 p-2.5 rounded-xl h-fit w-fit text-[#39A900]">
-              <Clock size={20} />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl text-left items-center animate-[fadeIn_0.5s_ease-out]">
+          <div className="space-y-4">
+            <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+              <h4 className="text-xs font-bold text-white font-outfit mb-1">OCR por Selección de Ventana</h4>
+              <p className="text-[11px] text-slate-400 leading-normal">Permite arrastrar el puntero del mouse sobre el PDF renderizado en el navegador para extraer cualquier metadato sin digitar.</p>
             </div>
-            <div className="space-y-1">
-              <span className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest">TIEMPO PROMEDIO</span>
-              <h4 className="text-xl font-black text-white">4 Minutos a 15s</h4>
-              <p className="text-[11px] text-slate-400 leading-normal">El robot radique y sube el archivo un 1600% más rápido que la digitación manual tradicional del operador.</p>
+            <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+              <h4 className="text-xs font-bold text-white font-outfit mb-1">Corrección de Fondo de Canvas</h4>
+              <p className="text-[11px] text-slate-400 leading-normal">Los navegadores web suelen procesar los recortes de imagen con fondo transparente. Inyectamos un color blanco sólido sólido antes del OCR para garantizar la legibilidad.</p>
             </div>
-          </div>
-
-          {/* Card 2 */}
-          <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 hover:scale-[1.02] hover:border-[#39A900]/30 transition-all text-left space-y-3">
-            <div className="bg-[#39A900]/10 p-2.5 rounded-xl h-fit w-fit text-[#39A900]">
-              <CheckCircle size={20} />
-            </div>
-            <div className="space-y-1">
-              <span className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest">PRECISIÓN DE DATOS</span>
-              <h4 className="text-xl font-black text-white">0% Errores de Indexación</h4>
-              <p className="text-[11px] text-slate-400 leading-normal">Los metadatos son extraídos por la IA y validados lógicamente contra la base de datos central antes de subir.</p>
+            <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+              <h4 className="text-xs font-bold text-white font-outfit mb-1">Enfoque Automático y Flujo Ágil</h4>
+              <p className="text-[11px] text-slate-400 leading-normal">Al terminar un recorte, el sistema ubica el cursor en el siguiente campo vacío del formulario, ahorrando clics.</p>
             </div>
           </div>
 
-          {/* Card 3 */}
-          <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 hover:scale-[1.02] hover:border-[#39A900]/30 transition-all text-left space-y-3">
-            <div className="bg-[#39A900]/10 p-2.5 rounded-xl h-fit w-fit text-[#39A900]">
-              <Zap size={20} />
+          <div className="bg-slate-950 border border-slate-850 rounded-2xl p-5 h-[280px] flex flex-col justify-between relative overflow-hidden shadow-2xl">
+            <div className="bg-slate-950 border border-slate-850 p-2 rounded-lg flex justify-between items-center text-[8px] font-bold text-slate-400 font-mono">
+              <span>VISOR DE PDF INTEGRADO</span>
+              <span className="text-[#39A900] animate-pulse">● OCR CANAL ALFA</span>
             </div>
-            <div className="space-y-1">
-              <span className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest">DISPONIBILIDAD</span>
-              <h4 className="text-xl font-black text-white">Operación 24/7</h4>
-              <p className="text-[11px] text-slate-400 leading-normal">El sistema puede programarse para ejecutarse en lotes nocturnos, amaneciendo con los repositorios al día.</p>
+            
+            <div className="relative w-full h-32 bg-white text-slate-800 rounded-lg p-3 flex flex-col justify-between font-mono text-[8px] border border-slate-200">
+              <div className="absolute left-4 top-6 w-24 h-5 border border-dashed border-[#39A900] bg-[#39A900]/10 flex items-center justify-center font-bold text-[7px] text-[#39A900]">
+                RECORTE ACTIVO
+                <div className="absolute top-0 left-0 w-full h-0.5 bg-[#39A900] animate-[laser-move_2.5s_ease-in-out_infinite]"></div>
+              </div>
+              <div>
+                <div className="h-1.5 w-12 bg-slate-350 rounded mb-1"></div>
+                <div className="font-sans text-xs font-bold text-slate-900">CARLOS MARIO MENDOZA</div>
+                <div className="text-slate-400 text-[7px] mt-0.5">Identificación: C.C. 1.082.944.221</div>
+              </div>
+              <div className="space-y-1">
+                <div className="h-0.5 bg-slate-200 rounded w-full"></div>
+                <div className="h-0.5 bg-slate-200 rounded w-5/6"></div>
+              </div>
             </div>
-          </div>
 
-          {/* Card 4 */}
-          <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 hover:scale-[1.02] hover:border-[#39A900]/30 transition-all text-left space-y-3">
-            <div className="bg-[#39A900]/10 p-2.5 rounded-xl h-fit w-fit text-[#39A900]">
-              <Brain size={20} />
-            </div>
-            <div className="space-y-1">
-              <span className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest">VALOR HUMANO</span>
-              <h4 className="text-xl font-black text-white">Felicidad y Análisis</h4>
-              <p className="text-[11px] text-slate-400 leading-normal">Libera a los empleados del copy-paste repetitivo, permitiéndoles enfocar su talento en el análisis de peticiones y contratos.</p>
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-2 text-[9px] text-left">
+              <span className="text-slate-400 font-bold block mb-0.5">Resultado OCR en formulario:</span>
+              <div className="bg-slate-950 border border-[#39A900]/30 p-1.5 rounded text-[#39A900] font-bold">
+                Nombre: CARLOS MARIO MENDOZA <span className="animate-pulse font-normal">|</span>
+              </div>
             </div>
           </div>
         </div>
       )
     },
     {
-      title: 'Espacio de Preguntas y Cierre',
-      subtitle: 'Diálogo interactivo con la audiencia',
-      speakerNotes: 'Dar espacio a las preguntas. En pantalla se exponen las tres dudas más comunes de la junta directiva o del público para que sirvan de disparador visual. Concluir la ponencia con un mensaje fuerte: La tecnología no viene a reemplazar al humano, sino a devolverle el tiempo de ser humano. Agradecer y cerrar.',
+      // Diapositiva 9
+      title: 'Estructura y Organización Simétrica en OneDrive',
+      subtitle: 'Sincronización directa y jerárquica con la nube institucional',
+      speakerNotes: 'Explicar que el sistema organiza dinámicamente los expedientes en carpetas de OneDrive estructuradas por series y subseries según la TRD. Aplica nomenclatura legal numerada (01_Petición, 02_Cédula) e implementa hashes SHA-256 para evitar archivos duplicados.',
       content: (
-        <div className="flex flex-col justify-center h-full max-w-3xl mx-auto space-y-6 p-2 text-left">
-          <div className="bg-slate-900 border border-[#39A900]/20 p-5 rounded-3xl text-center space-y-2">
-            <h4 className="text-lg font-black text-white">"La automatización no reemplaza el talento humano..."</h4>
-            <p className="text-sm text-slate-400">"...le devuelve el tiempo de analizar, tomar decisiones y crear valor real."</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl text-left items-center animate-[fadeIn_0.5s_ease-out]">
+          <div className="bg-slate-950 border border-slate-850 rounded-2xl p-4 font-mono text-[11px] text-slate-300 space-y-1.5 shadow-2xl h-[260px] overflow-y-auto custom-scroll">
+            <div className="flex items-center gap-1.5 text-[#39A900] font-bold">
+              📂 OneDrive Institucional
+            </div>
+            <div className="pl-3 border-l border-slate-800 ml-1 space-y-1.5 py-0.5">
+              <div className="text-slate-400 flex items-center gap-1.5">📁 Regional Distrito Capital</div>
+              <div className="pl-3 border-l border-slate-800 ml-1 space-y-1.5">
+                <div className="text-slate-400 flex items-center gap-1.5">📁 Centro de Formación C.E.E.</div>
+                <div className="pl-3 border-l border-slate-800 ml-1 space-y-1.5">
+                  <div className="text-emerald-400 flex items-center gap-1.5">📁 Serie: 11-02 Comunicaciones</div>
+                  <div className="pl-3 border-l border-slate-800 ml-1 space-y-1.5">
+                    <div className="text-cyan-400 flex items-center gap-1.5">📁 Subserie: 11-02-05 Derechos Petición</div>
+                    <div className="pl-3 border-l border-slate-800 ml-1 space-y-1.5">
+                      <div className="text-yellow-400 flex items-center gap-1.5">📁 Expediente: Carlos Mendoza C.C. 1082</div>
+                      <div className="pl-3 border-l border-slate-800 ml-1 text-[10px] text-slate-450 space-y-1">
+                        <div>📄 01_DERECHO_DE_PETICION.pdf</div>
+                        <div>📄 02_ANEXO_CEDULA.pdf</div>
+                        <div className="text-[#39A900]">📄 Hoja_de_Control_Digital.json</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="space-y-3">
-            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest text-center">Preguntas Frecuentes del Público</h4>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-              <div className="bg-slate-950 border border-slate-850 p-4 rounded-2xl space-y-1.5">
-                <span className="font-bold text-[#39A900] flex items-center gap-1.5">
-                  <Info size={12} /> ¿Qué pasa si el formulario del ECM cambia?
-                </span>
-                <p className="text-slate-400 leading-relaxed">
-                  El robot cuenta con selectores lógicos flexibles. Si el diseño web tiene cambios menores, el motor se auto-cura buscando patrones semánticos alternos.
-                </p>
-              </div>
-
-              <div className="bg-slate-950 border border-slate-850 p-4 rounded-2xl space-y-1.5">
-                <span className="font-bold text-[#39A900] flex items-center gap-1.5">
-                  <Info size={12} /> ¿Es segura la información enviada a la IA?
-                </span>
-                <p className="text-slate-400 leading-relaxed">
-                  La comunicación es privada. Los datos son procesados temporalmente bajo políticas de privacidad y protección empresarial estrictas, sin entrenamiento público.
-                </p>
-              </div>
+            <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+              <h4 className="text-xs font-bold text-white font-outfit mb-0.5">Estructura Jerárquica</h4>
+              <p className="text-[11px] text-slate-400 leading-normal">Creación de carpetas automatizadas respetando la codificación exacta de las Tablas de Retención Documental.</p>
             </div>
+            <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+              <h4 className="text-xs font-bold text-white font-outfit mb-0.5">Nomenclatura Homologada</h4>
+              <p className="text-[11px] text-slate-400 leading-normal">Ordenación de archivos numerada de acuerdo con el orden de radicación exigido por las normas de archivo vigentes.</p>
+            </div>
+            <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl">
+              <h4 className="text-xs font-bold text-white font-outfit mb-0.5">Validación Criptográfica</h4>
+              <p className="text-[11px] text-slate-400 leading-normal">Comparación de hashes criptográficos para prevenir cargas accidentales de documentos duplicados en el mismo expediente.</p>
+            </div>
+          </div>
+        </div>
+      )
+    },
+    {
+      // Diapositiva 10
+      title: 'Retorno de la Inversión (ROI) y Beneficios Tangibles',
+      subtitle: 'Resultados operacionales medibles tras la adopción de SENA V2',
+      speakerNotes: 'Concluir mostrando las métricas del sistema. Destacar los 3 grandes beneficios: Tiempo (de 10 minutos a 15 segundos), Precisión (99.8% seguro contra clasificaciones subjetivas erróneas) y cero errores de digitación de metadatos.',
+      content: (
+        <div className="w-full max-w-4xl text-left space-y-4 animate-[fadeIn_0.5s_ease-out]">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+            <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl text-center space-y-3 hover:border-[#39A900]/30 relative overflow-hidden group">
+              <div className="text-5xl font-black font-outfit text-transparent bg-clip-text bg-gradient-to-r from-[#39A900] to-emerald-400">95%</div>
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider font-outfit">Ahorro en Tiempos</h4>
+              <p className="text-[11px] text-slate-400 leading-relaxed font-medium">Reducción del tiempo total de radicación e indexación de folios individuales en las bandejas del gestor.</p>
+            </div>
+            
+            <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl text-center space-y-3 hover:border-[#39A900]/30 relative overflow-hidden group">
+              <div className="text-5xl font-black font-outfit text-transparent bg-clip-text bg-gradient-to-r from-[#39A900] to-cyan-400">99.8%</div>
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider font-outfit">Precisión de Tipologías</h4>
+              <p className="text-[11px] text-slate-400 leading-relaxed font-medium">Asignación correcta del código TRD de series y subseries mediante el entendimiento del contexto semántico de la IA.</p>
+            </div>
+            
+            <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl text-center space-y-3 hover:border-[#39A900]/30 relative overflow-hidden group">
+              <div className="text-5xl font-black font-outfit text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400">0%</div>
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider font-outfit">Errores de Digitación</h4>
+              <p className="text-[11px] text-slate-400 leading-relaxed font-medium">Transcripción e inyección directa de caracteres al ECM eliminando descuidos tipográficos en identificaciones o nombres.</p>
+            </div>
+          </div>
+        </div>
+      )
+    },
+    {
+      // Diapositiva 11
+      title: 'Hoja de Ruta de Implementación Organizacional',
+      subtitle: 'Fases y tiempos estimados para el despliegue del sistema',
+      speakerNotes: 'Describir la línea de tiempo de 7 semanas para la adopción en la organización. Fase 1: Diagnóstico/TRD, Fase 2: Configuración del backend y llaves de Gemini, Fase 3: Capacitación a funcionarios de archivo, y Fase 4: Escalado total.',
+      content: (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 w-full max-w-4xl text-left pt-4 animate-[fadeIn_0.5s_ease-out]">
+          <div className="bg-slate-900/40 border border-slate-850 p-4 rounded-xl border-l-4 border-l-[#39A900]">
+            <span className="text-[8px] font-bold text-[#39A900] bg-[#39A900]/10 px-2 py-0.5 rounded uppercase font-mono">Fase 1</span>
+            <h4 className="text-xs font-bold text-white font-outfit mt-2 mb-1">Mapeo & TRD</h4>
+            <p className="text-[10px] text-slate-400 leading-relaxed font-medium">Diagnóstico de tipologías más comunes y configuración en base de datos. (Semana 1-2)</p>
+          </div>
+          <div className="bg-slate-900/40 border border-slate-850 p-4 rounded-xl border-l-4 border-l-cyan-400">
+            <span className="text-[8px] font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded uppercase font-mono">Fase 2</span>
+            <h4 className="text-xs font-bold text-white font-outfit mt-2 mb-1">Servidor & Llaves</h4>
+            <p className="text-[10px] text-slate-400 leading-relaxed font-medium">Configuración de Express y credenciales de la API segura de Gemini. (Semana 3-4)</p>
+          </div>
+          <div className="bg-slate-900/40 border border-slate-850 p-4 rounded-xl border-l-4 border-l-indigo-400">
+            <span className="text-[8px] font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded uppercase font-mono">Fase 3</span>
+            <h4 className="text-xs font-bold text-white font-outfit mt-2 mb-1">Capacitación Piloto</h4>
+            <p className="text-[10px] text-slate-400 leading-relaxed font-medium">Entrenamiento a personal de archivo y puesta en marcha piloto controlada. (Semana 5-6)</p>
+          </div>
+          <div className="bg-slate-900/40 border border-slate-850 p-4 rounded-xl border-l-4 border-l-emerald-400">
+            <span className="text-[8px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded uppercase font-mono">Fase 4</span>
+            <h4 className="text-xs font-bold text-white font-outfit mt-2 mb-1">Escalabilidad</h4>
+            <p className="text-[10px] text-slate-400 leading-relaxed font-medium">Habilitación de robots desatendidos para cargas masivas paralelas. (Semana 7+)</p>
+          </div>
+        </div>
+      )
+    },
+    {
+      // Diapositiva 12
+      title: 'El Futuro de la Gestión Pública Inteligente',
+      subtitle: 'SENA V2',
+      speakerNotes: 'Concluir la ponencia con el mensaje inspirador: la IA no reemplaza al talento humano, sino que lo libera del trabajo repetitivo e intelectualmente vacío. Agradecer formalmente y abrir ronda de preguntas.',
+      content: (
+        <div className="text-center space-y-6 max-w-2xl mx-auto animate-[fadeIn_0.5s_ease-out]">
+          <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl shadow-xl relative overflow-hidden">
+            <p className="text-sm text-slate-200 leading-relaxed font-light italic relative z-10">
+              "La Inteligencia Artificial no viene a reemplazar al talento humano administrativo; viene a deponer el trabajo mecánico para permitirle enfocarse en el análisis, la toma de decisiones y el servicio empático al ciudadano."
+            </p>
+          </div>
+          
+          <div className="pt-2 flex justify-center">
+            <span className="px-6 py-2.5 rounded-full bg-gradient-to-r from-[#39A900] to-emerald-500 text-white font-bold font-outfit text-xs tracking-wider shadow-lg uppercase">
+              Muchísimas Gracias
+            </span>
           </div>
         </div>
       )
@@ -850,17 +904,21 @@ export default function InteractivePresentation() {
   const slide = slides[currentSlide];
 
   return (
-    <div className="min-h-[calc(100vh-80px)] bg-slate-950 text-slate-200 p-4 md:p-6 flex flex-col font-sans select-none rounded-2xl border border-slate-900">
+    <div className="min-h-[calc(100vh-80px)] bg-slate-950 text-slate-200 p-4 md:p-6 flex flex-col font-sans select-none rounded-2xl border border-slate-900 relative overflow-hidden">
       
+      {/* Background drift animations */}
+      <div className="absolute w-[400px] h-[400px] rounded-full bg-[#39A900]/10 filter blur-[90px] -top-20 -left-20 pointer-events-none animate-pulse"></div>
+      <div className="absolute w-[300px] h-[300px] rounded-full bg-cyan-600/10 filter blur-[90px] -bottom-20 -right-20 pointer-events-none animate-pulse" style={{ animationDelay: '2s' }}></div>
+
       {/* HEADER CONTROLS */}
-      <div className="flex flex-wrap items-center justify-between border-b border-slate-900 pb-4 mb-4 gap-4">
+      <div className="flex flex-wrap items-center justify-between border-b border-slate-900 pb-4 mb-4 gap-4 z-10">
         <div>
-          <h1 className="text-lg md:text-xl font-black text-white flex items-center gap-2 uppercase tracking-wide">
-            <Zap size={18} className="text-[#39A900]" />
+          <h1 className="text-base md:text-lg font-black text-white flex items-center gap-2 uppercase tracking-wide font-outfit">
+            <Zap size={16} className="text-[#39A900]" />
             Ponencia e Inteligencia Artificial
           </h1>
-          <p className="text-xs text-slate-500">
-            Material dinámico y simulador visual interactivo de hiperautomatización (RPA + IA).
+          <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mt-0.5">
+            Material dinámico y simulador visual interactivo de hiperautomatización (RPA + IA)
           </p>
         </div>
 
@@ -875,7 +933,7 @@ export default function InteractivePresentation() {
             }`}
             title="Mostrar/Ocultar Notas del Expositor"
           >
-            <Info size={14} /> {showNotes ? 'Ocultar Notas' : 'Ver Notas'}
+            <Info size={13} /> {showNotes ? 'Ocultar Notas' : 'Ver Notas'}
           </button>
 
           {/* Fullscreen Toggle */}
@@ -884,31 +942,31 @@ export default function InteractivePresentation() {
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
               isFullscreen 
                 ? 'bg-[#39A900] text-white' 
-                : 'bg-slate-950 border border-slate-900 text-slate-400 hover:border-slate-800'
+                : 'bg-slate-950 border border-slate-900 text-slate-450 hover:border-slate-800'
             }`}
             title="Modo Proyector"
           >
-            {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
             {isFullscreen ? 'Vista Normal' : 'Modo Proyector'}
           </button>
         </div>
       </div>
 
       {/* CORE DISPLAY (GRID) */}
-      <div className={`flex-grow grid gap-5 ${isFullscreen || !showNotes ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-12'}`}>
+      <div className={`flex-grow grid gap-5 z-10 ${isFullscreen || !showNotes ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-12'}`}>
         
         {/* LEFT COMPONENT: THE SLIDE VIEW */}
-        <div className={`bg-gradient-to-br from-slate-950 to-slate-900 border border-slate-850 rounded-3xl p-5 md:p-8 flex flex-col justify-between shadow-2xl relative min-h-[460px] overflow-hidden ${
+        <div className={`bg-gradient-to-br from-slate-950 to-slate-900 border border-slate-850 rounded-3xl p-5 md:p-6 flex flex-col justify-between shadow-2xl relative min-h-[460px] overflow-hidden ${
           isFullscreen || !showNotes ? '' : 'lg:col-span-8'
         }`}>
           {/* Top Info of Slide */}
           <div className="flex justify-between items-start mb-6">
             <div>
-              <span className="text-[10px] font-black tracking-widest text-[#39A900] uppercase bg-[#39A900]/10 px-2.5 py-1 rounded-full">
+              <span className="text-[9px] font-black tracking-widest text-[#39A900] uppercase bg-[#39A900]/10 px-2.5 py-1 rounded-full">
                 Diapositiva {currentSlide + 1} de {slidesCount}
               </span>
-              <h2 className="text-xl md:text-2xl font-black text-white mt-2.5 tracking-tight">{slide.title}</h2>
-              <p className="text-xs text-slate-400 mt-0.5">{slide.subtitle}</p>
+              <h2 className="text-xl md:text-2xl font-black text-white mt-2.5 tracking-tight font-outfit">{slide.title}</h2>
+              <p className="text-xs text-slate-450 mt-0.5 font-medium">{slide.subtitle}</p>
             </div>
             
             <div className="flex items-center gap-1.5">
@@ -917,20 +975,20 @@ export default function InteractivePresentation() {
                 disabled={currentSlide === 0}
                 className="p-1.5 bg-slate-900 border border-slate-850 hover:border-slate-700 disabled:opacity-30 rounded-lg cursor-pointer text-slate-300 transition-colors"
               >
-                <ChevronLeft size={16} />
+                <ChevronLeft size={15} />
               </button>
               <button 
                 onClick={nextSlide} 
                 disabled={currentSlide === slidesCount - 1}
                 className="p-1.5 bg-slate-900 border border-slate-850 hover:border-slate-700 disabled:opacity-30 rounded-lg cursor-pointer text-slate-300 transition-colors"
               >
-                <ChevronRight size={16} />
+                <ChevronRight size={15} />
               </button>
             </div>
           </div>
 
           {/* Slide Interactive Content Container */}
-          <div className="flex-grow flex flex-col justify-center py-2 h-full">
+          <div className="flex-grow flex flex-col justify-center py-2 h-full items-center">
             {slide.content}
           </div>
 
@@ -943,9 +1001,9 @@ export default function InteractivePresentation() {
                   key={idx}
                   onClick={() => {
                     setCurrentSlide(idx);
-                    setSimStep(0);
+                    resetSimulatorState();
                   }}
-                  className={`w-2.5 h-1.5 rounded-full transition-all cursor-pointer ${idx === currentSlide ? 'bg-[#39A900] w-6' : 'bg-slate-800'}`}
+                  className={`w-2.5 h-1.5 rounded-full transition-all cursor-pointer ${idx === currentSlide ? 'bg-[#39A900] w-6' : 'bg-slate-850'}`}
                 ></button>
               ))}
             </div>
@@ -955,24 +1013,24 @@ export default function InteractivePresentation() {
 
         {/* RIGHT COMPONENT: SPEAKER NOTES (visible if not fullscreen) */}
         {!isFullscreen && showNotes && (
-          <div className="lg:col-span-4 bg-slate-900 border border-slate-800/80 rounded-3xl p-5 flex flex-col justify-between shadow-lg text-left">
+          <div className="lg:col-span-4 bg-slate-900/60 border border-slate-850 rounded-3xl p-5 flex flex-col justify-between shadow-lg text-left">
             <div className="space-y-4">
               <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
-                <Brain size={18} className="text-[#39A900]" />
-                <h3 className="text-sm font-black text-white uppercase tracking-wider">Notas de Apoyo al Expositor</h3>
+                <Brain size={16} className="text-[#39A900]" />
+                <h3 className="text-xs font-black text-white uppercase tracking-wider font-outfit">Notas de Apoyo al Expositor</h3>
               </div>
               
-              <div className="text-xs text-slate-300 leading-relaxed font-medium bg-slate-950/40 p-4 rounded-2xl border border-slate-850 max-h-[300px] overflow-y-auto">
+              <div className="text-xs text-slate-350 leading-relaxed font-medium bg-slate-950/40 p-4 rounded-2xl border border-slate-850 max-h-[300px] overflow-y-auto custom-scroll">
                 <p className="whitespace-pre-line">{slide.speakerNotes}</p>
               </div>
             </div>
 
             <div className="border-t border-slate-800 pt-4 mt-4 space-y-2">
-              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block">Consejo de Ponencia:</span>
-              <div className="bg-[#39A900]/5 border border-[#39A900]/25 rounded-2xl p-3 flex gap-2.5 text-[10px] text-slate-400">
-                <Info size={16} className="text-[#39A900] flex-shrink-0" />
+              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block font-mono">Consejo de Ponencia:</span>
+              <div className="bg-[#39A900]/5 border border-[#39A900]/25 rounded-xl p-3 flex gap-2 text-[10px] text-slate-400 font-medium">
+                <Info size={14} className="text-[#39A900] flex-shrink-0 mt-0.5" />
                 <p className="leading-snug">
-                  Use las flechas del teclado <kbd className="bg-slate-950 px-1 py-0.5 rounded font-mono">←</kbd> y <kbd className="bg-slate-950 px-1 py-0.5 rounded font-mono">→</kbd> para navegar de manera elegante mientras sostiene un pasador de diapositivas o interactúa con el público.
+                  Use las flechas del teclado <kbd className="bg-slate-950 px-1 py-0.5 rounded font-mono">←</kbd> y <kbd className="bg-slate-950 px-1 py-0.5 rounded font-mono">→</kbd> para navegar de manera elegante mientras sostiene un pasador de diapositivas.
                 </p>
               </div>
             </div>
