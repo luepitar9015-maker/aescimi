@@ -58,16 +58,26 @@ const MOCK_DOCUMENTS = [
 export default function InteractivePresentation() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showNotes, setShowNotes] = useState(true);
+  const [allowNotes, setAllowNotes] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
   const containerRef = useRef(null);
 
-  // Sync fullscreen state when exiting with Escape
+  // Sync fullscreen state when exiting with Escape and check URL for presenter notes option
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    
+    // Check url param
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasNotes = urlParams.get('notes') === 'true';
+    setAllowNotes(hasNotes);
+    setShowNotes(hasNotes);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
   }, []);
 
   // --- CALCULATOR STATE (Slide 4) ---
@@ -94,12 +104,14 @@ export default function InteractivePresentation() {
       } else if (e.key === 'ArrowLeft') {
         prevSlide();
       } else if (e.key.toLowerCase() === 'n') {
-        setShowNotes(n => !n);
+        if (allowNotes) {
+          setShowNotes(n => !n);
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentSlide]);
+  }, [currentSlide, allowNotes]);
 
   const nextSlide = () => {
     if (currentSlide < slides.length - 1) {
@@ -934,17 +946,19 @@ export default function InteractivePresentation() {
 
         <div className="flex items-center gap-2">
           {/* Notes Toggle */}
-          <button
-            onClick={() => setShowNotes(!showNotes)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              showNotes 
-                ? 'bg-slate-900 border border-slate-700 text-white' 
-                : 'bg-slate-950 border border-slate-900 text-slate-500 hover:border-slate-800'
-            }`}
-            title="Mostrar/Ocultar Notas del Expositor"
-          >
-            <Info size={13} /> {showNotes ? 'Ocultar Notas' : 'Ver Notas'}
-          </button>
+          {allowNotes && (
+            <button
+              onClick={() => setShowNotes(!showNotes)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                showNotes 
+                  ? 'bg-slate-900 border border-slate-700 text-white' 
+                  : 'bg-slate-950 border border-slate-900 text-slate-500 hover:border-slate-800'
+              }`}
+              title="Mostrar/Ocultar Notas del Expositor"
+            >
+              <Info size={13} /> {showNotes ? 'Ocultar Notas' : 'Ver Notas'}
+            </button>
+          )}
 
           {/* Fullscreen Toggle */}
           <button

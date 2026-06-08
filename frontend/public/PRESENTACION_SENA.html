@@ -175,7 +175,7 @@
             </div>
             
             <div class="flex items-center gap-2">
-                <button onclick="toggleNotes()" class="px-3.5 py-1.5 bg-slate-900 border border-white/10 hover:border-sena-green/30 text-xs font-bold rounded-xl text-slate-300 transition-all flex items-center gap-1.5">
+                <button id="notesToggleBtn" onclick="toggleNotes()" class="px-3.5 py-1.5 bg-slate-900 border border-white/10 hover:border-sena-green/30 text-xs font-bold rounded-xl text-slate-300 transition-all flex items-center gap-1.5">
                     💡 <span id="notesBtnText">Ver Notas</span>
                 </button>
                 <button onclick="toggleFullscreen()" class="p-1.5 bg-slate-900 border border-white/10 hover:border-sena-green/30 text-xs font-bold rounded-xl text-slate-400 hover:text-white transition-all">
@@ -1458,8 +1458,11 @@
                 e.preventDefault();
                 prevSlide();
             } else if (e.key.toLowerCase() === "n") {
-                e.preventDefault();
-                toggleNotes();
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('notes') === 'true') {
+                    e.preventDefault();
+                    toggleNotes();
+                }
             }
         });
 
@@ -1467,18 +1470,21 @@
         window.onload = () => {
             const urlParams = new URLSearchParams(window.location.search);
             const notesParam = urlParams.get('notes');
+            const toggleBtn = document.getElementById("notesToggleBtn");
             if (notesParam === 'true') {
                 showPresenterNotes = true;
                 const drawer = document.getElementById("notesDrawer");
                 if (drawer) drawer.classList.remove("translate-x-full");
                 const btnText = document.getElementById("notesBtnText");
                 if (btnText) btnText.innerText = "Ocultar Notas";
+                if (toggleBtn) toggleBtn.style.display = "";
             } else {
                 showPresenterNotes = false;
                 const drawer = document.getElementById("notesDrawer");
                 if (drawer) drawer.classList.add("translate-x-full");
                 const btnText = document.getElementById("notesBtnText");
                 if (btnText) btnText.innerText = "Ver Notas";
+                if (toggleBtn) toggleBtn.style.display = "none";
             }
             renderSlide();
         };
