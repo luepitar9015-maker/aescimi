@@ -75,10 +75,10 @@ jobs:
           node update_gemini_key.js
           node check_key.js
 
-          # 6. Reiniciar solo el backend con PM2 (backend sirve el frontend compilado)
+          # 6. Reiniciar backend y presentación independiente con PM2
           echo "=== Reiniciando PM2 ==="
           cd ~/aescimi
-          pm2 restart sena-backend || pm2 start ecosystem.config.js --only sena-backend
+          pm2 restart all || pm2 start ecosystem.config.js
           pm2 delete sena-frontend 2>/dev/null || true
           pm2 save
 
