@@ -6,9 +6,9 @@ const port = process.env.PORT || 3005;
 // Servir la carpeta public del frontend de forma estática
 app.use(express.static(path.join(__dirname, '../frontend/public')));
 
-// Servir el archivo PRESENTACION_SENA.html ante cualquier ruta
+// Servir el archivo presentacion.html ante cualquier ruta
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../frontend/public/PRESENTACION_SENA.html'));
+    res.sendFile(path.join(__dirname, '../frontend/public/presentacion.html'));
 });
 
 app.listen(port, '0.0.0.0', () => {

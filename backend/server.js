@@ -384,6 +384,14 @@ app.post('/api/generate-letters', requireAuth, upload.fields([{ name: 'file', ma
     }
 });
 
+// Ruta directa para servir la presentación HTML independiente directamente desde public (evita problemas de compilación)
+app.get('/presentacion', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/public/presentacion.html'));
+});
+app.get('/presentacion.html', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/public/presentacion.html'));
+});
+
 // Configurar servidor para servir el Frontend compilado en Producción
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
 

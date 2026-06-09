@@ -1,0 +1,1660 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SENA V2 - Hiperautomatización con IA y RPA</title>
+    <!-- Google Fonts: Outfit & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        outfit: ['Outfit', 'sans-serif'],
+                    },
+                    colors: {
+                        sena: {
+                            green: '#39A900',
+                            dark: '#0B2F00',
+                            glow: 'rgba(57, 169, 0, 0.4)',
+                        },
+                        darkbg: '#050811',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #03060d;
+            color: #e2e8f0;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+        }
+        
+        /* Glassmorphism panel styling */
+        .glass-panel {
+            background: rgba(10, 17, 34, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
+        }
+        
+        .glass-card {
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .glass-card:hover {
+            border-color: rgba(57, 169, 0, 0.25);
+            background: rgba(15, 23, 42, 0.6);
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(57, 169, 0, 0.05);
+        }
+        
+        /* Laser scanner animation */
+        @keyframes laser-move {
+            0% { top: 0%; }
+            50% { top: 100%; }
+            100% { top: 0%; }
+        }
+        .laser-line {
+            animation: laser-move 2.5s ease-in-out infinite;
+        }
+
+        /* Pulsing background glows */
+        @keyframes drift {
+            0%, 100% { transform: translate(0px, 0px) scale(1); }
+            33% { transform: translate(30px, -50px) scale(1.1); }
+            66% { transform: translate(-20px, 20px) scale(0.95); }
+        }
+        .glow-sphere {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.12;
+            pointer-events: none;
+            z-index: 0;
+            animation: drift 15s ease-in-out infinite;
+        }
+
+        /* Blinking cursor */
+        @keyframes cursor-blink {
+            0%, 100% { opacity: 0; }
+            50% { opacity: 1; }
+        }
+        .caret-blink {
+            animation: cursor-blink 0.9s infinite;
+        }
+
+        /* Slide element enter animations */
+        .slide-enter-active {
+            animation: slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .stagger-1 { animation-delay: 100ms; }
+        .stagger-2 { animation-delay: 200ms; }
+        .stagger-3 { animation-delay: 300ms; }
+        .stagger-4 { animation-delay: 400ms; }
+        .stagger-5 { animation-delay: 500ms; }
+
+        .custom-scroll::-webkit-scrollbar {
+            width: 5px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.1);
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb:hover {
+            background: rgba(57,169,0,0.3);
+        }
+
+        /* Micro animations */
+        .glow-hover:hover {
+            box-shadow: 0 0 20px rgba(57, 169, 0, 0.4);
+        }
+        
+        /* Vibrating phone animation */
+        @keyframes vibrate {
+            0%, 100% { transform: rotate(0deg); }
+            10%, 30%, 50%, 70%, 90% { transform: rotate(-2deg); }
+            20%, 40%, 60%, 80% { transform: rotate(2deg); }
+        }
+        .phone-vibrate {
+            animation: vibrate 0.5s linear infinite;
+        }
+    </style>
+</head>
+<body class="antialiased overflow-hidden select-none">
+
+    <!-- PULSING BACKGROUND NEON GLOWS -->
+    <div class="glow-sphere w-[50vw] h-[50vw] bg-[#39A900] -top-20 -left-20 animate-drift"></div>
+    <div class="glow-sphere w-[40vw] h-[40vw] bg-cyan-600 -bottom-20 -right-20 animate-drift" style="animation-delay: 3s;"></div>
+    <div class="glow-sphere w-[30vw] h-[30vw] bg-indigo-600 top-1/3 left-1/3 animate-drift" style="animation-delay: 6s;"></div>
+
+    <!-- TOP PROGRESS BAR -->
+    <div class="fixed top-0 left-0 w-full h-1.5 bg-slate-950 z-50">
+        <div id="progressBar" class="h-full bg-gradient-to-r from-sena-green via-emerald-400 to-cyan-400 transition-all duration-300" style="width: 8.33%"></div>
+    </div>
+
+    <!-- MAIN APP STRUCTURE -->
+    <div class="relative w-screen h-screen flex flex-col justify-between p-4 md:p-6 z-10">
+        
+        <!-- HEADER CONTROLS -->
+        <header class="flex justify-between items-center border-b border-white/5 pb-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sena-green to-emerald-500 p-0.5 flex items-center justify-center shadow-lg shadow-sena-green/10">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-sm font-black font-outfit uppercase tracking-wider text-white">SENA V2</h1>
+                    <span class="text-[10px] text-slate-500 font-semibold block">HIPERAUTOMATIZACIÓN DOCUMENTAL</span>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <button id="notesToggleBtn" onclick="toggleNotes()" class="px-3.5 py-1.5 bg-slate-900 border border-white/10 hover:border-sena-green/30 text-xs font-bold rounded-xl text-slate-300 transition-all flex items-center gap-1.5">
+                    💡 <span id="notesBtnText">Ver Notas</span>
+                </button>
+                <button onclick="toggleFullscreen()" class="p-1.5 bg-slate-900 border border-white/10 hover:border-sena-green/30 text-xs font-bold rounded-xl text-slate-400 hover:text-white transition-all">
+                    <svg id="fullscreenIcon" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- PRESENTATION SCREEN CONTAINER -->
+        <main class="flex-grow flex items-center justify-center py-4 relative">
+            <div id="slideViewport" class="w-full max-w-6xl h-[72vh] flex items-center justify-center">
+                <!-- Slide code injected here dynamically -->
+            </div>
+        </main>
+
+        <!-- FLOATING CONTROL DOCK -->
+        <footer class="flex justify-between items-center border-t border-white/5 pt-3">
+            <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-outfit">
+                Estrategia 180 / SENA
+            </div>
+
+            <!-- Diapositivas Progress Buttons -->
+            <div class="flex items-center gap-4 bg-slate-950/80 border border-white/10 px-5 py-2 rounded-full shadow-2xl">
+                <button onclick="prevSlide()" class="p-1.5 text-slate-400 hover:text-white disabled:opacity-20 transition-all" id="prevBtn">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <div class="flex gap-1.5" id="bulletContainer">
+                    <!-- Dots generated automatically -->
+                </div>
+                <button onclick="nextSlide()" class="p-1.5 text-slate-400 hover:text-white disabled:opacity-20 transition-all" id="nextBtn">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" /></svg>
+                </button>
+            </div>
+
+            <div class="text-[10px] font-bold text-slate-500 tracking-wider font-mono">
+                [Pág. <span id="pageNum" class="text-sena-green font-black">1</span> / 12]
+            </div>
+        </footer>
+
+        <!-- PRESENTER NOTES DRAWER -->
+        <div id="notesDrawer" class="absolute top-0 right-0 w-[400px] h-full bg-slate-950/95 border-l border-white/10 shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out z-50 flex flex-col">
+            <div class="p-4 border-b border-white/10 flex justify-between items-center bg-slate-900/60">
+                <div class="flex items-center gap-2">
+                    <span class="text-sena-green">💡</span>
+                    <h3 class="text-xs font-black font-outfit text-white uppercase tracking-wider">Notas de Apoyo al Expositor</h3>
+                </div>
+                <button onclick="toggleNotes()" class="p-1 text-slate-500 hover:text-white rounded-lg hover:bg-white/5 transition-all">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div id="notesContent" class="flex-grow p-5 overflow-y-auto text-xs text-slate-300 leading-relaxed font-medium space-y-4 custom-scroll">
+                <!-- Speaker Notes dynamically written here -->
+            </div>
+            <div class="p-3 border-t border-white/5 bg-slate-900/30 text-[9px] text-slate-500 text-center font-semibold uppercase tracking-wider">
+                Tip: Teclas [←] y [→] navegan. Tecla [N] abre/cierra las notas.
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN SLIDE DATABASE -->
+    <script>
+        const slides = [
+            {
+                // Slide 1: Cover
+                notes: `
+                    <div class="space-y-3">
+                        <div class="bg-sena-green/10 border border-sena-green/30 text-sena-green text-[10px] font-black uppercase px-2 py-1 rounded-md w-fit">⏱ TIEMPO: 00:00 - 02:30</div>
+                        <p class="font-bold text-white text-[13px] border-b border-white/5 pb-1">BIENVENIDA E INTRODUCCIÓN</p>
+                        <p><strong>Guión:</strong> "Muy buenas tardes a todos. Hoy no venimos a hablar de teorías de archivo digital. Venimos a presentarles una realidad operativa revolucionaria: **SENA V2**."</p>
+                        <p><strong>Acción:</strong> Párate erguido, mira fijamente a los directivos. El fondo verde del SENA proyectará innovación tecnológica.</p>
+                    </div>
+                `,
+                render: () => `
+                    <div class="text-center space-y-6 slide-enter-active max-w-4xl">
+                        <span class="px-4 py-1.5 rounded-full bg-sena-green/10 border border-sena-green/20 text-sena-green text-xs font-black uppercase tracking-widest font-outfit shadow-inner">
+                            Proyecto de Innovación Digital
+                        </span>
+                        <h1 class="text-7xl font-extrabold font-outfit tracking-tighter leading-none text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-slate-400">
+                            SENA V2
+                        </h1>
+                        <p class="text-3xl font-bold font-outfit text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 tracking-wide mt-2">
+                            La Revolución Documental con IA e Hiperautomatización
+                        </p>
+                        <p class="text-base text-slate-400 font-light max-w-2xl mx-auto leading-relaxed stagger-1 animate-fade-in">
+                            De horas de transcripción manual a segundos de clasificación estructurada y sincronización automatizada.
+                        </p>
+                        <div class="pt-6 flex justify-center gap-3 stagger-2 animate-fade-in">
+                            <span class="bg-slate-900 border border-white/5 px-3 py-1.5 rounded-xl text-xs text-slate-300 font-bold">✨ Gemini 1.5 Flash</span>
+                            <span class="bg-slate-900 border border-white/5 px-3 py-1.5 rounded-xl text-xs text-slate-300 font-bold">🤖 RPA Puppeteer Engine</span>
+                            <span class="bg-slate-900 border border-white/5 px-3 py-1.5 rounded-xl text-xs text-sena-green border-sena-green/20 font-bold">📁 100% Cumplimiento TRD</span>
+                        </div>
+                    </div>
+                `
+            },
+            {
+                // Slide 2: El Desafío
+                notes: `
+                    <div class="space-y-3">
+                        <div class="bg-sena-green/10 border border-sena-green/30 text-sena-green text-[10px] font-black uppercase px-2 py-1 rounded-md w-fit">⏱ TIEMPO: 02:30 - 05:00</div>
+                        <p class="font-bold text-white text-[13px] border-b border-white/5 pb-1">EL DESAFÍO EN LA GESTIÓN</p>
+                        <p><strong>Guión:</strong> "Nuestros funcionarios enfrentan a diario miles de folios PDF. El dolor no es solo digitalizar, es interpretar, clasificar e indexar sin equivocarse bajo cansancio y estrés."</p>
+                        <p><strong>Acción:</strong> Usa gestos de peso en tus manos. Señala los problemas de cansancio y el riesgo latente de perder un documento de por vida por digitar un dato mal.</p>
+                    </div>
+                `,
+                render: () => `
+                    <div class="w-full space-y-6 slide-enter-active text-left max-w-5xl">
+                        <div class="text-center space-y-2 mb-4">
+                            <span class="text-xs font-bold tracking-[0.2em] text-red-400 uppercase">La Realidad Operativa</span>
+                            <h2 class="text-4xl font-extrabold font-outfit text-white tracking-tight">El Dolor de Hoy: Fricción en el Archivo</h2>
+                        </div>
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                            <!-- Left: cards (5 cols) -->
+                            <div class="lg:col-span-5 space-y-4">
+                                <div class="glass-card p-4 rounded-xl flex gap-3 items-start stagger-1 animate-fade-in">
+                                    <div class="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center font-bold text-xs flex-shrink-0">01</div>
+                                    <div>
+                                        <h4 class="text-xs font-black text-white font-outfit">Fatiga Cognitiva</h4>
+                                        <p class="text-[10px] text-slate-455 leading-relaxed font-medium">Leer individualmente cientos de archivos de múltiples páginas para deducir qué tipología representa según la norma.</p>
+                                    </div>
+                                </div>
+                                <div class="glass-card p-4 rounded-xl flex gap-3 items-start stagger-2 animate-fade-in">
+                                    <div class="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center font-bold text-xs flex-shrink-0">02</div>
+                                    <div>
+                                        <h4 class="text-xs font-black text-white font-outfit">Ineficiencia Manual</h4>
+                                        <p class="text-[10px] text-slate-455 leading-relaxed font-medium">Copiar, transcribir y pegar nombres completos, identificaciones, fechas y asuntos del PDF al formulario del sistema.</p>
+                                    </div>
+                                </div>
+                                <div class="glass-card p-4 rounded-xl flex gap-3 items-start stagger-3 animate-fade-in">
+                                    <div class="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center font-bold text-xs flex-shrink-0">03</div>
+                                    <div>
+                                        <h4 class="text-xs font-black text-white font-outfit">Inconsistencia Crítica</h4>
+                                        <p class="text-[10px] text-slate-455 leading-relaxed font-medium">Equivocaciones en nombres o cédulas que imposibilitan búsquedas futuras, rompiendo la integridad del expediente.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Right: SVG Bottleneck (7 cols) -->
+                            <div class="lg:col-span-7 bg-slate-950 border border-white/5 rounded-3xl p-6 h-[320px] flex flex-col justify-between shadow-2xl relative overflow-hidden">
+                                <h4 class="text-xs font-black text-red-450 uppercase tracking-widest mb-2">Embudo de Fricción Manual de Indexación</h4>
+                                <svg viewBox="0 0 400 200" class="w-full h-full text-white font-sans">
+                                    <defs>
+                                        <marker id="arrow-red" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#ef4444" />
+                                        </marker>
+                                        <linearGradient id="grad-red" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stop-color="#ef4444" />
+                                            <stop offset="100%" stop-color="#f43f5e" />
+                                        </linearGradient>
+                                    </defs>
+
+                                    <!-- Step 1: Ingest -->
+                                    <rect x="10" y="70" width="70" height="50" rx="6" fill="url(#grad-red)" opacity="0.85" />
+                                    <text x="45" y="90" text-anchor="middle" font-size="8" font-weight="bold" fill="#fff">1. Ingesta</text>
+                                    <text x="45" y="103" text-anchor="middle" font-size="6" fill="#fff" opacity="0.8">PDF Descargado</text>
+                                    
+                                    <!-- Arrow 1 -->
+                                    <path d="M 80 95 L 110 95" fill="none" stroke="#ef4444" stroke-width="1.5" marker-end="url(#arrow-red)" />
+
+                                    <!-- Step 2: Reading -->
+                                    <rect x="120" y="60" width="75" height="70" rx="6" fill="#1e293b" stroke="#ef4444" stroke-width="1" />
+                                    <text x="157" y="80" text-anchor="middle" font-size="8" font-weight="bold" fill="#fff">2. Lectura</text>
+                                    <text x="157" y="93" text-anchor="middle" font-size="6" fill="#ef4444" font-weight="bold">FATIGA COGNITIVA</text>
+                                    <text x="157" y="103" text-anchor="middle" font-size="5.5" fill="#94a3b8">Búsqueda de Datos</text>
+                                    <text x="157" y="113" text-anchor="middle" font-size="5.5" fill="#94a3b8">150-300 segs / doc</text>
+
+                                    <!-- Arrow 2 -->
+                                    <path d="M 195 95 L 225 95" fill="none" stroke="#ef4444" stroke-width="1.5" marker-end="url(#arrow-red)" />
+
+                                    <!-- Step 3: Digitation -->
+                                    <rect x="235" y="60" width="75" height="70" rx="6" fill="#1e293b" stroke="#ef4444" stroke-width="1" />
+                                    <text x="272" y="80" text-anchor="middle" font-size="8" font-weight="bold" fill="#fff">3. Digitación</text>
+                                    <text x="272" y="93" text-anchor="middle" font-size="6" fill="#ef4444" font-weight="bold">ERROR DE DATO</text>
+                                    <text x="272" y="103" text-anchor="middle" font-size="5.5" fill="#94a3b8">Nombres y Cédulas</text>
+                                    <text x="272" y="113" text-anchor="middle" font-size="5.5" fill="#94a3b8">Digitado manual</text>
+
+                                    <!-- Arrow 3 -->
+                                    <path d="M 310 95 L 335 95" fill="none" stroke="#ef4444" stroke-width="1.5" marker-end="url(#arrow-red)" />
+
+                                    <!-- Step 4: Storage -->
+                                    <rect x="345" y="70" width="45" height="50" rx="6" fill="#1e293b" stroke="rgba(255,255,255,0.08)" stroke-width="1" />
+                                    <text x="367" y="90" text-anchor="middle" font-size="7" font-weight="bold" fill="#94a3b8">4. OneDrive</text>
+                                    <text x="367" y="103" text-anchor="middle" font-size="5.5" fill="#f43f5e">Desorden</text>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                `
+            },
+            {
+                // Slide 3: Anatomía del Trabajo Manual
+                notes: `
+                    <div class="space-y-3">
+                        <div class="bg-sena-green/10 border border-sena-green/30 text-sena-green text-[10px] font-black uppercase px-2 py-1 rounded-md w-fit">⏱ TIEMPO: 05:00 - 08:00</div>
+                        <p class="font-bold text-white text-[13px] border-b border-white/5 pb-1">ANATOMÍA DEL TRABAJO REPETITIVO</p>
+                        <p><strong>Guión:</strong> "Miremos la tabla. Esto es lo que gasta el tiempo de la organización. Clics innecesarios, sesiones caídas, copias manuales. Cinco pasos tediosos por cada archivo."</p>
+                        <p><strong>Acción:</strong> Pasa el puntero por cada paso de la tabla, remarcando la ineficiencia estructural.</p>
+                    </div>
+                `,
+                render: () => `
+                    <div class="w-full space-y-4 slide-enter-active max-w-5xl">
+                        <div class="text-center space-y-2 mb-4">
+                            <span class="text-xs font-bold tracking-[0.2em] text-red-400 uppercase">Fricción en Detalle</span>
+                            <h2 class="text-3xl font-extrabold font-outfit text-white tracking-tight">El Calvario del Proceso de Indexación Manual</h2>
+                        </div>
+                        <div class="glass-panel rounded-2xl overflow-hidden stagger-1 animate-fade-in border border-white/5">
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-xs border-collapse">
+                                    <thead>
+                                        <tr class="bg-slate-900/80 border-b border-white/10 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                            <th class="p-3">Paso</th>
+                                            <th class="p-3">Operación Manual</th>
+                                            <th class="p-3 text-red-400">Riesgos y Limitantes</th>
+                                            <th class="p-3 text-sena-green">Solución Automática</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-white/5">
+                                        <tr>
+                                            <td class="p-3 font-bold text-slate-400">1. Descarga</td>
+                                            <td class="p-3">Extraer PDF de correos y bandejas de entrada a mano.</td>
+                                            <td class="p-3 text-slate-400">Duplicidad, desorden en descargas locales.</td>
+                                            <td class="p-3 text-sena-green font-bold">API Ingesta Directa</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="p-3 font-bold text-slate-400">2. Lectura</td>
+                                            <td class="p-3">Leer el archivo para adivinar y asignar tipología TRD.</td>
+                                            <td class="p-3 text-slate-400">Clasificación subjetiva y errónea.</td>
+                                            <td class="p-3 text-sena-green font-bold">Modelado Cognitivo IA</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="p-3 font-bold text-slate-400">3. Login</td>
+                                            <td class="p-3">Abrir el portal del ECM institucional y pasar por Microsoft SSO.</td>
+                                            <td class="p-3 text-slate-400">Pérdida de tiempo por sesiones expiradas.</td>
+                                            <td class="p-3 text-sena-green font-bold">Automatización Puppeteer</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="p-3 font-bold text-slate-400">4. Digitación</td>
+                                            <td class="p-3">Copiar nombres, cédulas, NIT y fechas letra por letra.</td>
+                                            <td class="p-3 text-slate-400">Altísima tasa de errores tipográficos.</td>
+                                            <td class="p-3 text-sena-green font-bold">OCR por Recorte Dinámico</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="p-3 font-bold text-slate-400">5. OneDrive</td>
+                                            <td class="p-3">Crear carpetas y renombrar PDFs según códigos TRD.</td>
+                                            <td class="p-3 text-slate-400">Inconsistencia en nomenclaturas de nube.</td>
+                                            <td class="p-3 text-sena-green font-bold">Estructura Simétrica API</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                `
+            },
+            {
+                // Slide 4: Interactive Calculator
+                notes: `
+                    <div class="space-y-3">
+                        <div class="bg-sena-green/10 border border-sena-green/30 text-sena-green text-[10px] font-black uppercase px-2 py-1 rounded-md w-fit">⏱ TIEMPO: 08:00 - 11:30</div>
+                        <p class="font-bold text-white text-[13px] border-b border-white/5 pb-1">DEMOSTRACIÓN DE AHORRO REAL</p>
+                        <p><strong>Guión:</strong> "Probemos los números. Arrastremos el slider de documentos diarios. Vean cómo suben las horas mensuales ganadas. Es una matemática de retorno indiscutible."</p>
+                        <p><strong>Acción:</strong> Interactúa con los controles en pantalla. Desplaza el deslizador de documentos para impresionar a la junta mostrando cómo se multiplica el ahorro.</p>
+                    </div>
+                `,
+                render: () => `
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center w-full max-w-5xl slide-enter-active text-left">
+                        <div class="space-y-4">
+                            <span class="text-xs font-bold tracking-[0.2em] text-sena-green uppercase">Matemáticas de Eficiencia</span>
+                            <h2 class="text-3xl font-extrabold font-outfit text-white tracking-tight">Cuantificación del Ahorro en la Organización</h2>
+                            <p class="text-xs text-slate-450 leading-relaxed font-medium">
+                                Ajuste los controles del simulador matemático en tiempo real para visualizar cuántas horas y días laborales puede liberar en su equipo al mes implementando SENA V2.
+                            </p>
+                            
+                            <div class="bg-slate-900/50 border border-white/5 rounded-2xl p-4 space-y-4">
+                                <div>
+                                    <div class="flex justify-between text-xs font-bold text-slate-400 mb-1.5">
+                                        <span>Documentos diarios a procesar:</span>
+                                        <span class="text-sena-green font-black text-sm bg-slate-950 px-2 py-0.5 rounded" id="valDocs">300</span>
+                                    </div>
+                                    <input type="range" min="10" max="1000" step="10" value="300" id="slideDocs" 
+                                           class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sena-green outline-none"
+                                           oninput="updateCalculator()">
+                                </div>
+                                
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Minutos Manuales / doc:</label>
+                                        <input type="number" min="1" max="15" value="4" id="valMinManual" 
+                                               class="w-full bg-slate-950 border border-white/5 text-xs text-slate-200 p-2 rounded-xl focus:border-sena-green outline-none font-bold"
+                                               oninput="updateCalculator()">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Segundos Robot / doc:</label>
+                                        <input type="number" min="5" max="60" value="15" id="valSecRobot" 
+                                               class="w-full bg-slate-950 border border-white/5 text-xs text-slate-200 p-2 rounded-xl focus:border-sena-green outline-none font-bold"
+                                               oninput="updateCalculator()">
+                                    </div>
+                                  <!-- Results Grid -->
+                        <div class="bg-slate-950/60 border border-white/10 rounded-3xl p-6 space-y-5">
+                            <h4 class="text-xs font-black text-slate-300 uppercase tracking-widest flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-sena-green animate-ping"></span>
+                                Retorno Operativo Estimado
+                            </h4>
+                            
+                            <div class="grid grid-cols-3 gap-3">
+                                <div class="bg-slate-900/40 p-4 rounded-2xl border border-white/5 text-center">
+                                    <span class="block text-[9px] font-bold text-slate-500 uppercase">Tiempo Manual</span>
+                                    <span class="text-xl font-black text-red-400 block mt-1" id="resManual">20.0h</span>
+                                </div>
+                                <div class="bg-slate-900/40 p-4 rounded-2xl border border-white/5 text-center">
+                                    <span class="block text-[9px] font-bold text-slate-500 uppercase">Tiempo Robot</span>
+                                    <span class="text-xl font-black text-green-400 block mt-1" id="resRobot">1.3h</span>
+                                </div>
+                                <div class="bg-slate-900/40 p-4 rounded-2xl border border-white/5 text-center">
+                                    <span class="block text-[9px] font-bold text-slate-500 uppercase">Aumento Vel.</span>
+                                    <span class="text-xl font-black text-sena-green block mt-1" id="resSpeed">16x</span>
+                                </div>
+                            </div>
+
+                            <!-- Comparative Bar Chart -->
+                            <div class="space-y-3 border-t border-white/5 pt-3">
+                                <span class="text-[9px] font-bold text-slate-400 uppercase block tracking-wider">Comparativa de Velocidad</span>
+                                
+                                <div class="space-y-1">
+                                    <div class="flex justify-between text-[8px] font-bold text-red-400 font-mono">
+                                        <span>Procesamiento Manual</span>
+                                        <span id="barManualVal">4.0 mins</span>
+                                    </div>
+                                    <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-white/5">
+                                        <div id="barManualWidth" class="bg-gradient-to-r from-red-500 to-rose-450 h-full rounded-full transition-all duration-300" style="width: 100%"></div>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-1">
+                                    <div class="flex justify-between text-[8px] font-bold text-sena-green font-mono">
+                                        <span>Procesamiento SENA V2</span>
+                                        <span id="barRobotVal">15 secs</span>
+                                    </div>
+                                    <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-white/5">
+                                        <div id="barRobotWidth" class="bg-gradient-to-r from-sena-green to-emerald-450 h-full rounded-full transition-all duration-300" style="width: 6.25%"></div>
+                                    </div>
+                                </div>
+                            </div>
+ 
+                            <div class="bg-sena-green/5 border border-sena-green/20 p-4 rounded-2xl text-center">
+                                <p class="text-xs text-slate-300">
+                                    Liberación neta de: <strong class="text-sena-green text-sm" id="resSavedHours">18.7 horas</strong> de labor al día.
+                                    <span class="block text-[11px] text-slate-400 mt-1 font-medium">Ahorras <strong class="text-sena-green font-black" id="resSavedDays">46.9 días laborables</strong> al mes para la institución.</span>
+                                </p>
+                            </div>
+                        </div>                              </p>
+                            </div>
+                        </div>
+                    </div>
+                `
+            },
+            {
+                // Slide 5: RPA + IA Concept
+                notes: `
+                    <div class="space-y-3">
+                        <div class="bg-sena-green/10 border border-sena-green/30 text-sena-green text-[10px] font-black uppercase px-2 py-1 rounded-md w-fit">⏱ TIEMPO: 11:30 - 14:00</div>
+                        <p class="font-bold text-white text-[13px] border-b border-white/5 pb-1">LA HIPERAUTOMATIZACIÓN</p>
+                        <p><strong>Guión:</strong> "Hablamos de Hiperautomatización porque unimos cerebro y manos. La IA procesa y comprende la información cognitiva; el RPA ejecuta las operaciones mecánicas."</p>
+                        <p><strong>Acción:</strong> Usa tu mano izquierda para el cerebro y la derecha para los brazos mecánicos, representándolos físicamente.</p>
+                    </div>
+                `,
+                render: () => `
+                    <div class="w-full space-y-6 slide-enter-active text-left max-w-5xl">
+                        <div class="text-center space-y-2 mb-4">
+                            <span class="text-xs font-bold tracking-[0.2em] text-sena-green uppercase">La Sinergia del Trabajador Digital</span>
+                            <h2 class="text-4xl font-extrabold font-outfit text-white tracking-tight">Cerebro y Brazos en Cooperación</h2>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                            
+                            <!-- Left Card (IA) -->
+                            <div class="glass-card p-5 rounded-2xl hover:border-sena-green/20 space-y-3 stagger-1 animate-fade-in flex flex-col justify-between h-[300px]">
+                                <div class="space-y-2">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xl">🧠</span>
+                                        <h4 class="text-sm font-black text-white font-outfit">Cerebro (IA)</h4>
+                                    </div>
+                                    <span class="inline-block text-[8px] font-bold text-sena-green bg-sena-green/10 px-2 py-0.5 rounded uppercase">Gemini 1.5 Flash</span>
+                                    <ul class="text-[10px] text-slate-400 space-y-1.5 list-disc list-inside font-medium pt-1 leading-normal">
+                                        <li>Lectura cognitiva de PDFs.</li>
+                                        <li>Deducción de tipología TRD.</li>
+                                        <li>Extracción lógica de campos.</li>
+                                        <li>Resúmenes automáticos.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <!-- Center Image -->
+                            <div class="relative rounded-3xl overflow-hidden border border-white/10 shadow-2xl h-[300px] flex items-center justify-center bg-slate-950 stagger-2 animate-fade-in">
+                                <img src="/assets/images/digital_worker_concept.png" class="w-full h-full object-cover opacity-85 hover:scale-105 transition-transform duration-500" alt="Trabajador Digital Concept" />
+                                <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent p-3 text-center">
+                                    <span class="text-[9px] font-bold text-white uppercase tracking-widest bg-slate-900/80 px-2.5 py-1 rounded-full border border-white/5">SENA V2: RPA + IA</span>
+                                </div>
+                            </div>
+
+                            <!-- Right Card (RPA) -->
+                            <div class="glass-card p-5 rounded-2xl hover:border-cyan-500/20 space-y-3 stagger-3 animate-fade-in flex flex-col justify-between h-[300px]">
+                                <div class="space-y-2">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xl">🦾</span>
+                                        <h4 class="text-sm font-black text-white font-outfit">Brazos (RPA)</h4>
+                                    </div>
+                                    <span class="inline-block text-[8px] font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded uppercase">Puppeteer Engine</span>
+                                    <ul class="text-[10px] text-slate-400 space-y-1.5 list-disc list-inside font-medium pt-1 leading-normal">
+                                        <li>Navegación web autónoma.</li>
+                                        <li>Ingreso seguro SSO Microsoft.</li>
+                                        <li>Digitación en formulario ECM.</li>
+                                        <li>Orden secuencial en OneDrive.</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                `
+            },
+            {
+                // Slide 6: Architecture
+                notes: `
+                    <div class="space-y-3">
+                        <div class="bg-sena-green/10 border border-sena-green/30 text-sena-green text-[10px] font-black uppercase px-2 py-1 rounded-md w-fit">⏱ TIEMPO: 14:00 - 17:00</div>
+                        <p class="font-bold text-white text-[13px] border-b border-white/5 pb-1">ARQUITECTURA DE SOFTWARE</p>
+                        <p><strong>Guión:</strong> "Esta es nuestra arquitectura en 3 capas. El front de React recibe el PDF; el back de Node orquesta a la IA de Gemini para extraer y al RPA para escribir."</p>
+                        <p><strong>Acción:</strong> Explica cómo fluye la información por los componentes.</p>
+                    </div>
+                `,
+                render: () => `
+                    <div class="w-full space-y-6 slide-enter-active text-left max-w-5xl">
+                        <div class="text-center space-y-2 mb-4">
+                            <span class="text-xs font-bold tracking-[0.2em] text-sena-green uppercase">Estructura de la Solución</span>
+                            <h2 class="text-4xl font-extrabold font-outfit text-white tracking-tight">Capas del Ecosistema e Integración</h2>
+                        </div>
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                            <!-- SVG Architecture Diagram (span 7) -->
+                            <div class="lg:col-span-7 bg-slate-950 border border-white/5 rounded-3xl p-4 h-[300px] flex items-center justify-center shadow-2xl relative overflow-hidden">
+                                <svg viewBox="0 0 500 240" class="w-full h-full text-white font-sans">
+                                    <defs>
+                                        <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#39A900" />
+                                        </marker>
+                                        <marker id="arrow-blue" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#06b6d4" />
+                                        </marker>
+                                        <linearGradient id="grad-sena" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stop-color="#39A900" />
+                                            <stop offset="100%" stop-color="#10b981" />
+                                        </linearGradient>
+                                        <linearGradient id="grad-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stop-color="#1e293b" />
+                                            <stop offset="100%" stop-color="#0f172a" />
+                                        </linearGradient>
+                                    </defs>
+
+                                    <!-- Node 1: React UI -->
+                                    <rect x="20" y="80" width="100" height="65" rx="8" fill="url(#grad-dark)" stroke="rgba(255,255,255,0.08)" stroke-width="1.5" />
+                                    <text x="70" y="105" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff">INTERFAZ (React)</text>
+                                    <text x="70" y="120" text-anchor="middle" font-size="8" fill="#94a3b8">Frontend & Visor</text>
+                                    <text x="70" y="132" text-anchor="middle" font-size="7" fill="#39A900" font-weight="bold">Control de Recorte</text>
+
+                                    <!-- Arrows from UI to Node Backend -->
+                                    <path d="M 120 112 L 170 112" fill="none" stroke="#39A900" stroke-width="2" marker-end="url(#arrow)" />
+                                    
+                                    <!-- Node 2: Node.js Backend -->
+                                    <rect x="180" y="80" width="110" height="65" rx="8" fill="url(#grad-dark)" stroke="rgba(255,255,255,0.08)" stroke-width="1.5" />
+                                    <text x="235" y="105" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff">BACKEND (Node/Express)</text>
+                                    <text x="235" y="120" text-anchor="middle" font-size="8" fill="#94a3b8">Orquestador de Flujo</text>
+                                    <text x="235" y="132" text-anchor="middle" font-size="7" fill="#06b6d4" font-weight="bold">PostgreSQL DB</text>
+
+                                    <!-- Paths from Backend to IA & RPA -->
+                                    <path d="M 290 100 L 350 50" fill="none" stroke="#39A900" stroke-width="1.5" marker-end="url(#arrow)" />
+                                    <path d="M 290 125 L 350 175" fill="none" stroke="#06b6d4" stroke-width="1.5" marker-end="url(#arrow-blue)" />
+
+                                    <!-- Node 3: Gemini IA -->
+                                    <rect x="360" y="20" width="110" height="55" rx="8" fill="url(#grad-dark)" stroke="rgba(57,169,0,0.3)" stroke-width="1" />
+                                    <text x="415" y="42" text-anchor="middle" font-size="10" font-weight="bold" fill="#39A900">✨ Google Gemini</text>
+                                    <text x="415" y="56" text-anchor="middle" font-size="8" fill="#94a3b8">Clasificación & OCR</text>
+
+                                    <!-- Node 4: Puppeteer RPA -->
+                                    <rect x="360" y="150" width="110" height="55" rx="8" fill="url(#grad-dark)" stroke="rgba(6,182,212,0.3)" stroke-width="1" />
+                                    <text x="415" y="172" text-anchor="middle" font-size="10" font-weight="bold" fill="#06b6d4">🤖 Puppeteer RPA</text>
+                                    <text x="415" y="186" text-anchor="middle" font-size="8" fill="#94a3b8">Ingreso a ECM / Cloud</text>
+
+                                    <!-- Return path to Backend -->
+                                    <path d="M 360 45 L 250 45 L 250 80" fill="none" stroke="#39A900" stroke-width="1" stroke-dasharray="3,3" />
+                                    <path d="M 360 180 L 220 180 L 220 145" fill="none" stroke="#06b6d4" stroke-width="1" stroke-dasharray="3,3" />
+                                </svg>
+                            </div>
+                            
+                            <!-- Text points (span 5) -->
+                            <div class="lg:col-span-5 space-y-4">
+                                <div class="glass-card p-4 rounded-xl hover:border-sena-green/10">
+                                    <h4 class="text-xs font-bold text-white font-outfit mb-0.5">Seguridad Extrema</h4>
+                                    <p class="text-[10px] text-slate-450 leading-relaxed font-medium">La comunicación con la API de Gemini es empresarial, lo que garantiza que los folios institucionales no se usan para re-entrenar modelos públicos.</p>
+                                </div>
+                                <div class="glass-card p-4 rounded-xl hover:border-sena-green/10">
+                                    <h4 class="text-xs font-bold text-white font-outfit mb-0.5">Orquestación Desacoplada</h4>
+                                    <p class="text-[10px] text-slate-450 leading-relaxed font-medium">El backend Express recibe el recorte de la UI, delega la carga cognitiva a la IA, y luego dispara el robot de Puppeteer en hilos independientes.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `so de documentos institucionales para el reentrenamiento de modelos públicos de Google.
+                        </div>
+                    </div>
+                `
+            },
+            {
+                // Slide 7: Live Simulator
+                notes: `
+                    <div class="space-y-3">
+                        <div class="bg-sena-green/10 border border-sena-green/30 text-sena-green text-[10px] font-black uppercase px-2 py-1 rounded-md w-fit">⏱ TIEMPO: 17:00 - 19:30</div>
+                        <p class="font-bold text-white text-[13px] border-b border-white/5 pb-1">DEMOSTRACIÓN DEL SIMULADOR</p>
+                        <p><strong>Guión:</strong> "Hagamos una simulación. Elijan un tipo de documento a la izquierda, presionen Iniciar y vean cómo la IA y el Robot cooperan en tiempo real."</p>
+                        <p><strong>Acción:</strong> Explica el flujo: la lectura de la IA, el logueo automatizado del robot, el bloqueo de seguridad corporativo de MFA, el clic para aprobar en la pantalla, y finalmente el registro exitoso.</p>
+                    </div>
+                `,
+                render: () => `
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 w-full max-w-6xl slide-enter-active text-left">
+                        
+                        <!-- Col 1: Selector & controls (3 cols) -->
+                        <div class="lg:col-span-3 space-y-3">
+                            <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest">1. Selección</h4>
+                            <div class="space-y-2">
+                                <button onclick="selectSimDoc('peticion')" id="btnSim_peticion" class="w-full p-3 rounded-xl border border-white/5 bg-slate-900 text-left text-xs transition-all flex flex-col justify-between hover:border-white/20">
+                                    <span class="font-bold text-white truncate">01_DERECHO_DE_PETICION.pdf</span>
+                                    <span class="block text-[9px] text-sena-green font-bold uppercase mt-1">TIPO: PETICIÓN</span>
+                                </button>
+                                <button onclick="selectSimDoc('contrato')" id="btnSim_contrato" class="w-full p-3 rounded-xl border border-white/5 bg-slate-950 text-left text-xs transition-all flex flex-col justify-between hover:border-white/20">
+                                    <span class="font-bold text-slate-400 truncate">CONTRATO_PRESTACION_180.pdf</span>
+                                    <span class="block text-[9px] text-slate-500 font-bold uppercase mt-1">TIPO: CONTRATO</span>
+                                </button>
+                                <button onclick="selectSimDoc('resolucion')" id="btnSim_resolucion" class="w-full p-3 rounded-xl border border-white/5 bg-slate-950 text-left text-xs transition-all flex flex-col justify-between hover:border-white/20">
+                                    <span class="font-bold text-slate-400 truncate">RESOLUCION_NOMBRAMIENTO_342.pdf</span>
+                                    <span class="block text-[9px] text-slate-500 font-bold uppercase mt-1">TIPO: RESOLUCIÓN</span>
+                                </button>
+                            </div>
+                            
+                            <div class="pt-2" id="simActionContainer">
+                                <button onclick="runSimulation()" class="w-full bg-sena-green text-white hover:bg-emerald-600 font-black text-xs p-3 rounded-xl shadow-lg shadow-sena-green/10 flex items-center justify-center gap-1.5 transition-all">
+                                    ▶ Iniciar Simulación
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Col 2: Canvas (5 cols) -->
+                        <div class="lg:col-span-5 bg-slate-950 border border-white/5 rounded-3xl p-4 flex flex-col h-[380px] relative overflow-hidden">
+                            <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-sena-green" id="simGlowLed"></span>
+                                2. Visualizador del Proceso
+                            </h4>
+                            
+                            <div class="flex-grow flex flex-col justify-center items-center relative" id="simCanvas">
+                                <div class="text-center space-y-3">
+                                    <div class="w-12 h-12 rounded-full bg-slate-900 border border-white/5 flex items-center justify-center text-xl text-sena-green mx-auto">🤖</div>
+                                    <h5 class="text-xs font-bold text-slate-300">Simulador de Hiperautomatización</h5>
+                                    <p class="text-[10px] text-slate-500 max-w-xs mx-auto">Selecciona un archivo del menú y presiona el botón verde para correr la demostración interactiva.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Col 3: Terminal (4 cols) -->
+                        <div class="lg:col-span-4 bg-slate-900/40 border border-white/5 backdrop-blur-md rounded-3xl p-4 flex flex-col h-[380px]">
+                            <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">3. Logs de Ejecución</h4>
+                            <div class="flex-grow bg-slate-950 border border-white/5 rounded-2xl p-3 font-mono text-[9px] text-slate-400 overflow-y-auto space-y-1.5 leading-normal custom-scroll" id="simLogs">
+                                <span class="text-slate-600 italic block text-center pt-24">Consola inactiva.</span>
+                            </div>
+                        </div>
+
+                    </div>
+                `
+            },
+            {
+                // Slide 8: OCR crop innovation
+                notes: `
+                    <div class="space-y-3">
+                        <div class="bg-sena-green/10 border border-sena-green/30 text-sena-green text-[10px] font-black uppercase px-2 py-1 rounded-md w-fit">⏱ TIEMPO: 19:30 - 22:00</div>
+                        <p class="font-bold text-white text-[13px] border-b border-white/5 pb-1">OCR POR RECORTE DINÁMICO</p>
+                        <p><strong>Guión:</strong> "Cuando tenemos un PDF escaneado sin texto, el funcionario no tiene que transcribir. Dibuja un cuadro verde con el ratón directamente en el PDF y el sistema extrae el texto al instante."</p>
+                        <p><strong>Acción:</strong> Explica cómo solucionamos el problema de transparencias en los navegadores inyectando un fondo blanco sólido para asegurar el OCR.</p>
+                    </div>
+                `,
+                render: () => `
+                    <div class="w-full space-y-6 slide-enter-active text-left max-w-5xl">
+                        <div class="text-center space-y-2 mb-4">
+                            <span class="text-xs font-bold tracking-[0.2em] text-sena-green uppercase">Usabilidad e Innovación</span>
+                            <h2 class="text-4xl font-extrabold font-outfit text-white tracking-tight">OCR por Recorte Dinámico</h2>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                            <div class="space-y-4">
+                                <div class="glass-card p-5 rounded-2xl hover:border-sena-green/20">
+                                    <h4 class="text-sm font-bold text-white font-outfit flex items-center gap-1.5 mb-1">
+                                        <span class="w-1.5 h-1.5 bg-sena-green rounded-full"></span>
+                                        Recorte y Extracción Instantánea
+                                    </h4>
+                                    <p class="text-xs text-slate-450 leading-relaxed font-medium">Permite dibujar con el ratón un rectángulo en el visor del PDF para capturar cualquier área de texto digitalizado o escaneado.</p>
+                                </div>
+                                <div class="glass-card p-5 rounded-2xl hover:border-sena-green/20">
+                                    <h4 class="text-sm font-bold text-white font-outfit flex items-center gap-1.5 mb-1">
+                                        <span class="w-1.5 h-1.5 bg-sena-green rounded-full"></span>
+                                        Corrección de Canal Alfa
+                                    </h4>
+                                    <p class="text-xs text-slate-450 leading-relaxed font-medium">Inyecta un fondo blanco sólido al canvas de recorte antes de enviarlo a procesar, evitando que las transparencias se vuelvan negras e ilegibles.</p>
+                                </div>
+                                <div class="glass-card p-5 rounded-2xl hover:border-sena-green/20">
+                                    <h4 class="text-sm font-bold text-white font-outfit flex items-center gap-1.5 mb-1">
+                                        <span class="w-1.5 h-1.5 bg-sena-green rounded-full"></span>
+                                        Foco Inteligente
+                                    </h4>
+                                    <p class="text-xs text-slate-450 leading-relaxed font-medium">El cursor salta de forma autónoma al siguiente campo de metadatos vacío, eliminando clics redundantes del operador.</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Visual OCR crop animation simulation -->
+                            <div class="bg-slate-950 border border-white/5 rounded-3xl p-6 h-[320px] flex flex-col justify-between relative overflow-hidden shadow-2xl">
+                                <div class="absolute inset-0 bg-slate-900/30"></div>
+                                <div class="z-10 bg-slate-950/80 p-2.5 rounded-xl border border-white/5 flex justify-between items-center text-[10px] font-bold text-slate-400">
+                                    <span>VISOR INTERACTIVO DE PDF (MOCK)</span>
+                                    <span class="text-sena-green">● RECORTE ACTIVO</span>
+                                </div>
+                                
+                                <div class="relative w-full h-40 bg-white text-slate-800 rounded-xl p-4 flex flex-col justify-between font-mono text-[9px] select-none shadow-inner border border-slate-200">
+                                    <!-- Drawing crop box visual -->
+                                    <div class="absolute left-6 top-8 w-28 h-6 border-2 border-dashed border-sena-green bg-sena-green/10 flex items-center justify-center font-bold text-[8px] text-sena-green">
+                                        RECORTE OCR
+                                        <!-- Laser scan line inside -->
+                                        <div class="absolute top-0 left-0 w-full h-0.5 bg-sena-green shadow-[0_0_4px_#39a900] laser-line"></div>
+                                    </div>
+                                    
+                                    <div>
+                                        <div class="h-2 w-16 bg-slate-300 rounded mb-2"></div>
+                                        <div class="font-sans text-xs font-bold text-slate-900">CARLOS MARIO MENDOZA</div>
+                                        <div class="text-slate-400 text-[8px] mt-0.5">Identificación: C.C. 1.082.944.221</div>
+                                    </div>
+                                    
+                                    <div class="space-y-1">
+                                        <div class="h-1 bg-slate-200 rounded w-full"></div>
+                                        <div class="h-1 bg-slate-200 rounded w-5/6"></div>
+                                        <div class="h-1 bg-slate-250 rounded w-full"></div>
+                                    </div>
+                                </div>
+
+                                <div class="z-10 bg-slate-900 border border-white/5 rounded-xl p-3 text-[10px] space-y-1.5 text-left">
+                                    <span class="text-slate-400 font-bold block">Campo Destino Auto-completado:</span>
+                                    <div class="bg-slate-950 border border-sena-green/30 p-2 rounded text-sena-green font-bold font-mono">
+                                        Nombre: CARLOS MARIO MENDOZA <span class="caret-blink">|</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `
+            },
+            {
+                // Slide 9: OneDrive folder explorer
+                notes: `
+                    <div class="space-y-3">
+                        <div class="bg-sena-green/10 border border-sena-green/30 text-sena-green text-[10px] font-black uppercase px-2 py-1 rounded-md w-fit">⏱ TIEMPO: 22:00 - 24:00</div>
+                        <p class="font-bold text-white text-[13px] border-b border-white/5 pb-1">ORGANIZACIÓN EN ONEDRIVE</p>
+                        <p><strong>Guión:</strong> "Nuestra automatización no genera desorden. El robot interactúa con OneDrive y organiza los archivos respetando el código jerárquico de la TRD: Regional, Centro, Serie y Subserie."</p>
+                        <p><strong>Acción:</strong> Muestra la estructura de carpetas en pantalla, enfatizando la nomenclatura ordenada del expediente.</p>
+                    </div>
+                `,
+                render: () => `
+                    <div class="w-full space-y-6 slide-enter-active text-left max-w-5xl">
+                        <div class="text-center space-y-2 mb-4">
+                            <span class="text-xs font-bold tracking-[0.2em] text-sena-green uppercase">Cumplimiento Normativo</span>
+                            <h2 class="text-4xl font-extrabold font-outfit text-white tracking-tight">Organización Simétrica en OneDrive</h2>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                            
+                            <!-- Folder tree explorer -->
+                            <div class="bg-slate-950 border border-white/5 rounded-3xl p-5 font-mono text-xs text-slate-300 space-y-2 shadow-2xl h-[300px] overflow-y-auto custom-scroll">
+                                <div class="flex items-center gap-2 text-sena-green font-bold">
+                                    📁 OneDrive Institucional (SENA)
+                                </div>
+                                <div class="pl-4 border-l border-white/10 ml-2 space-y-2 py-1">
+                                    <div class="flex items-center gap-2 text-slate-400">
+                                        📁 Regional Distrito Capital
+                                    </div>
+                                    <div class="pl-4 border-l border-white/10 ml-2 space-y-2">
+                                        <div class="flex items-center gap-2 text-slate-400">
+                                            📁 Centro de Electricidad y Electrónica
+                                        </div>
+                                        <div class="pl-4 border-l border-white/10 ml-2 space-y-2">
+                                            <div class="flex items-center gap-2 text-emerald-400">
+                                                📁 Serie: 11-02 Comunicaciones Oficiales
+                                            </div>
+                                            <div class="pl-4 border-l border-white/10 ml-2 space-y-2">
+                                                <div class="flex items-center gap-2 text-cyan-400">
+                                                    📁 Subserie: 11-02-05 Derechos de Petición
+                                                </div>
+                                                <div class="pl-4 border-l border-white/10 ml-2 space-y-2">
+                                                    <div class="flex items-center gap-2 text-yellow-400">
+                                                        📁 Expediente: Carlos Mario Mendoza C.C. 1082944
+                                                    </div>
+                                                    <div class="pl-4 border-l border-white/10 ml-2 space-y-1 text-[11px] text-slate-400">
+                                                        <div class="flex items-center gap-1.5">📄 01_DERECHO_DE_PETICION.pdf</div>
+                                                        <div class="flex items-center gap-1.5">📄 02_ANEXO_CEDULA.pdf</div>
+                                                        <div class="flex items-center gap-1.5 text-sena-green">📄 Hoja_de_Control_Digital.json</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="space-y-4">
+                                <div class="glass-card p-5 rounded-2xl hover:border-sena-green/20">
+                                    <h4 class="text-sm font-bold text-white font-outfit mb-1">Estandarización Absoluta</h4>
+                                    <p class="text-xs text-slate-400 leading-relaxed font-medium">Elimina la anarquía de carpetas con nombres informales creadas por operadores. Todo se rige bajo el código oficial TRD.</p>
+                                </div>
+                                <div class="glass-card p-5 rounded-2xl hover:border-sena-green/20">
+                                    <h4 class="text-sm font-bold text-white font-outfit mb-1">Nomenclatura Secuencial</h4>
+                                    <p class="text-xs text-slate-400 leading-relaxed font-medium">Asignación correlativa de archivos en el expediente (01_Peticion, 02_Anexo), facilitando la lectura e indexación posterior.</p>
+                                </div>
+                                <div class="glass-card p-5 rounded-2xl hover:border-sena-green/20">
+                                    <h4 class="text-sm font-bold text-white font-outfit mb-1">Control de Redundancia</h4>
+                                    <p class="text-xs text-slate-400 leading-relaxed font-medium">Validación mediante hash criptográfico SHA-256 para evitar duplicidad o sobreescritura accidental de folios.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `
+            },
+            {
+                // Slide 10: ROI & metrics
+                notes: `
+                    <div class="space-y-3">
+                        <div class="bg-sena-green/10 border border-sena-green/30 text-sena-green text-[10px] font-black uppercase px-2 py-1 rounded-md w-fit">⏱ TIEMPO: 24:00 - 26:30</div>
+                        <p class="font-bold text-white text-[13px] border-b border-white/5 pb-1">RETORNO DE LA INVERSIÓN (ROI)</p>
+                        <p><strong>Guión:</strong> "El impacto final es contundente: 95% de reducción en tiempo, 99.8% de precisión en tipologías y cero errores de duplicados."</p>
+                        <p><strong>Acción:</strong> Enfatiza el valor del bienestar humano: liberar al funcionario del estrés mecánico de copiar y pegar le permite enfocarse en tareas intelectuales.</p>
+                    </div>
+                `,
+                render: () => `
+                    <div class="w-full space-y-6 slide-enter-active text-left max-w-5xl">
+                        <div class="text-center space-y-2 mb-4">
+                            <span class="text-xs font-bold tracking-[0.2em] text-sena-green uppercase">Resultados Tangibles</span>
+                            <h2 class="text-4xl font-extrabold font-outfit text-white tracking-tight">Retorno de Inversión e Impacto Directo</h2>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+                            
+                            <!-- Radial Circle 1: 95% -->
+                            <div class="glass-card p-6 rounded-2xl text-center flex flex-col items-center justify-between hover:border-sena-green/30 relative overflow-hidden group">
+                                <div class="relative w-28 h-28 flex items-center justify-center">
+                                    <svg class="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                                        <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.03)" stroke-width="8" fill="transparent" />
+                                        <circle cx="50" cy="50" r="40" stroke="#39A900" stroke-width="8" fill="transparent" 
+                                            stroke-dasharray="251.2" stroke-dashoffset="12.56" class="transition-all duration-1000 ease-out" />
+                                    </svg>
+                                    <span class="absolute text-2xl font-black font-outfit text-white">95%</span>
+                                </div>
+                                <div class="space-y-1 mt-4">
+                                    <h4 class="text-xs font-bold text-white uppercase tracking-wider font-outfit">Reducción de Tiempo</h4>
+                                    <p class="text-[10px] text-slate-400 leading-relaxed font-medium">De 10 minutos por indexación manual a solo 15 segundos mediante la clasificación automática.</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Radial Circle 2: 99.8% -->
+                            <div class="glass-card p-6 rounded-2xl text-center flex flex-col items-center justify-between hover:border-sena-green/30 relative overflow-hidden group">
+                                <div class="relative w-28 h-28 flex items-center justify-center">
+                                    <svg class="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                                        <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.03)" stroke-width="8" fill="transparent" />
+                                        <circle cx="50" cy="50" r="40" stroke="#06b6d4" stroke-width="8" fill="transparent" 
+                                            stroke-dasharray="251.2" stroke-dashoffset="0.5" class="transition-all duration-1000 ease-out" />
+                                    </svg>
+                                    <span class="absolute text-2xl font-black font-outfit text-white">99.8%</span>
+                                </div>
+                                <div class="space-y-1 mt-4">
+                                    <h4 class="text-xs font-bold text-white uppercase tracking-wider font-outfit">Precisión de Indexación</h4>
+                                    <p class="text-[10px] text-slate-400 leading-relaxed font-medium">La IA identifica la tipología TRD de forma semántica basada en el contexto completo del folio.</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Radial Circle 3: 0% -->
+                            <div class="glass-card p-6 rounded-2xl text-center flex flex-col items-center justify-between hover:border-sena-green/30 relative overflow-hidden group">
+                                <div class="relative w-28 h-28 flex items-center justify-center">
+                                    <svg class="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                                        <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.03)" stroke-width="8" fill="transparent" />
+                                        <circle cx="50" cy="50" r="40" stroke="#10b981" stroke-width="8" fill="transparent" 
+                                            stroke-dasharray="251.2" stroke-dashoffset="251.2" class="transition-all duration-1000 ease-out" />
+                                    </svg>
+                                    <span class="absolute text-2xl font-black font-outfit text-white">0%</span>
+                                </div>
+                                <div class="space-y-1 mt-4">
+                                    <h4 class="text-xs font-bold text-white uppercase tracking-wider font-outfit">Errores de Digitación</h4>
+                                    <p class="text-[10px] text-slate-400 leading-relaxed font-medium">Inyección directa de metadatos del PDF al ECM mediante Puppeteer sin error tipográfico humano.</p>
+                                </div>
+                            </div>
+                            
+                        </div>
+                    </div>
+                `
+            },
+            {
+                // Slide 11: Roadmap
+                notes: `
+                    <div class="space-y-3">
+                        <div class="bg-sena-green/10 border border-sena-green/30 text-sena-green text-[10px] font-black uppercase px-2 py-1 rounded-md w-fit">⏱ TIEMPO: 26:30 - 28:00</div>
+                        <p class="font-bold text-white text-[13px] border-b border-white/5 pb-1">HOJA DE RUTA DE IMPLANTACIÓN</p>
+                        <p><strong>Guión:</strong> "Hemos estructurado la implantación del sistema en cuatro fases claras a lo largo de 7 semanas, garantizando la seguridad en la configuración y capacitación de funcionarios."</p>
+                        <p><strong>Acción:</strong> Avanza con convicción por las cuatro fases del roadmap horizontal.</p>
+                    </div>
+                `,
+                render: () => `
+                    <div class="w-full space-y-6 slide-enter-active text-left max-w-5xl">
+                        <div class="text-center space-y-2 mb-4">
+                            <span class="text-xs font-bold tracking-[0.2em] text-sena-green uppercase">Línea de Tiempo</span>
+                            <h2 class="text-4xl font-extrabold font-outfit text-white tracking-tight">Ruta de Implementación en la Organización</h2>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 pt-6">
+                            
+                            <div class="glass-card p-5 rounded-2xl border-l-4 border-l-sena-green hover:border-sena-green/30 stagger-1 animate-fade-in">
+                                <span class="text-[10px] font-bold text-sena-green bg-sena-green/10 px-2 py-0.5 rounded uppercase">Fase 1</span>
+                                <h4 class="text-sm font-bold text-white font-outfit mt-2 mb-1">Mapeo & TRD</h4>
+                                <p class="text-[10px] text-slate-400 leading-relaxed font-medium">Auditoría del flujo documental recurrente y configuración de series en la base de datos local. (Semanas 1-2)</p>
+                            </div>
+                            
+                            <div class="glass-card p-5 rounded-2xl border-l-4 border-l-cyan-400 hover:border-cyan-500/30 stagger-2 animate-fade-in">
+                                <span class="text-[10px] font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded uppercase">Fase 2</span>
+                                <h4 class="text-sm font-bold text-white font-outfit mt-2 mb-1">Servidor & Conectores</h4>
+                                <p class="text-[10px] text-slate-400 leading-relaxed font-medium">Despliegue del backend Express, bases de datos PostgreSQL y llaves de la API privada de Google Gemini. (Semanas 3-4)</p>
+                            </div>
+                            
+                            <div class="glass-card p-5 rounded-2xl border-l-4 border-l-indigo-400 hover:border-indigo-500/30 stagger-3 animate-fade-in">
+                                <span class="text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded uppercase">Fase 3</span>
+                                <h4 class="text-sm font-bold text-white font-outfit mt-2 mb-1">Capacitación Piloto</h4>
+                                <p class="text-[10px] text-slate-400 leading-relaxed font-medium">Entrenamiento a funcionarios encargados del archivo e inicio de pruebas reales controladas. (Semanas 5-6)</p>
+                            </div>
+                            
+                            <div class="glass-card p-5 rounded-2xl border-l-4 border-l-emerald-400 hover:border-emerald-500/30 stagger-4 animate-fade-in">
+                                <span class="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded uppercase">Fase 4</span>
+                                <h4 class="text-sm font-bold text-white font-outfit mt-2 mb-1">Escalabilidad</h4>
+                                <p class="text-[10px] text-slate-400 leading-relaxed font-medium">Activación total de robots Puppeteer desatendidos para indexar radicados masivos en paralelo. (Semana 7+)</p>
+                            </div>
+                            
+                        </div>
+                    </div>
+                `
+            },
+            {
+                // Slide 12: Closure & Q&A
+                notes: `
+                    <div class="space-y-3">
+                        <div class="bg-sena-green/10 border border-sena-green/30 text-sena-green text-[10px] font-black uppercase px-2 py-1 rounded-md w-fit">⏱ TIEMPO: 28:00 - 30:00</div>
+                        <p class="font-bold text-white text-[13px] border-b border-white/5 pb-1">CONCLUYENDO LA PONENCIA</p>
+                        <p><strong>Guión:</strong> "La IA no viene a reemplazar al funcionario público. Viene a devolverle el tiempo de ser humano: analizar, decidir y servir."</p>
+                        <p><strong>Acción:</strong> Pausa silenciosa, agradece formalmente, y abre el micrófono de forma amigable a las preguntas.</p>
+                    </div>
+                `,
+                render: () => `
+                    <div class="text-center space-y-6 slide-enter-active max-w-4xl">
+                        <h2 class="text-4xl font-extrabold font-outfit text-white tracking-tight leading-none">El Futuro de la Gestión Pública Inteligente</h2>
+                        <p class="text-xs font-semibold text-sena-green uppercase tracking-widest font-outfit">SENA V2</p>
+                        
+                        <div class="glass-panel p-6 rounded-3xl border-sena-green/10 max-w-2xl mx-auto shadow-2xl relative overflow-hidden stagger-1 animate-fade-in">
+                            <p class="text-sm text-slate-200 leading-relaxed font-light italic relative z-10">
+                                "La Inteligencia Artificial no viene a reemplazar al talento humano administrativo institucional; viene a liberarlo del trabajo mecánico para permitirle enfocarse en el análisis, la calidad y el servicio al ciudadano."
+                            </p>
+                        </div>
+                        
+                        <div class="pt-4 flex justify-center stagger-2 animate-fade-in">
+                            <span class="px-6 py-2.5 rounded-full bg-gradient-to-r from-sena-green to-emerald-500 text-white font-bold font-outfit text-xs tracking-wider shadow-lg hover:scale-105 transition-transform duration-200 uppercase">
+                                Muchísimas Gracias
+                            </span>
+                        </div>
+                    </div>
+                `
+            }
+        ];
+
+        let currentIdx = 0;
+        let showPresenterNotes = false;
+        let isFullscreen = false;
+
+        // Visual bullet indicators generator
+        function buildBullets() {
+            const container = document.getElementById("bulletContainer");
+            container.innerHTML = "";
+            for (let i = 0; i < slides.length; i++) {
+                const dot = document.createElement("button");
+                dot.onclick = () => jumpToSlide(i);
+                dot.className = `w-2 h-2 rounded-full transition-all duration-300 ${i === currentIdx ? 'bg-sena-green w-5' : 'bg-slate-800 hover:bg-slate-700'}`;
+                dot.title = `Ir a Diapositiva ${i + 1}`;
+                container.appendChild(dot);
+            }
+        }
+
+        // Render standard slides
+        function renderSlide() {
+            const slide = slides[currentIdx];
+            const viewport = document.getElementById("slideViewport");
+            
+            // Render HTML of slide
+            viewport.innerHTML = slide.render();
+            
+            // Update page numbers & indicator
+            document.getElementById("pageNum").innerText = currentIdx + 1;
+            
+            const progressPercent = ((currentIdx + 1) / slides.length) * 100;
+            document.getElementById("progressBar").style.width = `${progressPercent}%`;
+
+            // Update speaker notes
+            document.getElementById("notesContent").innerHTML = slide.notes;
+
+            // Manage nav button statuses
+            document.getElementById("prevBtn").disabled = currentIdx === 0;
+            document.getElementById("nextBtn").disabled = currentIdx === slides.length - 1;
+
+            buildBullets();
+
+            // Special initializations based on active slide type
+            if (currentIdx === 3) {
+                // Initialize calculator slide variables
+                updateCalculator();
+            } else if (currentIdx === 6) {
+                // Reset simulator variables
+                simStep = 0;
+                simLogs = [];
+                mfaApproved = false;
+            }
+        }
+
+        function nextSlide() {
+            if (currentIdx < slides.length - 1) {
+                currentIdx++;
+                renderSlide();
+            }
+        }
+
+        function prevSlide() {
+            if (currentIdx > 0) {
+                currentIdx--;
+                renderSlide();
+            }
+        }
+
+        function jumpToSlide(idx) {
+            currentIdx = idx;
+            renderSlide();
+        }
+
+        // --- SPEAKER NOTES DRAWER MANAGER ---
+        function toggleNotes() {
+            showPresenterNotes = !showPresenterNotes;
+            const drawer = document.getElementById("notesDrawer");
+            const btnText = document.getElementById("notesBtnText");
+            
+            if (showPresenterNotes) {
+                drawer.classList.remove("translate-x-full");
+                btnText.innerText = "Ocultar Notas";
+            } else {
+                drawer.classList.add("translate-x-full");
+                btnText.innerText = "Ver Notas";
+            }
+        }
+
+        // --- FULLSCREEN TOGGLER ---
+        function toggleFullscreen() {
+            const elem = document.documentElement;
+            if (!document.fullscreenElement) {
+                if (elem.requestFullscreen) {
+                    elem.requestFullscreen().catch(err => {
+                        console.error("Error al activar modo proyector: ", err);
+                    });
+                } else if (elem.webkitRequestFullscreen) {
+                    elem.webkitRequestFullscreen();
+                } else if (elem.msRequestFullscreen) {
+                    elem.msRequestFullscreen();
+                }
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                } else if (document.msExitFullscreen) {
+                    document.msExitFullscreen();
+                }
+            }
+        }
+
+        // Sincronizar estado cuando se sale con la tecla Escape
+        document.addEventListener('fullscreenchange', () => {
+            isFullscreen = !!document.fullscreenElement;
+            const icon = document.getElementById("fullscreenIcon");
+            if (icon) {
+                if (isFullscreen) {
+                    icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 14h6v6m10-6h-6v6M4 10h6V4m10 6h-6V4" />`;
+                } else {
+                    icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />`;
+                }
+            }
+        });
+
+        // --- INTERACTIVE CALCULATOR ENGINE (Slide 4) ---
+        function updateCalculator() {
+            const docsInput = document.getElementById("slideDocs");
+            const minManualInput = document.getElementById("valMinManual");
+            const secRobotInput = document.getElementById("valSecRobot");
+            
+            if (!docsInput) return; // Not on slide 4
+
+            const docs = parseInt(docsInput.value);
+            document.getElementById("valDocs").innerText = docs;
+
+            const minManual = parseFloat(minManualInput.value) || 4;
+            const secRobot = parseFloat(secRobotInput.value) || 15;
+
+            // Calculations
+            const manualHours = (docs * minManual) / 60;
+            const robotHours = (docs * secRobot) / 3600;
+            const savedHours = manualHours - robotHours;
+            const savedDays = (savedHours * 20) / 8; // 20 working days, 8hr shift
+            const relativeSpeed = Math.round((minManual * 60) / secRobot);
+
+            // Print
+            document.getElementById("resManual").innerText = manualHours.toFixed(1) + "h";
+            document.getElementById("resRobot").innerText = (robotHours * 60).toFixed(1) + "m";
+            document.getElementById("resSpeed").innerText = relativeSpeed + "x";
+            document.getElementById("resSavedHours").innerText = savedHours.toFixed(1) + " horas";
+            document.getElementById("resSavedDays").innerText = savedDays.toFixed(1) + " días";
+
+            // Bar Chart Updates
+            const barManualVal = document.getElementById("barManualVal");
+            const barRobotVal = document.getElementById("barRobotVal");
+            const barRobotWidth = document.getElementById("barRobotWidth");
+            
+            if (barManualVal) barManualVal.innerText = minManual + " mins";
+            if (barRobotVal) barRobotVal.innerText = secRobot + " secs";
+            if (barRobotWidth) {
+                const manualSec = minManual * 60;
+                const robotRatio = Math.min((secRobot / manualSec) * 100, 100);
+                barRobotWidth.style.width = robotRatio.toFixed(1) + "%";
+            }
+        }
+
+        // --- INTERACTIVE SIMULATOR ENGINE (Slide 7) ---
+        const MOCK_DOCS = {
+            peticion: {
+                title: '01_DERECHO_DE_PETICION.pdf',
+                type: 'DERECHO DE PETICIÓN',
+                confidence: '99.2%',
+                reasoning: 'Invocación explícita al Artículo 23 de la CP. Solicitud de copia de historia clínica y estado de afiliaciones.',
+                solicitante: 'Carlos Mario Mendoza',
+                cedula: '1.082.944.221',
+                expediente: '2026EX-035914'
+            },
+            contrato: {
+                title: 'CONTRATO_PRESTACION_180.pdf',
+                type: 'CONTRATO',
+                confidence: '98.5%',
+                reasoning: 'Cláusula de objeto, partes (Contratista y Ordenación), valor del contrato, firmas jurídicas y tabla de TRD.',
+                solicitante: 'Estrategia 180 S.A.S.',
+                cedula: 'NIT 901.422.180-2',
+                expediente: '2026EX-012903'
+            },
+            resolucion: {
+                title: 'RESOLUCION_NOMBRAMIENTO_342.pdf',
+                type: 'RESOLUCIÓN',
+                confidence: '97.9%',
+                reasoning: 'Fórmula solemne de considerandos y sección explícita de "RESUELVE" decretando nombramiento de personal universitario.',
+                solicitante: 'Laura Sofía Gómez',
+                cedula: '1.018.399.402',
+                expediente: '2026EX-008922'
+            }
+        };
+
+        let selectedSimDocId = 'peticion';
+        let simStep = 0; // 0: Idle, 1: Scanning, 2: Login SSO, 3: MFA, 4: RPA typing, 5: Done
+        let simLogs = [];
+        let mfaApproved = false;
+
+        function selectSimDoc(docId) {
+            if (simStep > 0 && simStep < 5) return; // Block changes during active run
+            
+            selectedSimDocId = docId;
+            
+            // CSS focus class toggle
+            const docs = ['peticion', 'contrato', 'resolucion'];
+            docs.forEach(d => {
+                const btn = document.getElementById("btnSim_" + d);
+                if (btn) {
+                    if (d === docId) {
+                        btn.classList.add("bg-slate-900", "border-white/20");
+                        btn.classList.remove("bg-slate-950");
+                        btn.querySelector("span").classList.add("text-white");
+                        btn.querySelector("span").classList.remove("text-slate-400");
+                    } else {
+                        btn.classList.remove("bg-slate-900", "border-white/20");
+                        btn.classList.add("bg-slate-950");
+                        btn.querySelector("span").classList.remove("text-white");
+                        btn.querySelector("span").classList.add("text-slate-400");
+                    }
+                }
+            });
+
+            // Reset simulation visual
+            simStep = 0;
+            mfaApproved = false;
+            drawSimCanvas();
+            document.getElementById("simLogs").innerHTML = `<span class="text-slate-655 italic block text-center pt-24">Consola inactiva. Seleccionado: ${MOCK_DOCS[selectedSimDocId].title}</span>`;
+        }
+
+        function logToSimConsole(msg, type = 'info') {
+            const logsBox = document.getElementById("simLogs");
+            if (!logsBox) return;
+            
+            let color = 'text-slate-400';
+            if (type === 'ia') color = 'text-green-400 font-semibold';
+            else if (type === 'rpa') color = 'text-cyan-400';
+            else if (type === 'mfa') color = 'text-yellow-400 animate-pulse';
+            else if (type === 'ok') color = 'text-emerald-400 font-bold';
+
+            simLogs.push(`<div class="${color}"><span class="text-slate-700 select-none mr-2">&gt;</span>${msg}</div>`);
+            logsBox.innerHTML = simLogs.join('');
+            logsBox.scrollTop = logsBox.scrollHeight;
+        }
+
+        function drawSimCanvas() {
+            const canvas = document.getElementById("simCanvas");
+            if (!canvas) return;
+
+            const doc = MOCK_DOCS[selectedSimDocId];
+
+            if (simStep === 0) {
+                canvas.innerHTML = `
+                    <div class="text-center space-y-3 animate-fade-in">
+                        <div class="w-12 h-12 rounded-full bg-slate-900 border border-white/5 flex items-center justify-center text-xl text-sena-green mx-auto">🤖</div>
+                        <h5 class="text-xs font-bold text-slate-350">Simulador Listo</h5>
+                        <p class="text-[10px] text-slate-500 max-w-xs mx-auto">Preparado para indexar: <strong>${doc.title}</strong>.<br>Presiona "Iniciar Simulación" para ver la cooperación IA + RPA.</p>
+                    </div>
+                `;
+                document.getElementById("simGlowLed").className = "w-2.5 h-2.5 rounded-full bg-slate-600";
+            }
+            else if (simStep === 1) {
+                // Scanning
+                canvas.innerHTML = `
+                    <div class="w-full h-full flex flex-col justify-center items-center space-y-4 p-4 relative animate-fade-in">
+                        <!-- Laser document scan visualization -->
+                        <div class="w-40 h-48 bg-slate-900 border border-white/10 rounded-xl p-3 relative overflow-hidden shadow-2xl flex flex-col justify-between">
+                            <div class="absolute top-0 left-0 w-full h-1 bg-green-400 shadow-[0_0_8px_#4ade80] laser-line"></div>
+                            
+                            <div class="space-y-1.5">
+                                <div class="h-2 w-1/3 bg-slate-750 rounded"></div>
+                                <div class="h-1 w-full bg-slate-800 rounded"></div>
+                                <div class="h-1 w-5/6 bg-slate-800 rounded"></div>
+                            </div>
+                            
+                            <div class="space-y-1">
+                                <div class="h-2.5 w-1/2 bg-sena-green/10 border border-sena-green/30 text-[6px] text-sena-green font-bold rounded flex items-center gap-1 p-0.5 truncate">✓ ${doc.solicitante}</div>
+                                <div class="h-2.5 w-2/3 bg-cyan-500/10 border border-cyan-500/30 text-[6px] text-cyan-400 font-bold rounded flex items-center gap-1 p-0.5 truncate">✓ C.C: ${doc.cedula}</div>
+                            </div>
+                        </div>
+                        <span class="text-[10px] font-black text-sena-green bg-sena-green/10 px-2 py-0.5 rounded-full uppercase tracking-wider">Cerebro IA Escaneando</span>
+                    </div>
+                `;
+                document.getElementById("simGlowLed").className = "w-2.5 h-2.5 rounded-full bg-sena-green animate-pulse";
+            }
+            else if (simStep === 2) {
+                // Autologin typing visual
+                canvas.innerHTML = `
+                    <div class="w-full h-full flex flex-col justify-center items-center p-3 animate-fade-in">
+                        <div class="w-full max-w-sm bg-white text-slate-800 rounded-2xl p-4 shadow-2xl border border-slate-200 text-[10px] space-y-2">
+                            <div class="flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
+                                <div class="w-2 h-2 rounded-full bg-red-400"></div>
+                                <div class="w-2 h-2 rounded-full bg-yellow-400"></div>
+                                <div class="w-2 h-2 rounded-full bg-green-400"></div>
+                                <span class="text-[8px] font-mono text-slate-400 truncate">login.microsoftonline.com/sso</span>
+                            </div>
+                            <div class="text-center font-bold text-slate-700">Microsoft SSO Institucional</div>
+                            
+                            <div class="space-y-1.5 text-left">
+                                <div>
+                                    <label class="block text-[8px] font-bold text-slate-400">Usuario Corporativo:</label>
+                                    <div class="bg-slate-50 border border-slate-200 p-1 rounded font-mono min-h-[20px] text-slate-700 font-semibold" id="simEmailBox"></div>
+                                </div>
+                                <div>
+                                    <label class="block text-[8px] font-bold text-slate-400">Contraseña:</label>
+                                    <div class="bg-slate-50 border border-slate-200 p-1 rounded font-mono min-h-[20px] text-slate-700 font-semibold" id="simPassBox"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <span class="block text-[9px] text-slate-400 mt-2 font-bold uppercase tracking-wider">Robot RPA digitando credenciales...</span>
+                    </div>
+                `;
+            }
+            else if (simStep === 3) {
+                // MFA Authentication lock
+                canvas.innerHTML = `
+                    <div class="w-full h-full flex flex-col justify-center items-center p-3 animate-fade-in">
+                        <div class="flex gap-4 items-center">
+                            
+                            <!-- Browser Locked -->
+                            <div class="w-32 h-24 bg-slate-900 border border-white/10 rounded-lg p-2 flex flex-col justify-between opacity-50 text-[6px]">
+                                <div class="h-1 bg-red-500/20 rounded w-1/2"></div>
+                                <div class="space-y-1">
+                                    <div class="h-1 bg-slate-800 rounded"></div>
+                                    <div class="h-1 bg-slate-800 rounded"></div>
+                                </div>
+                                <div class="bg-yellow-500/20 border border-yellow-500/30 rounded p-1 text-center font-bold text-yellow-400">
+                                    MFA PENDIENTE
+                                </div>
+                            </div>
+                            
+                            <div class="text-slate-600 font-bold animate-pulse text-xs">➔</div>
+                            
+                            <!-- Mobile Phone -->
+                            <div class="w-32 h-52 bg-slate-900 border border-white/20 rounded-2xl p-2.5 relative shadow-2xl flex flex-col justify-between ${!mfaApproved ? 'phone-vibrate' : ''}">
+                                <div class="w-8 h-2.5 bg-slate-950 rounded-full mx-auto mb-1"></div>
+                                
+                                <div class="bg-slate-950 border border-white/5 rounded-xl p-2 flex-grow flex flex-col justify-between text-center space-y-2 text-[8px]">
+                                    <div class="space-y-1">
+                                        <span class="bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 px-1 py-0.5 rounded-full font-bold uppercase text-[6px]">Seguridad</span>
+                                        <span class="block font-black text-slate-300">¿Aprobar Acceso RPA?</span>
+                                        <span class="block text-[6px] text-slate-500 font-bold">Ip: 192.168.1.15</span>
+                                    </div>
+                                    
+                                    ${!mfaApproved ? `
+                                        <button onclick="approveSimMfa()" class="bg-sena-green hover:bg-emerald-600 text-white font-black py-1 px-2 rounded-lg cursor-pointer transition-all active:scale-95 text-[8px]">
+                                            ✓ APROBAR LOGIN
+                                        </button>
+                                    ` : `
+                                        <div class="bg-emerald-950/30 border border-emerald-500/20 text-emerald-400 font-black py-1 rounded-lg">
+                                            ✓ AUTORIZADO
+                                        </div>
+                                    `}
+                                </div>
+                            </div>
+
+                        </div>
+                        <span class="block text-[9px] text-yellow-400 font-bold animate-pulse mt-4 text-center">
+                            ${!mfaApproved ? 'HAGA CLIC EN "APROBAR LOGIN" EN EL CELULAR DE ARRIBA' : 'MFA verificado de forma exitosa...'}
+                        </span>
+                    </div>
+                `;
+                document.getElementById("simGlowLed").className = "w-2.5 h-2.5 rounded-full bg-yellow-500 animate-pulse";
+            }
+            else if (simStep === 4) {
+                // RPA typing into ECM form
+                canvas.innerHTML = `
+                    <div class="w-full h-full flex flex-col justify-center items-center p-3 animate-fade-in">
+                        <div class="w-full bg-slate-900 border border-white/10 rounded-xl p-3 shadow-2xl text-[8px] space-y-2">
+                            <div class="bg-slate-950 border-b border-white/5 p-1 flex justify-between items-center font-mono text-[7px]">
+                                <span class="text-slate-400 font-bold">ECM GESTOR DOCUMENTAL INSTITUCIONAL</span>
+                                <span class="text-cyan-400 font-bold blink">ESCRIBIENDO...</span>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-2 text-left font-mono">
+                                <div>
+                                    <span class="text-[7px] text-slate-500 block font-bold">EXPEDIENTE:</span>
+                                    <div class="bg-slate-950 border border-white/5 p-1 rounded font-bold text-slate-350">${doc.expediente}</div>
+                                </div>
+                                <div>
+                                    <span class="text-[7px] text-slate-500 block font-bold">TIPOLOGÍA:</span>
+                                    <div class="bg-slate-950 border border-sena-green/30 p-1 rounded font-bold text-sena-green">${doc.type}</div>
+                                </div>
+                                <div>
+                                    <span class="text-[7px] text-slate-500 block font-bold">TITULAR/CIUDADANO:</span>
+                                    <div class="bg-slate-950 border border-white/5 p-1 rounded font-bold text-slate-350 truncate">${doc.solicitante}</div>
+                                </div>
+                                <div>
+                                    <span class="text-[7px] text-slate-500 block font-bold">CÉDULA/NIT:</span>
+                                    <div class="bg-slate-950 border border-white/5 p-1 rounded font-bold text-slate-350">${doc.cedula}</div>
+                                </div>
+                            </div>
+                            
+                            <div class="space-y-1 border-t border-white/5 pt-2 text-left">
+                                <div class="flex justify-between text-[7px] text-slate-400 font-bold">
+                                    <span>Cargando PDF: ${doc.title}</span>
+                                    <span id="simUploadPerc">0%</span>
+                                </div>
+                                <div class="w-full bg-slate-950 h-1 rounded-full overflow-hidden">
+                                    <div class="bg-sena-green h-full w-0 transition-all duration-100" id="simUploadBar"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <span class="block text-[9px] text-cyan-400 mt-2 font-bold uppercase tracking-wider">Robot RPA ingresando datos y cargando documento...</span>
+                    </div>
+                `;
+                document.getElementById("simGlowLed").className = "w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse";
+            }
+            else if (simStep === 5) {
+                // Done successfully
+                canvas.innerHTML = `
+                    <div class="w-full h-full flex flex-col justify-center items-center space-y-3 p-4 animate-fade-in">
+                        <div class="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl shadow-lg shadow-emerald-500/5">✓</div>
+                        <h5 class="text-sm font-black text-emerald-400 font-outfit uppercase">Radicado con Éxito</h5>
+                        
+                        <div class="bg-slate-900 border border-white/5 rounded-xl p-3 text-left w-full text-[9px] space-y-1 leading-relaxed">
+                            <span class="text-sena-green font-bold uppercase block tracking-wider">Resumen IA (Gemini):</span>
+                            <p class="text-slate-400 font-medium font-mono">"${doc.type} radicado en expediente ${doc.expediente} correspondiente a ${doc.solicitante} con documento ${doc.cedula}. Transcripción indexada con 0% de errores de digitación."</p>
+                        </div>
+                    </div>
+                `;
+                document.getElementById("simGlowLed").className = "w-2.5 h-2.5 rounded-full bg-emerald-400";
+            }
+        }
+
+        function runSimulation() {
+            if (simStep > 0) return; // Prevent double trigger
+            
+            const doc = MOCK_DOCS[selectedSimDocId];
+            simLogs = [];
+            simStep = 1;
+            drawSimCanvas();
+
+            // Action triggers & timing sequence
+            logToSimConsole(`[IA] Iniciando escaneo de documento: ${doc.title}...`, 'ia');
+            logToSimConsole(`[IA] Extrayendo estructura semántica y caracteres multimodales...`, 'ia');
+
+            setTimeout(() => {
+                // Scan success, proceed to SSO Login
+                simStep = 2;
+                drawSimCanvas();
+                logToSimConsole(`[IA] Clasificación propuesta: ${doc.type} (Confianza: ${doc.confidence})`, 'ia');
+                logToSimConsole(`[IA] Datos deducidos: Titular="${doc.solicitante}", Id="${doc.cedula}"`, 'ia');
+                logToSimConsole(`[RPA] Iniciando robot. Abriendo navegador institucional...`, 'rpa');
+                logToSimConsole(`[RPA] Redireccionado a inicio de sesión único (Microsoft SSO).`, 'rpa');
+
+                // Simulate typing credentials
+                typeEmailAndPass();
+            }, 2500);
+        }
+
+        function typeEmailAndPass() {
+            const email = 'orador.sena@sena.edu.co';
+            const pass = 'HiperAutomatizacion2026*';
+            
+            const emailBox = document.getElementById("simEmailBox");
+            const passBox = document.getElementById("simPassBox");
+            
+            let i = 0;
+            const emailInterval = setInterval(() => {
+                if (i < email.length) {
+                    if (emailBox) emailBox.innerText = email.substring(0, i + 1) + '|';
+                    i++;
+                } else {
+                    clearInterval(emailInterval);
+                    if (emailBox) emailBox.innerText = email; // Remove cursor character
+                    
+                    logToSimConsole(`[RPA] Digitando contraseña segura corporativa...`, 'rpa');
+                    let j = 0;
+                    const passInterval = setInterval(() => {
+                        if (j < pass.length) {
+                            if (passBox) passBox.innerText = '*'.repeat(j + 1) + '|';
+                            j++;
+                        } else {
+                            clearInterval(passInterval);
+                            if (passBox) passBox.innerText = '*'.repeat(pass.length);
+                            
+                            // SSO validation proceeds to MFA challenge
+                            setTimeout(() => {
+                                simStep = 3;
+                                mfaApproved = false;
+                                drawSimCanvas();
+                                logToSimConsole(`[SEGURIDAD] Autenticación bloqueada por MFA corporativo.`, 'mfa');
+                                logToSimConsole(`[SEGURIDAD] Esperando aprobación manual en celular del expositor...`, 'mfa');
+                            }, 600);
+                        }
+                    }, 30);
+                }
+            }, 30);
+        }
+
+        function approveSimMfa() {
+            mfaApproved = true;
+            drawSimCanvas();
+            logToSimConsole(`[SEGURIDAD] Acceso autorizado en celular. Credencial validada.`, 'ok');
+            logToSimConsole(`[RPA] Login exitoso. Navegando al módulo de radicación del ECM...`, 'rpa');
+
+            setTimeout(() => {
+                // Proceed to RPA data entry
+                simStep = 4;
+                drawSimCanvas();
+                logToSimConsole(`[RPA] Buscando expediente: ${MOCK_DOCS[selectedSimDocId].expediente}`, 'rpa');
+                logToSimConsole(`[RPA] Escribiendo metadato: Titular -> ${MOCK_DOCS[selectedSimDocId].solicitante}`, 'rpa');
+                logToSimConsole(`[RPA] Escribiendo metadato: Cédula -> ${MOCK_DOCS[selectedSimDocId].cedula}`, 'rpa');
+                logToSimConsole(`[RPA] Seleccionando tipología TRD -> ${MOCK_DOCS[selectedSimDocId].type}`, 'rpa');
+                logToSimConsole(`[RPA] Adjuntando y cargando archivo PDF...`, 'rpa');
+
+                // Sim progress bar upload
+                let progress = 0;
+                const uploadInterval = setInterval(() => {
+                    const bar = document.getElementById("simUploadBar");
+                    const perc = document.getElementById("simUploadPerc");
+                    
+                    if (progress < 100) {
+                        progress += 10;
+                        if (bar) bar.style.width = progress + '%';
+                        if (perc) perc.innerText = progress + '%';
+                    } else {
+                        clearInterval(uploadInterval);
+                        
+                        // Final step success
+                        setTimeout(() => {
+                            simStep = 5;
+                            drawSimCanvas();
+                            logToSimConsole(`[RPA] Carga de documento terminada con éxito.`, 'rpa');
+                            logToSimConsole(`[RPA] Archivo guardado simétricamente en OneDrive institucional.`, 'rpa');
+                            logToSimConsole(`[SISTEMA] Radicación exitosa. Flujo terminado en 12.8 segundos.`, 'ok');
+
+                            // Reset button to allow restart
+                            const btnBox = document.getElementById("simActionContainer");
+                            if (btnBox) {
+                                btnBox.innerHTML = `
+                                    <button onclick="resetSim()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs p-3 rounded-xl flex items-center justify-center gap-1.5 transition-all">
+                                        ↻ Reiniciar Simulador
+                                    </button>
+                                `;
+                            }
+                        }, 500);
+                    }
+                }, 100);
+
+            }, 1500);
+        }
+
+        function resetSim() {
+            simStep = 0;
+            mfaApproved = false;
+            simLogs = [];
+            drawSimCanvas();
+            document.getElementById("simLogs").innerHTML = `<span class="text-slate-600 italic block text-center pt-24">Consola inactiva.</span>`;
+            
+            const btnBox = document.getElementById("simActionContainer");
+            if (btnBox) {
+                btnBox.innerHTML = `
+                    <button onclick="runSimulation()" class="w-full bg-sena-green text-white hover:bg-emerald-600 font-black text-xs p-3 rounded-xl shadow-lg shadow-sena-green/10 flex items-center justify-center gap-1.5 transition-all">
+                        ▶ Iniciar Simulación
+                    </button>
+                `;
+            }
+        }
+
+        // --- KEYBOARD & MOUSE NAVIGATION CONTROLLERS ---
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "ArrowRight") {
+                e.preventDefault();
+                nextSlide();
+            } else if (e.key === "ArrowLeft") {
+                e.preventDefault();
+                prevSlide();
+            } else if (e.key.toLowerCase() === "n") {
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('notes') === 'true') {
+                    e.preventDefault();
+                    toggleNotes();
+                }
+            }
+        });
+
+        // Initialize presentation on load
+        window.onload = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const notesParam = urlParams.get('notes');
+            const toggleBtn = document.getElementById("notesToggleBtn");
+            if (notesParam === 'true') {
+                showPresenterNotes = true;
+                const drawer = document.getElementById("notesDrawer");
+                if (drawer) drawer.classList.remove("translate-x-full");
+                const btnText = document.getElementById("notesBtnText");
+                if (btnText) btnText.innerText = "Ocultar Notas";
+                if (toggleBtn) toggleBtn.style.display = "";
+            } else {
+                showPresenterNotes = false;
+                const drawer = document.getElementById("notesDrawer");
+                if (drawer) drawer.classList.add("translate-x-full");
+                const btnText = document.getElementById("notesBtnText");
+                if (btnText) btnText.innerText = "Ver Notas";
+                if (toggleBtn) toggleBtn.style.display = "none";
+            }
+            renderSlide();
+        };
+    </script>
+</body>
+</html>
