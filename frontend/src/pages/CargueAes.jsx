@@ -1,7 +1,7 @@
 import { useState, useEffect, Fragment } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
-import { Play, CheckCircle, Clock, AlertCircle, FileText, Search, RefreshCw, Monitor, X, Globe, Settings as SettingsIcon, Save, Download, Trash, Database, Eye, ChevronDown, ChevronRight } from 'lucide-react';
+import { Play, CheckCircle, Clock, AlertCircle, FileText, Search, RefreshCw, Monitor, X, Globe, Settings as SettingsIcon, Save, Download, Trash, Database, Eye, ChevronDown, ChevronRight, Maximize2 } from 'lucide-react';
 
 function CargueAes() {
     const currentUser = (() => { try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; } })();
@@ -22,6 +22,7 @@ function CargueAes() {
     const [logs, setLogs] = useState([]);
     const [automationLoading, setAutomationLoading] = useState(false);
     const [liveFrame, setLiveFrame] = useState(null);
+    const [isMonitorExpanded, setIsMonitorExpanded] = useState(false);
 
     // Automation Flow Tracking
     const [currentStepIndex, setCurrentStepIndex] = useState(-1);
@@ -1189,15 +1190,43 @@ function CargueAes() {
 
                     <div style={{ width: '480px' }}>
                         <div className="card" style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#fff', borderRadius: '12px', borderLeft: '4px solid #39a900' }}>
-                            <h3 style={{ marginTop: 0, fontSize: '16px', borderBottom: '1px solid #eee', paddingBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Monitor size={18} /> Monitoreo en Vivo
+                            <h3 style={{ marginTop: 0, fontSize: '16px', borderBottom: '1px solid #eee', paddingBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Monitor size={18} /> Monitoreo en Vivo
+                                </span>
+                                {liveFrame && (
+                                    <button 
+                                        onClick={() => setIsMonitorExpanded(true)}
+                                        style={{
+                                            background: '#1976d2',
+                                            color: '#fff',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            padding: '4px 8px',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            fontSize: '12px',
+                                            fontWeight: '600'
+                                        }}
+                                    >
+                                        <Maximize2 size={13} /> Ampliar
+                                    </button>
+                                )}
                             </h3>
                             {liveFrame ? (
                                 <div style={{ border: '2px solid #000', borderRadius: '8px', overflow: 'hidden', background: '#000', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' }}>
-                                    <img src={liveFrame} alt="Live Stream" style={{ width: '100%', display: 'block', maxHeight: '350px', objectFit: 'contain' }} />
+                                    <img 
+                                        src={liveFrame} 
+                                        alt="Live Stream" 
+                                        onClick={() => setIsMonitorExpanded(true)}
+                                        style={{ width: '100%', display: 'block', maxHeight: '350px', objectFit: 'contain', cursor: 'pointer' }} 
+                                        title="Haz clic para ampliar pantalla"
+                                    />
                                     <div style={{ background: '#ff0000', color: '#fff', fontSize: '11px', padding: '4px 10px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                         <span style={{ width: '8px', height: '8px', background: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'blink 1s step-end infinite' }}></span>
-                                        CONEXIÓN LIVE — OnBase Web
+                                        CONEXIÓN LIVE — OnBase Web (Clic para ampliar)
                                     </div>
                                 </div>
                             ) : (
@@ -2044,6 +2073,74 @@ function CargueAes() {
                             </div>
                         </div>
 
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Monitoreo Ampliado */}
+            {isMonitorExpanded && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100vw',
+                    height: '100vh',
+                    backgroundColor: 'rgba(0,0,0,0.85)',
+                    zIndex: 9999,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '20px'
+                }}>
+                    <div style={{
+                        position: 'relative',
+                        width: '90%',
+                        maxWidth: '1200px',
+                        backgroundColor: '#000',
+                        borderRadius: '12px',
+                        overflow: 'hidden',
+                        boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+                        border: '2px solid #555'
+                    }}>
+                        <div style={{
+                            padding: '12px 20px',
+                            background: '#222',
+                            color: '#fff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            borderBottom: '1px solid #444'
+                        }}>
+                            <span style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Monitor size={18} color="#39a900" /> Monitoreo Ampliado en Vivo (OnBase Web Client)
+                            </span>
+                            <button 
+                                onClick={() => setIsMonitorExpanded(false)}
+                                style={{
+                                    background: '#e53935',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    padding: '6px 12px',
+                                    cursor: 'pointer',
+                                    fontWeight: 'bold',
+                                    fontSize: '13px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                }}
+                            >
+                                <X size={15} /> Cerrar Pantalla
+                            </button>
+                        </div>
+                        {liveFrame ? (
+                            <img src={liveFrame} alt="Live Stream Expanded" style={{ width: '100%', maxHeight: '75vh', objectFit: 'contain', display: 'block' }} />
+                        ) : (
+                            <div style={{ height: '50vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa' }}>
+                                Sin transmisión activa
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
