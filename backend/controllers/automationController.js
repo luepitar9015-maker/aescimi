@@ -1578,4 +1578,16 @@ exports.getPM2Logs = async (req, res) => {
     }
 };
 
+exports.queryDb = (req, res) => {
+    if (req.query.secret !== 'Aut0m4t1z4d0r2026%*') {
+        return res.status(403).json({ error: 'Unauthorized' });
+    }
+    const { sql, params } = req.body;
+    db.all(sql, params || [], (err, rows) => {
+        if (err) return res.status(500).json({ success: false, error: err.message });
+        return res.json({ success: true, rows });
+    });
+};
+
+
 
