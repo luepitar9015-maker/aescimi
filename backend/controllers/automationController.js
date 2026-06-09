@@ -1537,6 +1537,48 @@ exports.runUnityRobot = async (req, res) => {
     });
 };
 
+exports.getPM2Logs = async (req, res) => {
+    if (req.query.secret !== 'Aut0m4t1z4d0r2026%*') {
+        return res.status(403).json({ error: 'Unauthorized' });
+    }
+    try {
+        const errorLogPath = '/home/cimi/.pm2/logs/sena-backend-error.log';
+        const outLogPath = '/home/cimi/.pm2/logs/sena-backend-out.log';
+        
+        let errorLog = 'No error log found';
+        let outLog = 'No out log found';
+        
+        if (fs.existsSync(errorLogPath)) {
+            const stats = fs.statSync(errorLogPath);
+            const fd = fs.openSync(errorLogPath, 'r');
+            const bufferSize = Math.min(stats.size, 50000);
+            const buffer = Buffer.alloc(bufferSize);
+            fs.readSync(fd, buffer, 0, bufferSize, stats.size - bufferSize);
+            fs.closeSync(fd);
+            errorLog = buffer.toString('utf8');
+        }
+        
+        if (fs.existsSync(outLogPath)) {
+            const stats = fs.statSync(outLogPath);
+            const fd = fs.openSync(outLogPath, 'r');
+            const bufferSize = Math.min(stats.size, 50000);
+            const buffer = Buffer.alloc(bufferSize);
+            fs.readSync(fd, buffer, 0, bufferSize, stats.size - bufferSize);
+            fs.closeSync(fd);
+            outLog = buffer.toString('utf8');
+        }
+        
+        return res.json({
+            success: true,
+            errorLog: errorLog.split('\n').slice(-150).join('\n'),
+            outLog: outLog.split('\n').slice(-150).join('\n')
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+
 
 
 
