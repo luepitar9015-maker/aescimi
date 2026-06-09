@@ -1779,23 +1779,55 @@ function CargueAes() {
                                 ><X size={20}/></button>
                             </div>
 
-                            {/* Stats */}
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-                                <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: '12px', padding: '10px 20px', textAlign: 'center', minWidth: '90px' }}>
-                                    <div style={{ fontSize: '24px', fontWeight: '900' }}>{previewData.length}</div>
-                                    <div style={{ fontSize: '10px', color: '#c8e6c9', textTransform: 'uppercase', tracking: '0.1em', marginTop: '2px' }}>Total</div>
+                            {/* Stats and Batch Assignment */}
+                            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '15px', marginTop: '10px' }}>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                                    <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: '12px', padding: '10px 20px', textAlign: 'center', minWidth: '90px' }}>
+                                        <div style={{ fontSize: '24px', fontWeight: '900' }}>{previewData.length}</div>
+                                        <div style={{ fontSize: '10px', color: '#c8e6c9', textTransform: 'uppercase', tracking: '0.1em', marginTop: '2px' }}>Total</div>
+                                    </div>
+                                    <div style={{ background: 'rgba(76,175,80,0.25)', borderRadius: '12px', padding: '10px 20px', textAlign: 'center', minWidth: '90px' }}>
+                                        <div style={{ fontSize: '24px', fontWeight: '900', color: '#a5d6a7' }}>{previewData.filter(e => getRowWarnings(e).length === 0).length}</div>
+                                        <div style={{ fontSize: '10px', color: '#a5d6a7', textTransform: 'uppercase', tracking: '0.1em', marginTop: '2px' }}>Sin errores</div>
+                                    </div>
+                                    <div style={{ background: 'rgba(255,152,0,0.25)', borderRadius: '12px', padding: '10px 20px', textAlign: 'center', minWidth: '90px' }}>
+                                        <div style={{ fontSize: '24px', fontWeight: '900', color: '#ffe082' }}>{previewData.filter(e => getRowWarnings(e).length > 0 && e.subserie).length}</div>
+                                        <div style={{ fontSize: '10px', color: '#ffe082', textTransform: 'uppercase', tracking: '0.1em', marginTop: '2px' }}>Advertencias</div>
+                                    </div>
+                                    <div style={{ background: 'rgba(244,67,54,0.25)', borderRadius: '12px', padding: '10px 20px', textAlign: 'center', minWidth: '90px' }}>
+                                        <div style={{ fontSize: '24px', fontWeight: '900', color: '#ffcdd2' }}>{previewData.filter(e => !e.subserie).length}</div>
+                                        <div style={{ fontSize: '10px', color: '#ffcdd2', textTransform: 'uppercase', tracking: '0.1em', marginTop: '2px' }}>Sin TRD</div>
+                                    </div>
                                 </div>
-                                <div style={{ background: 'rgba(76,175,80,0.25)', borderRadius: '12px', padding: '10px 20px', textAlign: 'center', minWidth: '90px' }}>
-                                    <div style={{ fontSize: '24px', fontWeight: '900', color: '#a5d6a7' }}>{previewData.filter(e => getRowWarnings(e).length === 0).length}</div>
-                                    <div style={{ fontSize: '10px', color: '#a5d6a7', textTransform: 'uppercase', tracking: '0.1em', marginTop: '2px' }}>Sin errores</div>
-                                </div>
-                                <div style={{ background: 'rgba(255,152,0,0.25)', borderRadius: '12px', padding: '10px 20px', textAlign: 'center', minWidth: '90px' }}>
-                                    <div style={{ fontSize: '24px', fontWeight: '900', color: '#ffe082' }}>{previewData.filter(e => getRowWarnings(e).length > 0 && e.subserie).length}</div>
-                                    <div style={{ fontSize: '10px', color: '#ffe082', textTransform: 'uppercase', tracking: '0.1em', marginTop: '2px' }}>Advertencias</div>
-                                </div>
-                                <div style={{ background: 'rgba(244,67,54,0.25)', borderRadius: '12px', padding: '10px 20px', textAlign: 'center', minWidth: '90px' }}>
-                                    <div style={{ fontSize: '24px', fontWeight: '900', color: '#ffcdd2' }}>{previewData.filter(e => !e.subserie).length}</div>
-                                    <div style={{ fontSize: '10px', color: '#ffcdd2', textTransform: 'uppercase', tracking: '0.1em', marginTop: '2px' }}>Sin TRD</div>
+                                
+                                {/* Asignador masivo en el modal */}
+                                <div style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', padding: '10px 15px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <div style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', color: '#e8f5e9' }}>
+                                        Asignar responsable a todo el lote:
+                                    </div>
+                                    <select
+                                        style={{ backgroundColor: '#1b5e20', border: '1px solid #2e7d32', borderRadius: '8px', padding: '8px', fontSize: '12px', color: '#fff', outline: 'none', cursor: 'pointer', minWidth: '200px' }}
+                                        value=""
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            if (!val) return;
+                                            const foundUser = activeUsers.find(u => u.id === parseInt(val));
+                                            if (foundUser && window.confirm(`¿Desea asignar a ${foundUser.full_name} como responsable para TODOS los ${previewData.length} expedientes en vista previa?`)) {
+                                                setPreviewData(prev => prev.map(row => ({
+                                                    ...row,
+                                                    assigned_user_id: foundUser.id,
+                                                    assigned_user_name: foundUser.full_name
+                                                })));
+                                            }
+                                        }}
+                                    >
+                                        <option value="" style={{color: '#111'}}>— Seleccionar responsable —</option>
+                                        {activeUsers.map(u => (
+                                            <option key={u.id} value={u.id} style={{color: '#111'}}>
+                                                {u.full_name} ({u.area || 'Sin área'})
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
                         </div>

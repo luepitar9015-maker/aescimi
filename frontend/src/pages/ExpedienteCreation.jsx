@@ -1238,23 +1238,55 @@ function ExpedienteCreation() {
                                 ><X size={20}/></button>
                             </div>
 
-                            {/* Stats */}
-                            <div className="flex flex-wrap gap-3">
-                                <div className="bg-white/15 rounded-xl px-5 py-2.5 text-center min-w-[90px]">
-                                    <div className="text-2xl font-black">{previewData.length}</div>
-                                    <div className="text-[10px] text-green-200 uppercase tracking-widest">Total</div>
+                            {/* Stats and Batch Assignment */}
+                            <div className="flex flex-wrap items-end justify-between gap-4 mt-2">
+                                <div className="flex flex-wrap gap-3">
+                                    <div className="bg-white/15 rounded-xl px-5 py-2.5 text-center min-w-[90px]">
+                                        <div className="text-2xl font-black">{previewData.length}</div>
+                                        <div className="text-[10px] text-green-200 uppercase tracking-widest">Total</div>
+                                    </div>
+                                    <div className="bg-emerald-500/25 rounded-xl px-5 py-2.5 text-center min-w-[90px]">
+                                        <div className="text-2xl font-black text-emerald-200">{previewData.filter(e => getRowWarnings(e).length === 0).length}</div>
+                                        <div className="text-[10px] text-emerald-300 uppercase tracking-widest">Sin errores</div>
+                                    </div>
+                                    <div className="bg-orange-400/25 rounded-xl px-5 py-2.5 text-center min-w-[90px]">
+                                        <div className="text-2xl font-black text-orange-200">{previewData.filter(e => getRowWarnings(e).length > 0 && e.subserie).length}</div>
+                                        <div className="text-[10px] text-orange-300 uppercase tracking-widest">Advertencias</div>
+                                    </div>
+                                    <div className="bg-red-500/25 rounded-xl px-5 py-2.5 text-center min-w-[90px]">
+                                        <div className="text-2xl font-black text-red-300">{previewData.filter(e => !e.subserie).length}</div>
+                                        <div className="text-[10px] text-red-300 uppercase tracking-widest">Sin TRD</div>
+                                    </div>
                                 </div>
-                                <div className="bg-emerald-500/25 rounded-xl px-5 py-2.5 text-center min-w-[90px]">
-                                    <div className="text-2xl font-black text-emerald-200">{previewData.filter(e => getRowWarnings(e).length === 0).length}</div>
-                                    <div className="text-[10px] text-emerald-300 uppercase tracking-widest">Sin errores</div>
-                                </div>
-                                <div className="bg-orange-400/25 rounded-xl px-5 py-2.5 text-center min-w-[90px]">
-                                    <div className="text-2xl font-black text-orange-200">{previewData.filter(e => getRowWarnings(e).length > 0 && e.subserie).length}</div>
-                                    <div className="text-[10px] text-orange-300 uppercase tracking-widest">Advertencias</div>
-                                </div>
-                                <div className="bg-red-500/25 rounded-xl px-5 py-2.5 text-center min-w-[90px]">
-                                    <div className="text-2xl font-black text-red-300">{previewData.filter(e => !e.subserie).length}</div>
-                                    <div className="text-[10px] text-red-300 uppercase tracking-widest">Sin TRD</div>
+                                
+                                {/* Asignador masivo en el modal */}
+                                <div className="bg-white/10 backdrop-blur-md border border-white/20 p-3 rounded-xl flex items-center gap-3">
+                                    <div className="text-xs font-bold uppercase tracking-wider text-green-100">
+                                        Asignar responsable a todo el lote:
+                                    </div>
+                                    <select
+                                        className="bg-green-900 border border-green-700 rounded-lg p-2 text-xs text-white outline-none focus:ring-1 focus:ring-green-400 cursor-pointer min-w-[200px]"
+                                        value=""
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            if (!val) return;
+                                            const foundUser = activeUsers.find(u => u.id === parseInt(val));
+                                            if (foundUser && window.confirm(`¿Desea asignar a ${foundUser.full_name} como responsable para TODOS los ${previewData.length} expedientes en vista previa?`)) {
+                                                setPreviewData(prev => prev.map(row => ({
+                                                    ...row,
+                                                    assigned_user_id: foundUser.id,
+                                                    assigned_user_name: foundUser.full_name
+                                                })));
+                                            }
+                                        }}
+                                    >
+                                        <option value="" style={{color: '#111'}}>— Seleccionar responsable —</option>
+                                        {activeUsers.map(u => (
+                                            <option key={u.id} value={u.id} style={{color: '#111'}}>
+                                                {u.full_name} ({u.area || 'Sin área'})
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
                         </div>
