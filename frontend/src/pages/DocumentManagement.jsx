@@ -332,10 +332,45 @@ function DocumentManagement() {
     const [expedienteSummary, setExpedienteSummary] = useState(null);
     const [summaryLoading, setSummaryLoading] = useState(false);
 
-    const [activeTextTarget, setActiveTextTarget] = useState(null);
+        const [activeTextTarget, setActiveTextTarget] = useState(null);
+
+    // Merge mode states
+    const [mergeMode, setMergeMode] = useState(false);
+    const [mergedTypologyId, setMergedTypologyId] = useState('');
+    const [mergedTypologyName, setMergedTypologyName] = useState('');
+    const [mergedDate, setMergedDate] = useState('');
+    const [mergedOrigen, setMergedOrigen] = useState('ELECTRONICO');
+    const [mergedAddText, setMergedAddText] = useState('no');
+    const [mergedText, setMergedText] = useState('');
+
+    const moveFile = (index, direction) => {
+        setFiles(prev => {
+            const updated = [...prev];
+            const targetIndex = index + direction;
+            if (targetIndex >= 0 && targetIndex < updated.length) {
+                const temp = updated[index];
+                updated[index] = updated[targetIndex];
+                updated[targetIndex] = temp;
+                
+                // Adjust preview index accordingly
+                if (previewIdx === index) setPreviewIdx(targetIndex);
+                else if (previewIdx === targetIndex) setPreviewIdx(index);
+            }
+            return updated;
+        });
+    };
 
     // Automatically set active text target when previewed file changes or text options change
     useEffect(() => {
+        if (mergeMode) {
+            if (mergedAddText === 'si') {
+                setActiveTextTarget({ type: 'merged' });
+            } else {
+                setActiveTextTarget(null);
+            }
+            return;
+        }
+
         if (previewIdx === null || !files[previewIdx]) {
             setActiveTextTarget(null);
             return;
@@ -368,7 +403,7 @@ function DocumentManagement() {
                 });
             }
         }
-    }, [previewIdx, files[previewIdx]?.addTextOption, files[previewIdx]?.isSplit]);
+    }, [previewIdx, files[previewIdx]?.addTextOption, files[previewIdx]?.isSplit, mergeMode, mergedAddText]);
 
     const handleOcrTextExtracted = (extractedText) => {
         if (!activeTextTarget) return;
@@ -400,6 +435,8 @@ function DocumentManagement() {
                 const newText = currentText ? `${currentText}\n${extractedText}` : extractedText;
                 return { ...prev, newDescription: newText };
             });
+        } else if (activeTextTarget.type === 'merged') {
+            setMergedText(prev => prev ? `${prev}\n${extractedText}` : extractedText);
         }
     };
 
@@ -416,6 +453,9 @@ function DocumentManagement() {
         }
         if (activeTextTarget.type === 'edit') {
             return editingDoc ? `Editar descripción de "${editingDoc.filename}"` : 'Editar descripción';
+        }
+        if (activeTextTarget.type === 'merged') {
+            return 'Texto de documento unido';
         }
         return null;
     };
@@ -463,6 +503,22 @@ function DocumentManagement() {
         setFiles([]);
         setStatus('');
         setHybridStatus(null);
+        setMergeMode(false);
+        const defaultDate = (() => {
+            if (exp && exp.opening_date) {
+                const od = exp.opening_date;
+                if (od.includes('T')) return od.slice(0, 16);
+                const datePart = od.split(' ')[0].split('T')[0];
+                return `${datePart}T12:00`;
+            }
+            return new Date().toISOString().slice(0, 16);
+        })();
+        setMergedDate(defaultDate);
+        setMergedTypologyId('');
+        setMergedTypologyName('');
+        setMergedOrigen('ELECTRONICO');
+        setMergedAddText('no');
+        setMergedText('');
         
         // Fetch Typologies: matching by subseries code (exp.subserie now stores the code)
         try {
@@ -820,9 +876,59 @@ function DocumentManagement() {
         }
     };
 
-    // Submit / Save - sends each file individually
+    // Submit / Save - sends each file individually or merges them
     const handleSave = async () => {
         if (files.length === 0 || !selectedExpediente) return;
+
+        if (mergeMode) {
+            if (!mergedTypologyName) {
+                alert("Por favor asigne una tipología para el documento unido.");
+                return;
+            }
+            if (mergedAddText === 'si' && !mergedText?.trim()) {
+                alert("Por favor escriba el texto del documento para el PDF unido.");
+                return;
+            }
+
+            setLoading(true);
+            setStatus("Uniendo y guardando archivos en un solo PDF...");
+
+            const formData = new FormData();
+            files.forEach(f => {
+                formData.append('files', f.file);
+            });
+            formData.append('expediente', JSON.stringify(selectedExpediente));
+            formData.append('typology_name', mergedTypologyName);
+            formData.append('document_date', mergedDate);
+            formData.append('origen', hybridStatus === 'no' ? 'ELECTRONICO' : mergedOrigen);
+            formData.append('description', mergedText);
+
+            try {
+                const token = localStorage.getItem('token');
+                const res = await axios.post('/api/documents/merge-upload', formData, {
+                    headers: { 
+                        'Content-Type': 'multipart/form-data',
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                setLoading(false);
+                const pathMsg = res.data.storage_path ? `\nGuardado en: ${res.data.storage_path}` : '';
+                setStatus(`¡Documentos unidos y guardados en OneDrive exitosamente!${pathMsg}`);
+                setFiles([]);
+                setPreviewIdx(null);
+                setMergeMode(false);
+                setMergedTypologyId('');
+                setMergedTypologyName('');
+                setMergedAddText('no');
+                setMergedText('');
+                fetchSavedDocs();
+            } catch (err) {
+                setLoading(false);
+                console.error(err);
+                setStatus('Error al unir y guardar: ' + (err.response?.data?.error || err.message));
+            }
+            return;
+        }
 
         // Validation
         for (const f of files) {
@@ -1218,6 +1324,106 @@ function DocumentManagement() {
                                         </div>
                                     </div>
 
+                                    {/* Toggle merge mode */}
+                                    {files.length >= 2 && (
+                                        <div className="bg-green-50 border border-green-200 rounded-lg p-2.5 flex items-center justify-between shadow-sm">
+                                            <label className="flex items-center gap-2 cursor-pointer select-none w-full">
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={mergeMode} 
+                                                    onChange={(e) => setMergeMode(e.target.checked)}
+                                                    className="w-4 h-4 text-green-600 rounded focus:ring-green-500 focus:ring-opacity-25"
+                                                />
+                                                <span className="text-xs font-bold text-green-800 uppercase">Unir en 1 solo PDF</span>
+                                            </label>
+                                        </div>
+                                    )}
+
+                                    {/* Merge mode configuration card */}
+                                    {mergeMode && (
+                                        <div className="bg-green-50 border-2 border-green-200 rounded-lg p-3 space-y-3 shadow-sm">
+                                            <h4 className="text-xs font-bold text-green-800 uppercase tracking-wide">Configuración PDF Unido</h4>
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Fecha de Creación Documento</label>
+                                                <input 
+                                                    type="datetime-local" 
+                                                    className="w-full p-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-green-500 outline-none bg-white"
+                                                    value={mergedDate}
+                                                    onChange={(e) => setMergedDate(e.target.value)}
+                                                />
+                                            </div>
+                                            {hybridStatus === 'yes' && (
+                                                <div>
+                                                    <label className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Soporte Documento</label>
+                                                    <select 
+                                                        className="w-full p-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-green-500 outline-none bg-white font-bold"
+                                                        value={mergedOrigen}
+                                                        onChange={(e) => setMergedOrigen(e.target.value)}
+                                                    >
+                                                        <option value="ELECTRONICO">ELECTRÓNICO</option>
+                                                        <option value="FISICO">FÍSICO</option>
+                                                    </select>
+                                                </div>
+                                            )}
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Tipología</label>
+                                                <select
+                                                    className={`w-full p-1.5 border rounded text-xs focus:ring-2 focus:ring-green-500 outline-none bg-white ${
+                                                        !mergedTypologyId ? 'border-orange-300 bg-orange-50/50' : 'border-gray-300'
+                                                    }`}
+                                                    value={mergedTypologyId}
+                                                    onChange={(e) => {
+                                                        const id = e.target.value;
+                                                        const typ = typologies.find(t => t.id == id);
+                                                        setMergedTypologyId(id);
+                                                        setMergedTypologyName(typ ? typ.name : '');
+                                                    }}
+                                                >
+                                                    <option value="">-- Tipología --</option>
+                                                    {typologies.map(t => (
+                                                        <option key={t.id} value={t.id}>{t.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 font-bold uppercase block mb-1">¿Se agregará un texto para el documento unido?</label>
+                                                <select
+                                                    className="w-full p-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-green-500 outline-none bg-white"
+                                                    value={mergedAddText || 'no'}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        setMergedAddText(val);
+                                                        if (val !== 'si') setMergedText('');
+                                                    }}
+                                                >
+                                                    <option value="no">No</option>
+                                                    <option value="si">Sí</option>
+                                                </select>
+                                                {mergedAddText === 'si' && (
+                                                    <div className="mt-1.5 relative">
+                                                        <textarea
+                                                            className={`w-full p-1.5 border rounded text-xs focus:ring-2 focus:ring-green-500 outline-none bg-white transition-all ${
+                                                                activeTextTarget && activeTextTarget.type === 'merged'
+                                                                    ? 'border-green-600 ring-2 ring-green-200'
+                                                                    : 'border-green-300'
+                                                            }`}
+                                                            rows="3"
+                                                            placeholder="Escriba o extraiga el texto del documento unido aquí..."
+                                                            value={mergedText || ''}
+                                                            onFocus={() => setActiveTextTarget({ type: 'merged' })}
+                                                            onChange={(e) => setMergedText(e.target.value)}
+                                                        />
+                                                        {activeTextTarget && activeTextTarget.type === 'merged' && (
+                                                            <div className="absolute top-1 right-2 bg-green-600 text-white text-[9px] font-bold px-1 py-0.5 rounded shadow-sm">
+                                                                Captura activa
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
                                         {files.map((entry, idx) => (
                                             <div
@@ -1241,113 +1447,117 @@ function DocumentManagement() {
                                                         </div>
                                                         <div className="flex items-center gap-2 mt-1">
                                                             <span className="text-[10px] text-gray-400">{(entry.file.size / 1024).toFixed(0)} KB</span>
-                                                            <label className="flex items-center gap-1 cursor-pointer select-none">
-                                                                <input 
-                                                                    type="checkbox" 
-                                                                    checked={entry.isSplit} 
-                                                                    onChange={() => toggleSplit(idx)}
-                                                                    className="w-3 h-3 text-green-600 rounded"
-                                                                />
-                                                                <span className="text-[10px] font-bold text-green-700 uppercase">Dividir</span>
-                                                            </label>
-                                                        </div>
-
-                                                        <div className="mt-2 text-xs">
-                                                            <label className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Fecha de Creación Documento</label>
-                                                            <input 
-                                                                type="datetime-local" 
-                                                                className="w-full p-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-green-500 outline-none mb-2"
-                                                                value={entry.creationDate}
-                                                                onChange={(e) => updateFileDate(idx, e.target.value)}
-                                                            />
-                                                            {hybridStatus === 'yes' && (
-                                                                <>
-                                                                    <label className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Soporte Documento</label>
-                                                                    <select 
-                                                                        className="w-full p-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-green-500 outline-none mb-2 bg-gray-50"
-                                                                        value={entry.origen}
-                                                                        onChange={(e) => {
-                                                                            setFiles(prev => prev.map((f, i) => i === idx ? { ...f, origen: e.target.value } : f));
-                                                                        }}
-                                                                    >
-                                                        <option value="ELECTRONICO">ELECTRÓNICO</option>
-                                                                        <option value="FISICO">FÍSICO</option>
-                                                                    </select>
-                                                                </>
+                                                            {!mergeMode && (
+                                                                <label className="flex items-center gap-1 cursor-pointer select-none">
+                                                                    <input 
+                                                                        type="checkbox" 
+                                                                        checked={entry.isSplit} 
+                                                                        onChange={() => toggleSplit(idx)}
+                                                                        className="w-3 h-3 text-green-600 rounded"
+                                                                    />
+                                                                    <span className="text-[10px] font-bold text-green-700 uppercase">Dividir</span>
+                                                                </label>
                                                             )}
                                                         </div>
-                                                            
-                                                            {/* Single Mode */}
-                                                            {!entry.isSplit && (
-                                                                <div className="mt-2 space-y-2">
-                                                                    <div>
-                                                                        <div className="flex items-center justify-between mb-1">
-                                                                            <label className="text-[10px] text-gray-400 font-bold uppercase">Tipología</label>
-                                                                            {entry.file.type === 'application/pdf' && (
-                                                                                <button 
-                                                                                    type="button" 
-                                                                                    onClick={(e) => { e.stopPropagation(); classifyFileWithAI(entry.id, entry.file); }}
-                                                                                    disabled={entry.aiAnalysisStatus === 'loading'}
-                                                                                    className="text-[9px] font-bold text-white bg-indigo-500 hover:bg-indigo-600 px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors"
-                                                                                >
-                                                                                    {entry.aiAnalysisStatus === 'loading' ? 'Procesando...' : '✨ Sugerir IA'}
-                                                                                </button>
-                                                                            )}
-                                                                        </div>
-                                                                        <select
-                                                                            className={`w-full p-1.5 border rounded text-xs focus:ring-2 focus:ring-green-500 outline-none ${
-                                                                                !entry.typologyId ? 'border-orange-300 bg-orange-50' : 'border-gray-300'
-                                                                            }`}
-                                                                            value={entry.typologyId}
-                                                                            onChange={(e) => updateFileTypology(idx, e.target.value)}
-                                                                        >
-                                                                            <option value="">-- Tipología --</option>
-                                                                            {typologies.map(t => (
-                                                                                <option key={t.id} value={t.id}>{t.name}</option>
-                                                                            ))}
-                                                                        </select>
 
-                                                                        {/* AI Analysis Suggestion & Validation Box */}
-                                                                        {entry.aiAnalysisStatus === 'loading' && (
-                                                                            <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-[10px] text-blue-800 animate-pulse flex items-center gap-1.5 font-medium">
-                                                                                <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                                                                                <span>Analizando documento con IA...</span>
-                                                                            </div>
-                                                                        )}
-                                                                        {entry.aiAnalysisStatus === 'success' && (
-                                                                            <div className="mt-2 p-2.5 bg-indigo-50 border border-indigo-200 rounded-lg text-[10px] text-indigo-900 shadow-sm space-y-1">
-                                                                                <div className="flex items-center justify-between">
-                                                                                    <span className="font-bold text-indigo-800 flex items-center gap-1">✨ Análisis de IA</span>
-                                                                                    <span className="bg-indigo-100 text-indigo-700 text-[9px] px-1.5 py-0.2 rounded-full font-bold">
-                                                                                        {entry.aiConfidence}% conf.
-                                                                                    </span>
-                                                                                </div>
-                                                                                <div>
-                                                                                    <span className="font-semibold text-gray-700">Sugerencia:</span>{" "}
-                                                                                    <span className="font-bold text-indigo-900">{entry.aiSuggestedTypology}</span>
-                                                                                </div>
-                                                                                <div className="text-gray-600 italic leading-relaxed pt-0.5 border-t border-indigo-100/50">
-                                                                                    "{entry.aiReason}"
-                                                                                </div>
-                                                                                <div className="text-[9px] text-green-700 font-bold flex items-center gap-1 pt-1">
-                                                                                    <span>✓</span>
-                                                                                    <span>Por favor, verifique y confirme la tipología seleccionada arriba.</span>
-                                                                                </div>
-                                                                            </div>
-                                                                        )}
-                                                                        {entry.aiAnalysisStatus === 'error' && (
-                                                                            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-[10px] text-red-800 flex items-center gap-1 font-medium">
-                                                                                <span>⚠️ Error al clasificar con IA.</span>
-                                                                                <button 
-                                                                                    type="button" 
-                                                                                    onClick={(e) => { e.stopPropagation(); classifyFileWithAI(entry.id, entry.file); }}
-                                                                                    className="text-red-700 underline font-bold hover:text-red-900 ml-auto"
-                                                                                >
-                                                                                    Reintentar
-                                                                                </button>
-                                                                            </div>
+                                                        {!mergeMode && (
+                                                            <div className="mt-2 text-xs">
+                                                                <label className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Fecha de Creación Documento</label>
+                                                                <input 
+                                                                    type="datetime-local" 
+                                                                    className="w-full p-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-green-500 outline-none mb-2"
+                                                                    value={entry.creationDate}
+                                                                    onChange={(e) => updateFileDate(idx, e.target.value)}
+                                                                />
+                                                                {hybridStatus === 'yes' && (
+                                                                    <>
+                                                                        <label className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Soporte Documento</label>
+                                                                        <select 
+                                                                            className="w-full p-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-green-500 outline-none mb-2 bg-gray-50"
+                                                                            value={entry.origen}
+                                                                            onChange={(e) => {
+                                                                                setFiles(prev => prev.map((f, i) => i === idx ? { ...f, origen: e.target.value } : f));
+                                                                            }}
+                                                                        >
+                                                                            <option value="ELECTRONICO">ELECTRÓNICO</option>
+                                                                            <option value="FISICO">FÍSICO</option>
+                                                                        </select>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                            
+                                                        {/* Single Mode */}
+                                                        {!mergeMode && !entry.isSplit && (
+                                                            <div className="mt-2 space-y-2">
+                                                                <div>
+                                                                    <div className="flex items-center justify-between mb-1">
+                                                                        <label className="text-[10px] text-gray-400 font-bold uppercase">Tipología</label>
+                                                                        {entry.file.type === 'application/pdf' && (
+                                                                            <button 
+                                                                                type="button" 
+                                                                                onClick={(e) => { e.stopPropagation(); classifyFileWithAI(entry.id, entry.file); }}
+                                                                                disabled={entry.aiAnalysisStatus === 'loading'}
+                                                                                className="text-[9px] font-bold text-white bg-indigo-500 hover:bg-indigo-600 px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors"
+                                                                            >
+                                                                                {entry.aiAnalysisStatus === 'loading' ? 'Procesando...' : '✨ Sugerir IA'}
+                                                                            </button>
                                                                         )}
                                                                     </div>
+                                                                    <select
+                                                                        className={`w-full p-1.5 border rounded text-xs focus:ring-2 focus:ring-green-500 outline-none ${
+                                                                            !entry.typologyId ? 'border-orange-300 bg-orange-50' : 'border-gray-300'
+                                                                        }`}
+                                                                        value={entry.typologyId}
+                                                                        onChange={(e) => updateFileTypology(idx, e.target.value)}
+                                                                    >
+                                                                        <option value="">-- Tipología --</option>
+                                                                        {typologies.map(t => (
+                                                                            <option key={t.id} value={t.id}>{t.name}</option>
+                                                                        ))}
+                                                                    </select>
+
+                                                                    {/* AI Analysis Suggestion & Validation Box */}
+                                                                    {entry.aiAnalysisStatus === 'loading' && (
+                                                                        <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-[10px] text-blue-800 animate-pulse flex items-center gap-1.5 font-medium">
+                                                                            <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                                                            <span>Analizando documento con IA...</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {entry.aiAnalysisStatus === 'success' && (
+                                                                        <div className="mt-2 p-2.5 bg-indigo-50 border border-indigo-200 rounded-lg text-[10px] text-indigo-900 shadow-sm space-y-1">
+                                                                            <div className="flex items-center justify-between">
+                                                                                <span className="font-bold text-indigo-800 flex items-center gap-1">✨ Análisis de IA</span>
+                                                                                <span className="bg-indigo-100 text-indigo-700 text-[9px] px-1.5 py-0.2 rounded-full font-bold">
+                                                                                    {entry.aiConfidence}% conf.
+                                                                                </span>
+                                                                            </div>
+                                                                            <div>
+                                                                                <span className="font-semibold text-gray-700">Sugerencia:</span>{" "}
+                                                                                <span className="font-bold text-indigo-900">{entry.aiSuggestedTypology}</span>
+                                                                            </div>
+                                                                            <div className="text-gray-600 italic leading-relaxed pt-0.5 border-t border-indigo-100/50">
+                                                                                "{entry.aiReason}"
+                                                                            </div>
+                                                                            <div className="text-[9px] text-green-700 font-bold flex items-center gap-1 pt-1">
+                                                                                <span>✓</span>
+                                                                                <span>Por favor, verifique y confirme la tipología seleccionada arriba.</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                    {entry.aiAnalysisStatus === 'error' && (
+                                                                        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-[10px] text-red-800 flex items-center gap-1 font-medium">
+                                                                            <span>⚠️ Error al clasificar con IA.</span>
+                                                                            <button 
+                                                                                type="button" 
+                                                                                onClick={(e) => { e.stopPropagation(); classifyFileWithAI(entry.id, entry.file); }}
+                                                                                className="text-red-700 underline font-bold hover:text-red-900 ml-auto"
+                                                                            >
+                                                                                Reintentar
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
 
                                                                 <div>
                                                                     <label className="text-[10px] text-gray-400 font-bold uppercase block mb-1">¿Se agregará un texto para el documento?</label>
@@ -1391,7 +1601,7 @@ function DocumentManagement() {
                                                         )}
 
                                                         {/* Split Mode */}
-                                                        {entry.isSplit && (
+                                                        {!mergeMode && entry.isSplit && (
                                                             <div className="mt-3 space-y-2 border-l-2 border-green-200 pl-2">
                                                                 {entry.ranges.map((range, ridx) => (
                                                                     <div key={ridx} className="bg-white border rounded p-2 text-[10px] space-y-2 relative group">
@@ -1462,6 +1672,31 @@ function DocumentManagement() {
                                                                     className="w-full py-1 text-[10px] bg-green-50 text-green-700 border border-green-200 border-dashed rounded hover:bg-green-100 font-bold"
                                                                 >
                                                                     + Agregar rango
+                                                                </button>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Reordering Controls in Merge Mode */}
+                                                        {mergeMode && (
+                                                            <div className="flex items-center gap-1.5 mt-2 bg-gray-50 border border-gray-200 rounded p-1">
+                                                                <span className="text-[10px] font-bold text-gray-500 uppercase flex-1">Orden:</span>
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={idx === 0}
+                                                                    onClick={(e) => { e.stopPropagation(); moveFile(idx, -1); }}
+                                                                    className="px-2 py-0.5 text-xs bg-white hover:bg-gray-100 border rounded font-bold disabled:opacity-50"
+                                                                    title="Subir orden"
+                                                                >
+                                                                    ▲
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={idx === files.length - 1}
+                                                                    onClick={(e) => { e.stopPropagation(); moveFile(idx, 1); }}
+                                                                    className="px-2 py-0.5 text-xs bg-white hover:bg-gray-100 border rounded font-bold disabled:opacity-50"
+                                                                    title="Bajar orden"
+                                                                >
+                                                                    ▼
                                                                 </button>
                                                             </div>
                                                         )}

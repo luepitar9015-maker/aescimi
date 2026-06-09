@@ -6,6 +6,7 @@ const fs = require('fs');
 const { PDFDocument } = require('pdf-lib');
 const db = require('../database');
 const sharp = require('sharp');
+const { requireAuth } = require('../middleware/authMiddleware');
 
 // Configure Multer storage
 const storage = multer.diskStorage({
@@ -24,7 +25,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // POST /upload - Process and Save Document
-router.post('/upload', upload.single('file'), async (req, res) => {
+router.post('/upload', requireAuth, upload.single('file'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
     const { split, origen = 'DIGITALIZADO' } = req.body;
@@ -942,6 +943,334 @@ router.get('/file/:id', async (req, res) => {
             primaryPath
         });
     });
+});
+
+// POST /merge-upload - Merge multiple files into one PDF and save
+router.post('/merge-upload', requireAuth, upload.array('files'), async (req, res) => {
+    if (!req.files || req.files.length < 2) {
+        return res.status(400).json({ error: 'Se requieren al menos 2 archivos para unir.' });
+    }
+
+    const { typology_name, origen = 'DIGITALIZADO', description = '' } = req.body;
+    if (!typology_name) {
+        return res.status(400).json({ error: 'La tipología es requerida para el documento resultante.' });
+    }
+
+    try {
+        const expediente = JSON.parse(req.body.expediente || '{}');
+        if (!expediente || !expediente.id) {
+            return res.status(400).json({ error: 'El expediente de destino es requerido.' });
+        }
+
+        // 1. LOOKUP TRD CODES AND STORAGE PATH
+        const trdInfo = await new Promise((resolve, reject) => {
+            const query = `
+                SELECT 
+                    sub.subseries_code, sub.subseries_name, sub.folder_hierarchy as sub_hierarchy,
+                    ser.series_code, ser.series_name, ser.folder_hierarchy as ser_hierarchy,
+                    org.section_code, org.subsection_code, org.regional_code, org.center_code,
+                    org.storage_path, org.entity_name, org.regional_name, org.center_name,
+                    ser.id as series_id, sub.id as id, org.id as dependency_id
+                FROM expedientes e
+                LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie LIKE '%-' || sub.subseries_code)
+                LEFT JOIN trd_series ser ON (e.subserie = ser.series_code OR e.subserie LIKE '%-' || ser.series_code OR sub.series_id = ser.id)
+                LEFT JOIN organization_structure org ON ser.dependency_id = org.id
+                WHERE e.id = ?
+                LIMIT 1
+            `;
+            db.get(query, [expediente.id], (err, row) => {
+                if (err) reject(err);
+                else resolve(row);
+            });
+        });
+
+        // 2. CHECK PERMISSIONS
+        if (req.user && req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+            const hasPerm = await new Promise((resolve) => {
+                const q = `
+                    SELECT can_upload FROM user_trd_permissions 
+                    WHERE user_id = $1 AND (series_id = $2 OR subseries_id = $3)
+                    ORDER BY can_upload DESC LIMIT 1
+                `;
+                db.get(q, [req.user.id, trdInfo?.series_id || null, trdInfo?.id || null], (err, row) => {
+                    resolve(row ? row.can_upload === 1 : false);
+                });
+            });
+            if (!hasPerm) {
+                return res.status(403).json({ error: 'No tiene permisos para cargar documentos en esta Serie/Subserie.' });
+            }
+        }
+
+        // 3. BUILD PATH
+        const getSystemSetting = (key) => new Promise((resolve) => {
+            db.get("SELECT value FROM system_settings WHERE key = ?", [key], (err, row) => {
+                if (err || !row) resolve(null);
+                else resolve(row.value);
+            });
+        });
+
+        const globalHierarchy = await getSystemSetting('folder_hierarchy');
+        let hierarchy = [];
+        try {
+            const raw = trdInfo?.sub_hierarchy || trdInfo?.ser_hierarchy || globalHierarchy;
+            hierarchy = raw ? JSON.parse(raw) : [{ type: 'dep' }, { type: 'ser' }, { type: 'meta_1' }];
+        } catch (e) { hierarchy = [{ type: 'dep' }, { type: 'ser' }, { type: 'meta_1' }]; }
+
+        let metaValues = {};
+        try {
+            metaValues = typeof expediente.metadata_values === 'string'
+                ? JSON.parse(expediente.metadata_values || '{}')
+                : (expediente.metadata_values || {});
+        } catch (e) { metaValues = {}; }
+
+        const getCleanSuffix = (fullCode, separator) => {
+            if (!fullCode) return '';
+            const parts = String(fullCode).split(separator);
+            return parts[parts.length - 1].replace(/[.-]/g, '');
+        };
+
+        const regCode = trdInfo?.regional_code || '68';
+        const ctrCode = trdInfo?.center_code || '9224';
+        const serieSuffix = getCleanSuffix(trdInfo?.series_code, '-');
+        const subserieSuffix = getCleanSuffix(trdInfo?.subseries_code, '.');
+
+        const basePath = process.env.LOCAL_STORAGE_PATH || (await getSystemSetting('storage_path')) || trdInfo?.storage_path || path.join(__dirname, '../uploads/Gestion_Documental');
+        const backupBasePath = await getSystemSetting('backup_path');
+
+        const getTypologyMapping = (name) => new Promise((resolve) => {
+            db.get("SELECT document_type_value FROM trd_typologies WHERE typology_name = ?", [name], (err, row) => {
+                resolve(row?.document_type_value || null);
+            });
+        });
+        const typValue = await getTypologyMapping(typology_name);
+
+        const rawLevels = hierarchy.map(level => {
+            let value = '';
+            const type = level.type;
+
+            if (type === 'reg') value = regCode;
+            else if (type === 'ctr') value = ctrCode;
+            else if (type === 'dep') value = trdInfo?.section_code || trdInfo?.subsection_code || 'DEP';
+            else if (type === 'dep_conc') value = `${regCode}${ctrCode}`;
+            else if (type === 'ser') value = trdInfo?.series_code || 'SERIE';
+            else if (type === 'ser_name') value = trdInfo?.series_name || 'SERIE';
+            else if (type === 'ser_conc') value = `${regCode}${ctrCode}${serieSuffix}`;
+            else if (type === 'sub') value = trdInfo?.subseries_code || 'SUBSERIE';
+            else if (type === 'sub_name') value = trdInfo?.subseries_name || 'SUBSERIE';
+            else if (type === 'sub_conc') value = `${regCode}${ctrCode}${serieSuffix}${subserieSuffix}`;
+            else if (type === 'typ_val') value = String(typValue || '');
+            else if (type === 'meta_1') {
+                const raw = expediente.title || metaValues['valor1'] || metaValues['Metadato 1'] || '';
+                value = (raw.trim() === 'Sin Título') ? '' : raw;
+            }
+            else if (type.startsWith('meta_')) {
+                const idx = type.split('_')[1];
+                value = metaValues[`valor${idx}`] || metaValues[`Metadato ${idx}`] || '';
+            }
+            
+            return String(value || '')
+                .replace(/[.-]/g, '')
+                .replace(/[<>:"/\\|?*]/g, '') 
+                .trim();
+        });
+
+        const meta1Index = hierarchy.findIndex(h => h.type === 'meta_1');
+        if (meta1Index !== -1 && (!rawLevels[meta1Index] || rawLevels[meta1Index].trim() === '')) {
+            throw new Error(
+                `El expediente "${expediente.title || '(sin título)'}" no tiene título válido.`
+            );
+        }
+
+        const pathParts = rawLevels.filter(v => v.trim() !== '');
+        const expDir = path.join(basePath, ...pathParts);
+
+        if (!fs.existsSync(expDir)) {
+            fs.mkdirSync(expDir, { recursive: true });
+        }
+
+        let backupExpDir = null;
+        if (backupBasePath && backupBasePath.trim() !== '') {
+            backupExpDir = path.join(backupBasePath, ...pathParts);
+            if (!fs.existsSync(backupExpDir)) {
+                try { fs.mkdirSync(backupExpDir, { recursive: true }); } 
+                catch (e) { console.error("[BACKUP] Error creating dir:", e); backupExpDir = null; }
+            }
+        }
+
+        // 4. MERGE FILES INTO A SINGLE PDF
+        const mergedPdf = await PDFDocument.create();
+
+        for (const file of req.files) {
+            const fileBytes = fs.readFileSync(file.path);
+            let pagePdfDoc;
+
+            const ext = path.extname(file.originalname).toLowerCase().trim();
+            const imageExtensions = ['.jpg', '.jpeg', '.png', '.tif', '.tiff'];
+
+            if (imageExtensions.includes(ext)) {
+                const pdfDocTemp = await PDFDocument.create();
+                if (ext === '.tif' || ext === '.tiff') {
+                    const metadata = await sharp(file.path).metadata();
+                    const pages = metadata.pages || 1;
+                    for (let i = 0; i < pages; i++) {
+                        const pageBuffer = await sharp(file.path, { page: i }).jpeg().toBuffer();
+                        const image = await pdfDocTemp.embedJpg(pageBuffer);
+                        const pdfPage = pdfDocTemp.addPage([image.width, image.height]);
+                        pdfPage.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+                    }
+                } else {
+                    const image = ext === '.png' ? await pdfDocTemp.embedPng(fileBytes) : await pdfDocTemp.embedJpg(fileBytes);
+                    const page = pdfDocTemp.addPage([image.width, image.height]);
+                    page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+                }
+                const tempPdfBytes = await pdfDocTemp.save();
+                pagePdfDoc = await PDFDocument.load(tempPdfBytes);
+            } else {
+                pagePdfDoc = await PDFDocument.load(fileBytes);
+            }
+
+            const copiedPages = await mergedPdf.copyPages(pagePdfDoc, pagePdfDoc.getPageIndices());
+            copiedPages.forEach((page) => mergedPdf.addPage(page));
+        }
+
+        // 5. GENERATE FILENAME
+        const getTypologyOrderMap = async (seriesId, subseriesId) => {
+            return new Promise((resolve) => {
+                let q, params;
+                if (subseriesId) {
+                    q = "SELECT typology_name FROM trd_typologies WHERE subseries_id = ? ORDER BY id ASC";
+                    params = [subseriesId];
+                } else if (seriesId) {
+                    q = "SELECT typology_name FROM trd_typologies WHERE series_id = ? ORDER BY id ASC";
+                    params = [seriesId];
+                } else {
+                    return resolve({});
+                }
+                db.all(q, params, (err, rows) => {
+                    const map = {};
+                    if (!err && rows) {
+                        rows.forEach((r, idx) => {
+                            const normalized = r.typology_name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+                            map[normalized] = idx + 1;
+                        });
+                    }
+                    resolve(map);
+                });
+            });
+        };
+
+        const typologyOrderMap = await getTypologyOrderMap(trdInfo?.series_id, trdInfo?.id);
+
+        const getTypologyCountMap = () => {
+            return new Promise((resolve) => {
+                const countQ = "SELECT typology_name, COUNT(id) as total FROM documents WHERE expediente_id = ? GROUP BY typology_name";
+                db.all(countQ, [expediente.id], (err, rows) => {
+                    const map = {};
+                    if (!err && rows) {
+                        rows.forEach(r => map[r.typology_name] = r.total);
+                    }
+                    resolve(map);
+                });
+            });
+        };
+        const typologyCounts = await getTypologyCountMap();
+        typologyCounts[typology_name] = (typologyCounts[typology_name] || 0) + 1;
+
+        const generateFilename = (typName, currentDocIndex) => {
+            const safeName = typName.replace(/[^a-zA-Z0-9\s-_]/g, '').trim();
+            const normalizedTypName = typName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+            const trdOrder = typologyOrderMap[normalizedTypName] || 99;
+            const paddedOrder = String(trdOrder).padStart(2, '0');
+            
+            if (currentDocIndex > 1) {
+                return `${paddedOrder}_${safeName}_${currentDocIndex}.pdf`;
+            }
+            return `${paddedOrder}_${safeName}.pdf`;
+        };
+
+        const filename = generateFilename(typology_name, typologyCounts[typology_name]);
+        const outputPath = path.join(expDir, filename);
+
+        const pdfBytes = await mergedPdf.save();
+        fs.writeFileSync(outputPath, pdfBytes);
+
+        if (backupExpDir) {
+            try {
+                const backupFilePath = path.join(backupExpDir, filename);
+                fs.writeFileSync(backupFilePath, pdfBytes);
+            } catch (e) {
+                console.error("[BACKUP] Error guardando copia de seguridad:", e);
+            }
+        }
+
+        // 6. SAVE RECORD TO DB
+        const saveToDb = (filename, filePath, typologyName, descriptionText = null) => {
+            return new Promise((resolve, reject) => {
+                const query = `INSERT INTO documents (
+                    organization_id, trd_series_id, trd_subseries_id, expediente_id,
+                    filename, path, typology_name, document_date, origen, metadata_values
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                
+                db.run(query, [
+                    trdInfo?.dependency_id || null,
+                    trdInfo?.series_id || null,
+                    trdInfo?.id || null, // subseries_id
+                    expediente.id || null,
+                    filename,
+                    filePath,
+                    typologyName,
+                    req.body.document_date || new Date().toISOString(),
+                    origen,
+                    descriptionText ? JSON.stringify({ description: descriptionText }) : null
+                ], function(err) {
+                    if (err) reject(err);
+                    else resolve(this.lastID);
+                });
+            });
+        };
+
+        await saveToDb(filename, outputPath, typology_name, description);
+
+        // 7. CLEAN UP TEMP FILES
+        for (const file of req.files) {
+            if (fs.existsSync(file.path)) {
+                fs.unlinkSync(file.path);
+            }
+        }
+
+        // Auto-assign
+        if (req.user && expediente.id) {
+            try {
+                const { pool: pgPool } = require('../database_pg');
+                const pkg = await pgPool.query(`
+                    SELECT p.id FROM paquete_items pi
+                    JOIN expediente_paquetes p ON p.id = pi.paquete_id
+                    WHERE pi.expediente_id = $1 AND p.user_id = $2 LIMIT 1
+                `, [expediente.id, req.user.id]);
+                if (pkg.rowCount > 0) {
+                    const paqId = pkg.rows[0].id;
+                    await pgPool.query(`
+                        INSERT INTO expediente_assignments (expediente_id, user_id, assigned_by, paquete_id, estado, observaciones)
+                        VALUES ($1,$2,$2,$3,'En Proceso','Auto-asignado al cargar documento')
+                        ON CONFLICT (expediente_id, user_id) DO UPDATE SET estado='En Proceso', assigned_at=CURRENT_TIMESTAMP
+                    `, [expediente.id, req.user.id, paqId]);
+                }
+            } catch (autoErr) {
+                console.warn('[AUTO-ASIGN] Error (no crítico):', autoErr.message);
+            }
+        }
+
+        res.json({ success: true, file: filename, path: outputPath, storage_path: expDir });
+
+    } catch (err) {
+        console.error("Error merging and saving documents:", err);
+        res.status(500).json({ error: err.message });
+        if (req.files) {
+            for (const file of req.files) {
+                if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+            }
+        }
+    }
 });
 
 module.exports = router;

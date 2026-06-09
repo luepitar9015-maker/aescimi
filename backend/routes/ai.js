@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const pdfParse = require('pdf-parse');
+const { PDFParse } = require('pdf-parse');
 const multer = require('multer');
 const { requireAuth } = require('../middleware/authMiddleware');
 const db = require('../database');
@@ -103,7 +103,8 @@ router.post('/classify-document', requireAuth, upload.single('file'), async (req
         }
 
         // Extraer texto del PDF usando pdf-parse (máximo 3 páginas para ahorrar tokens y tiempo)
-        const pdfData = await pdfParse(req.file.buffer, { max: 3 });
+        const parser = new PDFParse({ data: req.file.buffer });
+        const pdfData = await parser.getText({ first: 1, last: 3 });
         const extractedText = (pdfData.text || '').substring(0, 15000); // Limitar a aprox 15k caracteres
 
         if (!extractedText || extractedText.trim().length === 0) {
