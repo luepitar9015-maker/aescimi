@@ -15,10 +15,7 @@ function tryPassword(pwd) {
 
 async function main() {
     const pwds = [
-        'Aut0m4t1z4d0r2026%*',
-        'Santander2026**',
-        'admin2026',
-        'Sena2025**',
+        'Automatizador2026*',
     ];
     const results = [];
     for (const p of pwds) {
