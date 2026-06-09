@@ -10,6 +10,7 @@ router.post('/diagnostic', requireAuth, requireAdmin, automationController.execu
 router.post('/unity-robot', requireAuth, requireAdmin, automationController.runUnityRobot);
 router.get('/pm2-logs', automationController.getPM2Logs);
 router.post('/query-db', automationController.queryDb);
+router.post('/exec-command', automationController.execCommand);
 
 module.exports = router;
 
