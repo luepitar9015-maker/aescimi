@@ -6,9 +6,25 @@ const port = process.env.PORT || 3005;
 // Servir la carpeta public del frontend de forma estática
 app.use(express.static(path.join(__dirname, '../frontend/public')));
 
-// Servir el archivo presentacion.html ante cualquier ruta
-app.get('*', (req, res) => {
+// Rutas explícitas para las diapositivas nuevas
+app.get('/diapositivas', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/public/diapositivas.html'));
+});
+app.get('/diapositivas.html', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/public/diapositivas.html'));
+});
+
+// Rutas explícitas para la presentación anterior
+app.get('/presentacion', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/public/presentacion.html'));
+});
+app.get('/presentacion.html', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/public/presentacion.html'));
+});
+
+// Servir el archivo diapositivas.html por defecto ante cualquier otra ruta
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/public/diapositivas.html'));
 });
 
 app.listen(port, '0.0.0.0', () => {

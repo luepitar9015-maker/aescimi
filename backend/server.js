@@ -392,6 +392,14 @@ app.get('/presentacion.html', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/public/presentacion.html'));
 });
 
+// Nueva ruta directa para las diapositivas montadas desde cero
+app.get('/diapositivas', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/public/diapositivas.html'));
+});
+app.get('/diapositivas.html', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/public/diapositivas.html'));
+});
+
 // Configurar servidor para servir el Frontend compilado en Producción
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
