@@ -20,6 +20,11 @@ pool.query(`
     )
 `).catch(e => console.warn('[SEGUIMIENTO] Table init error:', e.message));
 
+// Ensure paquete_id column exists if table was created previously without it
+pool.query(`
+    ALTER TABLE expediente_assignments ADD COLUMN IF NOT EXISTS paquete_id INTEGER;
+`).catch(e => console.warn('[SEGUIMIENTO] Column paquete_id patch error:', e.message));
+
 pool.query(`
     CREATE TABLE IF NOT EXISTS expediente_paquetes (
         id SERIAL PRIMARY KEY,

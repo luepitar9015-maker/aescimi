@@ -15,20 +15,21 @@ router.get('/template', (req, res) => {
         'Subserie', 
         'Tipo Almacenamiento', 
         'Titulo',
+        'Responsable',
         'Valor 1', 'Valor 2', 'Valor 3', 'Valor 4',
         'Valor 5', 'Valor 6', 'Valor 7', 'Valor 8'
     ];
     
     // Example data
     const examples = [
-        ['EXP-2026-001', 'CAJA-01', '2026-01-15', '200.1.01', 'Fisico', 'Expediente de Prueba 1', 'Meta 1', 'Meta 2', '', '', '', '', '', ''],
+        ['EXP-2026-001', 'CAJA-01', '2026-01-15', '200.1.01', 'Fisico', 'Expediente de Prueba 1', 'Luis Ernesto Parada Moreno', 'Meta 1', 'Meta 2', '', '', '', '', '', ''],
     ];
 
     const ws = xlsx.utils.aoa_to_sheet([headers, ...examples]);
     
     // Set column widths
     ws['!cols'] = [
-        { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 30 },
+        { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 30 }, { wch: 25 },
         { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }
     ];
 
@@ -45,6 +46,7 @@ router.get('/template', (req, res) => {
         ['Subserie', 'Código de la Subserie o Serie según la TRD', 'SI', '200.1.01'],
         ['Tipo Almacenamiento', 'Fisico o Digital', 'SI', 'Fisico'],
         ['Titulo', 'Nombre descriptivo del expediente', 'SI', 'Expediente de Personal - Juan Perez'],
+        ['Responsable', 'Nombre, documento o correo del responsable asignado', 'NO', 'Luis Ernesto Parada Moreno'],
         ['Valor 1 - 8', 'Metadatos adicionales según la configuración de la Subserie', 'NO', 'Valor'],
         [''],
         ['REGLAS DE CREACIÓN MASIVA:'],
@@ -304,6 +306,7 @@ router.post('/mass', async (req, res) => {
     const errors = [];
     const created_ids = [];
     let created = 0;
+    let updatedCount = 0;
 
     try {
         await client.query('BEGIN');
@@ -349,16 +352,63 @@ router.post('/mass', async (req, res) => {
             const savepointName = `sp_exp_${i}`;
             try {
                 await client.query(`SAVEPOINT ${savepointName}`);
-                const result = await client.query(
-                    `INSERT INTO expedientes 
-                     (expediente_code, box_id, opening_date, subserie, regional, centro, dependencia, storage_type, title, metadata_values) 
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
-                    params
-                );
+                
+                let newId = null;
+                let isUpdate = false;
+                
+                // Verificar si ya existe por expediente_code
+                if (exp.expediente_code) {
+                    const checkRes = await client.query(
+                        `SELECT id FROM expedientes WHERE expediente_code = $1 LIMIT 1`,
+                        [exp.expediente_code]
+                    );
+                    if (checkRes.rowCount > 0) {
+                        newId = checkRes.rows[0].id;
+                        isUpdate = true;
+                    }
+                }
+                
+                if (isUpdate) {
+                    await client.query(
+                        `UPDATE expedientes SET 
+                            box_id = $1, 
+                            opening_date = $2, 
+                            subserie = $3, 
+                            regional = $4, 
+                            centro = $5, 
+                            dependencia = $6, 
+                            storage_type = $7, 
+                            title = $8, 
+                            metadata_values = $9 
+                         WHERE id = $10`,
+                        [
+                            exp.box_id || null,
+                            normalizeDate(exp.opening_date),
+                            exp.subserie || null,
+                            exp.regional || null,
+                            exp.centro || null,
+                            exp.dependencia || null,
+                            exp.storage_type || null,
+                            tituloLimpio,
+                            JSON.stringify(exp.metadata_values || {}),
+                            newId
+                        ]
+                    );
+                    updatedCount++;
+                } else {
+                    const result = await client.query(
+                        `INSERT INTO expedientes 
+                         (expediente_code, box_id, opening_date, subserie, regional, centro, dependencia, storage_type, title, metadata_values) 
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+                        params
+                    );
+                    newId = result.rows[0].id;
+                    created++;
+                }
+                
                 await client.query(`RELEASE SAVEPOINT ${savepointName}`);
-                created++;
-                if (result.rows[0]) {
-                    const newId = result.rows[0].id;
+                
+                if (newId) {
                     created_ids.push(newId);
                     
                     // Asignación individual (Opción B: Excel)
@@ -366,14 +416,17 @@ router.post('/mass', async (req, res) => {
                         await client.query(`
                             INSERT INTO expediente_assignments (expediente_id, user_id, assigned_by, observaciones)
                             VALUES ($1, $2, $3, $4)
-                            ON CONFLICT (expediente_id, user_id) DO NOTHING
-                        `, [newId, exp.assigned_user_id, req.user?.id || null, 'Asignado en creación masiva (Excel)']);
+                            ON CONFLICT (expediente_id, user_id) DO UPDATE
+                                SET assigned_by = EXCLUDED.assigned_by,
+                                    observaciones = EXCLUDED.observaciones,
+                                    assigned_at = CURRENT_TIMESTAMP
+                        `, [newId, exp.assigned_user_id, req.user?.id || null, 'Asignado/Actualizado en creación masiva (Excel)']);
                     }
                 }
             } catch (err) {
                 await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
                 const errMsg = err.detail || err.message;
-                console.error(`[EXPEDIENTES] Error insertando "${exp.expediente_code || exp.title}": ${errMsg}`);
+                console.error(`[EXPEDIENTES] Error insertando/actualizando "${exp.expediente_code || exp.title}": ${errMsg}`);
                 errors.push({ expediente: exp.expediente_code || exp.title || `Fila ${i + 1}`, error: errMsg });
             }
         }
@@ -386,16 +439,19 @@ router.post('/mass', async (req, res) => {
                     await client.query(`
                         INSERT INTO expediente_assignments (expediente_id, user_id, assigned_by, observaciones)
                         VALUES ($1, $2, $3, $4)
-                        ON CONFLICT (expediente_id, user_id) DO NOTHING
+                        ON CONFLICT (expediente_id, user_id) DO UPDATE
+                            SET assigned_by = EXCLUDED.assigned_by,
+                                observaciones = EXCLUDED.observaciones,
+                                assigned_at = CURRENT_TIMESTAMP
                     `, [expId, userId, req.user?.id || null, 'Asignado en creación masiva (Global)']);
                 }
             }
         }
 
         await client.query('COMMIT');
-        console.log(`[EXPEDIENTES] Completado. ${created} creados, ${errors.length} fallidos.`);
+        console.log(`[EXPEDIENTES] Completado. ${created} creados, ${updatedCount} actualizados, ${errors.length} fallidos.`);
         res.json({
-            message: `Procesado. ${created} creados, ${errors.length} fallidos.`,
+            message: `Procesado. ${created} creados, ${updatedCount} actualizados, ${errors.length} fallidos.`,
             errors,
             created_ids
         });
