@@ -630,6 +630,118 @@ router.delete('/:id', (req, res) => {
     });
 });
 
+// GET run-deduplicate manually
+router.get('/run-deduplicate', async (req, res) => {
+    // Only allow admin or superadmin
+    if (req.user && req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'No autorizado' });
+    }
+
+    const { pool } = require('../database_pg');
+    try {
+        console.log('[MANUAL MIGRATION] Running deduplicate...');
+        const queryRes = await pool.query('SELECT id, expediente_code, title, subserie, box_id, metadata_values FROM expedientes');
+        const list = queryRes.rows;
+        
+        const groups = {};
+        for (const row of list) {
+            let key = '';
+            if (row.expediente_code && row.expediente_code.trim() !== '') {
+                key = `code:${row.expediente_code.trim()}`;
+            } else {
+                let metaStr = '';
+                if (row.metadata_values) {
+                    try {
+                        const mObj = typeof row.metadata_values === 'string' ? JSON.parse(row.metadata_values) : row.metadata_values;
+                        metaStr = Object.keys(mObj).sort().map(k => `${k}:${mObj[k]}`).join('|');
+                    } catch (e) {
+                        metaStr = String(row.metadata_values);
+                    }
+                }
+                key = `meta:${(row.title || '').trim().toLowerCase()}|${(row.subserie || '').trim()}|${(row.box_id || '').trim()}|${metaStr}`;
+            }
+            
+            if (!groups[key]) {
+                groups[key] = [];
+            }
+            groups[key].push(row);
+        }
+        
+        let totalDeduplicated = 0;
+        const log = [];
+        
+        for (const key of Object.keys(groups)) {
+            const group = groups[key];
+            if (group.length > 1) {
+                group.sort((a, b) => a.id - b.id);
+                const primaryId = group[0].id;
+                const duplicateIds = group.slice(1).map(r => r.id);
+                
+                log.push(`Grupo duplicado. Primario: ${primaryId}. Duplicados: ${duplicateIds.join(', ')}`);
+                
+                // 1. Move documents
+                const docRes = await pool.query(
+                    'UPDATE documents SET expediente_id = $1 WHERE expediente_id = ANY($2::int[])',
+                    [primaryId, duplicateIds]
+                );
+                log.push(`  Movidos ${docRes.rowCount} documentos al primario ${primaryId}`);
+                
+                // 2. Move assignments
+                for (const dupId of duplicateIds) {
+                    const assignmentsRes = await pool.query(
+                        'SELECT user_id, assigned_by, observaciones, estado FROM expediente_assignments WHERE expediente_id = $1',
+                        [dupId]
+                    );
+                    for (const assign of assignmentsRes.rows) {
+                        await pool.query(`
+                            INSERT INTO expediente_assignments (expediente_id, user_id, assigned_by, observaciones, estado)
+                            VALUES ($1, $2, $3, $4, $5)
+                            ON CONFLICT (expediente_id, user_id) DO NOTHING
+                        `, [primaryId, assign.user_id, assign.assigned_by, assign.observaciones, assign.estado]);
+                    }
+                }
+                const delAssign = await pool.query(
+                    'DELETE FROM expediente_assignments WHERE expediente_id = ANY($1::int[])',
+                    [duplicateIds]
+                );
+                log.push(`  Eliminadas ${delAssign.rowCount} asignaciones de duplicados`);
+
+                // 3. Move package items
+                for (const dupId of duplicateIds) {
+                    await pool.query(`
+                        UPDATE paquete_items SET expediente_id = $1 
+                        WHERE expediente_id = $2
+                        ON CONFLICT (paquete_id, expediente_id) DO NOTHING
+                    `, [primaryId, dupId]);
+                }
+                const delPkg = await pool.query(
+                    'DELETE FROM paquete_items WHERE expediente_id = ANY($1::int[])',
+                    [duplicateIds]
+                );
+                log.push(`  Eliminados ${delPkg.rowCount} items de paquetes de duplicados`);
+                
+                // 4. Delete duplicate expedientes
+                const delRes = await pool.query(
+                    'DELETE FROM expedientes WHERE id = ANY($1::int[])',
+                    [duplicateIds]
+                );
+                log.push(`  Eliminados ${delRes.rowCount} expedientes duplicados de la tabla expedientes`);
+                
+                totalDeduplicated += delRes.rowCount;
+            }
+        }
+        
+        res.json({
+            success: true,
+            totalDeduplicated,
+            log
+        });
+    } catch (err) {
+        console.error('[MANUAL MIGRATION] Error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ──────────────────────────────────────────────────────────────
 // Automatic Migration: Deduplicate expedientes table on startup
 // ──────────────────────────────────────────────────────────────
