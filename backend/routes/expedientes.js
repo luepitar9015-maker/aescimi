@@ -686,39 +686,37 @@ router.get('/run-deduplicate', async (req, res) => {
                 );
                 log.push(`  Movidos ${docRes.rowCount} documentos al primario ${primaryId}`);
                 
-                // 2. Move assignments
-                for (const dupId of duplicateIds) {
-                    const assignmentsRes = await pool.query(
-                        'SELECT user_id, assigned_by, observaciones, estado FROM expediente_assignments WHERE expediente_id = $1',
-                        [dupId]
-                    );
-                    for (const assign of assignmentsRes.rows) {
-                        await pool.query(`
-                            INSERT INTO expediente_assignments (expediente_id, user_id, assigned_by, observaciones, estado)
-                            VALUES ($1, $2, $3, $4, $5)
-                            ON CONFLICT (expediente_id, user_id) DO NOTHING
-                        `, [primaryId, assign.user_id, assign.assigned_by, assign.observaciones, assign.estado]);
-                    }
-                }
-                const delAssign = await pool.query(
-                    'DELETE FROM expediente_assignments WHERE expediente_id = ANY($1::int[])',
-                    [duplicateIds]
-                );
-                log.push(`  Eliminadas ${delAssign.rowCount} asignaciones de duplicados`);
+                // 2. Move assignments (delete duplicates, update others)
+                const delAssignDup = await pool.query(`
+                    DELETE FROM expediente_assignments
+                    WHERE expediente_id = ANY($1::int[])
+                      AND user_id IN (
+                          SELECT user_id FROM expediente_assignments WHERE expediente_id = $2
+                      )
+                `, [duplicateIds, primaryId]);
+                log.push(`  Eliminadas ${delAssignDup.rowCount} asignaciones que causarían conflicto`);
 
-                // 3. Move package items
-                for (const dupId of duplicateIds) {
-                    await pool.query(`
-                        UPDATE paquete_items SET expediente_id = $1 
-                        WHERE expediente_id = $2
-                        ON CONFLICT (paquete_id, expediente_id) DO NOTHING
-                    `, [primaryId, dupId]);
-                }
-                const delPkg = await pool.query(
-                    'DELETE FROM paquete_items WHERE expediente_id = ANY($1::int[])',
-                    [duplicateIds]
+                const updAssign = await pool.query(
+                    'UPDATE expediente_assignments SET expediente_id = $1 WHERE expediente_id = ANY($2::int[])',
+                    [primaryId, duplicateIds]
                 );
-                log.push(`  Eliminados ${delPkg.rowCount} items de paquetes de duplicados`);
+                log.push(`  Movidas ${updAssign.rowCount} asignaciones al primario ${primaryId}`);
+
+                // 3. Move package items (delete duplicates, update others)
+                const delPkgDup = await pool.query(`
+                    DELETE FROM paquete_items 
+                    WHERE expediente_id = ANY($1::int[])
+                      AND paquete_id IN (
+                          SELECT paquete_id FROM paquete_items WHERE expediente_id = $2
+                      )
+                `, [duplicateIds, primaryId]);
+                log.push(`  Eliminados ${delPkgDup.rowCount} items de paquetes que causarían conflicto`);
+
+                const updPkg = await pool.query(
+                    'UPDATE paquete_items SET expediente_id = $1 WHERE expediente_id = ANY($2::int[])',
+                    [primaryId, duplicateIds]
+                );
+                log.push(`  Movidos ${updPkg.rowCount} items de paquetes al primario ${primaryId}`);
                 
                 // 4. Delete duplicate expedientes
                 const delRes = await pool.query(
@@ -802,36 +800,29 @@ router.get('/run-deduplicate', async (req, res) => {
                 );
                 
                 // 2. Move assignments from duplicate expedientes to the primary one
-                for (const dupId of duplicateIds) {
-                    const assignmentsRes = await pool.query(
-                        'SELECT user_id, assigned_by, observaciones, estado FROM expediente_assignments WHERE expediente_id = $1',
-                        [dupId]
-                    );
-                    for (const assign of assignmentsRes.rows) {
-                        await pool.query(`
-                            INSERT INTO expediente_assignments (expediente_id, user_id, assigned_by, observaciones, estado)
-                            VALUES ($1, $2, $3, $4, $5)
-                            ON CONFLICT (expediente_id, user_id) DO NOTHING
-                        `, [primaryId, assign.user_id, assign.assigned_by, assign.observaciones, assign.estado]);
-                    }
-                }
-                // Delete duplicate assignments associated with the duplicates
+                await pool.query(`
+                    DELETE FROM expediente_assignments
+                    WHERE expediente_id = ANY($1::int[])
+                      AND user_id IN (
+                          SELECT user_id FROM expediente_assignments WHERE expediente_id = $2
+                      )
+                `, [duplicateIds, primaryId]);
                 await pool.query(
-                    'DELETE FROM expediente_assignments WHERE expediente_id = ANY($1::int[])',
-                    [duplicateIds]
+                    'UPDATE expediente_assignments SET expediente_id = $1 WHERE expediente_id = ANY($2::int[])',
+                    [primaryId, duplicateIds]
                 );
 
                 // 3. Move items in packages (paquete_items)
-                for (const dupId of duplicateIds) {
-                    await pool.query(`
-                        UPDATE paquete_items SET expediente_id = $1 
-                        WHERE expediente_id = $2
-                        ON CONFLICT (paquete_id, expediente_id) DO NOTHING
-                    `, [primaryId, dupId]);
-                }
+                await pool.query(`
+                    DELETE FROM paquete_items 
+                    WHERE expediente_id = ANY($1::int[])
+                      AND paquete_id IN (
+                          SELECT paquete_id FROM paquete_items WHERE expediente_id = $2
+                      )
+                `, [duplicateIds, primaryId]);
                 await pool.query(
-                    'DELETE FROM paquete_items WHERE expediente_id = ANY($1::int[])',
-                    [duplicateIds]
+                    'UPDATE paquete_items SET expediente_id = $1 WHERE expediente_id = ANY($2::int[])',
+                    [primaryId, duplicateIds]
                 );
                 
                 // 4. Finally delete the duplicate expedientes themselves
