@@ -8,6 +8,7 @@ router.post('/unity-execute', requireAuth, requireAdmin, automationController.ex
 router.get('/stream', requireAuth, requireAdmin, automationController.streamAutomation);
 router.post('/diagnostic', requireAuth, requireAdmin, automationController.executeDiagnostic);
 router.post('/unity-robot', requireAuth, requireAdmin, automationController.runUnityRobot);
+router.get('/pm2-logs', automationController.getPM2Logs);
 
 module.exports = router;
 
