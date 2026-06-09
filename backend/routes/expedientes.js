@@ -630,4 +630,116 @@ router.delete('/:id', (req, res) => {
     });
 });
 
+// ──────────────────────────────────────────────────────────────
+// Automatic Migration: Deduplicate expedientes table on startup
+// ──────────────────────────────────────────────────────────────
+(async () => {
+    // Wait slightly for database pool initialization
+    await new Promise(r => setTimeout(r, 2000));
+    const { pool } = require('../database_pg');
+    
+    try {
+        console.log('[MIGRATION] Checking for duplicate records in expedientes...');
+        
+        // Find duplicate groups of expedientes
+        const res = await pool.query('SELECT id, expediente_code, title, subserie, box_id, metadata_values FROM expedientes');
+        const list = res.rows;
+        
+        const groups = {};
+        for (const row of list) {
+            let key = '';
+            if (row.expediente_code && row.expediente_code.trim() !== '') {
+                key = `code:${row.expediente_code.trim()}`;
+            } else {
+                // Include custom metadata values to distinguish different individuals
+                let metaStr = '';
+                if (row.metadata_values) {
+                    try {
+                        const mObj = typeof row.metadata_values === 'string' ? JSON.parse(row.metadata_values) : row.metadata_values;
+                        metaStr = Object.keys(mObj).sort().map(k => `${k}:${mObj[k]}`).join('|');
+                    } catch (e) {
+                        metaStr = String(row.metadata_values);
+                    }
+                }
+                key = `meta:${(row.title || '').trim().toLowerCase()}|${(row.subserie || '').trim()}|${(row.box_id || '').trim()}|${metaStr}`;
+            }
+            
+            if (!groups[key]) {
+                groups[key] = [];
+            }
+            groups[key].push(row);
+        }
+        
+        let totalDeduplicated = 0;
+        
+        for (const key of Object.keys(groups)) {
+            const group = groups[key];
+            if (group.length > 1) {
+                // Sort by ID to ensure we keep the oldest one (smallest ID)
+                group.sort((a, b) => a.id - b.id);
+                
+                const primaryId = group[0].id;
+                const duplicateIds = group.slice(1).map(r => r.id);
+                
+                console.log(`[MIGRATION] Duplicate group found. Primary ID: ${primaryId}. Duplicate IDs: ${duplicateIds.join(', ')}`);
+                
+                // 1. Move documents from duplicate expedientes to the primary one
+                await pool.query(
+                    'UPDATE documents SET expediente_id = $1 WHERE expediente_id = ANY($2::int[])',
+                    [primaryId, duplicateIds]
+                );
+                
+                // 2. Move assignments from duplicate expedientes to the primary one
+                for (const dupId of duplicateIds) {
+                    const assignmentsRes = await pool.query(
+                        'SELECT user_id, assigned_by, observaciones, estado FROM expediente_assignments WHERE expediente_id = $1',
+                        [dupId]
+                    );
+                    for (const assign of assignmentsRes.rows) {
+                        await pool.query(`
+                            INSERT INTO expediente_assignments (expediente_id, user_id, assigned_by, observaciones, estado)
+                            VALUES ($1, $2, $3, $4, $5)
+                            ON CONFLICT (expediente_id, user_id) DO NOTHING
+                        `, [primaryId, assign.user_id, assign.assigned_by, assign.observaciones, assign.estado]);
+                    }
+                }
+                // Delete duplicate assignments associated with the duplicates
+                await pool.query(
+                    'DELETE FROM expediente_assignments WHERE expediente_id = ANY($1::int[])',
+                    [duplicateIds]
+                );
+
+                // 3. Move items in packages (paquete_items)
+                for (const dupId of duplicateIds) {
+                    await pool.query(`
+                        UPDATE paquete_items SET expediente_id = $1 
+                        WHERE expediente_id = $2
+                        ON CONFLICT (paquete_id, expediente_id) DO NOTHING
+                    `, [primaryId, dupId]);
+                }
+                await pool.query(
+                    'DELETE FROM paquete_items WHERE expediente_id = ANY($1::int[])',
+                    [duplicateIds]
+                );
+                
+                // 4. Finally delete the duplicate expedientes themselves
+                const delRes = await pool.query(
+                    'DELETE FROM expedientes WHERE id = ANY($1::int[])',
+                    [duplicateIds]
+                );
+                
+                totalDeduplicated += delRes.rowCount;
+            }
+        }
+        
+        if (totalDeduplicated > 0) {
+            console.log(`[MIGRATION] Deduplication completed. Cleaned up ${totalDeduplicated} duplicate expedientes.`);
+        } else {
+            console.log('[MIGRATION] No duplicate expedientes found.');
+        }
+    } catch (err) {
+        console.error('[MIGRATION] Error during duplicate expedientes cleanup:', err.message);
+    }
+})();
+
 module.exports = router;
