@@ -25,6 +25,24 @@ pool.query(`
     ALTER TABLE expediente_assignments ADD COLUMN IF NOT EXISTS paquete_id INTEGER;
 `).catch(e => console.warn('[SEGUIMIENTO] Column paquete_id patch error:', e.message));
 
+// Deduplicate and apply UNIQUE constraint to expediente_assignments table
+pool.query(`
+    DELETE FROM expediente_assignments a
+    USING expediente_assignments b
+    WHERE a.id < b.id 
+      AND a.expediente_id = b.expediente_id 
+      AND a.user_id = b.user_id;
+`).then(() => {
+    console.log('[MIGRATION] Duplicates removed from expediente_assignments.');
+    return pool.query(`
+        ALTER TABLE expediente_assignments ADD CONSTRAINT expediente_assignments_unique_exp_user UNIQUE (expediente_id, user_id);
+    `);
+}).then(() => {
+    console.log('[MIGRATION] UNIQUE constraint added to expediente_assignments.');
+}).catch(e => {
+    console.warn('[MIGRATION] Constraint/Deduplication check info:', e.message);
+});
+
 pool.query(`
     CREATE TABLE IF NOT EXISTS expediente_paquetes (
         id SERIAL PRIMARY KEY,
