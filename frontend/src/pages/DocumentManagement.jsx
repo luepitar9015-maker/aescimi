@@ -333,6 +333,11 @@ function DocumentManagement() {
     const [summaryLoading, setSummaryLoading] = useState(false);
 
         const [activeTextTarget, setActiveTextTarget] = useState(null);
+        const activeTextTargetRef = useRef(null);
+
+        useEffect(() => {
+            activeTextTargetRef.current = activeTextTarget;
+        }, [activeTextTarget]);
 
     // Merge mode states
     const [mergeMode, setMergeMode] = useState(false);
@@ -406,18 +411,19 @@ function DocumentManagement() {
     }, [previewIdx, files[previewIdx]?.addTextOption, files[previewIdx]?.isSplit, mergeMode, mergedAddText]);
 
     const handleOcrTextExtracted = (extractedText) => {
-        if (!activeTextTarget) return;
+        const currentTarget = activeTextTargetRef.current;
+        if (!currentTarget) return;
 
-        if (activeTextTarget.type === 'single') {
-            const { fileIdx } = activeTextTarget;
+        if (currentTarget.type === 'single') {
+            const { fileIdx } = currentTarget;
             setFiles(prev => prev.map((f, i) => {
                 if (i !== fileIdx) return f;
                 const currentText = f.documentText || '';
                 const newText = currentText ? `${currentText}\n${extractedText}` : extractedText;
                 return { ...f, documentText: newText };
             }));
-        } else if (activeTextTarget.type === 'split') {
-            const { fileIdx, rangeIdx } = activeTextTarget;
+        } else if (currentTarget.type === 'split') {
+            const { fileIdx, rangeIdx } = currentTarget;
             setFiles(prev => prev.map((f, i) => {
                 if (i !== fileIdx) return f;
                 const newRanges = f.ranges.map((r, ri) => {
@@ -428,14 +434,14 @@ function DocumentManagement() {
                 });
                 return { ...f, ranges: newRanges };
             }));
-        } else if (activeTextTarget.type === 'edit') {
+        } else if (currentTarget.type === 'edit') {
             setEditingDoc(prev => {
                 if (!prev) return null;
                 const currentText = prev.newDescription || '';
                 const newText = currentText ? `${currentText}\n${extractedText}` : extractedText;
                 return { ...prev, newDescription: newText };
             });
-        } else if (activeTextTarget.type === 'merged') {
+        } else if (currentTarget.type === 'merged') {
             setMergedText(prev => prev ? `${prev}\n${extractedText}` : extractedText);
         }
     };
