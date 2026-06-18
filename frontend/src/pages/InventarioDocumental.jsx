@@ -60,6 +60,60 @@ export default function InventarioDocumental() {
             } catch (err) {
                 console.error("Error fetching organization data:", err);
             }
+
+            try {
+                const token = localStorage.getItem('token');
+                const resFuid = await axios.get('/api/expedientes/inventario-fuid', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = resFuid.data.data || [];
+                
+                const mapped = data.map((exp, idx) => {
+                    const typeLower = (exp.storage_type || '').toLowerCase()
+                        .normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // remove accents
+                    
+                    let sop = 'FISICO';
+                    let otro = '';
+                    let caja = '';
+                    
+                    if (typeLower.includes('electronico') || typeLower.includes('digital') || typeLower.includes('virtual')) {
+                        sop = 'ELECTRONICO';
+                        otro = 'X';
+                    } else if (typeLower.includes('hibrido')) {
+                        sop = 'HIBRIDO';
+                        caja = exp.box_id || '';
+                    } else {
+                        sop = 'FISICO';
+                        caja = exp.box_id || '';
+                    }
+
+                    return {
+                        n: idx + 1,
+                        cod: exp.subserie || '',
+                        nombre: exp.title || '',
+                        ini: exp.fecha_inicio || '',
+                        fin: exp.fecha_fin || '',
+                        caja: caja,
+                        carp: '',
+                        tomo: '',
+                        otro: otro,
+                        del: '',
+                        al: '',
+                        sop: sop,
+                        frec: 'ALTA',
+                        notas: ''
+                    };
+                });
+
+                // Pad rows to keep at least 8
+                const finalRows = [...mapped];
+                while (finalRows.length < 8) {
+                    finalRows.push(fila(finalRows.length + 1));
+                }
+                setFilas(finalRows);
+            } catch (err) {
+                console.error("Error fetching FUID inventory data:", err);
+            }
         };
         fetchData();
     }, []);

@@ -68,6 +68,85 @@ router.get('/template', (req, res) => {
     res.send(buffer);
 });
 
+// GET expedientes for FUID document inventory
+router.get('/inventario-fuid', (req, res) => {
+    const baseQuery = `
+        SELECT 
+            e.id, 
+            e.expediente_code, 
+            e.title, 
+            e.box_id, 
+            e.storage_type,
+            e.subserie,
+            TO_CHAR(MIN(COALESCE(d.document_date, d.created_at)), 'YYYY-MM-DD') as fecha_inicio,
+            TO_CHAR(MAX(COALESCE(d.document_date, d.created_at)), 'YYYY-MM-DD') as fecha_fin,
+            COUNT(d.id) as doc_count
+        FROM expedientes e
+        INNER JOIN documents d ON d.expediente_id = e.id
+        LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie LIKE '%-' || sub.subseries_code)
+        LEFT JOIN trd_series s ON (e.subserie = s.series_code OR e.subserie LIKE '%-' || s.series_code OR sub.series_id = s.id)
+    `;
+
+    const groupOrder = `
+        GROUP BY e.id, sub.id, s.id
+        ORDER BY e.created_at DESC
+    `;
+
+    if (req.user && req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+        const allowedQ = `
+            SELECT series_id, subseries_id FROM user_trd_permissions 
+            WHERE user_id = $1 AND can_view = 1
+        `;
+        db.all(allowedQ, [req.user.id], (err, perms) => {
+            if (err) return res.status(500).json({ error: 'Error verificando permisos.' });
+            if (perms.length === 0) return res.json({ data: [] });
+
+            const seriesIds = perms.map(p => p.series_id).filter(Boolean);
+            const subseriesIds = perms.map(p => p.subseries_id).filter(Boolean);
+
+            const paramSeriesIds = seriesIds.length > 0 ? seriesIds : [-1];
+            const paramSubseriesIds = subseriesIds.length > 0 ? subseriesIds : [-1];
+
+            const filteredQuery = `
+                ${baseQuery}
+                WHERE (
+                    s.id = ANY($1::int[])
+                    OR sub.id = ANY($2::int[])
+                    OR (s.series_name IS NOT NULL AND s.series_name IN (
+                        SELECT ps.series_name FROM trd_series ps WHERE ps.id = ANY($1::int[]) AND ps.series_name IS NOT NULL
+                    ))
+                    OR (sub.subseries_name IS NOT NULL AND sub.subseries_name IN (
+                        SELECT pss.subseries_name FROM trd_subseries pss WHERE pss.id = ANY($2::int[]) AND pss.subseries_name IS NOT NULL
+                    ))
+                )
+                ${groupOrder}
+            `;
+
+            db.all(filteredQuery, [paramSeriesIds, paramSubseriesIds], (err, rows) => {
+                if (err) {
+                    console.error("FUID query error (filtered):", err);
+                    return res.status(500).json({ error: 'Error al obtener inventario.' });
+                }
+                res.json({ data: rows });
+            });
+        });
+        return;
+    }
+
+    const finalQuery = `
+        ${baseQuery}
+        ${groupOrder}
+    `;
+
+    db.all(finalQuery, [], (err, rows) => {
+        if (err) {
+            console.error("FUID query error:", err);
+            return res.status(500).json({ error: 'Error al obtener inventario.' });
+        }
+        res.json({ data: rows });
+    });
+});
+
 // GET search expedientes
 router.get('/search', (req, res) => {
     const term = req.query.term || '';
