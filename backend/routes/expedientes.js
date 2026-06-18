@@ -225,7 +225,7 @@ router.get('/search', (req, res) => {
                 if (err) return res.status(500).json({ error: 'Error al buscar expedientes.' });
                 const processed = rows.map(row => ({
                     ...row,
-                    metadata_values: row.metadata_values ? JSON.parse(row.metadata_values) : {},
+                    metadata_values: row.metadata_values ? correctMetadata(JSON.parse(row.metadata_values)) : {},
                     metadata_labels: row.sub_labels ? JSON.parse(row.sub_labels) : (row.series_labels ? JSON.parse(row.series_labels) : null)
                 }));
                 res.json({ data: processed });
@@ -238,7 +238,7 @@ router.get('/search', (req, res) => {
         if (err) return res.status(500).json({ error: err.message });
         const processed = rows.map(row => ({
             ...row,
-            metadata_values: row.metadata_values ? JSON.parse(row.metadata_values) : {},
+            metadata_values: row.metadata_values ? correctMetadata(JSON.parse(row.metadata_values)) : {},
             metadata_labels: row.sub_labels ? JSON.parse(row.sub_labels) : (row.series_labels ? JSON.parse(row.series_labels) : null)
         }));
         res.json({ data: processed });
@@ -289,7 +289,7 @@ router.get('/', (req, res) => {
                 if (err) return res.status(500).json({ error: 'Error al obtener expedientes.' });
                 const expedientes = rows.map(row => ({
                     ...row,
-                    metadata_values: row.metadata_values ? JSON.parse(row.metadata_values) : {}
+                    metadata_values: row.metadata_values ? correctMetadata(JSON.parse(row.metadata_values)) : {}
                 }));
                 res.json({ data: expedientes });
             });
@@ -303,7 +303,7 @@ router.get('/', (req, res) => {
         }
         const expedientes = rows.map(row => ({
             ...row,
-            metadata_values: row.metadata_values ? JSON.parse(row.metadata_values) : {}
+            metadata_values: row.metadata_values ? correctMetadata(JSON.parse(row.metadata_values)) : {}
         }));
         res.json({ data: expedientes });
     });
@@ -331,7 +331,7 @@ router.get('/detail/:id', (req, res) => {
         if (err) return res.status(500).json({ error: err.message });
         if (!row) return res.status(404).json({ error: 'Expediente no encontrado' });
         
-        row.metadata_values = row.metadata_values ? JSON.parse(row.metadata_values) : {};
+        row.metadata_values = row.metadata_values ? correctMetadata(JSON.parse(row.metadata_values)) : {};
         res.json({ data: row });
     });
 });

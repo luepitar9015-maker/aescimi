@@ -80,6 +80,44 @@ app.use((req, res, next) => {
     next();
 });
 
+// Database auto-patch for TÉCNICO -> TECNÓLOGO
+const patchDatabaseMetadata = async () => {
+    try {
+        console.log('[AUTO-PATCH] Checking for metadata records that need TÉCNICO -> TECNÓLOGO correction...');
+        const queryRes = await pool.query('SELECT id, metadata_values FROM expedientes');
+        const rows = queryRes.rows;
+        let count = 0;
+        for (const row of rows) {
+            if (row.metadata_values) {
+                let meta;
+                try {
+                    meta = typeof row.metadata_values === 'string' ? JSON.parse(row.metadata_values) : row.metadata_values;
+                } catch (e) {
+                    continue;
+                }
+                if (meta) {
+                    let v1 = meta.valor1 || '';
+                    let v3 = meta.valor3 || '';
+                    const v1Clean = String(v1).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+                    const v3Clean = String(v3).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+                    if (v1Clean === 'tecnico' && v3Clean.startsWith('tecnologo')) {
+                        meta.valor1 = 'TECNÓLOGO';
+                        await pool.query('UPDATE expedientes SET metadata_values = $1 WHERE id = $2', [JSON.stringify(meta), row.id]);
+                        count++;
+                    }
+                }
+            }
+        }
+        if (count > 0) {
+            console.log(`[AUTO-PATCH] Successfully corrected ${count} expedientes metadata values from TÉCNICO to TECNÓLOGO.`);
+        } else {
+            console.log('[AUTO-PATCH] No incorrect metadata records found.');
+        }
+    } catch (err) {
+        console.error('[AUTO-PATCH] Error running auto-patch for metadata:', err.message);
+    }
+};
+
 // Crear tabla system_settings al inicio (asegura que siempre exista)
 pool.query(`
     CREATE TABLE IF NOT EXISTS system_settings (
@@ -87,7 +125,10 @@ pool.query(`
         value TEXT,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
-`).catch(e => console.warn('[Server] system_settings:', e.message));
+`).then(() => {
+    // Run the metadata auto-patch on startup
+    patchDatabaseMetadata();
+}).catch(e => console.warn('[Server] system_settings:', e.message));
 
 // System Expiration Middleware
 app.use((req, res, next) => {
