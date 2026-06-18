@@ -1314,6 +1314,31 @@ function DocumentManagement() {
                                     <span>✨ Cargar PDF de Prueba (Exposición)</span>
                                 </button>
                             </div>
+
+                            {/* Guía visual interactiva de operaciones con PDFs */}
+                            <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl shadow-sm space-y-3">
+                                <h4 className="text-sm font-bold text-green-900 flex items-center gap-1.5">
+                                    💡 Guía Rápida de Operaciones:
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                    <div className="bg-white p-3.5 rounded-lg border border-green-100 shadow-sm">
+                                        <span className="font-bold text-green-800 uppercase block mb-1.5">✂️ ¿Cómo Dividir un PDF?</span>
+                                        <p className="text-gray-600 leading-relaxed">
+                                            1. Sube tu archivo PDF.<br />
+                                            2. En la lista de archivos, marca la casilla <strong className="text-green-700">"Dividir"</strong>.<br />
+                                            3. Define los rangos de páginas (ej. de 1 a 1, de 2 a 5) y asígnales su tipología individual.
+                                        </p>
+                                    </div>
+                                    <div className="bg-white p-3.5 rounded-lg border border-green-100 shadow-sm">
+                                        <span className="font-bold text-emerald-800 uppercase block mb-1.5">🔗 ¿Cómo Unir varios PDFs?</span>
+                                        <p className="text-gray-600 leading-relaxed">
+                                            1. Selecciona y sube <strong className="text-green-700">2 o más archivos</strong>.<br />
+                                            2. Marca la casilla verde <strong className="text-green-700">"Unir en 1 solo PDF"</strong> que aparecerá arriba de la lista.<br />
+                                            3. Ordena los archivos con las flechas (▲/▼) y configura la tipología unificada para el nuevo documento.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         {/* FILE LIST + PREVIEW - Two column layout */}
