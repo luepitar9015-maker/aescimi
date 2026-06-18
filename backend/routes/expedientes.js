@@ -3,6 +3,21 @@ const router = express.Router();
 const db = require('../database');
 const xlsx = require('xlsx');
 
+const correctMetadata = (metadata) => {
+    if (!metadata) return {};
+    let meta = { ...metadata };
+    let v1 = meta.valor1 || '';
+    let v3 = meta.valor3 || '';
+
+    const v1Clean = String(v1).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    const v3Clean = String(v3).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+    if (v1Clean === 'tecnico' && v3Clean.startsWith('tecnologo')) {
+        meta.valor1 = 'TECNÓLOGO';
+    }
+    return meta;
+};
+
 // GET Template for Mass Upload Expedientes
 router.get('/template', (req, res) => {
     const wb = xlsx.utils.book_new();
@@ -347,7 +362,7 @@ router.post('/', (req, res) => {
         dependencia,
         storage_type, 
         title, 
-        JSON.stringify(metadata_values || {})
+        JSON.stringify(correctMetadata(metadata_values || {}))
     ];
 
     db.run(query, params, function(err) {
@@ -425,7 +440,7 @@ router.post('/mass', async (req, res) => {
                 exp.dependencia || null,
                 exp.storage_type || null,
                 tituloLimpio,
-                JSON.stringify(exp.metadata_values || {})
+                JSON.stringify(correctMetadata(exp.metadata_values || {}))
             ];
 
             const savepointName = `sp_exp_${i}`;
@@ -469,7 +484,7 @@ router.post('/mass', async (req, res) => {
                             exp.dependencia || null,
                             exp.storage_type || null,
                             tituloLimpio,
-                            JSON.stringify(exp.metadata_values || {}),
+                            JSON.stringify(correctMetadata(exp.metadata_values || {})),
                             newId
                         ]
                     );
@@ -666,7 +681,7 @@ router.put('/:id', (req, res) => {
             dependencia !== undefined ? dependencia : row.dependencia,
             storage_type !== undefined ? storage_type : row.storage_type,
             title !== undefined ? title : row.title,
-            metadata_values !== undefined ? JSON.stringify(metadata_values) : row.metadata_values,
+            metadata_values !== undefined ? JSON.stringify(correctMetadata(metadata_values)) : row.metadata_values,
             id
         ];
 

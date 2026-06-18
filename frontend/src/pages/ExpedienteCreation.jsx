@@ -179,9 +179,19 @@ function ExpedienteCreation() {
     const handleSubmit = (e) => {
         e.preventDefault();
         
+        let val1 = formData.valor1 || '';
+        let val3 = formData.valor3 || '';
+        const v1Clean = val1.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+        const v3Clean = val3.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+        if (v1Clean === 'tecnico' && v3Clean.startsWith('tecnologo')) {
+            val1 = 'TECNÓLOGO';
+            setFormData(prev => ({ ...prev, valor1: 'TECNÓLOGO' }));
+        }
+
         // Combine values into metadata object
         const metadata = {
-            valor1: formData.valor1, valor2: formData.valor2,
+            valor1: val1, valor2: formData.valor2,
             valor3: formData.valor3, valor4: formData.valor4,
             valor5: formData.valor5, valor6: formData.valor6,
             valor7: formData.valor7, valor8: formData.valor8
@@ -532,6 +542,15 @@ function ExpedienteCreation() {
                             if (altH && row[altH] !== undefined) val = String(row[altH]);
                         }
                         metadata[`valor${i}`] = val.trim();
+                    }
+
+                    // Auto-correction rule Técnico -> Tecnólogo
+                    const v1 = metadata.valor1 || '';
+                    const v3 = metadata.valor3 || '';
+                    const v1Clean = v1.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+                    const v3Clean = v3.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+                    if (v1Clean === 'tecnico' && v3Clean.startsWith('tecnologo')) {
+                        metadata.valor1 = 'TECNÓLOGO';
                     }
 
                     let assigned_user_id = null;
