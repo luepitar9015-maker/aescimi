@@ -1709,7 +1709,7 @@ function DocumentManagement() {
                                                                                 placeholder="H"
                                                                             />
                                                                             <select
-                                                                                className="flex-1 border rounded px-1"
+                                                                                className="flex-1 border rounded px-1 min-w-0"
                                                                                 value={range.typologyId}
                                                                                 onChange={e => updateRange(idx, ridx, 'typologyId', e.target.value)}
                                                                             >
@@ -1717,7 +1717,14 @@ function DocumentManagement() {
                                                                                 {typologies.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                                                                             </select>
                                                                             {entry.ranges.length > 1 && (
-                                                                                <button onClick={() => removeRange(idx, ridx)} className="text-red-400 hover:text-red-600 font-bold">×</button>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => removeRange(idx, ridx)}
+                                                                                    className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded flex-shrink-0 transition-colors"
+                                                                                    title="Eliminar rango"
+                                                                                >
+                                                                                    <X size={12} />
+                                                                                </button>
                                                                             )}
                                                                         </div>
                                                                         <div>
