@@ -20,15 +20,191 @@ function KPICard({ icon, label, value, sub, color = '#39A900' }) {
   return (
     <div style={{
       background: '#fff', borderRadius: 14, padding: '20px 24px',
-      boxShadow: '0 2px 12px rgba(0,0,0,.07)', display: 'flex', alignItems: 'center', gap: 16
+      boxShadow: '0 2px 12px rgba(0,0,0,.07)', display: 'flex', alignItems: 'center', gap: 16,
+      border: '1px solid #f3f4f6'
     }}>
       <div style={{ background: color + '18', borderRadius: 12, padding: 14, color }}>
         {icon}
       </div>
       <div>
-        <div style={{ fontSize: 26, fontWeight: 800, color: '#111' }}>{value}</div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>{label}</div>
-        {sub && <div style={{ fontSize: 11, color: '#9ca3af' }}>{sub}</div>}
+        <div style={{ fontSize: 26, fontWeight: 800, color: '#111', lineHeight: '1.2' }}>{value}</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginTop: 4 }}>{label}</div>
+        {sub && <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Gráfico de Barra Horizontal ───────────────────────── */
+function HorizontalBarChart({ data, colorStart = '#39A900', colorEnd = '#6bc235' }) {
+  // data: [{ label: string, value: number, subLabel?: string }]
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {data.map((item, index) => (
+        <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 600, color: '#4b5563' }}>
+            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '80%' }}>
+              {item.label} {item.subLabel ? `(${item.subLabel})` : ''}
+            </span>
+            <span style={{ color: '#111', fontWeight: 700 }}>{item.value}%</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ background: '#f3f4f6', borderRadius: 99, height: 12, flex: 1, position: 'relative', overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+              <div style={{ 
+                width: `${item.value}%`, 
+                background: `linear-gradient(90deg, ${colorStart} 0%, ${colorEnd} 100%)`, 
+                borderRadius: 99, 
+                height: '100%', 
+                transition: 'width 1s ease-out' 
+              }} />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ─── Gráfico de Columnas Verticales SVG ────────────────── */
+function SVGVerticalBarChart({ data, height = 180 }) {
+  // data: [{ label: string, value: number, tooltip?: string }]
+  const chartHeight = height - 40;
+  const barWidth = 32;
+  const gap = 16;
+  const chartWidth = Math.max(280, data.length * (barWidth + gap) + 50);
+
+  return (
+    <div style={{ overflowX: 'auto', padding: '10px 0', width: '100%' }}>
+      <svg width="100%" height={height} viewBox={`0 0 ${chartWidth} ${height}`} style={{ display: 'block', margin: '0 auto' }}>
+        <defs>
+          <linearGradient id="chartGreenGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#39A900" />
+            <stop offset="100%" stopColor="#81c784" />
+          </linearGradient>
+        </defs>
+        {/* Grid Lines */}
+        {[0, 25, 50, 75, 100].map((tick, i) => {
+          const y = (height - 30) - (tick / 100) * chartHeight;
+          return (
+            <g key={i}>
+              <line x1="35" y1={y} x2={chartWidth} y2={y} stroke="#f3f4f6" strokeWidth="1" />
+              <text x="5" y={y + 4} style={{ fontSize: 9, fill: '#9ca3af', fontWeight: 'bold', fontFamily: 'sans-serif' }}>{tick}%</text>
+            </g>
+          );
+        })}
+        {/* Bars */}
+        {data.map((item, idx) => {
+          const x = idx * (barWidth + gap) + 45;
+          const barHeight = (item.value / 100) * chartHeight;
+          const y = (height - 30) - barHeight;
+
+          return (
+            <g key={idx} style={{ cursor: 'pointer' }}>
+              <rect
+                x={x}
+                y={y}
+                width={barWidth}
+                height={Math.max(barHeight, 2)}
+                rx="4"
+                fill="url(#chartGreenGrad)"
+                style={{ transition: 'all 0.5s ease' }}
+              />
+              <text
+                x={x + barWidth / 2}
+                y={y - 6}
+                textAnchor="middle"
+                style={{ fontSize: 9, fontWeight: 'bold', fill: '#39A900', fontFamily: 'sans-serif' }}
+              >
+                {Math.round(item.value)}%
+              </text>
+              <text
+                x={x + barWidth / 2}
+                y={height - 12}
+                textAnchor="middle"
+                style={{ fontSize: 9, fill: '#4b5563', fontWeight: '600', fontFamily: 'sans-serif' }}
+              >
+                {item.label.length > 8 ? `${item.label.substring(0, 7)}..` : item.label}
+              </text>
+              <title>{item.tooltip || `${item.label}: ${item.value}%`}</title>
+            </g>
+          );
+        })}
+        {/* Baseline */}
+        <line x1="35" y1={height - 30} x2={chartWidth} y2={height - 30} stroke="#d1d5db" strokeWidth="1.5" />
+      </svg>
+    </div>
+  );
+}
+
+/* ─── Gráfico de Dona SVG ───────────────────────────────── */
+function SVGDoughnutChart({ data, size = 160 }) {
+  // data: [{ label: string, value: number, color: string }]
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  const radius = size * 0.35;
+  const strokeWidth = radius * 0.3;
+  const center = size / 2;
+  const circumference = 2 * Math.PI * radius;
+
+  let currentAngle = -90; // start at top
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        {total === 0 ? (
+          <circle
+            cx={center}
+            cy={center}
+            r={radius}
+            fill="transparent"
+            stroke="#e5e7eb"
+            strokeWidth={strokeWidth}
+          />
+        ) : (
+          data.map((item, idx) => {
+            const percentage = (item.value / total) * 100;
+            const strokeLength = (percentage / 100) * circumference;
+            const strokeOffset = circumference - strokeLength;
+            const angle = (percentage / 100) * 360;
+            const rotation = currentAngle;
+            currentAngle += angle;
+
+            return (
+              <circle
+                key={idx}
+                cx={center}
+                cy={center}
+                r={radius}
+                fill="transparent"
+                stroke={item.color}
+                strokeWidth={strokeWidth}
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeOffset}
+                transform={`rotate(${rotation} ${center} ${center})`}
+                style={{ transition: 'stroke-dashoffset 0.8s ease-out' }}
+              >
+                <title>{item.label}: {item.value} ({Math.round(percentage)}%)</title>
+              </circle>
+            );
+          })
+        )}
+        <circle cx={center} cy={center} r={radius - strokeWidth / 2 - 2} fill="#fff" />
+        <text
+          x={center}
+          y={center + 5}
+          textAnchor="middle"
+          style={{ fontSize: 13, fontWeight: '800', fill: '#374151', fontFamily: 'sans-serif' }}
+        >
+          {total} Total
+        </text>
+      </svg>
+      {/* Legends */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'center', fontSize: 11, width: '100%' }}>
+        {data.map((item, idx) => (
+          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f9fafb', padding: '4px 10px', borderRadius: 6, border: '1px solid #f3f4f6' }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: item.color, display: 'inline-block' }} />
+            <span style={{ color: '#4b5563', fontWeight: 600 }}>{item.label}: {item.value}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -42,6 +218,9 @@ export default function SeguimientoExpedientes() {
   const [stats, setStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(false);
   const [searchExpedienteTerm, setSearchExpedienteTerm] = useState('');
+  const [filtroUsuarioStats, setFiltroUsuarioStats] = useState('todos');
+  const [allAsignaciones, setAllAsignaciones] = useState([]);
+  const [loadingAllAsig, setLoadingAllAsig] = useState(false);
 
   /* Asignaciones */
   const [asignaciones, setAsignaciones] = useState([]);
@@ -106,7 +285,25 @@ export default function SeguimientoExpedientes() {
     finally { setLoadingPaq(false); }
   }, []);
 
-  useEffect(() => { if (tab === 'estadisticas') fetchStats(); }, [tab, fetchStats]);
+  const fetchAllAsignaciones = async () => {
+    setLoadingAllAsig(true);
+    try {
+      const r = await axios.get('/api/seguimiento/asignaciones');
+      setAllAsignaciones(r.data.data || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingAllAsig(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tab === 'estadisticas') {
+      fetchStats();
+      fetchPaquetes();
+      fetchAllAsignaciones();
+    }
+  }, [tab, fetchStats, fetchPaquetes]);
   useEffect(() => { if (tab === 'asignaciones') fetchAsignaciones(); }, [tab, fetchAsignaciones]);
   useEffect(() => { if (tab === 'paquetes') fetchPaquetes(); }, [tab, fetchPaquetes]);
 
@@ -270,174 +467,379 @@ export default function SeguimientoExpedientes() {
             </button>
           </div>
 
+          {stats && (
+            <div style={{
+              background: '#fff', borderRadius: 14, padding: '16px 24px',
+              boxShadow: '0 2px 12px rgba(0,0,0,.05)', marginBottom: 24,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16,
+              border: '1px solid #e5e7eb'
+            }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#111' }}>
+                  👤 Analizar por Usuario
+                </h3>
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#6b7280' }}>
+                  Visualiza gráficos interactivos del avance, lotes y expedientes asignados.
+                </p>
+              </div>
+              <div>
+                <select
+                  value={filtroUsuarioStats}
+                  onChange={e => setFiltroUsuarioStats(e.target.value)}
+                  style={{
+                    padding: '8px 16px', border: '1.5px solid #d1d5db', borderRadius: 8,
+                    fontSize: 13, fontWeight: 600, background: '#fff', color: '#374151',
+                    outline: 'none', cursor: 'pointer', minWidth: 200
+                  }}
+                >
+                  <option value="todos">Todos los Usuarios (Global)</option>
+                  {(stats.usuarios || []).map(u => (
+                    <option key={u.user_id} value={u.user_id}>{u.usuario}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
           {loadingStats ? (
             <div style={{ textAlign: 'center', padding: 60, color: '#9ca3af' }}>Cargando estadísticas...</div>
           ) : stats ? (
             <>
-              {/* KPIs */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 16, marginBottom: 32 }}>
-                <KPICard icon={<FolderOpen size={22}/>} label="Total Expedientes" value={G.total_expedientes || 0} color="#39A900" />
-                <KPICard icon={<CheckCircle size={22}/>} label="Con Documentos" value={G.expedientes_con_docs || 0} color="#3b82f6" />
-                <KPICard icon={<BarChart2 size={22}/>} label="% Cargue Global" value={`${G.porcentaje_global || 0}%`} color="#8b5cf6" />
-                <KPICard icon={<Users size={22}/>} label="Total Asignaciones" value={G.total_asignaciones || 0} color="#f59e0b" />
-              </div>
-
-              {/* Por Dependencia */}
-              <div style={{ background: '#fff', borderRadius: 14, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,.07)', marginBottom: 28 }}>
-                <h2 style={{ fontSize: 16, fontWeight: 700, color: '#111', marginBottom: 16 }}>
-                  🏢 % Cargue por Dependencia
-                </h2>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                    <thead>
-                      <tr style={{ background: '#f9fafb' }}>
-                        {['Dependencia','Total Exp.','Con Docs','% Cargue','Documentos'].map(h => (
-                          <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e5e7eb' }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(stats.dependencias || []).map((d, i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                          <td style={{ padding: '10px 12px', fontWeight: 600, color: '#111' }}>{d.dependencia}</td>
-                          <td style={{ padding: '10px 12px', color: '#374151' }}>{d.total_expedientes}</td>
-                          <td style={{ padding: '10px 12px', color: '#374151' }}>{d.expedientes_con_docs}</td>
-                          <td style={{ padding: '10px 12px', minWidth: 160 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <ProgressBar value={d.porcentaje_cargue} color={Number(d.porcentaje_cargue) >= 80 ? '#39A900' : Number(d.porcentaje_cargue) >= 40 ? '#f59e0b' : '#ef4444'} />
-                              <span style={{ fontSize: 12, fontWeight: 700, minWidth: 40 }}>{d.porcentaje_cargue}%</span>
-                            </div>
-                          </td>
-                          <td style={{ padding: '10px 12px', color: '#374151' }}>{d.total_documentos}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Por Usuario */}
-              <div style={{ background: '#fff', borderRadius: 14, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,.07)' }}>
-                <h2 style={{ fontSize: 16, fontWeight: 700, color: '#111', marginBottom: 16 }}>
-                  👤 % Cargue por Usuario
-                </h2>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                    <thead>
-                      <tr style={{ background: '#f9fafb' }}>
-                        {['Usuario','Área','Exp. Asignados','Con Docs','% Cargue','Documentos'].map(h => (
-                          <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e5e7eb' }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(stats.usuarios || []).filter(u => u.expedientes_asignados > 0).map((u, i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                          <td style={{ padding: '10px 12px', fontWeight: 600, color: '#111' }}>{u.usuario}</td>
-                          <td style={{ padding: '10px 12px', color: '#6b7280' }}>{u.area || '—'}</td>
-                          <td style={{ padding: '10px 12px' }}>{u.expedientes_asignados}</td>
-                          <td style={{ padding: '10px 12px' }}>{u.expedientes_con_docs}</td>
-                          <td style={{ padding: '10px 12px', minWidth: 160 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <ProgressBar value={u.porcentaje_cargue} color={Number(u.porcentaje_cargue) >= 80 ? '#39A900' : Number(u.porcentaje_cargue) >= 40 ? '#f59e0b' : '#ef4444'} />
-                              <span style={{ fontSize: 12, fontWeight: 700, minWidth: 40 }}>{u.porcentaje_cargue}%</span>
-                            </div>
-                          </td>
-                          <td style={{ padding: '10px 12px' }}>{u.total_documentos}</td>
-                        </tr>
-                      ))}
-                      {(stats.usuarios || []).filter(u => u.expedientes_asignados > 0).length === 0 && (
-                        <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#9ca3af' }}>
-                          Sin usuarios con expedientes asignados aún.
-                        </td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Por Expediente */}
-              <div style={{ background: '#fff', borderRadius: 14, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,.07)', marginTop: 28 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
-                  <h2 style={{ fontSize: 16, fontWeight: 700, color: '#111', margin: 0 }}>
-                    📁 Avance Detallado por Expediente
-                  </h2>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '6px 12px' }}>
-                    <Search size={14} style={{ color: '#9ca3af' }} />
-                    <input
-                      type="text"
-                      placeholder="Buscar por código o título..."
-                      value={searchExpedienteTerm}
-                      onChange={e => setSearchExpedienteTerm(e.target.value)}
-                      style={{ border: 'none', outline: 'none', fontSize: 13, width: 220 }}
-                    />
-                    {searchExpedienteTerm && (
-                      <button onClick={() => setSearchExpedienteTerm('')} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#9ca3af', padding: 0 }}>
-                        <X size={14} />
-                      </button>
-                    )}
+              {filtroUsuarioStats === 'todos' ? (
+                <>
+                  {/* KPIs Globales */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 16, marginBottom: 32 }}>
+                    <KPICard icon={<FolderOpen size={22}/>} label="Total Expedientes" value={G.total_expedientes || 0} color="#39A900" />
+                    <KPICard icon={<CheckCircle size={22}/>} label="Con Documentos" value={G.expedientes_con_docs || 0} color="#3b82f6" />
+                    <KPICard icon={<BarChart2 size={22}/>} label="% Cargue Global" value={`${G.porcentaje_global || 0}%`} color="#8b5cf6" />
+                    <KPICard icon={<Users size={22}/>} label="Total Asignaciones" value={G.total_asignaciones || 0} color="#f59e0b" />
                   </div>
-                </div>
 
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                    <thead>
-                      <tr style={{ background: '#f9fafb' }}>
-                        {['Código', 'Título', 'Dependencia', 'TRD', 'Documentos', '% Avance'].map(h => (
-                          <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e5e7eb' }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(stats.expedientes || [])
-                        .filter(exp => {
-                          const term = searchExpedienteTerm.toLowerCase().trim();
-                          if (!term) return true;
-                          return (exp.expediente_code && exp.expediente_code.toLowerCase().includes(term)) ||
-                                 (exp.title && exp.title.toLowerCase().includes(term)) ||
-                                 (exp.dependencia && exp.dependencia.toLowerCase().includes(term)) ||
-                                 (exp.subserie && exp.subserie.toLowerCase().includes(term));
-                        })
-                        .map((exp) => {
-                          const pct = Number(exp.avance) || 0;
-                          return (
-                            <tr key={exp.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                              <td style={{ padding: '10px 12px', fontWeight: 600, color: '#111' }}>{exp.expediente_code || `ID: ${exp.id}`}</td>
-                              <td style={{ padding: '10px 12px', color: '#374151' }} title={exp.title}>{exp.title || 'Sin Título'}</td>
-                              <td style={{ padding: '10px 12px', color: '#6b7280' }}>{exp.dependencia || '—'}</td>
-                              <td style={{ padding: '10px 12px', color: '#6b7280' }}>{exp.subserie || '—'}</td>
-                              <td style={{ padding: '10px 12px', color: '#374151' }}>
-                                <span style={{ fontWeight: 600 }}>{exp.cargados}</span>
-                                <span style={{ color: '#9ca3af' }}> / {exp.total_requeridos}</span>
-                              </td>
+                  {/* Panel de Gráficos Globales */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 20, marginBottom: 28 }}>
+                    {/* Gráfico 1: Avance por Dependencia */}
+                    <div style={{ background: '#fff', borderRadius: 14, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,.07)', border: '1px solid #f3f4f6' }}>
+                      <h3 style={{ fontSize: 15, fontWeight: 700, color: '#111', marginBottom: 16 }}>🏢 Avance por Dependencia</h3>
+                      <HorizontalBarChart 
+                        data={(stats.dependencias || []).slice(0, 5).map(d => ({
+                          label: d.dependencia,
+                          value: Number(d.porcentaje_cargue) || 0,
+                          subLabel: `${d.expedientes_con_docs}/${d.total_expedientes} exp.`
+                        }))} 
+                      />
+                    </div>
+
+                    {/* Gráfico 2: Avance por Usuario (Top) */}
+                    <div style={{ background: '#fff', borderRadius: 14, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,.07)', border: '1px solid #f3f4f6' }}>
+                      <h3 style={{ fontSize: 15, fontWeight: 700, color: '#111', marginBottom: 16 }}>👤 Avance por Usuario (Top)</h3>
+                      <SVGVerticalBarChart 
+                        data={(stats.usuarios || [])
+                          .filter(u => u.expedientes_asignados > 0)
+                          .slice(0, 6)
+                          .map(u => ({
+                            label: u.usuario,
+                            value: Number(u.porcentaje_cargue) || 0,
+                            tooltip: `${u.usuario}: ${u.porcentaje_cargue}% (${u.total_documentos} docs)`
+                          }))}
+                      />
+                    </div>
+
+                    {/* Gráfico 3: Distribución Global de Expedientes */}
+                    <div style={{ background: '#fff', borderRadius: 14, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,.07)', border: '1px solid #f3f4f6' }}>
+                      <h3 style={{ fontSize: 15, fontWeight: 700, color: '#111', marginBottom: 16 }}>📊 Distribución de Expedientes</h3>
+                      <SVGDoughnutChart 
+                        data={[
+                          { label: 'Con Documentos', value: G.expedientes_con_docs || 0, color: '#3b82f6' },
+                          { label: 'Sin Documentos', value: (G.total_expedientes || 0) - (G.expedientes_con_docs || 0), color: '#ef4444' }
+                        ]}
+                      />
+                    </div>
+
+                    {/* Gráfico 4: Avance de Lotes/Paquetes del Sistema */}
+                    <div style={{ background: '#fff', borderRadius: 14, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,.07)', border: '1px solid #f3f4f6' }}>
+                      <h3 style={{ fontSize: 15, fontWeight: 700, color: '#111', marginBottom: 16 }}>📦 Avance de Lotes/Paquetes</h3>
+                      <HorizontalBarChart 
+                        data={paquetes.slice(0, 5).map(p => ({
+                          label: p.nombre,
+                          value: p.total_docs > 0 ? Math.round((Number(p.docs_cargados) / Number(p.total_docs)) * 100) : 0,
+                          subLabel: p.usuario_nombre
+                        }))} 
+                        colorStart="#8b5cf6" 
+                        colorEnd="#a78bfa"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Por Dependencia */}
+                  <div style={{ background: '#fff', borderRadius: 14, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,.07)', marginBottom: 28 }}>
+                    <h2 style={{ fontSize: 16, fontWeight: 700, color: '#111', marginBottom: 16 }}>
+                      🏢 % Cargue por Dependencia
+                    </h2>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                        <thead>
+                          <tr style={{ background: '#f9fafb' }}>
+                            {['Dependencia','Total Exp.','Con Docs','% Cargue','Documentos'].map(h => (
+                              <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e5e7eb' }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(stats.dependencias || []).map((d, i) => (
+                            <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                              <td style={{ padding: '10px 12px', fontWeight: 600, color: '#111' }}>{d.dependencia}</td>
+                              <td style={{ padding: '10px 12px', color: '#374151' }}>{d.total_expedientes}</td>
+                              <td style={{ padding: '10px 12px', color: '#374151' }}>{d.expedientes_con_docs}</td>
                               <td style={{ padding: '10px 12px', minWidth: 160 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  <ProgressBar value={pct} color={pct >= 80 ? '#39A900' : pct >= 40 ? '#f59e0b' : '#ef4444'} />
-                                  <span style={{ fontSize: 12, fontWeight: 700, minWidth: 40 }}>{pct}%</span>
+                                  <ProgressBar value={d.porcentaje_cargue} color={Number(d.porcentaje_cargue) >= 80 ? '#39A900' : Number(d.porcentaje_cargue) >= 40 ? '#f59e0b' : '#ef4444'} />
+                                  <span style={{ fontSize: 12, fontWeight: 700, minWidth: 40 }}>{d.porcentaje_cargue}%</span>
                                 </div>
                               </td>
+                              <td style={{ padding: '10px 12px', color: '#374151' }}>{d.total_documentos}</td>
                             </tr>
-                          );
-                        })
-                      }
-                      {(stats.expedientes || []).filter(exp => {
-                        const term = searchExpedienteTerm.toLowerCase().trim();
-                        if (!term) return true;
-                        return (exp.expediente_code && exp.expediente_code.toLowerCase().includes(term)) ||
-                               (exp.title && exp.title.toLowerCase().includes(term)) ||
-                               (exp.dependencia && exp.dependencia.toLowerCase().includes(term)) ||
-                               (exp.subserie && exp.subserie.toLowerCase().includes(term));
-                      }).length === 0 && (
-                        <tr>
-                          <td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#9ca3af' }}>
-                            No se encontraron expedientes coincidentes.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Por Usuario */}
+                  <div style={{ background: '#fff', borderRadius: 14, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,.07)' }}>
+                    <h2 style={{ fontSize: 16, fontWeight: 700, color: '#111', marginBottom: 16 }}>
+                      👤 % Cargue por Usuario
+                    </h2>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                        <thead>
+                          <tr style={{ background: '#f9fafb' }}>
+                            {['Usuario','Área','Exp. Asignados','Con Docs','% Cargue','Documentos'].map(h => (
+                              <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e5e7eb' }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(stats.usuarios || []).filter(u => u.expedientes_asignados > 0).map((u, i) => (
+                            <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                              <td style={{ padding: '10px 12px', fontWeight: 600, color: '#111' }}>{u.usuario}</td>
+                              <td style={{ padding: '10px 12px', color: '#6b7280' }}>{u.area || '—'}</td>
+                              <td style={{ padding: '10px 12px' }}>{u.expedientes_asignados}</td>
+                              <td style={{ padding: '10px 12px' }}>{u.expedientes_con_docs}</td>
+                              <td style={{ padding: '10px 12px', minWidth: 160 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <ProgressBar value={u.porcentaje_cargue} color={Number(u.porcentaje_cargue) >= 80 ? '#39A900' : Number(u.porcentaje_cargue) >= 40 ? '#f59e0b' : '#ef4444'} />
+                                  <span style={{ fontSize: 12, fontWeight: 700, minWidth: 40 }}>{u.porcentaje_cargue}%</span>
+                                </div>
+                              </td>
+                              <td style={{ padding: '10px 12px' }}>{u.total_documentos}</td>
+                            </tr>
+                          ))}
+                          {(stats.usuarios || []).filter(u => u.expedientes_asignados > 0).length === 0 && (
+                            <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#9ca3af' }}>
+                              Sin usuarios con expedientes asignados aún.
+                            </td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Por Expediente */}
+                  <div style={{ background: '#fff', borderRadius: 14, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,.07)', marginTop: 28 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+                      <h2 style={{ fontSize: 16, fontWeight: 700, color: '#111', margin: 0 }}>
+                        📁 Avance Detallado por Expediente
+                      </h2>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '6px 12px' }}>
+                        <Search size={14} style={{ color: '#9ca3af' }} />
+                        <input
+                          type="text"
+                          placeholder="Buscar por código o título..."
+                          value={searchExpedienteTerm}
+                          onChange={e => setSearchExpedienteTerm(e.target.value)}
+                          style={{ border: 'none', outline: 'none', fontSize: 13, width: 220 }}
+                        />
+                        {searchExpedienteTerm && (
+                          <button onClick={() => setSearchExpedienteTerm('')} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#9ca3af', padding: 0 }}>
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                        <thead>
+                          <tr style={{ background: '#f9fafb' }}>
+                            {['Código', 'Título', 'Dependencia', 'TRD', 'Documentos', '% Avance'].map(h => (
+                              <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e5e7eb' }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(stats.expedientes || [])
+                            .filter(exp => {
+                              const term = searchExpedienteTerm.toLowerCase().trim();
+                              if (!term) return true;
+                              return (exp.expediente_code && exp.expediente_code.toLowerCase().includes(term)) ||
+                                     (exp.title && exp.title.toLowerCase().includes(term)) ||
+                                     (exp.dependencia && exp.dependencia.toLowerCase().includes(term)) ||
+                                     (exp.subserie && exp.subserie.toLowerCase().includes(term));
+                            })
+                            .map((exp) => {
+                              const pct = Number(exp.avance) || 0;
+                              return (
+                                <tr key={exp.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                                  <td style={{ padding: '10px 12px', fontWeight: 600, color: '#111' }}>{exp.expediente_code || `ID: ${exp.id}`}</td>
+                                  <td style={{ padding: '10px 12px', color: '#374151' }} title={exp.title}>{exp.title || 'Sin Título'}</td>
+                                  <td style={{ padding: '10px 12px', color: '#6b7280' }}>{exp.dependencia || '—'}</td>
+                                  <td style={{ padding: '10px 12px', color: '#6b7280' }}>{exp.subserie || '—'}</td>
+                                  <td style={{ padding: '10px 12px', color: '#374151' }}>
+                                    <span style={{ fontWeight: 600 }}>{exp.cargados}</span>
+                                    <span style={{ color: '#9ca3af' }}> / {exp.total_requeridos}</span>
+                                  </td>
+                                  <td style={{ padding: '10px 12px', minWidth: 160 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                      <ProgressBar value={pct} color={pct >= 80 ? '#39A900' : pct >= 40 ? '#f59e0b' : '#ef4444'} />
+                                      <span style={{ fontSize: 12, fontWeight: 700, minWidth: 40 }}>{pct}%</span>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          }
+                          {(stats.expedientes || []).filter(exp => {
+                            const term = searchExpedienteTerm.toLowerCase().trim();
+                            if (!term) return true;
+                            return (exp.expediente_code && exp.expediente_code.toLowerCase().includes(term)) ||
+                                   (exp.title && exp.title.toLowerCase().includes(term)) ||
+                                   (exp.dependencia && exp.dependencia.toLowerCase().includes(term)) ||
+                                   (exp.subserie && exp.subserie.toLowerCase().includes(term));
+                          }).length === 0 && (
+                            <tr>
+                              <td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#9ca3af' }}>
+                                No se encontraron expedientes coincidentes.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              ) : (() => {
+                const userStatsObj = (stats.usuarios || []).find(u => u.user_id === Number(filtroUsuarioStats));
+                const userLotes = paquetes.filter(p => p.usuario_nombre === userStatsObj?.usuario);
+                const userExps = allAsignaciones
+                  .filter(a => a.usuario_nombre === userStatsObj?.usuario)
+                  .map(a => {
+                    const expInfo = (stats.expedientes || []).find(e => e.id === a.expediente_id);
+                    return {
+                      id: a.expediente_id,
+                      code: a.expediente_code || `EXP-${a.expediente_id}`,
+                      title: a.expediente_titulo || 'Sin Título',
+                      dependencia: a.dependencia || '—',
+                      subserie: a.subserie || '—',
+                      avance: expInfo ? expInfo.avance : 0,
+                      cargados: expInfo ? expInfo.cargados : a.doc_count,
+                      requeridos: expInfo ? expInfo.total_requeridos : 0
+                    };
+                  });
+
+                return (
+                  <>
+                    {/* KPIs del Usuario */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 16, marginBottom: 32 }}>
+                      <KPICard icon={<FolderOpen size={22}/>} label="Exp. Asignados" value={userStatsObj?.expedientes_asignados || 0} color="#39A900" />
+                      <KPICard icon={<CheckCircle size={22}/>} label="Con Documentos" value={userStatsObj?.expedientes_con_docs || 0} color="#3b82f6" />
+                      <KPICard icon={<BarChart2 size={22}/>} label="% Avance Promedio" value={`${userStatsObj?.porcentaje_cargue || 0}%`} color="#8b5cf6" />
+                      <KPICard icon={<Users size={22}/>} label="Documentos Cargados" value={userStatsObj?.total_documentos || 0} color="#f59e0b" />
+                    </div>
+
+                    {/* Gráficos del Usuario */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 20, marginBottom: 28 }}>
+                      {/* Lotes del Usuario */}
+                      <div style={{ background: '#fff', borderRadius: 14, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,.07)', border: '1px solid #f3f4f6' }}>
+                        <h3 style={{ fontSize: 15, fontWeight: 700, color: '#111', marginBottom: 16 }}>📦 Avance por Lote / Paquete</h3>
+                        {userLotes.length === 0 ? (
+                          <div style={{ padding: '40px 0', textAlign: 'center', color: '#9ca3af', fontSize: 12 }}>El usuario no tiene lotes asignados.</div>
+                        ) : (
+                          <HorizontalBarChart 
+                            data={userLotes.map(p => ({
+                              label: p.nombre,
+                              value: p.total_docs > 0 ? Math.round((Number(p.docs_cargados) / Number(p.total_docs)) * 100) : 0,
+                              subLabel: `${p.docs_cargados}/${p.total_docs} docs`
+                            }))}
+                            colorStart="#8b5cf6" 
+                            colorEnd="#a78bfa"
+                          />
+                        )}
+                      </div>
+
+                      {/* Expedientes del Usuario */}
+                      <div style={{ background: '#fff', borderRadius: 14, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,.07)', border: '1px solid #f3f4f6' }}>
+                        <h3 style={{ fontSize: 15, fontWeight: 700, color: '#111', marginBottom: 16 }}>📁 Avance por Expediente (Top 6)</h3>
+                        {userExps.length === 0 ? (
+                          <div style={{ padding: '40px 0', textAlign: 'center', color: '#9ca3af', fontSize: 12 }}>El usuario no tiene expedientes asignados.</div>
+                        ) : (
+                          <SVGVerticalBarChart 
+                            data={userExps.slice(0, 6).map(e => ({
+                              label: e.code,
+                              value: Number(e.avance) || 0,
+                              tooltip: `${e.title}: ${e.avance}% (${e.cargados}/${e.requeridos} docs)`
+                            }))}
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Tabla de Expedientes del Usuario */}
+                    <div style={{ background: '#fff', borderRadius: 14, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,.07)' }}>
+                      <h2 style={{ fontSize: 16, fontWeight: 700, color: '#111', marginBottom: 16 }}>
+                        📁 Expedientes Asignados a {userStatsObj?.usuario}
+                      </h2>
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                          <thead>
+                            <tr style={{ background: '#f9fafb' }}>
+                              {['Código', 'Título', 'Dependencia', 'TRD', 'Documentos', '% Avance'].map(h => (
+                                <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e5e7eb' }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {userExps.map((exp) => (
+                              <tr key={exp.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                                <td style={{ padding: '10px 12px', fontWeight: 600, color: '#111' }}>{exp.code}</td>
+                                <td style={{ padding: '10px 12px', color: '#374151' }}>{exp.title}</td>
+                                <td style={{ padding: '10px 12px', color: '#6b7280' }}>{exp.dependencia}</td>
+                                <td style={{ padding: '10px 12px', color: '#6b7280' }}>{exp.subserie}</td>
+                                <td style={{ padding: '10px 12px', color: '#374151' }}>
+                                  <span style={{ fontWeight: 600 }}>{exp.cargados}</span>
+                                  <span style={{ color: '#9ca3af' }}> / {exp.requeridos}</span>
+                                </td>
+                                <td style={{ padding: '10px 12px', minWidth: 160 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <ProgressBar value={exp.avance} color={exp.avance >= 80 ? '#39A900' : exp.avance >= 40 ? '#f59e0b' : '#ef4444'} />
+                                    <span style={{ fontSize: 12, fontWeight: 700, minWidth: 40 }}>{exp.avance}%</span>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                            {userExps.length === 0 && (
+                              <tr>
+                                <td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#9ca3af' }}>
+                                  Sin expedientes asignados.
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </>
           ) : (
             <div style={{ textAlign: 'center', padding: 60, color: '#9ca3af' }}>Sin datos. Haga clic en Actualizar.</div>

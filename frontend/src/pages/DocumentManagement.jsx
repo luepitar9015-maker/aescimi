@@ -347,6 +347,8 @@ function DocumentManagement() {
     const [mergedOrigen, setMergedOrigen] = useState('ELECTRONICO');
     const [mergedAddText, setMergedAddText] = useState('no');
     const [mergedText, setMergedText] = useState('');
+    const [existingDocs, setExistingDocs] = useState([]);
+    const [loadingExisting, setLoadingExisting] = useState(false);
 
     const moveFile = (index, direction) => {
         setFiles(prev => {
@@ -554,6 +556,7 @@ function DocumentManagement() {
             setTypologies([]);
         }
         
+        fetchExistingDocs(exp.id);
         setViewMode('upload');
     };
 
@@ -648,6 +651,37 @@ function DocumentManagement() {
         try {
             await axios.delete(`/api/documents/${doc.id}`);
             alert("Documento eliminado correctamente");
+            fetchSavedDocs();
+        } catch (err) {
+            console.error(err);
+            alert("Error al eliminar documento: " + (err.response?.data?.error || err.message));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchExistingDocs = async (expId) => {
+        setLoadingExisting(true);
+        try {
+            const res = await axios.get(`/api/documents/expediente/${expId}`);
+            setExistingDocs(res.data.data || []);
+        } catch (err) {
+            console.error('Error fetching existing docs:', err);
+        } finally {
+            setLoadingExisting(false);
+        }
+    };
+
+    const handleDeleteExistingDoc = async (doc) => {
+        if (!window.confirm(`¿Estás seguro de que deseas eliminar permanentemente el archivo "${doc.filename}"? Esta acción borrará el archivo físico de OneDrive.`)) {
+            return;
+        }
+
+        setLoading(true);
+        try {
+            await axios.delete(`/api/documents/${doc.id}`);
+            alert("Documento eliminado correctamente");
+            if (selectedExpediente) fetchExistingDocs(selectedExpediente.id);
             fetchSavedDocs();
         } catch (err) {
             console.error(err);
@@ -779,6 +813,7 @@ function DocumentManagement() {
             addTextOption: 'no',
             documentText: '',
             isSplit: false,
+            selectedForMerge: true,
             ranges: [{ start: 1, end: 1, typologyId: '', typologyName: '', addTextOption: 'no', documentText: '' }],
             url: URL.createObjectURL(f),  // create preview URL
             aiAnalysisStatus: 'idle', // 'idle' | 'loading' | 'success' | 'error'
@@ -887,6 +922,11 @@ function DocumentManagement() {
         if (files.length === 0 || !selectedExpediente) return;
 
         if (mergeMode) {
+            const filesToMerge = files.filter(f => f.selectedForMerge !== false);
+            if (filesToMerge.length < 2) {
+                alert("Por favor seleccione al menos 2 archivos para unir.");
+                return;
+            }
             if (!mergedTypologyName) {
                 alert("Por favor asigne una tipología para el documento unido.");
                 return;
@@ -900,7 +940,7 @@ function DocumentManagement() {
             setStatus("Uniendo y guardando archivos en un solo PDF...");
 
             const formData = new FormData();
-            files.forEach(f => {
+            filesToMerge.forEach(f => {
                 formData.append('files', f.file);
             });
             formData.append('expediente', JSON.stringify(selectedExpediente));
@@ -928,6 +968,7 @@ function DocumentManagement() {
                 setMergedAddText('no');
                 setMergedText('');
                 fetchSavedDocs();
+                if (selectedExpediente) fetchExistingDocs(selectedExpediente.id);
             } catch (err) {
                 setLoading(false);
                 console.error(err);
@@ -1012,6 +1053,7 @@ function DocumentManagement() {
             setFiles([]);
             setPreviewIdx(null);
             fetchSavedDocs();
+            if (selectedExpediente) fetchExistingDocs(selectedExpediente.id);
         } else {
             setStatus(`${successCount} guardados. Errores: ${errors.join(' | ')}`);
         }
@@ -1463,7 +1505,7 @@ function DocumentManagement() {
                                                     previewIdx === idx
                                                         ? 'border-green-500 shadow-md bg-green-50'
                                                         : 'border-gray-200 hover:border-gray-300 shadow-sm'
-                                                }`}
+                                                } ${mergeMode && entry.selectedForMerge === false ? 'opacity-40 bg-gray-50 border-dashed border-gray-300' : ''}`}
                                             >
                                                 <div className="flex items-start justify-between gap-2">
                                                     <div className="flex-1 min-w-0" onClick={() => setPreviewIdx(idx)}>
@@ -1487,6 +1529,20 @@ function DocumentManagement() {
                                                                         className="w-3 h-3 text-green-600 rounded"
                                                                     />
                                                                     <span className="text-[10px] font-bold text-green-700 uppercase">Dividir</span>
+                                                                </label>
+                                                            )}
+                                                            {mergeMode && (
+                                                                <label className="flex items-center gap-1.5 cursor-pointer select-none" onClick={(e) => e.stopPropagation()}>
+                                                                    <input 
+                                                                        type="checkbox" 
+                                                                        checked={entry.selectedForMerge !== false} 
+                                                                        onChange={(e) => {
+                                                                            const checked = e.target.checked;
+                                                                            setFiles(prev => prev.map((f, i) => i === idx ? { ...f, selectedForMerge: checked } : f));
+                                                                        }}
+                                                                        className="w-3.5 h-3.5 text-green-600 rounded focus:ring-green-500"
+                                                                    />
+                                                                    <span className="text-[10px] font-bold text-green-700 uppercase">Incluir</span>
                                                                 </label>
                                                             )}
                                                         </div>
@@ -1750,7 +1806,7 @@ function DocumentManagement() {
                                             disabled={loading}
                                             className="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-bold shadow flex justify-center items-center gap-2"
                                         >
-                                            {loading ? 'Procesando...' : <><Save size={18} /> Guardar {files.length} Archivo{files.length !== 1 ? 's' : ''}</>}
+                                            {loading ? 'Procesando...' : <><Save size={18} /> Guardar {mergeMode ? files.filter(f => f.selectedForMerge !== false).length : files.length} Archivo{(mergeMode ? files.filter(f => f.selectedForMerge !== false).length : files.length) !== 1 ? 's' : ''}</>}
                                         </button>
                                         {status && <p className="text-center text-xs font-medium text-green-700 bg-green-50 p-2 rounded">{status}</p>}
                                     </div>
@@ -1782,6 +1838,60 @@ function DocumentManagement() {
                                 </div>
                             </div>
                         )}
+
+                            {/* Documentos Existentes en el Expediente */}
+                                <div className="mt-8 pt-6 border-t border-gray-200">
+                                    <h3 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-1.5">
+                                        📁 Documentos ya guardados en este expediente ({existingDocs.length})
+                                    </h3>
+                                    {loadingExisting ? (
+                                        <div className="flex items-center gap-2 text-xs text-gray-400 py-2">
+                                            <div className="w-3.5 h-3.5 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                                            <span>Cargando documentos guardados...</span>
+                                        </div>
+                                    ) : existingDocs.length === 0 ? (
+                                        <p className="text-xs text-gray-400 italic py-2">No hay documentos guardados en este expediente aún.</p>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[300px] overflow-y-auto pr-1">
+                                            {existingDocs.map((doc) => (
+                                                <div 
+                                                    key={doc.id} 
+                                                    className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 hover:shadow-sm transition-all"
+                                                >
+                                                    <div className="flex-1 min-w-0 pr-3">
+                                                        <p className="text-xs font-bold text-gray-800 truncate" title={doc.filename}>
+                                                            📄 {doc.filename}
+                                                        </p>
+                                                        <p className="text-[10px] text-gray-500 mt-0.5 truncate">
+                                                            <span className="bg-green-100 text-green-800 px-1.5 py-0.2 rounded-full font-semibold mr-1.5">
+                                                                {doc.typology_name || 'Sin tipología'}
+                                                            </span>
+                                                            {doc.origen}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 shrink-0">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => window.open(`/api/documents/file/${doc.id}`, '_blank')}
+                                                            className="p-1.5 text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-100 rounded-lg transition-colors"
+                                                            title="Ver PDF"
+                                                        >
+                                                            <Eye size={14} />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleDeleteExistingDoc(doc)}
+                                                            className="p-1.5 text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 rounded-lg transition-colors"
+                                                            title="Eliminar permanentemente"
+                                                        >
+                                                            <X size={14} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </>
                         )}
                     </div>

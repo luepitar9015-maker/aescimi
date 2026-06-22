@@ -418,7 +418,7 @@ router.get('/paquetes', requireAuth, async (req, res) => {
     try {
         const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
         const result = await pool.query(
-            `SELECT p.id, p.nombre, p.descripcion, p.estado, p.created_at,
+            `SELECT p.id, p.nombre, p.descripcion, p.estado, p.created_at, p.user_id,
                     u.full_name AS usuario_nombre,
                     cb.full_name AS creado_por,
                     COUNT(DISTINCT pi.expediente_id) AS total_expedientes,
@@ -429,7 +429,7 @@ router.get('/paquetes', requireAuth, async (req, res) => {
              LEFT JOIN users cb ON cb.id = p.created_by
              LEFT JOIN paquete_items pi ON pi.paquete_id = p.id
              ${isAdmin ? '' : 'WHERE p.user_id = $1'}
-             GROUP BY p.id, u.full_name, cb.full_name
+             GROUP BY p.id, u.full_name, cb.full_name, p.user_id
              ORDER BY p.created_at DESC`,
             isAdmin ? [] : [req.user.id]
         );
