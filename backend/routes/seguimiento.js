@@ -3,6 +3,9 @@ const router = express.Router();
 const { pool } = require('../database_pg');
 const { requireAuth, requireAdmin } = require('../middleware/authMiddleware');
 
+// Habilitar extensión unaccent si no existe
+pool.query('CREATE EXTENSION IF NOT EXISTS unaccent').catch(e => console.warn('[SEGUIMIENTO] unaccent extension patch error:', e.message));
+
 // ──────────────────────────────────────────────────────────────
 // Ensure the expediente_assignments table exists
 // ──────────────────────────────────────────────────────────────
