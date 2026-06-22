@@ -59,14 +59,15 @@ function StatCard({ icon: Icon, value, label, sublabel, colorBg, colorIcon, colo
 export default function Dashboard() {
     const navigate = useNavigate();
     const [user, setUser]           = useState(null);
-    const [stats, setStats]         = useState(null);
+    const [globalStats, setGlobalStats] = useState(null);
+    const [assignedStats, setAssignedStats] = useState(null);
+    const [viewMode, setViewMode]   = useState('global'); // 'global' or 'assigned'
     const [permissions, setPerms]   = useState([]);
     const [loadingStats, setLoadingStats] = useState(true);
     const [loadingPerms, setLoadingPerms] = useState(true);
 
     useEffect(() => {
         const stored = JSON.parse(localStorage.getItem('user') || '{}');
-        // Mostrar el nombre completo; si no existe 'name', usar 'username'
         setUser(stored);
         fetchStats();
         if (stored.role) fetchPerms(stored.role);
@@ -75,9 +76,18 @@ export default function Dashboard() {
     const fetchStats = async () => {
         try {
             const res = await axios.get('/api/documents/stats/dashboard');
-            setStats(res.data.data);
+            const data = res.data;
+            if (data.scope === 'global') {
+                setGlobalStats(data.data);
+                setAssignedStats(data.assigned);
+                setViewMode('global');
+            } else {
+                setAssignedStats(data.data);
+                setViewMode('assigned');
+            }
         } catch {
-            setStats({});
+            setGlobalStats({});
+            setAssignedStats({});
         } finally {
             setLoadingStats(false);
         }
@@ -107,7 +117,11 @@ export default function Dashboard() {
     // Nombre a mostrar: preferir name, luego username, luego 'Usuario'
     const displayName = user?.name || user?.username || user?.document_no || 'Usuario';
     const roleBadge   = ROLE_BADGE[user?.role] || 'bg-gray-200 text-gray-700';
-    const scopeLabel  = isSuperOrAdmin ? 'Sistema completo' : 'Tu dependencia';
+
+    // Las estadísticas activas a mostrar en las tarjetas
+    const activeStats = viewMode === 'global' ? globalStats : assignedStats;
+    const sublabelExp = viewMode === 'global' ? 'Total sistema' : 'Asignados a mí';
+    const sublabelDocs = viewMode === 'global' ? 'En el sistema' : 'Asignados a mí';
 
     return (
         <div className="p-5 max-w-7xl mx-auto space-y-7">
@@ -126,8 +140,8 @@ export default function Dashboard() {
                     <p className="text-green-100 text-sm opacity-90 max-w-2xl">
                         Panel de control del <strong>Automatizador de Gestión Documental</strong>.
                         {isSuperOrAdmin
-                            ? ' Visualizando estadísticas globales del sistema.'
-                            : ' Visualizando datos de tu dependencia.'}
+                            ? ' Visualizando estadísticas del sistema y tus asignaciones.'
+                            : ' Visualizando tus expedientes asignados.'}
                     </p>
                 </div>
                 <LayoutDashboard className="absolute right-0 bottom-0 text-white opacity-10 w-56 h-56 -mb-10 -mr-10" />
@@ -135,19 +149,43 @@ export default function Dashboard() {
 
             {/* ── ESTADÍSTICAS DE EXPEDIENTES ──────────────────────────── */}
             <div>
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                     <h2 className="text-base font-black text-gray-700 flex items-center gap-2">
                         <FolderKanban size={18} className="text-[#39A900]" />
-                        Expedientes — <span className="text-gray-400 font-semibold text-sm">{scopeLabel}</span>
+                        Expedientes — <span className="text-gray-400 font-semibold text-sm">{viewMode === 'global' ? 'Sistema completo' : 'Asignados a mí'}</span>
                     </h2>
+                    {isSuperOrAdmin && (
+                        <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200 text-xs shadow-inner select-none">
+                            <button
+                                onClick={() => setViewMode('global')}
+                                className={`px-4 py-1.5 rounded-lg font-bold transition-all duration-200 ${
+                                    viewMode === 'global'
+                                        ? 'bg-white text-green-700 shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-800'
+                                }`}
+                            >
+                                Sistema completo
+                            </button>
+                            <button
+                                onClick={() => setViewMode('assigned')}
+                                className={`px-4 py-1.5 rounded-lg font-bold transition-all duration-200 ${
+                                    viewMode === 'assigned'
+                                        ? 'bg-white text-green-700 shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-800'
+                                }`}
+                            >
+                                Asignados a mí
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                     <StatCard
                         icon={FolderOpen}
-                        value={stats?.total_expedientes}
+                        value={activeStats?.total_expedientes}
                         label="Aperturados"
-                        sublabel={isSuperOrAdmin ? 'Total sistema' : 'En tu dependencia'}
+                        sublabel={sublabelExp}
                         colorBg="border-green-100 bg-green-50"
                         colorIcon="text-green-600"
                         colorText="text-green-700"
@@ -156,7 +194,7 @@ export default function Dashboard() {
                     />
                     <StatCard
                         icon={FileText}
-                        value={stats?.expedientes_con_docs}
+                        value={activeStats?.expedientes_con_docs}
                         label="Con documentos"
                         sublabel="Expedientes cargados"
                         colorBg="border-blue-100 bg-blue-50"
@@ -167,7 +205,7 @@ export default function Dashboard() {
                     />
                     <StatCard
                         icon={FolderX}
-                        value={stats?.expedientes_sin_docs}
+                        value={activeStats?.expedientes_sin_docs}
                         label="Sin documentos"
                         sublabel="Pendientes por cargar"
                         colorBg="border-orange-100 bg-orange-50"
@@ -178,7 +216,7 @@ export default function Dashboard() {
                     />
                     <StatCard
                         icon={Clock}
-                        value={stats?.docs_pendientes}
+                        value={activeStats?.docs_pendientes}
                         label="Docs. Pendientes"
                         sublabel="Por procesar en AES"
                         colorBg="border-red-100 bg-red-50"
@@ -189,7 +227,7 @@ export default function Dashboard() {
                     />
                     <StatCard
                         icon={CheckCircle}
-                        value={stats?.docs_cargados_hoy}
+                        value={activeStats?.docs_cargados_hoy}
                         label="Cargados Hoy"
                         sublabel="Procesados hoy"
                         colorBg="border-teal-100 bg-teal-50"
@@ -199,9 +237,9 @@ export default function Dashboard() {
                     />
                     <StatCard
                         icon={Files}
-                        value={stats?.total_docs}
+                        value={activeStats?.total_docs}
                         label="Total Docs."
-                        sublabel={isSuperOrAdmin ? 'En el sistema' : 'En tu dependencia'}
+                        sublabel={sublabelDocs}
                         colorBg="border-purple-100 bg-purple-50"
                         colorIcon="text-purple-600"
                         colorText="text-purple-700"
