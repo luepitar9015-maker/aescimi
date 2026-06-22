@@ -24,7 +24,19 @@ const SuperuserModule = () => {
 
   useEffect(() => {
     fetchTables();
+    fetchExpirationDate();
   }, []);
+
+  const fetchExpirationDate = async () => {
+    try {
+      const res = await axios.get('/api/settings/system_expiration_date', { headers });
+      if (res.data && res.data.value) {
+        setExpirationDate(res.data.value);
+      }
+    } catch (err) {
+      console.error("Error fetching expiration date:", err);
+    }
+  };
 
   const fetchTables = async () => {
     try {

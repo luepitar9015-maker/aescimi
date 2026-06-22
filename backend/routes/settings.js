@@ -65,6 +65,13 @@ router.post('/', requireAuth, async (req, res) => {
     const { key, value } = req.body;
     if (!key) return res.status(400).json({ error: 'Key is required' });
 
+    // Block modifying system expiration date unless the user is a superadmin
+    if (key === 'system_expiration_date') {
+        if (!req.user || req.user.role !== 'superadmin') {
+            return res.status(403).json({ error: 'Acceso denegado. Solo el superusuario puede modificar la licencia del sistema.' });
+        }
+    }
+
     const isAesKey = ['ades_url', 'ades_username', 'ades_password'].includes(key);
     const isAdmin = req.user && (req.user.role === 'admin' || req.user.role === 'superadmin');
 

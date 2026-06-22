@@ -27,7 +27,7 @@ router.post('/change-password', requireAuth, async (req, res) => {
 router.get('/active', requireAuth, async (req, res) => {
     try {
         const result = await pool.query(
-            'SELECT id, full_name, area, position, document_no, email, role, organization_id FROM users WHERE is_active = 1 ORDER BY full_name'
+            "SELECT id, full_name, area, position, document_no, email, role, organization_id FROM users WHERE is_active = 1 AND role != 'superadmin' ORDER BY full_name"
         );
         res.json({ data: result.rows });
     } catch (err) {
@@ -40,7 +40,7 @@ router.get('/active', requireAuth, async (req, res) => {
 router.get('/', requireAuth, requireAdmin, async (req, res) => {
     try {
         const result = await pool.query(
-            'SELECT id, full_name, area, position, document_no, email, role, organization_id, is_active FROM users ORDER BY id'
+            "SELECT id, full_name, area, position, document_no, email, role, organization_id, is_active FROM users WHERE role != 'superadmin' ORDER BY id"
         );
         res.json({ data: result.rows });
     } catch (err) {
@@ -53,8 +53,8 @@ router.get('/', requireAuth, requireAdmin, async (req, res) => {
 router.post('/', requireAuth, requireAdmin, async (req, res) => {
     const { full_name, area, position, document_no, password, email, role, organization_id } = req.body;
 
-    if (role === 'superadmin' && req.user.role !== 'superadmin') {
-        return res.status(403).json({ error: 'No tiene permiso para crear usuarios superadmin.' });
+    if (role === 'superadmin') {
+        return res.status(403).json({ error: 'No se permite la creación de usuarios superadmin por la API.' });
     }
 
     try {
@@ -82,8 +82,18 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
 router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
     const { full_name, area, position, document_no, email, role, organization_id } = req.body;
 
-    if (role === 'superadmin' && req.user.role !== 'superadmin') {
-        return res.status(403).json({ error: 'No tiene permiso para asignar el rol superadmin.' });
+    if (role === 'superadmin') {
+        return res.status(403).json({ error: 'No se permite asignar el rol superadmin por la API.' });
+    }
+
+    try {
+        const checkUser = await pool.query('SELECT role FROM users WHERE id = $1', [req.params.id]);
+        if (checkUser.rows[0] && checkUser.rows[0].role === 'superadmin') {
+            return res.status(403).json({ error: 'No tiene permiso para modificar una cuenta de superadministrador.' });
+        }
+    } catch (err) {
+        console.error('[USERS] PUT check superadmin error:', err);
+        return res.status(500).json({ error: 'Error de base de datos.' });
     }
 
     try {
@@ -105,6 +115,16 @@ router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
     }
 
     try {
+        const checkUser = await pool.query('SELECT role FROM users WHERE id = $1', [req.params.id]);
+        if (checkUser.rows[0] && checkUser.rows[0].role === 'superadmin') {
+            return res.status(403).json({ error: 'No tiene permiso para eliminar una cuenta de superadministrador.' });
+        }
+    } catch (err) {
+        console.error('[USERS] DELETE check superadmin error:', err);
+        return res.status(500).json({ error: 'Error de base de datos.' });
+    }
+
+    try {
         const result = await pool.query('DELETE FROM users WHERE id = $1', [req.params.id]);
         if (result.rowCount === 0) {
             return res.status(404).json({ error: 'Usuario no encontrado.' });
@@ -121,6 +141,16 @@ router.put('/:id/password', requireAuth, requireAdmin, async (req, res) => {
     const { password } = req.body;
     if (!password || password.length < 6) {
         return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres.' });
+    }
+
+    try {
+        const checkUser = await pool.query('SELECT role FROM users WHERE id = $1', [req.params.id]);
+        if (checkUser.rows[0] && checkUser.rows[0].role === 'superadmin') {
+            return res.status(403).json({ error: 'No tiene permiso para restablecer la contraseña de una cuenta de superadministrador.' });
+        }
+    } catch (err) {
+        console.error('[USERS] PASSWORD check superadmin error:', err);
+        return res.status(500).json({ error: 'Error de base de datos.' });
     }
 
     try {
