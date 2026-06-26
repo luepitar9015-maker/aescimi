@@ -256,8 +256,8 @@ export default function InteractivePresentation() {
   const slides = [
     {
       // Diapositiva 1
-      title: 'SENA V2',
-      subtitle: 'La Revolución Documental con Inteligencia Artificial',
+      title: 'Automatización Inteligente del Archivo Electrónico',
+      subtitle: 'Agilidad, cumplimiento y preservación',
       speakerNotes: 'Comenzar dando la bienvenida al público. Aclarar que la gestión documental es el corazón de la administración pública y privada, pero suele consumir miles de horas humanas en tareas de copiar y pegar. Introducir el concepto de "Trabajador Digital" como una combinación de Inteligencia Artificial (cerebro/ojos) y Robots (brazos/manos) para librar a los funcionarios de la rutina repetitiva.',
       content: (
         <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-6 animate-[fadeIn_0.5s_ease-out]">
@@ -270,10 +270,10 @@ export default function InteractivePresentation() {
           <div className="space-y-3">
             <span className="text-xs font-bold tracking-[0.2em] text-[#39A900] uppercase">Proyecto de Innovación Digital</span>
             <h2 className="text-4xl md:text-5xl font-black text-white tracking-tight leading-tight font-outfit">
-              SENA V2
+              Automatización Inteligente del Archivo Electrónico
             </h2>
             <p className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 font-bold text-xl md:text-2xl max-w-xl mx-auto font-outfit">
-              Gestión Documental con IA e Hiperautomatización
+              Agilidad, cumplimiento y preservación
             </p>
             <p className="text-slate-400 text-sm max-w-lg mx-auto font-medium">
               De horas de transcripción manual a segundos de clasificación estructurada y sincronización automatizada.
@@ -501,7 +501,7 @@ export default function InteractivePresentation() {
 
               <div className="space-y-1">
                 <div className="flex justify-between text-[8px] font-bold text-sena-green font-mono">
-                  <span>Procesamiento SENA V2</span>
+                  <span>Procesamiento Automatizado</span>
                   <span>{autoTime} secs</span>
                 </div>
                 <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
@@ -529,7 +529,7 @@ export default function InteractivePresentation() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center w-full max-w-5xl p-2 text-left animate-[fadeIn_0.5s_ease-out]">
           
           {/* Left: IA */}
-          <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between hover:border-[#39A900]/25 transition-all h-[300px]">
+          <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between hover:border-[#39A900]/25 transition-all min-h-[320px] h-auto pb-6">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <span className="text-xl">🧠</span>
@@ -546,15 +546,15 @@ export default function InteractivePresentation() {
           </div>
 
           {/* Center Image */}
-          <div className="relative rounded-3xl overflow-hidden border border-slate-800 shadow-2xl h-[300px] flex items-center justify-center bg-slate-950">
+          <div className="relative rounded-3xl overflow-hidden border border-slate-800 shadow-2xl min-h-[320px] h-auto flex items-center justify-center bg-slate-950">
             <img src="/assets/images/digital_worker_concept.png" className="w-full h-full object-cover opacity-85 hover:scale-105 transition-transform duration-500" alt="Trabajador Digital Concept" />
             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent p-3 text-center">
-              <span className="text-[9px] font-bold text-white uppercase tracking-widest bg-slate-900/80 px-2.5 py-1 rounded-full border border-slate-800 font-outfit">SENA V2: RPA + IA</span>
+              <span className="text-[9px] font-bold text-white uppercase tracking-widest bg-slate-900/80 px-2.5 py-1 rounded-full border border-slate-800 font-outfit">Automatización Inteligente: RPA + IA</span>
             </div>
           </div>
 
           {/* Right: RPA */}
-          <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between hover:border-cyan-500/25 transition-all h-[300px]">
+          <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between hover:border-cyan-500/25 transition-all min-h-[320px] h-auto pb-6">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <span className="text-xl">🦾</span>
@@ -699,7 +699,7 @@ export default function InteractivePresentation() {
           </div>
 
           {/* Canvas View */}
-          <div className="lg:col-span-5 bg-slate-950 border border-slate-850 rounded-2xl p-4 flex flex-col h-[320px] relative overflow-hidden justify-center items-center">
+          <div className="lg:col-span-5 bg-slate-950 border border-slate-850 rounded-2xl p-4 flex flex-col min-h-[340px] h-auto relative overflow-hidden justify-center items-center pb-6">
             {simStep === 0 && (
               <div className="text-center space-y-2">
                 <div className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-lg text-sena-green mx-auto">🤖</div>
@@ -832,7 +832,7 @@ export default function InteractivePresentation() {
           </div>
 
           {/* Logs View */}
-          <div className="lg:col-span-4 bg-slate-900/60 border border-slate-800 backdrop-blur-md rounded-2xl p-4 flex flex-col h-[320px]">
+          <div className="lg:col-span-4 bg-slate-900/60 border border-slate-800 backdrop-blur-md rounded-2xl p-4 flex flex-col min-h-[340px] h-auto pb-6">
             <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">3. Logs de Consola</h4>
             <div className="flex-grow bg-slate-950 rounded-xl p-3 font-mono text-[9px] text-slate-400 overflow-y-auto space-y-1 border border-slate-850 leading-relaxed text-left custom-scroll">
               {simLogs.length === 0 ? (
@@ -881,7 +881,7 @@ export default function InteractivePresentation() {
             </div>
           </div>
 
-          <div className="bg-slate-950 border border-slate-850 rounded-2xl p-5 h-[280px] flex flex-col justify-between relative overflow-hidden shadow-2xl">
+          <div className="bg-slate-950 border border-slate-850 rounded-2xl p-5 min-h-[300px] h-auto flex flex-col justify-between relative overflow-hidden shadow-2xl pb-6">
             <div className="bg-slate-950 border border-slate-850 p-2 rounded-lg flex justify-between items-center text-[8px] font-bold text-slate-400 font-mono">
               <span>VISOR DE PDF INTEGRADO</span>
               <span className="text-[#39A900] animate-pulse">● OCR CANAL ALFA</span>
@@ -966,7 +966,7 @@ export default function InteractivePresentation() {
     {
       // Diapositiva 10
       title: 'Retorno de la Inversión (ROI) y Beneficios Tangibles',
-      subtitle: 'Resultados operacionales medibles tras la adopción de SENA V2',
+      subtitle: 'Resultados operacionales medibles tras la adopción de la Automatización Inteligente',
       speakerNotes: 'Concluir mostrando las métricas del sistema. Destacar los 3 grandes beneficios: Tiempo (de 10 minutos a 15 segundos), Precisión (99.8% seguro contra clasificaciones subjetivas erróneas) y cero errores de digitación de metadatos.',
       content: (
         <div className="w-full max-w-4xl text-left space-y-4 animate-[fadeIn_0.5s_ease-out]">
@@ -1057,7 +1057,7 @@ export default function InteractivePresentation() {
     {
       // Diapositiva 12
       title: 'El Futuro de la Gestión Pública Inteligente',
-      subtitle: 'SENA V2',
+      subtitle: 'Automatización Inteligente del Archivo Electrónico: Agilidad, cumplimiento y preservación',
       speakerNotes: 'Concluir la ponencia con el mensaje inspirador: la IA no reemplaza al talento humano, sino que lo libera del trabajo repetitivo e intelectualmente vacío. Agradecer formalmente y abrir ronda de preguntas.',
       content: (
         <div className="text-center space-y-6 max-w-2xl mx-auto animate-[fadeIn_0.5s_ease-out]">
@@ -1083,6 +1083,26 @@ export default function InteractivePresentation() {
 
   return (
     <div ref={containerRef} className="min-h-[calc(100vh-80px)] bg-slate-950 text-slate-200 p-4 md:p-6 flex flex-col font-sans select-none rounded-2xl border border-slate-900 relative overflow-hidden">
+      <style>{`
+        #slideViewport .text-\\[6px\\] { font-size: 11px !important; }
+        #slideViewport .text-\\[6\\.5px\\] { font-size: 11px !important; }
+        #slideViewport .text-\\[7px\\] { font-size: 12px !important; }
+        #slideViewport .text-\\[8px\\] { font-size: 13px !important; }
+        #slideViewport .text-\\[9px\\] { font-size: 14px !important; }
+        #slideViewport .text-\\[10px\\] { font-size: 15px !important; }
+        #slideViewport .text-\\[11px\\] { font-size: 16px !important; }
+        #slideViewport .text-xs { font-size: 15px !important; }
+        #slideViewport .text-sm { font-size: 17px !important; }
+        #slideViewport .text-base { font-size: 19px !important; }
+        #slideViewport .text-lg { font-size: 22px !important; }
+        #slideViewport .text-xl { font-size: 26px !important; }
+        #slideViewport .text-2xl { font-size: 30px !important; }
+        #slideViewport .text-3xl { font-size: 36px !important; }
+        #slideViewport .text-4xl { font-size: 44px !important; }
+        #slideViewport .text-5xl { font-size: 54px !important; }
+        #slideViewport .text-6xl { font-size: 64px !important; }
+        #slideViewport .text-7xl { font-size: 76px !important; }
+      `}</style>
       
       {/* Background drift animations */}
       <div className="absolute w-[400px] h-[400px] rounded-full bg-[#39A900]/10 filter blur-[90px] -top-20 -left-20 pointer-events-none animate-pulse"></div>
@@ -1176,7 +1196,7 @@ export default function InteractivePresentation() {
           </div>
 
           {/* Slide Interactive Content Container */}
-          <div className="flex-grow flex flex-col justify-center py-2 h-full items-center">
+          <div id="slideViewport" className="flex-grow flex flex-col justify-center py-2 h-full items-center">
             {slide.content}
           </div>
 

@@ -2,7 +2,7 @@
 chcp 65001 >nul
 echo.
 echo ╔══════════════════════════════════════════════════════╗
-echo ║      LIMPIEZA TOTAL DE EXPEDIENTES - SENA V2         ║
+echo ║ LIMPIEZA TOTAL DE EXPEDIENTES - ARCHIVO ELECTRÓNICO  ║
 echo ╚══════════════════════════════════════════════════════╝
 echo.
 echo ADVERTENCIA: Esta operacion eliminara TODOS los expedientes

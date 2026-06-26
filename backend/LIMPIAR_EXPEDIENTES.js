@@ -77,7 +77,7 @@ function vaciarCarpeta(carpeta) {
 async function limpiarTodo() {
     console.log('');
     console.log('╔══════════════════════════════════════════════════════╗');
-    console.log('║      LIMPIEZA TOTAL DE EXPEDIENTES - SENA V2         ║');
+    console.log('║ LIMPIEZA TOTAL DE EXPEDIENTES - ARCHIVO ELECTRÓNICO  ║');
     console.log('╚══════════════════════════════════════════════════════╝');
     console.log('');
 

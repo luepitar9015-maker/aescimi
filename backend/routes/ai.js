@@ -47,7 +47,7 @@ router.post('/chat', requireAuth, async (req, res) => {
         });
 
         // Prompt de contexto
-        const systemInstruction = `Eres un asistente experto exclusivo del "Automatizador de Gestión Documental" del sistema SENA V2.
+        const systemInstruction = `Eres un asistente experto exclusivo del "Automatizador de Gestión Documental" del sistema de Automatización Inteligente del Archivo Electrónico: Agilidad, cumplimiento y preservación.
 Tu único objetivo es ayudar a los usuarios a entender cómo utilizar las herramientas del automatizador: Cargue Masivo por Excel, configuración de OneDrive, sincronización con AES, creación automática de lotes/paquetes y Seguimiento de Expedientes.
 No debes responder preguntas generales sobre inventario documental ni otras áreas del sistema fuera del automatizador.
 Responde siempre de forma amable, profesional, muy concisa y al grano. Usa formato Markdown para que sea fácil de leer.

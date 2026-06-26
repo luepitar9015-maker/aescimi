@@ -1,4 +1,4 @@
-# GUÍA DE EXPOSICIÓN PASO A PASO: SENA V2
+# GUÍA DE EXPOSICIÓN PASO A PASO: Automatización Inteligente del Archivo Electrónico: Agilidad, cumplimiento y preservación
 ## Manual y Guion del Orador para Ponencia de 30 Minutos
 ---
 
@@ -27,7 +27,7 @@
 *   **Tono de Voz:** Entusiasta, firme, formal pero accesible. Debe proyectar liderazgo tecnológico.
 *   **Lenguaje Corporal:** De pie, brazos abiertos para recibir a la audiencia, contacto visual inicial con los directivos o jurados principales.
 *   **Guion Literario:**
-    > *"Muy buenas tardes a todos los presentes. Es un honor estar frente a ustedes el día de hoy para presentar un proyecto que representa no solo una evolución tecnológica, sino una verdadera transformación cultural en la forma en que gestionamos la información institucional. Les presento **SENA V2**, el Automatizador de Gestión Documental con Inteligencia Artificial.
+    > *"Muy buenas tardes a todos los presentes. Es un honor estar frente a ustedes el día de hoy para presentar un proyecto que representa no solo una evolución tecnológica, sino una verdadera transformación cultural en la forma en que gestionamos la información institucional. Les presento la **Automatización Inteligente del Archivo Electrónico: Agilidad, cumplimiento y preservación**, el Automatizador de Gestión Documental con Inteligencia Artificial.
     > 
     > En el día a día institucional, pasamos miles de horas procesando documentos, copiando nombres, tipeando cédulas y archivando PDFs en carpetas en la nube. Hoy queremos mostrarles cómo hemos transformado esa realidad, convirtiendo horas de archivo repetitivo y agotador en apenas segundos de clasificación inteligente asistida por IA. No venimos a presentar una idea teórica; venimos a mostrarles una solución funcional, desarrollada para y por nuestra institución, respetando al cien por ciento nuestras normas de archivo. Comencemos."*
 *   **Transición:** *"Pero para entender el valor de la solución, primero debemos mirar de frente el tamaño del problema al que nos enfrentamos a diario..."*
@@ -62,7 +62,7 @@
 *   **Guion Literario (Instrucciones de Demostración de la Calculadora):**
     > *"Aquí tenemos los números reales. En la calculadora que ven en pantalla, podemos ajustar las variables. Si asumimos una carga típica de solo 200 documentos al día en un centro de formación, y le dedicamos un tiempo promedio de 4 minutos por documento de forma manual, estamos hablando de 13.3 horas de trabajo humano al día. Es decir, necesitamos casi dos personas dedicadas de forma exclusiva y sin pestañear a transcribir datos.
     > 
-    > En contraste, cuando pasamos el proceso al robot del SENA V2, el tiempo promedio cae a solo 15 segundos por documento. Es decir, los mismos 200 documentos se procesan en apenas 50 minutos. Esto representa liberar más del 90% del tiempo de esos funcionarios. Estamos recuperando 250 horas de trabajo humano calificado al mes. Ese tiempo ahora se puede usar para responderle más rápido al ciudadano, auditar expedientes o realizar labores estratégicas."*
+    > En contraste, cuando pasamos el proceso al robot de la Automatización Inteligente del Archivo Electrónico, el tiempo promedio cae a solo 15 segundos por documento. Es decir, los mismos 200 documentos se procesan en apenas 50 minutos. Esto representa liberar más del 90% del tiempo de esos funcionarios. Estamos recuperando 250 horas de trabajo humano calificado al mes. Ese tiempo ahora se puede usar para responderle más rápido al ciudadano, auditar expedientes o realizar labores estratégicas."*
 *   **Transición:** *"¿Cómo logramos este milagro de velocidad sin perder precisión? La respuesta está en un concepto moderno: la hiperautomatización..."*
 
 ---
@@ -73,7 +73,7 @@
 *   **Guion Literario:**
     > *"Durante años, las empresas han usado RPA, que son robots de software que imitan los clics del mouse y la digitación del teclado. El problema es que el RPA tradicional es ciego y rígido. Si le cambias un botón de lugar en la pantalla o le entregas un PDF con un formato diferente, el robot se rompe y se detiene.
     > 
-    > Por eso, en el SENA V2 implementamos la Hiperautomatización. Esto es unir los brazos mecánicos del RPA con el cerebro cognitivo de la Inteligencia Artificial. La IA actúa como los ojos y el entendimiento: lee el PDF, comprende su contenido semántico y extrae los datos clave estructurados. Luego, le pasa esa información limpia al robot RPA, que actúa como las manos: abre el navegador, digita los campos a la velocidad del rayo y carga el archivo al repositorio central. Es la combinación perfecta: cognición más acción."*
+    > Por eso, en la Automatización Inteligente del Archivo Electrónico implementamos la Hiperautomatización. Esto es unir los brazos mecánicos del RPA con el cerebro cognitivo de la Inteligencia Artificial. La IA actúa como los ojos y el entendimiento: lee el PDF, comprende su contenido semántico y extrae los datos clave estructurados. Luego, le pasa esa información limpia al robot RPA, que actúa como las manos: abre el navegador, digita los campos a la velocidad del rayo y carga el archivo al repositorio central. Es la combinación perfecta: cognición más acción."*
 *   **Transición:** *"Permítanme mostrarles brevemente la arquitectura tecnológica que sostiene esta integración..."*
 
 ---
@@ -93,7 +93,7 @@
 *   **Tono de Voz:** Profesional, archivístico, tranquilizador.
 *   **Lenguaje Corporal:** Palmas de las manos hacia arriba para transmitir honestidad y transparencia. Señalar la interfaz del simulador de clasificación.
 *   **Guion Literario:**
-    > *"Uno de los mayores temores de los directores de archivo es que la IA clasifique de forma errónea o desorganice el fondo documental. En el SENA V2 diseñamos el sistema para que no sea una caja negra automatizada que toma decisiones sin control.
+    > *"Uno de los mayores temores de los directores de archivo es que la IA clasifique de forma errónea o desorganice el fondo documental. En la Automatización Inteligente del Archivo Electrónico diseñamos el sistema para que no sea una caja negra automatizada que toma decisiones sin control.
     > 
     > Cuando el PDF entra al sistema, la IA no busca palabras clave de forma rígida; comprende el contexto. Si el documento dice 'Solicito respetuosamente que me entreguen copia de mi contrato de prestación de servicios para tramitar un préstamo', el sistema no lo clasifica como un Contrato; entiende semánticamente que la intención es solicitar información, y lo predice como un Derecho de Petición. El sistema muestra la tipología alineada con la TRD, nos arroja un porcentaje de confianza y redacta una breve explicación de su razonamiento. El funcionario tiene el control total: si está de acuerdo, aprueba; si no, puede corregirlo en un segundo. Es automatización con supervisión humana."*
 *   **Transición:** *"Pero, ¿qué pasa si el PDF es una imagen escaneada donde no se puede copiar texto? Para eso creamos una innovación de usabilidad..."*
@@ -126,7 +126,7 @@
 *   **Tono de Voz:** Triunfante, contundente, comercial.
 *   **Lenguaje Corporal:** Postura erguida, mirar fijamente a los tomadores de decisiones. Apuntar con decisión a los porcentajes altos en pantalla.
 *   **Guion Literario:**
-    > *"Hablemos de impacto real. Pasamos de 10 minutos de procesamiento e indexación manual a solo 15 segundos promedio por documento con la plataforma SENA V2. Eso es una reducción del 95% del tiempo operativo.
+    > *"Hablemos de impacto real. Pasamos de 10 minutos de procesamiento e indexación manual a solo 15 segundos promedio por documento con la plataforma de Automatización Inteligente del Archivo Electrónico. Eso es una reducción del 95% del tiempo operativo.
     > 
     > La precisión en la clasificación documental sube al 99.8% gracias a las sugerencias semánticas de la IA, eliminando los expedientes 'traspapelados' o mal clasificados. La fricción de tener que loguearse a cada momento en el portal ECM se elimina, delegando esa tarea al robot Puppeteer que maneja de forma segura las credenciales y el flujo de sesión. Y lo más valioso de todo: eliminamos el estrés y la fatiga de nuestros funcionarios, permitiendo que su jornada laboral se centre en el análisis intelectual de las solicitudes y la atención de calidad al ciudadano."*
 *   **Transición:** *"Para llevar este sistema del laboratorio a la realidad de toda la institución, hemos trazado una ruta clara..."*
@@ -150,7 +150,7 @@
 *   **Guion Literario:**
     > *"Quiero cerrar con esta frase que ha sido nuestro norte durante el desarrollo del proyecto: 'La Inteligencia Artificial no viene a reemplazar al funcionario público; viene a devolverle el tiempo de ser verdaderamente humano'. Tareas mecánicas como transcribir números de cédula deben ser hechas por máquinas. El análisis, la empatía y la toma de decisiones complejas son facultades exclusivas de nuestro talento humano.
     > 
-    > El Automatizador SENA V2 es una prueba de que podemos modernizar el Estado colombiano con tecnología de vanguardia mundial de manera costo-efectiva. Muchísimas gracias a todos por su tiempo. Quedo a su entera disposición para responder cualquier inquietud que tengan."*
+    > El Automatizador (Automatización Inteligente del Archivo Electrónico: Agilidad, cumplimiento y preservación) es una prueba de que podemos modernizar el Estado colombiano con tecnología de vanguardia mundial de manera costo-efectiva. Muchísimas gracias a todos por su tiempo. Quedo a su entera disposición para responder cualquier inquietud que tengan."*
 *   **Transición:** *Hacer una pausa silenciosa de 3 segundos, sonreír e invitar a la ronda de preguntas.*
 
 ---
@@ -158,7 +158,7 @@
 ## Panel de Respuestas a Preguntas Críticas (Q&A)
 
 ### 1. ¿Cómo garantizamos la seguridad y privacidad de los datos personales (Ley 1581 de 2012) al enviarlos a la IA de Google Gemini?
-*   **Respuesta del Orador:** *"Es una excelente pregunta. En SENA V2 no utilizamos la API pública/gratuita de consumo general. Implementamos la API empresarial (Enterprise) de Google Cloud. Bajo este esquema de licenciamiento, Google garantiza por contrato que los datos y documentos enviados no se almacenan para entrenamiento de sus modelos públicos, ni son compartidos con terceros. Todo el procesamiento de los PDFs se realiza en canales cifrados SSL de extremo a extremo y los metadatos se purgan de la memoria temporal del servidor una vez finalizada la indexación."*
+*   **Respuesta del Orador:** *"Es una excelente pregunta. En la Automatización Inteligente del Archivo Electrónico no utilizamos la API pública/gratuita de consumo general. Implementamos la API empresarial (Enterprise) de Google Cloud. Bajo este esquema de licenciamiento, Google garantiza por contrato que los datos y documentos enviados no se almacenan para entrenamiento de sus modelos públicos, ni son compartidos con terceros. Todo el procesamiento de los PDFs se realiza en canales cifrados SSL de extremo a extremo y los metadatos se purgan de la memoria temporal del servidor una vez finalizada la indexación."*
 
 ### 2. ¿Qué pasa si el canal de internet falla o la API de Gemini no responde? ¿Se detiene el archivo de la entidad?
 *   **Respuesta del Orador:** *"El sistema fue construido bajo el principio de resiliencia operativa. Si el internet falla o hay una caída del servicio de IA, la interfaz entra en modo 'contingencia'. El funcionario puede continuar subiendo archivos y clasificándolos de forma manual en la interfaz local. El sistema almacena una copia cifrada en la base de datos relacional local (PostgreSQL) y, una vez se restablece la conexión, el robot sincroniza y actualiza automáticamente el expediente en OneDrive sin pérdida de información."*

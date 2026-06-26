@@ -1,14 +1,14 @@
-# PRESENTACIÓN: AUTOMATIZADOR DE GESTIÓN DOCUMENTAL - SENA V2
+# PRESENTACIÓN: AUTOMATIZACIÓN INTELIGENTE DEL ARCHIVO ELECTRÓNICO
 ## Material de Exposición para Ponencia de 30 Minutos
 ---
 
 ## Diapositiva 1: Portada y Bienvenida
-*   **Título Principal:** SENA V2: La Revolución Documental con Inteligencia Artificial
+*   **Título Principal:** Automatización Inteligente del Archivo Electrónico: Agilidad, cumplimiento y preservación
 *   **Subtítulo:** De horas de archivo repetitivo a segundos de clasificación inteligente
 *   **Presentado por:** Equipo de Desarrollo Estrategia 180 / SENA
 *   **Concepto Visual:** Fondo oscuro tecnológico, con el logo del SENA estilizado, luces de gradiente animadas en tonos verde institucional (Hex #39A900) y azul cian, íconos flotantes de un cerebro (Inteligencia Artificial) y un rayo (RPA / Automatización).
 *   **Contenido de la Diapositiva:**
-    *   Logotipo del SENA y marca del proyecto SENA V2.
+    *   Logotipo del SENA y marca del proyecto Automatización Inteligente del Archivo Electrónico.
     *   Propósito central: "Optimización operativa y liberación del talento humano a través de la hiperautomatización".
     *   Pilares del Proyecto:
         *   **Cognición:** IA generativa interpretando texto.
@@ -74,7 +74,7 @@
         *   *La Limitación:* Es ciego. Si el formato del documento cambia o el texto está desorganizado, el robot tradicional falla catastróficamente.
     *   **¿Qué aporta la Inteligencia Artificial (IA)?**
         *   *El Cerebro:* Lee, comprende, razona y extrae. Interpreta PDFs complejos o imágenes escaneadas y predice su contenido.
-    *   **La Hiperautomatización en SENA V2:**
+    *   **La Hiperautomatización en la Automatización Inteligente del Archivo Electrónico:**
         *   La IA lee el PDF y estructura los metadatos (Nombres, Cédulas, Fechas).
         *   El Robot recibe estos datos limpios y los inyecta a toda velocidad en el ECM y OneDrive.
         *   **Resultado:** Un proceso dinámico que tolera cambios de formato y mantiene precisión quirúrgica.
@@ -110,7 +110,7 @@ graph TD
 *   **Concepto Visual:** Captura de la interfaz donde se ve la propuesta de clasificación con su respectivo porcentaje de confianza y justificación semántica.
 *   **Contenido de la Diapositiva:**
     *   **El problema de las reglas rígidas:** Los sistemas antiguos buscan palabras clave ("contrato", "petición"). Si no están textualmente escritas, fallan.
-    *   **La aproximación semántica del SENA V2:** La IA lee el documento de manera integral y comprende la intención.
+    *   **La aproximación semántica de la Automatización Inteligente del Archivo Electrónico:** La IA lee el documento de manera integral y comprende la intención.
     *   **Características Clave del Motor de Clasificación:**
         *   *Sugerencia de Tipología:* Recomienda la serie o subserie adecuada según las Tablas de Retención Documental de la institución.
         *   *Nivel de Confianza (Confidence Score):* Muestra un porcentaje de certeza (ej. 98.5% seguro).
@@ -165,7 +165,7 @@ graph TD
 *   **Concepto Visual:** Gráfico de torta mostrando la reducción de costos operativos y una lista de beneficios cualitativos resaltados.
 *   **Contenido de la Diapositiva:**
 
-| Métrica Analizada | Antes (Proceso Manual) | Ahora (SENA V2) | Beneficio Porcentual |
+| Métrica Analizada | Antes (Proceso Manual) | Ahora (Automatización Inteligente) | Beneficio Porcentual |
 | :--- | :--- | :--- | :--- |
 | **Tiempo de Procesamiento** | 10 Minutos / Documento | 15 Segundos / Documento | **97.5% Reducción de Tiempo** |
 | **Tasa de Errores en Tipología** | ~ 25% de registros inconsistentes | < 0.2% de registros | **99.2% de Mayor Precisión** |
@@ -202,7 +202,7 @@ graph TD
 *   **Contenido de la Diapositiva:**
     *   *Reflexión Final:* **"La tecnología de Inteligencia Artificial no viene a reemplazar al funcionario público; viene a devolverle el tiempo de ser verdaderamente humano: analizar, decidir y servir con empatía."**
     *   **Conclusiones Clave del Proyecto:**
-        *   SENA V2 une de forma práctica la visión científica de la IA con la pragmática operacional de los robots de software.
+        *   La Automatización Inteligente del Archivo Electrónico une de forma práctica la visión científica de la IA con la pragmática operacional de los robots de software.
         *   Cumple al 100% con la normatividad legal de archivos en Colombia.
         *   Es una solución escalable y de bajo costo que puede replicarse en todas las regionales del país.
     *   **Espacio Abierto para Preguntas del Auditorio**
