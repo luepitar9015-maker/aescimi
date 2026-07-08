@@ -306,6 +306,50 @@ router.post('/files/zip', async (req, res) => {
     }
 });
 
+// GET /api/superuser/online-users
+router.get('/online-users', async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT id, full_name, email, role, area, position, last_activity, is_active 
+             FROM users 
+             ORDER BY last_activity DESC NULLS LAST, full_name`
+        );
+        const users = result.rows.map(user => {
+            let isOnline = false;
+            if (user.last_activity) {
+                const diffMs = Date.now() - new Date(user.last_activity).getTime();
+                if (diffMs < 300000) { // 5 minutos
+                    isOnline = true;
+                }
+            }
+            return {
+                ...user,
+                is_online: isOnline
+            };
+        });
+        res.json({ data: users });
+    } catch (err) {
+        console.error('[SUPERUSER] Error fetching online users:', err);
+        res.status(500).json({ error: 'Error al obtener usuarios.' });
+    }
+});
+
+// GET /api/superuser/audit-logs
+router.get('/audit-logs', async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT id, user_id, user_name, user_role, action, details, ip_address, created_at 
+             FROM audit_logs 
+             ORDER BY created_at DESC 
+             LIMIT 500`
+        );
+        res.json({ data: result.rows });
+    } catch (err) {
+        console.error('[SUPERUSER] Error fetching audit logs:', err);
+        res.status(500).json({ error: 'Error al obtener bitácora de auditoría.' });
+    }
+});
+
 module.exports = router;
 
 

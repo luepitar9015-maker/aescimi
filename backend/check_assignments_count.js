@@ -12,9 +12,12 @@ const pool = new Pool({
 async function main() {
     const client = await pool.connect();
     try {
-        console.log("=== USUARIOS EN LA BASE DE DATOS ===");
-        const res = await client.query("SELECT id, full_name, document_no, role, is_active FROM users");
-        console.table(res.rows);
+        console.log("=== RECUENTO DE ASIGNACIONES EN POSTGRES ===");
+        const res = await client.query("SELECT COUNT(*) FROM expediente_assignments");
+        console.log("Total filas en expediente_assignments:", res.rows[0].count);
+        
+        const sample = await client.query("SELECT * FROM expediente_assignments LIMIT 5");
+        console.table(sample.rows);
     } catch (e) {
         console.error(e);
     } finally {

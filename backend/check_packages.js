@@ -12,9 +12,15 @@ const pool = new Pool({
 async function main() {
     const client = await pool.connect();
     try {
-        console.log("=== USUARIOS EN LA BASE DE DATOS ===");
-        const res = await client.query("SELECT id, full_name, document_no, role, is_active FROM users");
+        console.log("=== INSPECCIONANDO PAQUETES DE EXPEDIENTES ===");
+        const res = await client.query("SELECT id, nombre, descripcion, user_id, created_by, created_at, estado FROM expediente_paquetes");
         console.table(res.rows);
+        
+        if (res.rows.length > 0) {
+            console.log("\n=== CONTEO DE ITEMS POR PAQUETE ===");
+            const itemsRes = await client.query("SELECT paquete_id, COUNT(*) as count FROM paquete_items GROUP BY paquete_id");
+            console.table(itemsRes.rows);
+        }
     } catch (e) {
         console.error(e);
     } finally {

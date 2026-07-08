@@ -12,9 +12,12 @@ const pool = new Pool({
 async function main() {
     const client = await pool.connect();
     try {
-        console.log("=== USUARIOS EN LA BASE DE DATOS ===");
-        const res = await client.query("SELECT id, full_name, document_no, role, is_active FROM users");
-        console.table(res.rows);
+        console.log("=== EXPEDIENTES DE HISTORIAS ACADEMICAS EN BD ===");
+        const res = await client.query("SELECT id, expediente_code, title, subserie, metadata_values FROM expedientes WHERE subserie = '68.9224.4-37' LIMIT 5");
+        console.table(res.rows.map(r => ({
+            ...r,
+            metadata_values: JSON.stringify(r.metadata_values)
+        })));
     } catch (e) {
         console.error(e);
     } finally {

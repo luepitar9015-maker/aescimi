@@ -66,13 +66,22 @@ const authLimiter = rateLimit({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Auth Middleware to extract user from token
+// Sistema de Auditoría
+const { auditMiddleware } = require('./middleware/auditMiddleware');
+app.use(auditMiddleware);
+
+// Auth Middleware to extract user from token and update last activity
 app.use((req, res, next) => {
     const token = req.headers['authorization']?.split(' ')[1];
     if (token) {
         try {
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
             req.user = decoded;
+            
+            // Actualizar last_activity en segundo plano para el monitoreo
+            pool.query('UPDATE users SET last_activity = CURRENT_TIMESTAMP WHERE id = $1', [decoded.id]).catch(err => {
+                console.error('[USERS] Error actualizando last_activity:', err.message);
+            });
         } catch (err) {
             // Token invalid - ignore but continue
         }
@@ -173,6 +182,7 @@ app.use('/api/superuser', require('./routes/superuser'));
 app.use('/api/seguimiento', require('./routes/seguimiento'));
 app.use('/api/ai', require('./routes/ai')); // AI Assistant & Classifier Routes
 app.use('/api/system', require('./routes/system')); // System Routes (Backup, etc)
+app.use('/api/audit', require('./routes/audit')); // Audit Log Routes
 
 // ── RUTA TEMPORAL: Reproductor de video para análisis (SOLO USO LOCAL) ──
 app.get('/video-player', (req, res) => {

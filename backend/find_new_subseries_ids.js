@@ -12,8 +12,15 @@ const pool = new Pool({
 async function main() {
     const client = await pool.connect();
     try {
-        console.log("=== USUARIOS EN LA BASE DE DATOS ===");
-        const res = await client.query("SELECT id, full_name, document_no, role, is_active FROM users");
+        const codes = [
+            '68.9224.2-53.39',
+            '68.9224.2-42.29',
+            '68.9224.2-53.38',
+            '68.9224.2-53.40'
+        ];
+        
+        console.log("=== BUSCANDO IDS NUEVOS PARA SUBSERIES ===");
+        const res = await client.query("SELECT id, subseries_code, subseries_name FROM trd_subseries WHERE subseries_code = ANY($1)", [codes]);
         console.table(res.rows);
     } catch (e) {
         console.error(e);

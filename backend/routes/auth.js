@@ -7,6 +7,8 @@ const { requireAuth, requireAdmin } = require('../middleware/authMiddleware');
 
 const SECRET_KEY = process.env.JWT_SECRET;
 
+const { logActivity } = require('../middleware/auditMiddleware');
+
 // Login
 router.post('/login', (req, res) => {
     const { document_no, password } = req.body;
@@ -20,11 +22,13 @@ router.post('/login', (req, res) => {
         }
         if (!user) {
             console.warn('[AUTH] User not found');
+            logActivity(null, 'Invitado', 'anonimo', 'LOGIN_FALLIDO_USUARIO_INEXISTENTE', `Intento de login con documento: ${document_no}`, req.ip);
             return res.status(401).json({ error: 'Usuario no encontrado' });
         }
 
         if (user.is_active === 0) {
             console.warn('[AUTH] User suspended');
+            logActivity(user.id, user.full_name, user.role, 'LOGIN_FALLIDO_CUENTA_SUSPENDIDA', `Cuenta suspendida intentó ingresar: ${user.full_name}`, req.ip);
             return res.status(401).json({ error: 'Su cuenta ha sido suspendida. Contacte al administrador.' });
         }
 
@@ -33,11 +37,14 @@ router.post('/login', (req, res) => {
         require('fs').appendFileSync('login_debug.txt', `[AUTH] validPassword=${validPassword}, hash=${user.password_hash}\n`);
         if (!validPassword) {
             console.warn('[AUTH] Invalid password');
+            logActivity(user.id, user.full_name, user.role, 'LOGIN_FALLIDO_CONTRASENA_INCORRECTA', `Contraseña incorrecta para: ${user.full_name}`, req.ip);
             return res.status(401).json({ error: 'Contraseña incorrecta' });
         }
 
         console.log('[AUTH] Login successful');
         const token = jwt.sign({ id: user.id, role: user.role, name: user.full_name }, SECRET_KEY, { expiresIn: '8h' });
+
+        logActivity(user.id, user.full_name, user.role, 'LOGIN_EXITOSO', `Inicio de sesión exitoso`, req.ip);
 
         res.json({ token, user: { id: user.id, name: user.full_name, role: user.role, mustChangePassword: user.must_change_password === 1 } });
     });

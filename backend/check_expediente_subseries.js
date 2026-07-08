@@ -12,8 +12,8 @@ const pool = new Pool({
 async function main() {
     const client = await pool.connect();
     try {
-        console.log("=== USUARIOS EN LA BASE DE DATOS ===");
-        const res = await client.query("SELECT id, full_name, document_no, role, is_active FROM users");
+        console.log("=== SUBSERIES ÚNICAS EN LA TABLA EXPEDIENTES ===");
+        const res = await client.query("SELECT DISTINCT subserie FROM expedientes ORDER BY subserie");
         console.table(res.rows);
     } catch (e) {
         console.error(e);

@@ -12,9 +12,13 @@ const pool = new Pool({
 async function main() {
     const client = await pool.connect();
     try {
-        console.log("=== USUARIOS EN LA BASE DE DATOS ===");
-        const res = await client.query("SELECT id, full_name, document_no, role, is_active FROM users");
+        console.log("=== DETALLE DE SERIE 97 ===");
+        const res = await client.query("SELECT * FROM trd_series WHERE id = 97");
         console.table(res.rows);
+        
+        console.log("=== DETALLE DE SERIES TOTAL ===");
+        const resAll = await client.query("SELECT id, series_code, series_name FROM trd_series");
+        console.table(resAll.rows);
     } catch (e) {
         console.error(e);
     } finally {

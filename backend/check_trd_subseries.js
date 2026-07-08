@@ -12,9 +12,13 @@ const pool = new Pool({
 async function main() {
     const client = await pool.connect();
     try {
-        console.log("=== USUARIOS EN LA BASE DE DATOS ===");
-        const res = await client.query("SELECT id, full_name, document_no, role, is_active FROM users");
+        console.log("=== LISTANDO SUBSERIES EN LA BD ===");
+        const res = await client.query("SELECT id, series_id, subseries_code, subseries_name FROM trd_subseries LIMIT 30");
         console.table(res.rows);
+        
+        console.log("\n=== LISTANDO SERIES EN LA BD ===");
+        const resSer = await client.query("SELECT id, dependency_id, series_code, series_name FROM trd_series LIMIT 10");
+        console.table(resSer.rows);
     } catch (e) {
         console.error(e);
     } finally {

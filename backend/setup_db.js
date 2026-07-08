@@ -175,6 +175,16 @@ async function setup() {
             can_view INTEGER DEFAULT 1,
             UNIQUE(role_name, module_id)
         )`,
+        `CREATE TABLE IF NOT EXISTS audit_logs (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER,
+            user_name TEXT,
+            user_role TEXT,
+            action TEXT NOT NULL,
+            details TEXT,
+            ip_address TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`,
     ];
     
     for (const sql of tables) {

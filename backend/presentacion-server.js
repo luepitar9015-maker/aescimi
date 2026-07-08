@@ -23,7 +23,7 @@ app.get('/presentacion.html', (req, res) => {
 });
 
 // Servir el archivo diapositivas.html por defecto ante cualquier otra ruta
-app.get('*', (req, res) => {
+app.use((req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/public/diapositivas.html'));
 });
 

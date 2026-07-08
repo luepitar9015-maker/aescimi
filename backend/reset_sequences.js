@@ -1,3 +1,4 @@
+require('dotenv').config();
 const pool = require('./database_pg').pool;
 
 async function resetSequences() {
