@@ -132,7 +132,7 @@ router.get('/estadisticas', requireAuth, async (req, res) => {
             FROM users u
             LEFT JOIN expediente_assignments ea ON ea.user_id = u.id
             LEFT JOIN expediente_avance ea_av ON ea_av.id = ea.expediente_id
-            WHERE u.is_active = 1 AND u.role != 'superadmin'
+            WHERE u.is_active = 1
             GROUP BY u.id, u.full_name, u.area
             ORDER BY expedientes_asignados DESC
         `);
@@ -255,7 +255,7 @@ router.get('/asignaciones', requireAuth, async (req, res) => {
                 (SELECT COUNT(*) FROM documents d WHERE d.expediente_id = ea.expediente_id) AS doc_count
             FROM expediente_assignments ea
             JOIN expedientes e ON e.id = ea.expediente_id
-            JOIN users u ON u.id = ea.user_id AND u.role != 'superadmin'
+            JOIN users u ON u.id = ea.user_id
             LEFT JOIN users ab ON ab.id = ea.assigned_by
             ${where}
             ORDER BY ea.assigned_at DESC
