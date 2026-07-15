@@ -1,3 +1,4 @@
+require('dotenv').config();
 const db = require('./database');
 
 // SQL to update or insert the system expiration date

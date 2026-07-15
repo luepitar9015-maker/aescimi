@@ -138,7 +138,14 @@ function ExpedienteCreation() {
         const fetchActiveUsers = async () => {
             try {
                 const res = await axios.get('/api/users/active');
-                setActiveUsers(res.data.data || []);
+                const users = res.data.data || [];
+                setActiveUsers(users);
+                const defaultResp = users.find(u => u.full_name.toLowerCase().includes('luis ernesto parada moreno'));
+                if (defaultResp) {
+                    setIndividualResponsible(defaultResp);
+                    setIndividualSearchText(defaultResp.full_name);
+                    setSelectedResponsibles([defaultResp]);
+                }
             } catch (err) {
                 console.error("Error fetching active users:", err);
             }
