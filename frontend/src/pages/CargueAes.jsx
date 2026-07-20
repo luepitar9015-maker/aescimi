@@ -23,6 +23,8 @@ function CargueAes() {
     const [automationLoading, setAutomationLoading] = useState(false);
     const [liveFrame, setLiveFrame] = useState(null);
     const [isMonitorExpanded, setIsMonitorExpanded] = useState(false);
+    const [manualText, setManualText] = useState('');
+    const [isInteracting, setIsInteracting] = useState(false);
 
     // Automation Flow Tracking
     const [currentStepIndex, setCurrentStepIndex] = useState(-1);
@@ -340,6 +342,76 @@ function CargueAes() {
 
     const handleView = (doc) => {
         window.open(`/api/ades/view/${doc.id}`, '_blank');
+    };
+
+    const handleImageClick = async (e) => {
+        if (!liveFrame || isInteracting) return;
+        setIsInteracting(true);
+        const rect = e.target.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const clickY = e.clientY - rect.top;
+        // Map to 1366x900 viewport
+        const x = Math.round((clickX / rect.width) * 1366);
+        const y = Math.round((clickY / rect.height) * 900);
+        
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post('/api/automation/click', { x, y }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+        } catch (err) {
+            console.error('Manual click failed:', err);
+        } finally {
+            setIsInteracting(false);
+        }
+    };
+
+    const sendManualText = async () => {
+        if (!manualText || isInteracting) return;
+        setIsInteracting(true);
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post('/api/automation/type', { text: manualText }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setManualText('');
+        } catch (err) {
+            alert('Error al escribir: ' + (err.response?.data?.error || err.message));
+        } finally {
+            setIsInteracting(false);
+        }
+    };
+
+    const sendManualKey = async (key) => {
+        if (isInteracting) return;
+        setIsInteracting(true);
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post('/api/automation/press-key', { key }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+        } catch (err) {
+            alert('Error al enviar tecla: ' + (err.response?.data?.error || err.message));
+        } finally {
+            setIsInteracting(false);
+        }
+    };
+
+    const killAutomation = async () => {
+        if (!window.confirm('¿Seguro que deseas forzar el cierre de la automatización activa?')) return;
+        setIsInteracting(true);
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post('/api/automation/kill', {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setIsMonitorExpanded(false);
+            alert('Automatización finalizada por el usuario.');
+        } catch (err) {
+            alert('Error al detener: ' + (err.response?.data?.error || err.message));
+        } finally {
+            setIsInteracting(false);
+        }
     };
 
     const saveExpedienteCode = async (docId) => {
@@ -2161,7 +2233,114 @@ function CargueAes() {
                             </button>
                         </div>
                         {liveFrame ? (
-                            <img src={liveFrame} alt="Live Stream Expanded" style={{ width: '100%', maxHeight: '75vh', objectFit: 'contain', display: 'block' }} />
+                            <div style={{ position: 'relative' }}>
+                                <img 
+                                    src={liveFrame} 
+                                    alt="Live Stream Expanded" 
+                                    onMouseDown={handleImageClick}
+                                    style={{ 
+                                        width: '100%', 
+                                        maxHeight: '70vh', 
+                                        objectFit: 'contain', 
+                                        display: 'block', 
+                                        cursor: isInteracting ? 'wait' : 'crosshair' 
+                                    }} 
+                                />
+                                
+                                {/* Panel de control manual */}
+                                <div style={{
+                                    padding: '12px 20px',
+                                    background: '#1a1a1a',
+                                    borderTop: '1px solid #333',
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    gap: '15px'
+                                }}>
+                                    {/* Control de teclado */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1', minWidth: '300px' }}>
+                                        <input 
+                                            type="text" 
+                                            placeholder="Escribe texto para enviar al navegador..." 
+                                            value={manualText}
+                                            onChange={e => setManualText(e.target.value)}
+                                            onKeyDown={e => { if (e.key === 'Enter') sendManualText(); }}
+                                            disabled={isInteracting}
+                                            style={{
+                                                flex: 1,
+                                                padding: '8px 12px',
+                                                borderRadius: '6px',
+                                                border: '1px solid #444',
+                                                background: '#333',
+                                                color: '#fff',
+                                                outline: 'none',
+                                                fontSize: '13px'
+                                            }}
+                                        />
+                                        <button 
+                                            onClick={sendManualText}
+                                            disabled={isInteracting || !manualText}
+                                            style={{
+                                                background: '#39a900',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '6px',
+                                                padding: '8px 16px',
+                                                fontWeight: 'bold',
+                                                fontSize: '13px',
+                                                cursor: (isInteracting || !manualText) ? 'not-allowed' : 'pointer',
+                                                opacity: (isInteracting || !manualText) ? 0.6 : 1
+                                            }}
+                                        >
+                                            Enviar Texto
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Botones de teclas rápidas */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                        {['Enter', 'Tab', 'Escape', 'Backspace'].map(k => (
+                                            <button
+                                                key={k}
+                                                onClick={() => sendManualKey(k)}
+                                                disabled={isInteracting}
+                                                style={{
+                                                    background: '#2a2a2a',
+                                                    color: '#eee',
+                                                    border: '1px solid #444',
+                                                    borderRadius: '6px',
+                                                    padding: '8px 14px',
+                                                    fontSize: '12px',
+                                                    fontWeight: '600',
+                                                    cursor: isInteracting ? 'not-allowed' : 'pointer'
+                                                }}
+                                            >
+                                                {k === 'Backspace' ? 'Borrar' : k === 'Escape' ? 'Esc' : k}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {/* Botón de cierre forzado de sesión */}
+                                    <div>
+                                        <button
+                                            onClick={killAutomation}
+                                            disabled={isInteracting}
+                                            style={{
+                                                background: '#d32f2f',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '6px',
+                                                padding: '8px 16px',
+                                                fontWeight: 'bold',
+                                                fontSize: '13px',
+                                                cursor: isInteracting ? 'not-allowed' : 'pointer'
+                                            }}
+                                        >
+                                            Forzar Cierre Navegador
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         ) : (
                             <div style={{ height: '50vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa' }}>
                                 Sin transmisión activa

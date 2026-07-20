@@ -10,5 +10,11 @@ router.post('/diagnostic', requireAuth, requireAdmin, automationController.execu
 router.post('/unity-robot', requireAuth, requireAdmin, automationController.runUnityRobot);
 router.get('/pm2-logs', automationController.getPM2Logs);
 
+// Rutas de Interacción Manual
+router.post('/click', requireAuth, requireAdmin, automationController.clickActivePage);
+router.post('/type', requireAuth, requireAdmin, automationController.typeActivePage);
+router.post('/press-key', requireAuth, requireAdmin, automationController.pressKeyActivePage);
+router.post('/kill', requireAuth, requireAdmin, automationController.killActiveAutomation);
+
 module.exports = router;
 

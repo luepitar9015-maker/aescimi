@@ -10,6 +10,9 @@ automationEmitter.setMaxListeners(20);
 
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
 
+let activeBrowser = null;
+let activePage = null;
+
 // ─────────────────────────────────────────────────────────────────
 // UTILIDADES
 // ─────────────────────────────────────────────────────────────────
@@ -1173,26 +1176,118 @@ async function paso6_guardar(page, allFramesFn, logs) {
     }
 
     // Esperar y manejar diálogo post-guardado
-    await wait(4000);
+    logs.push('[PASO 6] Esperando diálogo post-guardado (ej. "Would you like to complete another form?")...');
     let dialogHandled = false;
-    for (const frame of allFramesFn()) {
-        try {
-            dialogHandled = await frame.evaluate(() => {
-                const btns = Array.from(document.querySelectorAll('button, a, input[type="button"]'));
-                const yesBtn = btns.find(b => {
-                    const t = (b.innerText || b.value || b.textContent || '').trim().toLowerCase();
-                    return (t === 'sí' || t === 'si' || t === 'yes') && b.offsetParent !== null;
+    for (let t = 0; t < 25 && !dialogHandled; t++) {
+        await wait(500);
+        for (const frame of allFramesFn()) {
+            try {
+                dialogHandled = await frame.evaluate(() => {
+                    const candidates = Array.from(document.querySelectorAll('button, a, input, div, span, td, [role="button"]'));
+                    const yesBtn = candidates.find(b => {
+                        const txt = (b.innerText || b.value || b.textContent || '').trim().toLowerCase();
+                        const isMatch = (txt === 'sí' || txt === 'si' || txt === 'yes');
+                        const isVisible = b.offsetParent !== null && b.getBoundingClientRect().width > 0;
+                        return isMatch && isVisible;
+                    });
+                    if (yesBtn) {
+                        yesBtn.scrollIntoView({ block: 'center' });
+                        yesBtn.click();
+                        return true;
+                    }
+                    return false;
                 });
-                if (yesBtn) { yesBtn.scrollIntoView(); yesBtn.click(); return true; }
-                return false;
-            });
-            if (dialogHandled) { logs.push('[PASO 6] Diálogo post-guardado: "Sí" presionado'); break; }
-        } catch { }
+                if (dialogHandled) {
+                    logs.push(`[PASO 6] ✅ Diálogo post-guardado detectado e interactuado en t=${(t * 0.5).toFixed(1)}s`);
+                    break;
+                }
+            } catch (e) { }
+        }
     }
 
-    await wait(5000);
+    if (!dialogHandled) {
+        logs.push('[PASO 6][WARN] Diálogo post-guardado ("Sí"/"Yes") no detectado. Continuando...');
+    }
+
+    await wait(3000);
     logs.push('[PASO 6] ✅ Proceso completado');
     return true;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// PASO 7: CERRAR SESIÓN ONBASE
+// ─────────────────────────────────────────────────────────────────
+async function paso7_logout(page, allFramesFn, logs) {
+    logs.push('[PASO 7] Iniciando cierre de sesión en OnBase...');
+    let logoutClicked = false;
+    
+    for (let attempt = 0; attempt < 6 && !logoutClicked; attempt++) {
+        await wait(800);
+        for (const frame of allFramesFn()) {
+            try {
+                logoutClicked = await frame.evaluate(() => {
+                    const elements = Array.from(document.querySelectorAll('a, button, span, div, li, [role="button"]'));
+                    const logoutWords = ['cerrar sesión', 'cerrar sesion', 'log out', 'logout', 'salir', 'exit'];
+                    const logoutBtn = elements.find(el => {
+                        const t = (el.innerText || el.textContent || '').trim().toLowerCase();
+                        const isMatch = logoutWords.some(word => t === word || t.includes(word));
+                        const isVisible = el.offsetParent !== null && el.getBoundingClientRect().width > 0;
+                        return isMatch && isVisible;
+                    });
+                    
+                    if (logoutBtn) {
+                        logoutBtn.scrollIntoView({ block: 'center' });
+                        logoutBtn.click();
+                        return true;
+                    }
+                    return false;
+                });
+                
+                if (logoutClicked) {
+                    logs.push(`[PASO 7] ✅ Botón de cierre de sesión presionado en intento ${attempt + 1}`);
+                    break;
+                }
+            } catch (e) {}
+        }
+        
+        if (!logoutClicked) {
+            // Intentar abrir el menú del usuario (dropdown en la esquina superior derecha)
+            for (const frame of allFramesFn()) {
+                try {
+                    await frame.evaluate(() => {
+                        const userElements = Array.from(document.querySelectorAll('a, div, span, button'));
+                        const userMenu = userElements.find(el => {
+                            const t = (el.innerText || el.textContent || '').trim().toLowerCase();
+                            const isUserMenu = t.includes('jorge') || t.includes('cimi') || t.includes('regional') || el.id?.toLowerCase().includes('user') || el.className?.toLowerCase().includes('user') || el.className?.toLowerCase().includes('profile');
+                            return isUserMenu && el.offsetParent !== null && el.getBoundingClientRect().width > 0;
+                        });
+                        if (userMenu) {
+                            userMenu.click();
+                        }
+                    });
+                } catch (e) {}
+            }
+        }
+    }
+    
+    if (!logoutClicked) {
+        logs.push('[PASO 7] No se pudo hacer clic en el botón de logout. Forzando navegación a la URL de salida...');
+        try {
+            const currentUrl = page.url();
+            const baseUrl = currentUrl.split('/AppNet/')[0];
+            if (baseUrl) {
+                const logoutUrl = `${baseUrl}/AppNet/Login.aspx?logout=true`;
+                logs.push(`[PASO 7] Navegando a: ${logoutUrl}`);
+                await page.goto(logoutUrl, { waitUntil: 'domcontentloaded', timeout: 12000 }).catch(() => {});
+                logoutClicked = true;
+            }
+        } catch (e) {
+            logs.push(`[PASO 7][WARN] Error al forzar navegación de logout: ${e.message}`);
+        }
+    }
+    
+    await wait(3000);
+    logs.push('[PASO 7] ✅ Cierre de sesión finalizado');
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1254,12 +1349,14 @@ exports.executeAutomation = async (req, res) => {
 
     const automationPromise = (async () => {
         try {
-            browser = await puppeteer.launch({
+            activeBrowser = await puppeteer.launch({
                 headless: process.platform === 'linux' ? true : false,
                 args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
             });
+            browser = activeBrowser;
 
-            const page = await browser.newPage();
+            activePage = await activeBrowser.newPage();
+            const page = activePage;
             await page.setViewport({ width: 1366, height: 900 });
 
             // Screencast en tiempo real
@@ -1282,7 +1379,11 @@ exports.executeAutomation = async (req, res) => {
             const loginOk = await paso1_login(page, url, username, password, logs);
             if (!loginOk) {
                 const ss = await page.screenshot().catch(() => null);
-                await browser.close();
+                if (activeBrowser) {
+                    await activeBrowser.close().catch(() => {});
+                    activeBrowser = null;
+                    activePage = null;
+                }
                 return {
                     statusCode: 500,
                     data: {
@@ -1328,9 +1429,18 @@ exports.executeAutomation = async (req, res) => {
             currentStep = 'PASO 6: Guardar';
             await paso6_guardar(page, allFrames, logs);
 
+            // ── PASO 7: CERRAR SESIÓN ──
+            currentStep = 'PASO 7: Cerrar Sesión';
+            await paso7_logout(page, allFrames, logs);
+
             // Captura final
-            const screenshotBuffer = await page.screenshot({ fullPage: false });
-            await browser.close();
+            const screenshotBuffer = await page.screenshot({ fullPage: false }).catch(() => null);
+            
+            if (activeBrowser) {
+                await activeBrowser.close().catch(() => {});
+                activeBrowser = null;
+                activePage = null;
+            }
 
             // Marcar documento como Cargado en la BD
             if (documentId) {
@@ -1348,13 +1458,17 @@ exports.executeAutomation = async (req, res) => {
                 statusCode: 200,
                 data: {
                     message: 'Automatización completada',
-                    screenshot: `data:image/png;base64,${screenshotBuffer.toString('base64')}`,
+                    screenshot: screenshotBuffer ? `data:image/png;base64,${screenshotBuffer.toString('base64')}` : null,
                     logs
                 }
             };
 
         } catch (err) {
-            if (browser) await browser.close().catch(() => { });
+            if (activeBrowser) {
+                await activeBrowser.close().catch(() => { });
+                activeBrowser = null;
+                activePage = null;
+            }
             throw err;
         }
     })();
@@ -1622,6 +1736,70 @@ exports.getPM2Logs = async (req, res) => {
         });
     } catch (err) {
         return res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+// ─────────────────────────────────────────────────────────────────
+// CONTROLES DE INTERACCIÓN MANUAL (PARA SOPORTE DE USUARIO)
+// ─────────────────────────────────────────────────────────────────
+exports.clickActivePage = async (req, res) => {
+    const { x, y } = req.body;
+    if (!activePage) {
+        return res.status(400).json({ error: 'No hay ninguna sesión de automatización activa' });
+    }
+    try {
+        console.log(`[MANUAL-CLICK] Clic en x: ${x}, y: ${y}`);
+        await activePage.mouse.click(Number(x), Number(y));
+        return res.json({ success: true, message: `Clic ejecutado en x: ${x}, y: ${y}` });
+    } catch (err) {
+        console.error('[MANUAL-CLICK] Error:', err);
+        return res.status(500).json({ error: err.message });
+    }
+};
+
+exports.typeActivePage = async (req, res) => {
+    const { text } = req.body;
+    if (!activePage) {
+        return res.status(400).json({ error: 'No hay ninguna sesión de automatización activa' });
+    }
+    try {
+        console.log(`[MANUAL-TYPE] Escribiendo texto: "${text}"`);
+        await activePage.keyboard.type(text, { delay: 30 });
+        return res.json({ success: true, message: `Texto escrito correctamente` });
+    } catch (err) {
+        console.error('[MANUAL-TYPE] Error:', err);
+        return res.status(500).json({ error: err.message });
+    }
+};
+
+exports.pressKeyActivePage = async (req, res) => {
+    const { key } = req.body;
+    if (!activePage) {
+        return res.status(400).json({ error: 'No hay ninguna sesión de automatización activa' });
+    }
+    try {
+        console.log(`[MANUAL-KEY] Presionando tecla: ${key}`);
+        await activePage.keyboard.press(key);
+        return res.json({ success: true, message: `Tecla ${key} presionada` });
+    } catch (err) {
+        console.error('[MANUAL-KEY] Error:', err);
+        return res.status(500).json({ error: err.message });
+    }
+};
+
+exports.killActiveAutomation = async (req, res) => {
+    if (!activeBrowser) {
+        return res.status(400).json({ error: 'No hay ninguna sesión de automatización activa' });
+    }
+    try {
+        console.log(`[MANUAL-KILL] Cerrando sesión y navegador por solicitud de usuario...`);
+        await activeBrowser.close();
+        activeBrowser = null;
+        activePage = null;
+        return res.json({ success: true, message: `Sesión de automatización terminada` });
+    } catch (err) {
+        console.error('[MANUAL-KILL] Error:', err);
+        return res.status(500).json({ error: err.message });
     }
 };
 
