@@ -350,20 +350,52 @@ function CargueAes() {
         const rect = e.target.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
         const clickY = e.clientY - rect.top;
-        // Map to 1366x900 viewport
-        const x = Math.round((clickX / rect.width) * 1366);
-        const y = Math.round((clickY / rect.height) * 900);
         
-        try {
-            const token = localStorage.getItem('token');
-            await axios.post('/api/automation/click', { x, y }, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-        } catch (err) {
-            console.error('Manual click failed:', err);
-        } finally {
-            setIsInteracting(false);
+        // Mapear exactamente según el object-fit: contain
+        const naturalWidth = e.target.naturalWidth || 1366;
+        const naturalHeight = e.target.naturalHeight || 900;
+        
+        const imageRatio = naturalWidth / naturalHeight;
+        const elementRatio = rect.width / rect.height;
+        
+        let renderedWidth, renderedHeight;
+        let leftOffset = 0;
+        let topOffset = 0;
+        
+        if (imageRatio > elementRatio) {
+            // Se ajusta al ancho (letterbox arriba/abajo)
+            renderedWidth = rect.width;
+            renderedHeight = rect.width / imageRatio;
+            topOffset = (rect.height - renderedHeight) / 2;
+        } else {
+            // Se ajusta al alto (pillarbox izquierda/derecha)
+            renderedHeight = rect.height;
+            renderedWidth = rect.height * imageRatio;
+            leftOffset = (rect.width - renderedWidth) / 2;
         }
+        
+        const relativeX = clickX - leftOffset;
+        const relativeY = clickY - topOffset;
+        
+        // Ejecutar clic solo si es dentro de la imagen real renderizada
+        if (relativeX >= 0 && relativeX <= renderedWidth && relativeY >= 0 && relativeY <= renderedHeight) {
+            const x = Math.round((relativeX / renderedWidth) * 1366);
+            const y = Math.round((relativeY / renderedHeight) * 900);
+            
+            console.log(`Manual click display: ${clickX.toFixed(1)}, ${clickY.toFixed(1)} -> mapped viewport: ${x}, ${y}`);
+            
+            try {
+                const token = localStorage.getItem('token');
+                await axios.post('/api/automation/click', { x, y }, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+            } catch (err) {
+                console.error('Manual click failed:', err);
+            }
+        } else {
+            console.log('Click outside rendered image content');
+        }
+        setIsInteracting(false);
     };
 
     const sendManualText = async () => {

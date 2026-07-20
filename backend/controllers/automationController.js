@@ -190,9 +190,35 @@ async function paso1_login(page, url, username, password, logs) {
         logs.push('[PASO 1] Botón login presionado. Esperando navegación...');
     }
 
-    // Esperar navegación final a OnBase
-    await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 25000 }).catch(() => { });
-    await wait(6000); // Darle tiempo para cargar el NavPanel
+    // Esperar 4 segundos y revisar si hay pantalla de "Sesión ya iniciada/Takeover"
+    await wait(4000);
+    const sessionTakeover = await page.evaluate(() => {
+        const txt = document.body ? document.body.innerText.toLowerCase() : '';
+        const hasSessionText = txt.includes('iniciada') || txt.includes('already logged in') || txt.includes('sesión activa') || txt.includes('active session') || txt.includes('already has an active') || txt.includes('user is logged in');
+        
+        if (hasSessionText) {
+            const elements = Array.from(document.querySelectorAll('input[type="button"], input[type="submit"], button, a, span, div'));
+            const acceptBtn = elements.find(el => {
+                const val = (el.value || el.innerText || el.textContent || '').trim().toLowerCase();
+                return val === 'yes' || val === 'si' || val === 'sí' || val === 'aceptar' || val.includes('take') || val.includes('contin') || val.includes('login anyway');
+            });
+            if (acceptBtn) {
+                acceptBtn.scrollIntoView({ block: 'center' });
+                acceptBtn.click();
+                return true;
+            }
+        }
+        return false;
+    }).catch(() => false);
+
+    if (sessionTakeover) {
+        logs.push('[PASO 1] ⚠️ Detectada advertencia de sesión activa. Se forzó la toma de control de la sesión (Session Takeover).');
+        await wait(5000); // esperar a que navegue tras tomar el control
+    } else {
+        // Esperar navegación final a OnBase
+        await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => { });
+        await wait(3000);
+    }
 
     const postUrl = page.url();
     logs.push(`[PASO 1] URL post-login: ${postUrl}`);
@@ -1221,12 +1247,14 @@ async function paso7_logout(page, allFramesFn, logs) {
     logs.push('[PASO 7] Iniciando cierre de sesión en OnBase...');
     let logoutClicked = false;
     
-    for (let attempt = 0; attempt < 6 && !logoutClicked; attempt++) {
-        await wait(800);
+    for (let attempt = 0; attempt < 8 && !logoutClicked; attempt++) {
+        await wait(1000);
+        
+        // 1. Verificar si el botón "Logout" o "Cerrar sesión" ya es visible
         for (const frame of allFramesFn()) {
             try {
                 logoutClicked = await frame.evaluate(() => {
-                    const elements = Array.from(document.querySelectorAll('a, button, span, div, li, [role="button"]'));
+                    const elements = Array.from(document.querySelectorAll('a, button, span, div, li, td, [role="button"], [role="menuitem"]'));
                     const logoutWords = ['cerrar sesión', 'cerrar sesion', 'log out', 'logout', 'salir', 'exit'];
                     const logoutBtn = elements.find(el => {
                         const t = (el.innerText || el.textContent || '').trim().toLowerCase();
@@ -1237,6 +1265,9 @@ async function paso7_logout(page, allFramesFn, logs) {
                     
                     if (logoutBtn) {
                         logoutBtn.scrollIntoView({ block: 'center' });
+                        // Simular secuencia completa de mouse click
+                        logoutBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                        logoutBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
                         logoutBtn.click();
                         return true;
                     }
@@ -1244,29 +1275,33 @@ async function paso7_logout(page, allFramesFn, logs) {
                 });
                 
                 if (logoutClicked) {
-                    logs.push(`[PASO 7] ✅ Botón de cierre de sesión presionado en intento ${attempt + 1}`);
+                    logs.push(`[PASO 7] ✅ Botón de cierre de sesión presionado`);
                     break;
                 }
             } catch (e) {}
         }
         
-        if (!logoutClicked) {
-            // Intentar abrir el menú del usuario (dropdown en la esquina superior derecha)
-            for (const frame of allFramesFn()) {
-                try {
-                    await frame.evaluate(() => {
-                        const userElements = Array.from(document.querySelectorAll('a, div, span, button'));
-                        const userMenu = userElements.find(el => {
-                            const t = (el.innerText || el.textContent || '').trim().toLowerCase();
-                            const isUserMenu = t.includes('jorge') || t.includes('cimi') || t.includes('regional') || el.id?.toLowerCase().includes('user') || el.className?.toLowerCase().includes('user') || el.className?.toLowerCase().includes('profile');
-                            return isUserMenu && el.offsetParent !== null && el.getBoundingClientRect().width > 0;
-                        });
-                        if (userMenu) {
-                            userMenu.click();
-                        }
+        if (logoutClicked) break;
+        
+        // 2. Si no es visible, intentar hacer clic en el menú del usuario para abrirlo
+        logs.push(`[PASO 7] Menú de logout no visible, intentando abrir menú de usuario (intento ${attempt + 1})...`);
+        for (const frame of allFramesFn()) {
+            try {
+                await frame.evaluate(() => {
+                    const userElements = Array.from(document.querySelectorAll('a, div, span, button, [class*="user" i]'));
+                    const userMenu = userElements.find(el => {
+                        const t = (el.innerText || el.textContent || '').trim().toLowerCase();
+                        // Buscar el menú del usuario
+                        const isUserMenu = t.includes('jorge') || t.includes('cimi') || t.includes('regional') || el.id?.toLowerCase().includes('user') || el.className?.toLowerCase().includes('user') || el.className?.toLowerCase().includes('profile');
+                        return isUserMenu && el.offsetParent !== null && el.getBoundingClientRect().width > 0;
                     });
-                } catch (e) {}
-            }
+                    if (userMenu) {
+                        userMenu.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                        userMenu.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+                        userMenu.click();
+                    }
+                });
+            } catch (e) {}
         }
     }
     
