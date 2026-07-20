@@ -20,7 +20,11 @@ def deploy_files():
         ("routes/audit.js", "routes/audit.js"),
         ("middleware/auditMiddleware.js", "middleware/auditMiddleware.js"),
         ("setup_db.js", "setup_db.js"),
-        ("reset_sequences.js", "reset_sequences.js")
+        ("reset_sequences.js", "reset_sequences.js"),
+        ("quitar_tilde.js", "quitar_tilde.js"),
+        ("sync_storage_to_db.js", "sync_storage_to_db.js"),
+        ("routes/ades.js", "routes/ades.js"),
+        ("controllers/automationController.js", "controllers/automationController.js")
     ]
     
     ssh = paramiko.SSHClient()

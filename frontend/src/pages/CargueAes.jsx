@@ -282,9 +282,8 @@ function CargueAes() {
         setAutomationLoading(false);
     };
     const filteredDocs = documents.filter(doc => {
-        // Status filter
-        if (statusFilter !== 'Todos' && doc.status !== statusFilter) return false;
-
+        // Status filter: Bypass client-side filtering as the backend handles the correct
+        // documents for each status tab ('Pendiente', 'Cargado', or 'Todos').
         if (!searchTerm) return true;
         const s = searchTerm.toLowerCase().trim();
 

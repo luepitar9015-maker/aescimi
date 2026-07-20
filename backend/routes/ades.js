@@ -46,11 +46,32 @@ const validateExpedienteTypologies = (expedienteId, callback) => {
 router.get('/pending', requireAuth, (req, res) => {
     const { status } = req.query;
     const activeStatus = status || 'Pendiente';
-    let whereClause = activeStatus === 'Todos'
-        ? 'WHERE 1=1'
-        : `WHERE d.status = '${activeStatus}'`;
-
+    
     const params = [];
+    let whereClause = '';
+
+    if (activeStatus === 'Todos') {
+        whereClause = 'WHERE 1=1';
+    } else if (activeStatus === 'Pendiente') {
+        let subPerms = '';
+        const subParams = [];
+        if (req.user && req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+            subPerms = ` AND organization_id = ? 
+                         AND (trd_series_id IN (SELECT series_id FROM user_trd_permissions WHERE user_id = ?) 
+                              OR trd_subseries_id IN (SELECT subseries_id FROM user_trd_permissions WHERE user_id = ?))`;
+            subParams.push(req.user.organization_id || 0, req.user.id, req.user.id);
+        }
+        whereClause = `WHERE (
+            (d.expediente_id IS NOT NULL AND d.expediente_id IN (
+                SELECT DISTINCT expediente_id FROM documents WHERE status = 'Pendiente' AND expediente_id IS NOT NULL ${subPerms}
+            )) OR 
+            (d.expediente_id IS NULL AND d.status = 'Pendiente')
+        )`;
+        params.push(...subParams);
+    } else {
+        whereClause = `WHERE d.status = '${activeStatus}'`;
+    }
+
     if (req.user && req.user.role !== 'admin' && req.user.role !== 'superadmin') {
         whereClause += ` AND d.organization_id = ? 
                          AND (d.trd_series_id IN (SELECT series_id FROM user_trd_permissions WHERE user_id = ?) 
@@ -78,7 +99,7 @@ router.get('/pending', requireAuth, (req, res) => {
         ) t_min ON d.typology_name = t_min.typology_name
         ${whereClause}
         ORDER BY ${activeStatus === 'Cargado' ? 'd.load_date DESC,' : ''} typology_order ASC, d.created_at ASC
-        LIMIT 300
+        LIMIT 10000
     `;
     db.all(query, params, async (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -167,7 +188,7 @@ router.get('/all', requireAuth, (req, res) => {
         ) t_min ON d.typology_name = t_min.typology_name
         ${whereClause}
         ORDER BY d.load_date DESC, typology_order ASC, d.created_at ASC
-        LIMIT 200
+        LIMIT 10000
     `;
     db.all(query, params, (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });

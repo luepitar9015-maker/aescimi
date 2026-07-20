@@ -746,7 +746,7 @@ async function paso4_llenarCampos(formPage, formFrame, docInfo, logs) {
         const dd = String(d.getDate()).padStart(2, '0');
         const mm = String(d.getMonth() + 1).padStart(2, '0');
         const yyyy = d.getFullYear();
-        docDate = `${dd}/${mm}/${yyyy} 00:00:00`;
+        docDate = `${dd}/${mm}/${yyyy} 0:00:00`;
     }
 
     // Diagnóstico inicial: mostrar todos los campos del formulario
@@ -837,7 +837,14 @@ async function paso4_llenarCampos(formPage, formFrame, docInfo, logs) {
                                             return r.width > 0 && r.height > 0;
                                         });
                                         if (items.length > 0) {
-                                            const exact = items.find(i => (i.innerText || i.textContent || '').toLowerCase().includes(sc.toLowerCase()));
+                                            const cleanText = (t) => (t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+                                            const searchText = cleanText(sc);
+                                            // 1. Intentar coincidencia exacta tras limpiar acentos y espacios
+                                            let exact = items.find(i => cleanText(i.innerText || i.textContent) === searchText);
+                                            // 2. Reintento con includes tras limpiar si no hay coincidencia exacta
+                                            if (!exact) {
+                                                exact = items.find(i => cleanText(i.innerText || i.textContent).includes(searchText));
+                                            }
                                             const target = exact || items[0];
                                             const r = target.getBoundingClientRect();
                                             return {
@@ -942,11 +949,47 @@ async function paso4_llenarCampos(formPage, formFrame, docInfo, logs) {
             logs.push(`[PASO 4] Selector dinámico encontrado para fecha: ${dateSelector || 'Nulo'}`);
 
             if (dateSelector) {
-                // Using the reliable type method for OnBase input forms
-                // Only send DD/MM/YYYY text if OnBase prefers it (cutting the HH:MM:SS)
-                const shortDate = docDate.split(' ')[0]; 
-                await typeFieldNativeById(dateSelector, shortDate, 'Fecha Creacion Documento', false);
-                await formPage.keyboard.press('Tab');
+                logs.push(`[PASO 4] Diligenciando "Fecha Creacion Documento" con fecha base: "${docInfo.document_date}"`);
+                const comboInput = await formFrame.$(dateSelector);
+                if (comboInput) {
+                    await formFrame.evaluate((el, dateStr) => {
+                        const d = new Date(dateStr);
+                        const yyyy = d.getFullYear();
+                        const mm = d.getMonth() + 1;
+                        const dd = d.getDate();
+                        const dateObj = new Date(yyyy, mm - 1, dd, 0, 0, 0);
+                        
+                        let success = false;
+                        if (typeof window.jQuery !== 'undefined') {
+                            const $el = window.jQuery(el);
+                            if (typeof $el.datetimepicker === 'function') {
+                                try {
+                                    $el.datetimepicker('setDate', dateObj);
+                                    $el.trigger('change');
+                                    success = true;
+                                } catch (e) {}
+                            }
+                            if (!success && typeof $el.datepicker === 'function') {
+                                try {
+                                    $el.datepicker('setDate', dateObj);
+                                    $el.trigger('change');
+                                    success = true;
+                                } catch (e) {}
+                            }
+                        }
+                        
+                        if (!success) {
+                            el.focus();
+                            el.value = `${mm}/${dd}/${yyyy} 12:00:00 AM`;
+                            el.dispatchEvent(new Event('input', { bubbles: true }));
+                            el.dispatchEvent(new Event('change', { bubbles: true }));
+                            el.dispatchEvent(new Event('blur', { bubbles: true }));
+                        }
+                    }, comboInput, docInfo.document_date);
+                    logs.push(`[PASO 4] ✅ Fecha Creacion Documento asignada exitosamente`);
+                } else {
+                    logs.push(`[PASO 4][ERROR] No se encontró el elemento input para la fecha`);
+                }
                 await wait(500);
             } else {
                 logs.push(`[PASO 4][ERROR] No se pudo localizar el campo "Fecha Creacion Documento". Revisa el diseñador de OnBase.`);
@@ -1326,10 +1369,14 @@ exports.executeAutomation = async (req, res) => {
 
     try {
         const result = await Promise.race([automationPromise, timeout]);
+        try { fs.writeFileSync(path.join(__dirname, '../automation_run.log'), JSON.stringify(logs, null, 2), 'utf-8'); } catch(e) {}
+        console.log("[AUTOMATION-LOGS] Completed:", JSON.stringify(logs, null, 2));
         if (result.statusCode === 500) return res.status(500).json(result.data);
         return res.json(result.data);
     } catch (error) {
         logs.push(`[ERROR CRÍTICO] ${error.message}`);
+        try { fs.writeFileSync(path.join(__dirname, '../automation_run.log'), JSON.stringify(logs, null, 2), 'utf-8'); } catch(e) {}
+        console.log("[AUTOMATION-LOGS] Failed:", JSON.stringify(logs, null, 2));
         return res.status(500).json({ error: error.message, logs });
     }
 };

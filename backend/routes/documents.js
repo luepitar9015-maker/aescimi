@@ -788,7 +788,7 @@ router.get('/stats/dashboard', requireAuth, (req, res) => {
                     COUNT(DISTINCT CASE WHEN d.id IS NOT NULL THEN e.id END) AS expedientes_con_docs,
                     COUNT(DISTINCT CASE WHEN d.id IS NULL THEN e.id END) AS expedientes_sin_docs,
                     COUNT(CASE WHEN d.status = 'Pendiente' THEN 1 END) AS docs_pendientes,
-                    COUNT(CASE WHEN d.status = 'Cargado' AND DATE(d.created_at) = CURRENT_DATE THEN 1 END) AS docs_cargados_hoy,
+                    COUNT(CASE WHEN d.status = 'Cargado' AND DATE(d.load_date) = CURRENT_DATE THEN 1 END) AS docs_cargados_hoy,
                     COUNT(d.id) AS total_docs
                 FROM expedientes e
                 LEFT JOIN documents d ON d.expediente_id = e.id
@@ -821,7 +821,7 @@ router.get('/stats/dashboard', requireAuth, (req, res) => {
                 ) AS expedientes_sin_docs,
                 (SELECT COUNT(*) FROM documents WHERE status = 'Pendiente') AS docs_pendientes,
                 (SELECT COUNT(*) FROM documents WHERE status = 'Cargado' 
-                 AND DATE(created_at) = CURRENT_DATE
+                 AND DATE(load_date) = CURRENT_DATE
                 ) AS docs_cargados_hoy,
                 (SELECT COUNT(*) FROM documents) AS total_docs
         `;

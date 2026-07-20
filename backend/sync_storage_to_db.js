@@ -172,6 +172,14 @@ async function sync() {
                                 // Quitar prefijos numéricos como "01_", "02_"
                                 cleanTypology = cleanTypology.replace(/^\d+[-_]/, "").trim();
 
+                                // Normalizar tipologías comunes para asegurar correspondencia exacta con TRD
+                                const upperClean = cleanTypology.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                                if (upperClean.includes("RESPUESTA") && upperClean.includes("PETICI")) {
+                                    cleanTypology = "RESPUESTA A DERECHO DE PETICION";
+                                } else if (upperClean.includes("PETICI") && !upperClean.includes("RESPUESTA")) {
+                                    cleanTypology = "DERECHO DE PETICION";
+                                }
+
                                 // Insertar documento en la BD
                                 const insertDocQuery = `
                                     INSERT INTO documents 
