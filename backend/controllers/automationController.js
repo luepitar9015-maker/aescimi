@@ -192,7 +192,8 @@ async function paso1_login(page, url, username, password, logs) {
 
     // Esperar 4 segundos y revisar si hay pantalla de "Sesión ya iniciada/Takeover"
     await wait(4000);
-    const sessionTakeover = await page.evaluate(() => {
+    let sessionTakeover = false;
+    const takeoverButtonSelector = await page.evaluate(() => {
         const txt = document.body ? document.body.innerText.toLowerCase() : '';
         const hasSessionText = txt.includes('iniciada') || txt.includes('already logged in') || txt.includes('sesión activa') || txt.includes('active session') || txt.includes('already has an active') || txt.includes('user is logged in');
         
@@ -203,19 +204,23 @@ async function paso1_login(page, url, username, password, logs) {
                 return val === 'yes' || val === 'si' || val === 'sí' || val === 'aceptar' || val.includes('take') || val.includes('contin') || val.includes('login anyway');
             });
             if (acceptBtn) {
-                acceptBtn.scrollIntoView({ block: 'center' });
-                acceptBtn.click();
-                return true;
+                acceptBtn.id = acceptBtn.id || 'temp_takeover_btn';
+                return '#' + acceptBtn.id;
             }
         }
-        return false;
-    }).catch(() => false);
+        return null;
+    }).catch(() => null);
 
-    if (sessionTakeover) {
-        logs.push('[PASO 1] ⚠️ Detectada advertencia de sesión activa. Se forzó la toma de control de la sesión (Session Takeover).');
-        await wait(5000); // esperar a que navegue tras tomar el control
+    if (takeoverButtonSelector) {
+        sessionTakeover = true;
+        logs.push('[PASO 1] ⚠️ Detectada advertencia de sesión activa. Tomando control de la sesión (Session Takeover)...');
+        await Promise.all([
+            page.waitForNavigation({ waitUntil: 'load', timeout: 25000 }).catch(() => {}),
+            page.click(takeoverButtonSelector)
+        ]);
+        await wait(6000); // Tiempo adicional para inicialización de JS post-takeover
     } else {
-        // Esperar navegación final a OnBase
+        // Esperar navegación normal
         await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => { });
         await wait(3000);
     }
@@ -389,10 +394,10 @@ async function paso2_abrirFormulario(page, browser, logs) {
     }
 
     // Esperar que el formulario abra (OnBase puede abrir en nueva pestaña o en iframe)
-    logs.push('[PASO 2] Esperando que el formulario SGDEA cargue (max 30s)...');
+    logs.push('[PASO 2] Esperando que el formulario SGDEA cargue (max 90s)...');
     
     let formLoaded = false;
-    for (let t = 0; t < 60 && !formLoaded; t++) {
+    for (let t = 0; t < 180 && !formLoaded; t++) {
         await wait(500);
         const allPages = await browser.pages();
         for (const pg of allPages) {
