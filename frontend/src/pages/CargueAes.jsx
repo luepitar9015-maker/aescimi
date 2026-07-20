@@ -391,6 +391,7 @@ function CargueAes() {
                 });
             } catch (err) {
                 console.error('Manual click failed:', err);
+                alert('No se pudo enviar el clic: ' + (err.response?.data?.error || err.message));
             }
         } else {
             console.log('Click outside rendered image content');

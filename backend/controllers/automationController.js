@@ -73,6 +73,84 @@ const safeClick = async (page, selector) => {
     return false;
 };
 
+// Helper para detectar y quitar bloqueos de objetos (Locked Objects)
+async function checkAndClearLocks(browser, logs) {
+    try {
+        const allPages = await browser.pages().catch(() => []);
+        for (const pg of allPages) {
+            for (const frame of pg.frames()) {
+                try {
+                    const hasLocksPopup = await frame.evaluate(() => {
+                        const txt = document.body ? document.body.innerText.toLowerCase() : '';
+                        return (txt.includes('locked objects') || txt.includes('manage locks') || txt.includes('objetos bloqueados')) && txt.includes('lock type');
+                    });
+                    
+                    if (hasLocksPopup) {
+                        logs.push('[LOCKS] ⚠️ Detectada advertencia de objetos bloqueados (Locked Objects)');
+                        
+                        const action = await frame.evaluate(() => {
+                            const buttons = Array.from(document.querySelectorAll('button, input[type="button"], a, span, div'));
+                            
+                            // 1. Intentar hacer clic en "Select All" o "Seleccionar todo"
+                            const selectAllBtn = buttons.find(b => {
+                                const t = (b.innerText || b.value || '').trim().toLowerCase();
+                                return t.includes('select all') || t.includes('seleccionar todo');
+                            });
+                            if (selectAllBtn) {
+                                selectAllBtn.click();
+                                return 'select_all';
+                            }
+                            
+                            // 2. Si no hay select all, buscar Remove Lock / Eliminar bloqueo directamente
+                            const removeBtn = buttons.find(b => {
+                                const t = (b.innerText || b.value || '').trim().toLowerCase();
+                                return t.includes('remove lock') || t.includes('eliminar bloqueo') || t.includes('quitar bloqueo');
+                            });
+                            if (removeBtn) {
+                                removeBtn.click();
+                                return 'remove_lock';
+                            }
+                            
+                            return null;
+                        });
+                        
+                        if (action) {
+                            logs.push(`[LOCKS] Acción ejecutada: ${action}`);
+                            await wait(2000);
+                            
+                            if (action === 'select_all') {
+                                // Clic en Remove Lock ahora
+                                await frame.evaluate(() => {
+                                    const buttons = Array.from(document.querySelectorAll('button, input[type="button"], a, span, div'));
+                                    const removeBtn = buttons.find(b => {
+                                        const t = (b.innerText || b.value || '').trim().toLowerCase();
+                                        return t.includes('remove lock') || t.includes('eliminar bloqueo') || t.includes('quitar bloqueo');
+                                    });
+                                    if (removeBtn) removeBtn.click();
+                                });
+                                logs.push('[LOCKS] Clic en Remove Lock ejecutado');
+                                await wait(3000);
+                            }
+                            
+                            // Cerrar el popup haciendo clic en el botón de cerrar
+                            await frame.evaluate(() => {
+                                const buttons = Array.from(document.querySelectorAll('button, input[type="button"], a, span, div, img'));
+                                const closeBtn = buttons.find(b => {
+                                    const t = (b.innerText || b.value || '').trim().toLowerCase();
+                                    return t === 'x' || t === 'close' || t === 'cerrar' || t === 'cancel' || t === 'cancelar' || b.className?.includes('close') || b.id?.includes('close');
+                                });
+                                if (closeBtn) closeBtn.click();
+                            });
+                            logs.push('[LOCKS] Popup de bloqueo cerrado');
+                            await wait(2000);
+                        }
+                    }
+                } catch (e) {}
+            }
+        }
+    } catch (err) {}
+}
+
 // ─────────────────────────────────────────────────────────────────
 // PASO 1: LOGIN
 // ─────────────────────────────────────────────────────────────────
@@ -399,6 +477,7 @@ async function paso2_abrirFormulario(page, browser, logs) {
     let formLoaded = false;
     for (let t = 0; t < 180 && !formLoaded; t++) {
         await wait(500);
+        await checkAndClearLocks(browser, logs);
         const allPages = await browser.pages();
         for (const pg of allPages) {
             for (const frame of pg.frames()) {
@@ -443,6 +522,7 @@ async function paso3_codigoExpediente(page, browser, code, logs) {
     // Esperar hasta 20s que aparezca el formulario con el campo
     for (let t = 0; t < 40 && !comboInput; t++) {
         await wait(500);
+        await checkAndClearLocks(browser, logs);
         const allPages = await browser.pages();
 
         for (const pg of allPages) {
