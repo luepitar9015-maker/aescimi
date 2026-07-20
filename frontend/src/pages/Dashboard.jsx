@@ -180,7 +180,7 @@ export default function Dashboard() {
                     )}
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
                     <StatCard
                         icon={FolderOpen}
                         value={activeStats?.total_expedientes}
@@ -233,6 +233,16 @@ export default function Dashboard() {
                         colorBg="border-teal-100 bg-teal-50"
                         colorIcon="text-teal-600"
                         colorText="text-teal-700"
+                        loading={loadingStats}
+                    />
+                    <StatCard
+                        icon={CheckCircle}
+                        value={activeStats?.docs_cargados_total}
+                        label="Total en AES"
+                        sublabel="Histórico cargado"
+                        colorBg="border-indigo-100 bg-indigo-50"
+                        colorIcon="text-indigo-600"
+                        colorText="text-indigo-700"
                         loading={loadingStats}
                     />
                     <StatCard
