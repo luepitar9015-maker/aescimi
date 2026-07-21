@@ -25,6 +25,108 @@ function Automation() {
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
+    const [manualText, setManualText] = useState('');
+    const [isInteracting, setIsInteracting] = useState(false);
+    const [clickPoint, setClickPoint] = useState(null);
+
+    const handleImageClick = async (e) => {
+        if (!liveFrame || isInteracting) return;
+        setIsInteracting(true);
+        const target = e.currentTarget;
+        const rect = target.getBoundingClientRect();
+
+        const clickX = e.nativeEvent ? e.nativeEvent.offsetX : (e.clientX - rect.left);
+        const clickY = e.nativeEvent ? e.nativeEvent.offsetY : (e.clientY - rect.top);
+
+        setClickPoint({ x: clickX, y: clickY });
+        setTimeout(() => setClickPoint(null), 700);
+
+        const naturalWidth = target.naturalWidth || 1366;
+        const naturalHeight = target.naturalHeight || 900;
+
+        const imageRatio = naturalWidth / naturalHeight;
+        const elementRatio = rect.width / rect.height;
+
+        let renderedWidth = rect.width;
+        let renderedHeight = rect.height;
+        let leftOffset = 0;
+        let topOffset = 0;
+
+        if (imageRatio > elementRatio) {
+            renderedHeight = rect.width / imageRatio;
+            topOffset = (rect.height - renderedHeight) / 2;
+        } else {
+            renderedWidth = rect.height * imageRatio;
+            leftOffset = (rect.width - renderedWidth) / 2;
+        }
+
+        const relativeX = clickX - leftOffset;
+        const relativeY = clickY - topOffset;
+
+        if (relativeX >= 0 && relativeX <= renderedWidth && relativeY >= 0 && relativeY <= renderedHeight) {
+            const x = Math.round((relativeX / renderedWidth) * 1366);
+            const y = Math.round((relativeY / renderedHeight) * 900);
+
+            console.log(`[AUTOMATION-CLICK] Viewport (${x}, ${y})`);
+
+            try {
+                const token = localStorage.getItem('token');
+                await axios.post('/api/automation/click', { x, y, button: e.button === 2 ? 'right' : 'left' }, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+            } catch (err) {
+                console.error('Manual click failed:', err);
+            }
+        }
+        setIsInteracting(false);
+    };
+
+    const sendManualText = async () => {
+        if (!manualText || isInteracting) return;
+        setIsInteracting(true);
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post('/api/automation/type', { text: manualText }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setManualText('');
+        } catch (err) {
+            alert('Error al escribir: ' + (err.response?.data?.error || err.message));
+        } finally {
+            setIsInteracting(false);
+        }
+    };
+
+    const sendManualKey = async (key) => {
+        if (isInteracting) return;
+        setIsInteracting(true);
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post('/api/automation/press-key', { key }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+        } catch (err) {
+            alert('Error al enviar tecla: ' + (err.response?.data?.error || err.message));
+        } finally {
+            setIsInteracting(false);
+        }
+    };
+
+    const killAutomation = async () => {
+        if (!window.confirm('¿Seguro que deseas forzar el cierre de la automatización activa?')) return;
+        setIsInteracting(true);
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post('/api/automation/kill', {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            alert('Automatización finalizada por el usuario.');
+        } catch (err) {
+            alert('Error al detener: ' + (err.response?.data?.error || err.message));
+        } finally {
+            setIsInteracting(false);
+        }
+    };
 
     // Load settings on mount
     useEffect(() => {
@@ -287,9 +389,59 @@ function Automation() {
                             </div>
                         ) : activeTab === 'web' ? (
                             liveFrame ? (
-                                <div style={{ border: '2px solid #000', borderRadius: '4px', overflow: 'hidden', background: '#000' }}>
-                                    <img src={liveFrame} alt="Live Stream" style={{ width: '100%', display: 'block' }} />
-                                    <div style={{ background: '#ff0000', color: '#fff', fontSize: '10px', padding: '2px 8px', fontWeight: 'bold' }}>LIVE</div>
+                                <div style={{ border: '2px solid #000', borderRadius: '8px', overflow: 'hidden', background: '#000', position: 'relative' }}>
+                                    <img 
+                                        src={liveFrame} 
+                                        alt="Live Stream" 
+                                        onMouseDown={handleImageClick}
+                                        onContextMenu={(e) => e.preventDefault()}
+                                        onDragStart={(e) => e.preventDefault()}
+                                        style={{ width: '100%', display: 'block', cursor: isInteracting ? 'wait' : 'crosshair' }} 
+                                    />
+                                    {clickPoint && (
+                                        <div style={{
+                                            position: 'absolute',
+                                            left: `${clickPoint.x}px`,
+                                            top: `${clickPoint.y}px`,
+                                            width: '16px',
+                                            height: '16px',
+                                            borderRadius: '50%',
+                                            backgroundColor: 'rgba(255, 0, 0, 0.8)',
+                                            border: '2px solid #fff',
+                                            transform: 'translate(-50%, -50%)',
+                                            pointerEvents: 'none',
+                                            boxShadow: '0 0 10px red',
+                                            zIndex: 10
+                                        }} />
+                                    )}
+                                    <div style={{ background: '#ff0000', color: '#fff', fontSize: '10px', padding: '4px 8px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <span>LIVE — OnBase Web (Haz clic en la imagen para interactuar)</span>
+                                    </div>
+                                    {/* Manual controls panel */}
+                                    <div style={{ padding: '10px', background: '#1a1a1a', borderTop: '1px solid #333', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                            <input 
+                                                type="text" 
+                                                placeholder="Texto para enviar a OnBase..." 
+                                                value={manualText}
+                                                onChange={e => setManualText(e.target.value)}
+                                                onKeyDown={e => { if (e.key === 'Enter') sendManualText(); }}
+                                                disabled={isInteracting}
+                                                style={{ flex: 1, padding: '6px 10px', borderRadius: '4px', border: '1px solid #444', background: '#333', color: '#fff', fontSize: '12px' }}
+                                            />
+                                            <button onClick={sendManualText} disabled={isInteracting || !manualText} style={{ background: '#39a900', color: '#fff', border: 'none', borderRadius: '4px', padding: '6px 12px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>Enviar</button>
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                                            <div style={{ display: 'flex', gap: '4px' }}>
+                                                {['Enter', 'Tab', 'Escape', 'Backspace'].map(k => (
+                                                    <button key={k} onClick={() => sendManualKey(k)} disabled={isInteracting} style={{ background: '#2a2a2a', color: '#eee', border: '1px solid #444', borderRadius: '4px', padding: '4px 8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>
+                                                        {k === 'Backspace' ? 'Borrar' : k === 'Escape' ? 'Esc' : k}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <button onClick={killAutomation} disabled={isInteracting} style={{ background: '#d32f2f', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>Forzar Cierre</button>
+                                        </div>
+                                    </div>
                                 </div>
                             ) : screenshot ? (
                                 <div>

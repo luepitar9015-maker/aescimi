@@ -308,6 +308,7 @@ async function paso1_login(page, url, username, password, logs) {
 
     if (postUrl.includes('NavPanel') || postUrl.includes('Dashboard') || postUrl.includes('Home') || postUrl.toLowerCase().includes('document/query')) {
         logs.push('[PASO 1] ✅ Login exitoso');
+        await checkAndClearLocks(page.browser(), logs).catch(() => {});
         return true;
     }
 
@@ -326,6 +327,29 @@ async function paso1_login(page, url, username, password, logs) {
 //   sidebar izq → "Nuevo formulario" → seleccionar SGDEA de la lista
 // ─────────────────────────────────────────────────────────────────
 async function paso2_abrirFormulario(page, browser, logs) {
+    // 0. Verificar si el formulario SGDEA ya está abierto (ej. tras "Guardar -> Sí")
+    let alreadyOpen = false;
+    try {
+        const allPagesCheck = await browser.pages().catch(() => [page]);
+        for (const pg of allPagesCheck) {
+            for (const frame of pg.frames()) {
+                try {
+                    const found = await frame.evaluate(() => {
+                        const html = document.body ? document.body.innerHTML.toLowerCase() : '';
+                        return (html.includes('código expediente') || html.includes('codigo expediente')) && html.includes('nombre documento');
+                    });
+                    if (found) { alreadyOpen = true; break; }
+                } catch { }
+            }
+            if (alreadyOpen) break;
+        }
+    } catch { }
+
+    if (alreadyOpen) {
+        logs.push('[PASO 2] ✅ Formulario SGDEA ya se encuentra abierto en pantalla');
+        return true;
+    }
+
     logs.push('[PASO 2] Buscando "Nuevo formulario" en el sidebar de OnBase...');
 
     // Esperar que el NavPanel cargue
@@ -1232,7 +1256,7 @@ async function paso5_adjuntarPDF(page, allFramesFn, docInfo, logs) {
 
 // ─────────────────────────────────────────────────────────────────
 // PASO 6: GUARDAR
-async function paso6_guardar(page, allFramesFn, logs) {
+async function paso6_guardar(page, allFramesFn, logs, hasMoreDocs = false) {
     logs.push('[PASO 6] Buscando botón "Guardar"...');
     try {
         const frames = allFramesFn();
@@ -1287,29 +1311,43 @@ async function paso6_guardar(page, allFramesFn, logs) {
     }
 
     // Esperar y manejar diálogo post-guardado
-    logs.push('[PASO 6] Esperando diálogo post-guardado (ej. "Would you like to complete another form?")...');
+    logs.push(`[PASO 6] Esperando diálogo post-guardado (siguiente doc en lote: ${hasMoreDocs ? 'SÍ' : 'NO'})...`);
     let dialogHandled = false;
     for (let t = 0; t < 25 && !dialogHandled; t++) {
         await wait(500);
         for (const frame of allFramesFn()) {
             try {
-                dialogHandled = await frame.evaluate(() => {
+                dialogHandled = await frame.evaluate((wantAnother) => {
                     const candidates = Array.from(document.querySelectorAll('button, a, input, div, span, td, [role="button"]'));
-                    const yesBtn = candidates.find(b => {
-                        const txt = (b.innerText || b.value || b.textContent || '').trim().toLowerCase();
-                        const isMatch = (txt === 'sí' || txt === 'si' || txt === 'yes');
-                        const isVisible = b.offsetParent !== null && b.getBoundingClientRect().width > 0;
-                        return isMatch && isVisible;
-                    });
-                    if (yesBtn) {
-                        yesBtn.scrollIntoView({ block: 'center' });
-                        yesBtn.click();
-                        return true;
+                    if (wantAnother) {
+                        const yesBtn = candidates.find(b => {
+                            const txt = (b.innerText || b.value || b.textContent || '').trim().toLowerCase();
+                            const isMatch = (txt === 'sí' || txt === 'si' || txt === 'yes');
+                            const isVisible = b.offsetParent !== null && b.getBoundingClientRect().width > 0;
+                            return isMatch && isVisible;
+                        });
+                        if (yesBtn) {
+                            yesBtn.scrollIntoView({ block: 'center' });
+                            yesBtn.click();
+                            return true;
+                        }
+                    } else {
+                        const noBtn = candidates.find(b => {
+                            const txt = (b.innerText || b.value || b.textContent || '').trim().toLowerCase();
+                            const isMatch = (txt === 'no' || txt === 'cancel' || txt === 'cancelar');
+                            const isVisible = b.offsetParent !== null && b.getBoundingClientRect().width > 0;
+                            return isMatch && isVisible;
+                        });
+                        if (noBtn) {
+                            noBtn.scrollIntoView({ block: 'center' });
+                            noBtn.click();
+                            return true;
+                        }
                     }
                     return false;
-                });
+                }, hasMoreDocs);
                 if (dialogHandled) {
-                    logs.push(`[PASO 6] ✅ Diálogo post-guardado detectado e interactuado en t=${(t * 0.5).toFixed(1)}s`);
+                    logs.push(`[PASO 6] ✅ Diálogo post-guardado procesado (${hasMoreDocs ? 'Sí' : 'No'}) en t=${(t * 0.5).toFixed(1)}s`);
                     break;
                 }
             } catch (e) { }
@@ -1317,11 +1355,11 @@ async function paso6_guardar(page, allFramesFn, logs) {
     }
 
     if (!dialogHandled) {
-        logs.push('[PASO 6][WARN] Diálogo post-guardado ("Sí"/"Yes") no detectado. Continuando...');
+        logs.push('[PASO 6][WARN] Diálogo post-guardado no detectado. Continuando...');
     }
 
     await wait(3000);
-    logs.push('[PASO 6] ✅ Proceso completado');
+    logs.push('[PASO 6] ✅ Proceso de guardado finalizado');
     return true;
 }
 
@@ -1413,57 +1451,64 @@ async function paso7_logout(page, allFramesFn, logs) {
 // ─────────────────────────────────────────────────────────────────
 // EXPORTACIÓN PRINCIPAL
 // ─────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────
+// EXPORTACIÓN PRINCIPAL
+// ─────────────────────────────────────────────────────────────────
 exports.executeAutomation = async (req, res) => {
-    const { url, username, password, documentId } = req.body;
+    const { url, username, password, documentId, documentIds } = req.body;
     const logs = [];
     let currentStep = 'Iniciando';
 
-    // Obtener info del documento
-    let docInfo = null;
-    if (documentId) {
+    const targetIds = Array.isArray(documentIds)
+        ? documentIds
+        : (documentId ? [documentId] : []);
+
+    let docsToProcess = [];
+    if (targetIds.length > 0) {
         try {
-            docInfo = await new Promise((resolve, reject) => {
-                const q = `
-                    SELECT d.*, d.storage_path, e.expediente_code, e.title as expediente_title,
-                           e.metadata_values as expediente_metadata
-                    FROM documents d
-                    LEFT JOIN expedientes e ON d.expediente_id = e.id
-                    WHERE d.id = ?`;
-                db.get(q, [documentId], (err, row) => {
-                    if (err) reject(err); else if (!row) reject(new Error('Document not found')); else resolve(row);
+            const placeholders = targetIds.map(() => '?').join(',');
+            const q = `
+                SELECT d.*, d.storage_path, e.expediente_code, e.title as expediente_title,
+                       e.metadata_values as expediente_metadata
+                FROM documents d
+                LEFT JOIN expedientes e ON d.expediente_id = e.id
+                WHERE d.id IN (${placeholders})`;
+
+            const rows = await new Promise((resolve, reject) => {
+                db.all(q, targetIds, (err, r) => {
+                    if (err) reject(err); else resolve(r || []);
                 });
             });
 
-            let meta = {};
-            try { meta = JSON.parse(docInfo.expediente_metadata || '{}'); } catch { }
-            // El nombre del documento concatena los metadatos con '_' como separador
-            // (confirmado en video: "NINI JOHANNA CAICEDO CAICEDO_NO INDICADO 00 72025002358")
-            const metaJoined = [1, 2, 3, 4, 5, 6, 7, 8]
-                .map(i => meta[`valor${i}`] || meta[`Metadato ${i}`])
-                .filter(Boolean).join('_');
-            docInfo.nombreDocumento = docInfo.expediente_title || metaJoined || docInfo.filename;
+            // Preservar orden original de IDs recibidos
+            docsToProcess = targetIds.map(id => rows.find(r => r.id === id)).filter(Boolean);
 
-            // Si el documento tiene descripción en sus metadatos (texto condicional), se anexa al final con un espacio
-            let docMeta = {};
-            try { if (docInfo.metadata_values) docMeta = JSON.parse(docInfo.metadata_values); } catch (e) { }
-            if (docMeta && docMeta.description) {
-                docInfo.nombreDocumento = `${docInfo.nombreDocumento.trim()} ${docMeta.description.trim()}`;
+            for (const docInfo of docsToProcess) {
+                let meta = {};
+                try { meta = JSON.parse(docInfo.expediente_metadata || '{}'); } catch { }
+                const metaJoined = [1, 2, 3, 4, 5, 6, 7, 8]
+                    .map(i => meta[`valor${i}`] || meta[`Metadato ${i}`])
+                    .filter(Boolean).join('_');
+                docInfo.nombreDocumento = docInfo.expediente_title || metaJoined || docInfo.filename;
+
+                let docMeta = {};
+                try { if (docInfo.metadata_values) docMeta = JSON.parse(docInfo.metadata_values); } catch (e) { }
+                if (docMeta && docMeta.description) {
+                    docInfo.nombreDocumento = `${docInfo.nombreDocumento.trim()} ${docMeta.description.trim()}`;
+                }
+
+                docInfo.joinedName = docInfo.nombreDocumento;
+                docInfo.parsedMeta = meta;
             }
 
-            docInfo.joinedName = docInfo.nombreDocumento;
-            docInfo.parsedMeta = meta;
-
-            logs.push(`[INFO] Documento: ${docInfo.filename}`);
-            logs.push(`[INFO] Expediente: ${docInfo.expediente_code || 'Sin código'}`);
-            logs.push(`[INFO] Tipología: ${docInfo.typology_name}`);
+            logs.push(`[INFO] Lote preparado: ${docsToProcess.length} documento(s) a procesar.`);
         } catch (e) {
-            logs.push(`[WARN] Info documento: ${e.message}`);
+            logs.push(`[WARN] Error cargando lista de documentos: ${e.message}`);
         }
     }
-    
-    logs.push(`[DEBUG] docInfo actual: ${JSON.stringify(docInfo)}`);
 
     if (!url) return res.status(400).json({ error: 'URL de OnBase requerida' });
+    if (!username || !password) return res.status(400).json({ error: 'Credenciales no configuradas' });
 
     let browser;
 
@@ -1482,7 +1527,7 @@ exports.executeAutomation = async (req, res) => {
             // Screencast en tiempo real
             try {
                 const session = await page.target().createCDPSession();
-                await session.send('Page.startScreencast', { format: 'jpeg', quality: 65 });
+                await session.send('Page.startScreencast', { format: 'jpeg', quality: 65, maxWidth: 1366, maxHeight: 900 });
                 session.on('Page.screencastFrame', ev => {
                     automationEmitter.emit('frame', ev.data);
                     session.send('Page.screencastFrameAck', { sessionId: ev.sessionId }).catch(() => { });
@@ -1491,11 +1536,8 @@ exports.executeAutomation = async (req, res) => {
 
             const allFrames = () => page.frames();
 
-            // ── PASO 1: LOGIN ──
+            // ── PASO 1: LOGIN ÚNICO ──
             currentStep = 'PASO 1: Login';
-            if (!username || !password) {
-                return { statusCode: 500, data: { error: 'Credenciales no configuradas', logs } };
-            }
             const loginOk = await paso1_login(page, url, username, password, logs);
             if (!loginOk) {
                 const ss = await page.screenshot().catch(() => null);
@@ -1514,70 +1556,93 @@ exports.executeAutomation = async (req, res) => {
                 };
             }
 
-            // ── PASO 2: ABRIR FORMULARIO SGDEA ──
-            currentStep = 'PASO 2: Abrir Formulario SGDEA';
-            await paso2_abrirFormulario(page, browser, logs);
-            await wait(2000);
+            // ── PROCESAR LOTE EN LA MISMA SESIÓN ──
+            const totalDocs = Math.max(1, docsToProcess.length);
+            for (let docIdx = 0; docIdx < totalDocs; docIdx++) {
+                const docInfo = docsToProcess[docIdx] || null;
+                const hasMoreDocs = docIdx < totalDocs - 1;
 
-            // ── PASO 3: CÓDIGO DE EXPEDIENTE ──
-            currentStep = 'PASO 3: Código de Expediente';
-            let formPage = page;
-            let formFrame = page.mainFrame();
+                if (docInfo) {
+                    logs.push(`\n--------------------------------------------------`);
+                    logs.push(`[LOTE] Documento ${docIdx + 1} de ${totalDocs}: "${docInfo.filename}"`);
+                    logs.push(`--------------------------------------------------`);
+                }
 
-            if (docInfo?.expediente_code) {
-                const result = await paso3_codigoExpediente(
-                    page, browser, docInfo.expediente_code, logs
-                );
-                if (result?.formPage) formPage = result.formPage;
-                if (result?.formFrame) formFrame = result.formFrame;
+                try {
+                    // ── PASO 2: ABRIR FORMULARIO SGDEA ──
+                    currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 2: Formulario SGDEA`;
+                    await paso2_abrirFormulario(page, browser, logs);
+                    await wait(1500);
+
+                    // ── PASO 3: CÓDIGO DE EXPEDIENTE ──
+                    currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 3: Código de Expediente`;
+                    let formPage = page;
+                    let formFrame = page.mainFrame();
+
+                    if (docInfo?.expediente_code) {
+                        const result = await paso3_codigoExpediente(
+                            page, browser, docInfo.expediente_code, logs
+                        );
+                        if (result?.formPage) formPage = result.formPage;
+                        if (result?.formFrame) formFrame = result.formFrame;
+                    }
+
+                    // ── PASO 4: LLENAR CAMPOS ──
+                    currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 4: Llenar Campos`;
+                    if (docInfo) {
+                        await paso4_llenarCampos(formPage, formFrame, docInfo, logs);
+                    }
+                    await wait(500);
+
+                    // ── PASO 5: ADJUNTAR PDF ──
+                    currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 5: Adjuntar PDF`;
+                    if (docInfo?.path) {
+                        await paso5_adjuntarPDF(page, allFrames, docInfo, logs);
+                    }
+
+                    // ── PASO 6: GUARDAR ──
+                    currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 6: Guardar`;
+                    await paso6_guardar(page, allFrames, logs, hasMoreDocs);
+
+                    // Marcar documento como Cargado en la BD
+                    if (docInfo?.id) {
+                        await new Promise(resolve => {
+                            db.run(
+                                'UPDATE documents SET status = ?, load_date = ? WHERE id = ?',
+                                ['Cargado', new Date().toISOString(), docInfo.id],
+                                () => resolve()
+                            );
+                        });
+                        logs.push(`[INFO] ✅ Documento "${docInfo.filename}" (ID ${docInfo.id}) actualizado a "Cargado" en BD`);
+                    }
+
+                } catch (docErr) {
+                    logs.push(`[ERROR DOC ${docIdx + 1}] Falló el procesamiento de "${docInfo?.filename || 'doc'}": ${docErr.message}`);
+                    await checkAndClearLocks(browser, logs).catch(() => {});
+                }
+
+                if (hasMoreDocs) {
+                    await wait(2000);
+                }
             }
 
-            // ── PASO 4: LLENAR CAMPOS ──
-            currentStep = 'PASO 4: Llenar Campos';
-            if (docInfo) {
-                await paso4_llenarCampos(formPage, formFrame, docInfo, logs);
-            }
-            await wait(500);
-
-            // ── PASO 5: ADJUNTAR PDF ──
-            currentStep = 'PASO 5: Adjuntar PDF';
-            if (docInfo?.path) {
-                await paso5_adjuntarPDF(page, allFrames, docInfo, logs);
-            }
-
-            // ── PASO 6: GUARDAR ──
-            currentStep = 'PASO 6: Guardar';
-            await paso6_guardar(page, allFrames, logs);
-
-            // ── PASO 7: CERRAR SESIÓN ──
-            currentStep = 'PASO 7: Cerrar Sesión';
+            // ── PASO 7: CERRAR SESIÓN TRAS TERMINAR LOTE ──
+            currentStep = 'PASO 7: Cerrar Sesión final';
             await paso7_logout(page, allFrames, logs);
 
             // Captura final
             const screenshotBuffer = await page.screenshot({ fullPage: false }).catch(() => null);
-            
+
             if (activeBrowser) {
                 await activeBrowser.close().catch(() => {});
                 activeBrowser = null;
                 activePage = null;
             }
 
-            // Marcar documento como Cargado en la BD
-            if (documentId) {
-                await new Promise(resolve => {
-                    db.run(
-                        'UPDATE documents SET status = ?, load_date = ? WHERE id = ?',
-                        ['Cargado', new Date().toISOString(), documentId],
-                        () => resolve()
-                    );
-                });
-                logs.push('[INFO] Estado del documento actualizado a "Cargado" en BD');
-            }
-
             return {
                 statusCode: 200,
                 data: {
-                    message: 'Automatización completada',
+                    message: 'Automatización completada exitosamente',
                     screenshot: screenshotBuffer ? `data:image/png;base64,${screenshotBuffer.toString('base64')}` : null,
                     logs
                 }
@@ -1593,11 +1658,14 @@ exports.executeAutomation = async (req, res) => {
         }
     })();
 
-    // Timeout global de 4 minutos
+    // Timeout global dinámico (mínimo 4 minutos)
+    const totalDocs = Math.max(1, docsToProcess.length);
+    const dynamicTimeoutMs = Math.max(240000, totalDocs * 120000);
+
     const timeout = new Promise((_, reject) =>
         setTimeout(() =>
-            reject(new Error(`Timeout en paso: "${currentStep}". Verifique OnBase.`)),
-            240000
+            reject(new Error(`Timeout global en paso: "${currentStep}". Verifique OnBase.`)),
+            dynamicTimeoutMs
         )
     );
 
@@ -1863,14 +1931,18 @@ exports.getPM2Logs = async (req, res) => {
 // CONTROLES DE INTERACCIÓN MANUAL (PARA SOPORTE DE USUARIO)
 // ─────────────────────────────────────────────────────────────────
 exports.clickActivePage = async (req, res) => {
-    const { x, y } = req.body;
+    const { x, y, clickCount = 1, button = 'left' } = req.body;
     if (!activePage) {
         return res.status(400).json({ error: 'No hay ninguna sesión de automatización activa' });
     }
     try {
-        console.log(`[MANUAL-CLICK] Clic en x: ${x}, y: ${y}`);
-        await activePage.mouse.click(Number(x), Number(y));
-        return res.json({ success: true, message: `Clic ejecutado en x: ${x}, y: ${y}` });
+        const nx = Number(x);
+        const ny = Number(y);
+        console.log(`[MANUAL-CLICK] Clic (${clickCount}x ${button}) en x: ${nx}, y: ${ny}`);
+        await activePage.mouse.move(nx, ny);
+        await wait(50);
+        await activePage.mouse.click(nx, ny, { clickCount: Number(clickCount), delay: 80, button });
+        return res.json({ success: true, message: `Clic ejecutado en x: ${nx}, y: ${ny}` });
     } catch (err) {
         console.error('[MANUAL-CLICK] Error:', err);
         return res.status(500).json({ error: err.message });

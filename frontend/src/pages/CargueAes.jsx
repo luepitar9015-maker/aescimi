@@ -193,7 +193,7 @@ function CargueAes() {
         if (specificDocId) setConfigDoc(null); // Close modal if starting from there
         setAutomationLoading(true);
 
-        // Fetch latest settings once before loop
+        // Fetch latest settings once before batch
         const token = localStorage.getItem('token');
         const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
         let settings;
@@ -208,80 +208,50 @@ function CargueAes() {
             return;
         }
 
-        // Processing loop for all selected documents
-        for (let i = 0; i < docsToProcess.length; i++) {
-            const docToProcess = docsToProcess[i];
+        const docIdsToProcess = docsToProcess.map(d => d.id);
 
-            setLogs([
-                `=== Procesando ${i + 1} de ${docsToProcess.length} ===`,
-                'Iniciando proceso de cargue AES...',
-                'Obteniendo configuración del sistema...'
-            ]);
-            setLiveFrame(null);
-            setCurrentStepIndex(0);
-            setAutomationError(false);
+        setLogs([
+            `=== Procesando Lote de ${docsToProcess.length} documento(s) ===`,
+            'Iniciando proceso de cargue AES en sesión única de OnBase...',
+            'Conectando con OnBase...'
+        ]);
+        setLiveFrame(null);
+        setCurrentStepIndex(0);
+        setAutomationError(false);
 
-            // START LIVE STREAM
-            const eventSource = new EventSource(`/api/automation/stream?token=${encodeURIComponent(token || '')}`);
-            eventSource.onmessage = (event) => {
-                setLiveFrame(`data:image/jpeg;base64,${event.data}`);
-            };
-            eventSource.onerror = () => {
-                eventSource.close();
-            };
-
-            setLogs(prev => [...prev, `Iniciando cargue para: ${docToProcess.filename}...`]);
-
-            try {
-                const res = await axios.post('/api/automation/execute', {
-                    url: settings.ades_url,
-                    username: settings.ades_username,
-                    password: settings.ades_password,
-                    documentId: docToProcess.id
-                }, { headers: authHeaders });
-
-                setLogs(prev => [...prev, ...res.data.logs, res.data.test_mode ? '✅ PRUEBA finalizada — el documento vuelve a estado Pendiente.' : 'Proceso de cargue completado.']);
-
-                if (res.data.test_mode) {
-                    // MODO PRUEBA: no cambiar estado, el documento queda Pendiente
-                    setCurrentStepIndex(automationSteps.length);
-                    await fetchPending();
-                } else if (!res.data.logs.some(log => log.includes('[ERROR]') || log.includes('Fallo crítico'))) {
-                    // MODO REAL: marcar como Cargado
-                    setCurrentStepIndex(automationSteps.length);
-                    await axios.post('/api/ades/update-status', {
-                        id: docToProcess.id,
-                        status: 'Cargado',
-                        ades_id: 'AES-' + Math.floor(Math.random() * 1000000)
-                    });
-                    await fetchPending();
-                } else {
-                    setAutomationError(true);
-                    eventSource.close();
-                    break;
-                }
-            } catch (err) {
-                console.error("Automation error:", err);
-                if (err.response && err.response.data && err.response.data.logs) {
-                    setLogs(prev => [...prev, ...err.response.data.logs]);
-                }
-                const errMsg = err.response?.data?.error || err.message || 'El proceso falló. Revise la conexión con OnBase.';
-                setLogs(prev => [...prev, `Error: ${errMsg}`]);
-                setAutomationError(true);
-                eventSource.close();
-                break; // Stop bulk processing
-            }
-
+        // START LIVE STREAM
+        const eventSource = new EventSource(`/api/automation/stream?token=${encodeURIComponent(token || '')}`);
+        eventSource.onmessage = (event) => {
+            setLiveFrame(`data:image/jpeg;base64,${event.data}`);
+        };
+        eventSource.onerror = () => {
             eventSource.close();
+        };
 
-            // Wait a few seconds between documents
-            if (i < docsToProcess.length - 1) {
-                setLogs(prev => [...prev, '\nEsperando para procesar el siguiente documento...']);
-                await new Promise(r => setTimeout(r, 4000));
+        try {
+            const res = await axios.post('/api/automation/execute', {
+                url: settings.ades_url,
+                username: settings.ades_username,
+                password: settings.ades_password,
+                documentIds: docIdsToProcess
+            }, { headers: authHeaders });
+
+            setLogs(prev => [...prev, ...(res.data.logs || []), 'Proceso de cargue de lote completado.']);
+            setCurrentStepIndex(automationSteps.length);
+            await fetchPending();
+            setSelectedDocs([]);
+        } catch (err) {
+            console.error("Automation error:", err);
+            if (err.response && err.response.data && err.response.data.logs) {
+                setLogs(prev => [...prev, ...err.response.data.logs]);
             }
+            const errMsg = err.response?.data?.error || err.message || 'El proceso falló. Revise la conexión con OnBase.';
+            setLogs(prev => [...prev, `Error: ${errMsg}`]);
+            setAutomationError(true);
+        } finally {
+            eventSource.close();
+            setAutomationLoading(false);
         }
-
-        setAutomationLoading(false);
     };
     const filteredDocs = documents.filter(doc => {
         // Status filter: Bypass client-side filtering as the backend handles the correct
@@ -344,57 +314,57 @@ function CargueAes() {
         window.open(`/api/ades/view/${doc.id}`, '_blank');
     };
 
+    const [clickPoint, setClickPoint] = useState(null);
+
     const handleImageClick = async (e) => {
         if (!liveFrame || isInteracting) return;
         setIsInteracting(true);
-        const rect = e.target.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        const clickY = e.clientY - rect.top;
-        
-        // Mapear exactamente según el object-fit: contain
-        const naturalWidth = e.target.naturalWidth || 1366;
-        const naturalHeight = e.target.naturalHeight || 900;
-        
+        const target = e.currentTarget;
+        const rect = target.getBoundingClientRect();
+
+        const clickX = e.nativeEvent ? e.nativeEvent.offsetX : (e.clientX - rect.left);
+        const clickY = e.nativeEvent ? e.nativeEvent.offsetY : (e.clientY - rect.top);
+
+        setClickPoint({ x: clickX, y: clickY });
+        setTimeout(() => setClickPoint(null), 700);
+
+        const naturalWidth = target.naturalWidth || 1366;
+        const naturalHeight = target.naturalHeight || 900;
+
         const imageRatio = naturalWidth / naturalHeight;
         const elementRatio = rect.width / rect.height;
-        
-        let renderedWidth, renderedHeight;
+
+        let renderedWidth = rect.width;
+        let renderedHeight = rect.height;
         let leftOffset = 0;
         let topOffset = 0;
-        
+
         if (imageRatio > elementRatio) {
-            // Se ajusta al ancho (letterbox arriba/abajo)
-            renderedWidth = rect.width;
             renderedHeight = rect.width / imageRatio;
             topOffset = (rect.height - renderedHeight) / 2;
         } else {
-            // Se ajusta al alto (pillarbox izquierda/derecha)
-            renderedHeight = rect.height;
             renderedWidth = rect.height * imageRatio;
             leftOffset = (rect.width - renderedWidth) / 2;
         }
-        
+
         const relativeX = clickX - leftOffset;
         const relativeY = clickY - topOffset;
-        
-        // Ejecutar clic solo si es dentro de la imagen real renderizada
+
         if (relativeX >= 0 && relativeX <= renderedWidth && relativeY >= 0 && relativeY <= renderedHeight) {
             const x = Math.round((relativeX / renderedWidth) * 1366);
             const y = Math.round((relativeY / renderedHeight) * 900);
-            
-            console.log(`Manual click display: ${clickX.toFixed(1)}, ${clickY.toFixed(1)} -> mapped viewport: ${x}, ${y}`);
-            
+
+            console.log(`[CLICK-SENT] Display (${clickX.toFixed(0)}, ${clickY.toFixed(0)}) -> OnBase Viewport (${x}, ${y})`);
+
             try {
                 const token = localStorage.getItem('token');
-                await axios.post('/api/automation/click', { x, y }, {
+                await axios.post('/api/automation/click', { x, y, button: e.button === 2 ? 'right' : 'left' }, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
             } catch (err) {
                 console.error('Manual click failed:', err);
                 alert('No se pudo enviar el clic: ' + (err.response?.data?.error || err.message));
             }
-        } else {
-            console.log('Click outside rendered image content');
         }
         setIsInteracting(false);
     };
@@ -2271,6 +2241,8 @@ function CargueAes() {
                                     src={liveFrame} 
                                     alt="Live Stream Expanded" 
                                     onMouseDown={handleImageClick}
+                                    onContextMenu={(e) => e.preventDefault()}
+                                    onDragStart={(e) => e.preventDefault()}
                                     style={{ 
                                         width: '100%', 
                                         maxHeight: '70vh', 
@@ -2279,6 +2251,22 @@ function CargueAes() {
                                         cursor: isInteracting ? 'wait' : 'crosshair' 
                                     }} 
                                 />
+                                {clickPoint && (
+                                    <div style={{
+                                        position: 'absolute',
+                                        left: `${clickPoint.x}px`,
+                                        top: `${clickPoint.y}px`,
+                                        width: '16px',
+                                        height: '16px',
+                                        borderRadius: '50%',
+                                        backgroundColor: 'rgba(255, 0, 0, 0.8)',
+                                        border: '2px solid #fff',
+                                        transform: 'translate(-50%, -50%)',
+                                        pointerEvents: 'none',
+                                        boxShadow: '0 0 10px red',
+                                        zIndex: 10
+                                    }} />
+                                )}
                                 
                                 {/* Panel de control manual */}
                                 <div style={{
