@@ -468,7 +468,11 @@ app.use((req, res, next) => {
 // Nginx recibe en 80/443 y reenvía a este proceso por HTTP.
 // ══════════════════════════════════════════════════════════════
 const http = require('http');
-http.createServer(app).listen(port, '0.0.0.0', () => {
+const server = http.createServer(app);
+server.setTimeout(600000); // 10 minutos para automatizaciones largas
+server.headersTimeout = 600000;
+server.keepAliveTimeout = 600000;
+server.listen(port, '0.0.0.0', () => {
     console.log(`[SERVER] ✅ HTTP escuchando en http://0.0.0.0:${port}`);
     console.log(`[SERVER] 🔀 Proxy inverso Nginx maneja HTTPS externamente.`);
 });

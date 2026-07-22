@@ -3,8 +3,14 @@ const router = express.Router();
 const automationController = require('../controllers/automationController');
 const { requireAuth, requireAdmin } = require('../middleware/authMiddleware');
 
-router.post('/execute', requireAuth, requireAdmin, automationController.executeAutomation);
-router.post('/unity-execute', requireAuth, requireAdmin, automationController.executeUnityAutomation);
+const setLongTimeout = (req, res, next) => {
+    req.setTimeout(600000);
+    res.setTimeout(600000);
+    next();
+};
+
+router.post('/execute', requireAuth, requireAdmin, setLongTimeout, automationController.executeAutomation);
+router.post('/unity-execute', requireAuth, requireAdmin, setLongTimeout, automationController.executeUnityAutomation);
 router.get('/stream', requireAuth, requireAdmin, automationController.streamAutomation);
 router.post('/diagnostic', requireAuth, requireAdmin, automationController.executeDiagnostic);
 router.post('/unity-robot', requireAuth, requireAdmin, automationController.runUnityRobot);

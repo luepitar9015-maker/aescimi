@@ -234,7 +234,7 @@ function CargueAes() {
                 username: settings.ades_username,
                 password: settings.ades_password,
                 documentIds: docIdsToProcess
-            }, { headers: authHeaders });
+            }, { headers: authHeaders, timeout: 600000 });
 
             setLogs(prev => [...prev, ...(res.data.logs || []), 'Proceso de cargue de lote completado.']);
             setCurrentStepIndex(automationSteps.length);
@@ -245,9 +245,18 @@ function CargueAes() {
             if (err.response && err.response.data && err.response.data.logs) {
                 setLogs(prev => [...prev, ...err.response.data.logs]);
             }
-            const errMsg = err.response?.data?.error || err.message || 'El proceso falló. Revise la conexión con OnBase.';
-            setLogs(prev => [...prev, `Error: ${errMsg}`]);
-            setAutomationError(true);
+            if (err.response?.status === 504) {
+                setLogs(prev => [
+                    ...prev,
+                    '⚠️ El servidor web intermediario respondió 504 Gateway Timeout.',
+                    'ℹ️ La automatización continúa ejecutándose en segundo plano en OnBase. Actualizando lista en unos segundos...'
+                ]);
+                setTimeout(() => fetchPending(), 10000);
+            } else {
+                const errMsg = err.response?.data?.error || err.message || 'El proceso falló. Revise la conexión con OnBase.';
+                setLogs(prev => [...prev, `Error: ${errMsg}`]);
+                setAutomationError(true);
+            }
         } finally {
             eventSource.close();
             setAutomationLoading(false);
