@@ -753,7 +753,7 @@ async function paso3_codigoExpediente(page, browser, code, logs) {
     }
 
     logs.push('[PASO 3] ✅ Código Expediente completado');
-    return { formPage, formFrame };
+    return { formPage, formFrame, success: !!comboInput };
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1569,10 +1569,16 @@ exports.executeAutomation = async (req, res) => {
                 }
 
                 try {
-                    // ── PASO 2: ABRIR FORMULARIO SGDEA ──
-                    currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 2: Formulario SGDEA`;
-                    await paso2_abrirFormulario(page, browser, logs);
-                    await wait(1500);
+                    // ── PASO 2 & 3: FORMULARIO SGDEA Y CÓDIGO DE EXPEDIENTE ──
+                    if (docIdx === 0) {
+                        // El 1er documento abre el formulario completo en el PASO 2
+                        currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 2: Formulario SGDEA`;
+                        await paso2_abrirFormulario(page, browser, logs);
+                        await wait(1500);
+                    } else {
+                        // A partir del 2do documento en adelante, se inicia la automatización en la Etapa 3
+                        logs.push(`[Doc ${docIdx + 1}/${totalDocs}] ⏩ [ETAPA 3 DIRECTA] Iniciando automatización del documento ${docIdx + 1} de ${totalDocs} directamente en la Etapa 3 (Código de Expediente)...`);
+                    }
 
                     // ── PASO 3: CÓDIGO DE EXPEDIENTE ──
                     currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 3: Código de Expediente`;
@@ -1580,9 +1586,20 @@ exports.executeAutomation = async (req, res) => {
                     let formFrame = page.mainFrame();
 
                     if (docInfo?.expediente_code) {
-                        const result = await paso3_codigoExpediente(
+                        let result = await paso3_codigoExpediente(
                             page, browser, docInfo.expediente_code, logs
                         );
+
+                        // Fallback de seguridad: Si para docIdx > 0 no se detectó el campo, re-ejecutar PASO 2 y reintentar PASO 3
+                        if ((!result || !result.success) && docIdx > 0) {
+                            logs.push(`[Doc ${docIdx + 1}/${totalDocs}] [FALLBACK] Campo "Código Expediente" no detectado. Re-ejecutando PASO 2 para asegurar formulario...`);
+                            await paso2_abrirFormulario(page, browser, logs);
+                            await wait(1500);
+                            result = await paso3_codigoExpediente(
+                                page, browser, docInfo.expediente_code, logs
+                            );
+                        }
+
                         if (result?.formPage) formPage = result.formPage;
                         if (result?.formFrame) formFrame = result.formFrame;
                     }

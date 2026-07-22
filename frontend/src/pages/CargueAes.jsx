@@ -32,13 +32,13 @@ function CargueAes() {
     const [selectedDocs, setSelectedDocs] = useState([]);
 
     const automationSteps = [
-        { id: 'start', label: '1. Conectando e Iniciando Sesión (OnBase Web Client)', match: ['Iniciando proceso', 'Conectando con OnBase', 'Autenticación exitosa', 'Post-login URL'] },
-        { id: 'nav', label: '2. Abriendo Menú y "Nuevo Formulario"', match: ['Buscando menú principal', 'Menú hamburguesa', 'Nuevo Formulario" seleccionado'] },
-        { id: 'type', label: '3. Seleccionando "SGDEA - Ingreso a Expediente"', match: ['Buscando tipo documental SGDEA', 'Tipo documental seleccionado:'] },
-        { id: 'fill', label: '4. Diligenciando Metadatos e Índices', match: ['Diligenciando metadatos', 'Metadatos diligenciados'] },
-        { id: 'upload', label: '5. Adjuntando Archivo Electrónico PDF', match: ['Adjuntando archivo', 'Click en botón "Importar"', 'Archivo PDF cargado'] },
-        { id: 'save', label: '6. Guardando y Radicando Documento', match: ['Guardando y radicando', 'Botón guardar activado', 'Documento radicado exitosamente', 'Ventana aceptada'] },
-        { id: 'restart', label: '7. Cerrar y si sigue el siguiente documento, reinicia al paso 1', match: ['Esperando para procesar', 'Reiniciando ciclo'] }
+        { id: 'start', label: '1. Conectando e Iniciando Sesión (OnBase Web Client)', match: ['Iniciando proceso', 'Conectando con OnBase', 'Autenticación exitosa', 'Post-login URL', 'PASO 1'] },
+        { id: 'nav', label: '2. Abriendo Menú y "Nuevo Formulario"', match: ['Buscando menú principal', 'Menú hamburguesa', 'Nuevo Formulario" seleccionado', 'PASO 2'] },
+        { id: 'type', label: '3. Seleccionando "SGDEA - Ingreso a Expediente" / Código de Expediente', match: ['Buscando tipo documental SGDEA', 'Tipo documental seleccionado:', 'ETAPA 3 DIRECTA', 'Código de Expediente', 'PASO 3'] },
+        { id: 'fill', label: '4. Diligenciando Metadatos e Índices', match: ['Diligenciando metadatos', 'Metadatos diligenciados', 'PASO 4'] },
+        { id: 'upload', label: '5. Adjuntando Archivo Electrónico PDF', match: ['Adjuntando archivo', 'Click en botón "Importar"', 'Archivo PDF cargado', 'PASO 5'] },
+        { id: 'save', label: '6. Guardando y Radicando Documento', match: ['Guardando y radicando', 'Botón guardar activado', 'Documento radicado exitosamente', 'Ventana aceptada', 'PASO 6'] },
+        { id: 'restart', label: '7. Continuar Siguiente Documento (Inicia en Etapa 3)', match: ['Esperando para procesar', 'Reiniciando ciclo', 'ETAPA 3 DIRECTA'] }
     ];
 
     useEffect(() => {
