@@ -11,6 +11,9 @@ echo  (Si se cae, se reinicia automaticamente)
 echo ============================================
 echo.
 
+:: Liberar puerto 3001 en caso de procesos huerfanos previos
+for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr :3001 ^| findstr LISTEN') do taskkill /f /pid %%a 2>nul
+
 node auto_ssl.js
 node server.js
 
