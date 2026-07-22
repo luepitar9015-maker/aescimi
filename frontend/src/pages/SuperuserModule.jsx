@@ -25,10 +25,21 @@ const SuperuserModule = () => {
   const [onlineLoading, setOnlineLoading] = useState(false);
   const [logsLoading, setLogsLoading] = useState(false);
 
-  // ── Estado para eliminación masiva ──────────────────────────
   const [confirmText, setConfirmText] = useState('');
   const [limpiandо, setLimpiando] = useState(false);
   const [resultadoLimpieza, setResultadoLimpieza] = useState(null);
+
+  const filteredLogs = auditLogs.filter(log => {
+    if (!logsSearch) return true;
+    const term = logsSearch.toLowerCase();
+    return (
+      (log.user_name && log.user_name.toLowerCase().includes(term)) ||
+      (log.user_role && log.user_role.toLowerCase().includes(term)) ||
+      (log.action && log.action.toLowerCase().includes(term)) ||
+      (log.details && log.details.toLowerCase().includes(term)) ||
+      (log.ip_address && log.ip_address.toLowerCase().includes(term))
+    );
+  });
 
   const token = localStorage.getItem('token');
   const headers = { Authorization: `Bearer ${token}` };
