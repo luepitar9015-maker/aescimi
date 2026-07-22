@@ -44,12 +44,33 @@ const SuperuserModule = () => {
   const token = localStorage.getItem('token');
   const headers = { Authorization: `Bearer ${token}` };
 
+  const currentUser = (() => { try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; } })();
+
   useEffect(() => {
-    fetchTables();
-    fetchExpirationDate();
-    fetchOnlineUsers();
-    fetchAuditLogs();
+    if (currentUser.role === 'superadmin' || currentUser.role === 'admin') {
+      fetchTables();
+      fetchExpirationDate();
+      fetchOnlineUsers();
+      fetchAuditLogs();
+    }
   }, []);
+
+  if (currentUser.role !== 'superadmin' && currentUser.role !== 'admin') {
+    return (
+      <div className="p-12 text-center">
+        <div className="max-w-md mx-auto bg-white p-8 rounded-2xl border border-gray-200 shadow-sm">
+          <ShieldAlert size={48} className="text-amber-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Acceso Restringido</h2>
+          <p className="text-sm text-gray-500 mb-6">
+            El Módulo de Gestión Superadmin está reservado para administradores del sistema. Tu usuario es <strong>{currentUser.name || currentUser.username || 'Jesús'}</strong> (Rol: <strong>{currentUser.role || 'usuario'}</strong>).
+          </p>
+          <a href="/dashboard" className="inline-block bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition-colors">
+            Volver al Dashboard
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   const fetchExpirationDate = async () => {
     try {
@@ -65,8 +86,9 @@ const SuperuserModule = () => {
   const fetchTables = async () => {
     try {
       const res = await axios.get(`${API_URL}/tables`, { headers });
-      setTables(res.data);
+      setTables(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
+      setTables([]);
       showError('Error cargando tablas');
     }
   };
@@ -75,8 +97,9 @@ const SuperuserModule = () => {
     setOnlineLoading(true);
     try {
       const res = await axios.get(`${API_URL}/online-users`, { headers });
-      setOnlineUsers(res.data.data);
+      setOnlineUsers(Array.isArray(res.data?.data) ? res.data.data : []);
     } catch (err) {
+      setOnlineUsers([]);
       showError('Error cargando usuarios conectados');
     } finally {
       setOnlineLoading(false);
@@ -87,8 +110,9 @@ const SuperuserModule = () => {
     setLogsLoading(true);
     try {
       const res = await axios.get(`${API_URL}/audit-logs`, { headers });
-      setAuditLogs(res.data.data);
+      setAuditLogs(Array.isArray(res.data?.data) ? res.data.data : []);
     } catch (err) {
+      setAuditLogs([]);
       showError('Error cargando bitácora de auditoría');
     } finally {
       setLogsLoading(false);
@@ -116,9 +140,13 @@ const SuperuserModule = () => {
     setLoading(true);
     try {
       const res = await axios.get(`${API_URL}/table/${tableName}`, { headers });
-      setData(res.data);
+      setData({
+        columns: Array.isArray(res.data?.columns) ? res.data.columns : [],
+        rows: Array.isArray(res.data?.rows) ? res.data.rows : []
+      });
       setEditingRow(null);
     } catch (err) {
+      setData({ columns: [], rows: [] });
       showError(`Error cargando tabla ${tableName}`);
     } finally {
       setLoading(false);
