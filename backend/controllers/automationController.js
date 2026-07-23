@@ -1451,62 +1451,6 @@ async function paso7_logout(page, allFramesFn, logs) {
 // ─────────────────────────────────────────────────────────────────
 // EXPORTACIÓN PRINCIPAL
 // ─────────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────
-// EXPORTACIÓN PRINCIPAL
-// ─────────────────────────────────────────────────────────────────
-exports.executeAutomation = async (req, res) => {
-    const { url, username, password, documentId, documentIds } = req.body;
-    const logs = [];
-    let currentStep = 'Iniciando';
-
-    const targetIds = Array.isArray(documentIds)
-        ? documentIds
-        : (documentId ? [documentId] : []);
-
-    let docsToProcess = [];
-    if (targetIds.length > 0) {
-        try {
-            const placeholders = targetIds.map(() => '?').join(',');
-            const q = `
-                SELECT d.*, d.storage_path, e.expediente_code, e.title as expediente_title,
-                       e.metadata_values as expediente_metadata
-                FROM documents d
-                LEFT JOIN expedientes e ON d.expediente_id = e.id
-                WHERE d.id IN (${placeholders})`;
-
-            const rows = await new Promise((resolve, reject) => {
-                db.all(q, targetIds, (err, r) => {
-                    if (err) reject(err); else resolve(r || []);
-                });
-            });
-
-            // Preservar orden original de IDs recibidos
-            docsToProcess = targetIds.map(id => rows.find(r => r.id === id)).filter(Boolean);
-
-            for (const docInfo of docsToProcess) {
-                let meta = {};
-                try { meta = JSON.parse(docInfo.expediente_metadata || '{}'); } catch { }
-                const metaJoined = [1, 2, 3, 4, 5, 6, 7, 8]
-                    .map(i => meta[`valor${i}`] || meta[`Metadato ${i}`])
-                    .filter(Boolean).join('_');
-                docInfo.nombreDocumento = docInfo.expediente_title || metaJoined || docInfo.filename;
-
-                let docMeta = {};
-                try { if (docInfo.metadata_values) docMeta = JSON.parse(docInfo.metadata_values); } catch (e) { }
-                if (docMeta && docMeta.description) {
-                    docInfo.nombreDocumento = `${docInfo.nombreDocumento.trim()} ${docMeta.description.trim()}`;
-                }
-
-                docInfo.joinedName = docInfo.nombreDocumento;
-                docInfo.parsedMeta = meta;
-            }
-
-            logs.push(`[INFO] Lote preparado: ${docsToProcess.length} documento(s) a procesar.`);
-        } catch (e) {
-            logs.push(`[WARN] Error cargando lista de documentos: ${e.message}`);
-        }
-    }
-
 let currentJob = {
     running: false,
     jobId: null,
