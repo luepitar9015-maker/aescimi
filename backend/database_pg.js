@@ -1,19 +1,10 @@
 const { Pool } = require('pg');
 
-// Validate required environment variables
-const requiredEnvVars = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'];
-const missingVars = requiredEnvVars.filter(v => !process.env[v]);
-if (missingVars.length > 0) {
-    console.error(`[FATAL] Missing required environment variables: ${missingVars.join(', ')}`);
-    console.error('[FATAL] Please create a .env file based on .env.example and set these variables.');
-    process.exit(1);
-}
-
 const pool = new Pool({
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_NAME,
-    password: process.env.DB_PASSWORD,
+    user: process.env.DB_USER || 'cimi',
+    host: process.env.DB_HOST || '192.168.8.164',
+    database: process.env.DB_NAME || 'sena_db',
+    password: process.env.DB_PASSWORD || 'Aut0m4t1z4d0r2026%*',
     port: parseInt(process.env.DB_PORT || '5432', 10),
 });
 
