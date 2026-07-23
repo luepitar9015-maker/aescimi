@@ -234,30 +234,44 @@ function CargueAes() {
                 username: settings.ades_username,
                 password: settings.ades_password,
                 documentIds: docIdsToProcess
-            }, { headers: authHeaders, timeout: 600000 });
+            }, { headers: authHeaders });
 
-            setLogs(prev => [...prev, ...(res.data.logs || []), 'Proceso de cargue de lote completado.']);
-            setCurrentStepIndex(automationSteps.length);
-            await fetchPending();
-            setSelectedDocs([]);
+            if (res.data?.logs && res.data.logs.length > 0) {
+                setLogs(res.data.logs);
+            }
+
+            // Iniciar Polling de Estado cada 2 segundos hasta que termine la automatización
+            const pollInterval = setInterval(async () => {
+                try {
+                    const statusRes = await axios.get('/api/automation/status', { headers: authHeaders });
+                    const st = statusRes.data;
+                    if (st.logs && st.logs.length > 0) {
+                        setLogs(st.logs);
+                    }
+                    if (st.error) {
+                        setAutomationError(true);
+                    }
+
+                    if (!st.running) {
+                        clearInterval(pollInterval);
+                        eventSource.close();
+                        setAutomationLoading(false);
+                        if (st.completed) {
+                            setCurrentStepIndex(automationSteps.length);
+                            await fetchPending();
+                            setSelectedDocs([]);
+                        }
+                    }
+                } catch (pollErr) {
+                    console.error("Error al consultar estado de automatización:", pollErr);
+                }
+            }, 2000);
+
         } catch (err) {
             console.error("Automation error:", err);
-            if (err.response && err.response.data && err.response.data.logs) {
-                setLogs(prev => [...prev, ...err.response.data.logs]);
-            }
-            if (err.response?.status === 504) {
-                setLogs(prev => [
-                    ...prev,
-                    '⚠️ El servidor web intermediario respondió 504 Gateway Timeout.',
-                    'ℹ️ La automatización continúa ejecutándose en segundo plano en OnBase. Actualizando lista en unos segundos...'
-                ]);
-                setTimeout(() => fetchPending(), 10000);
-            } else {
-                const errMsg = err.response?.data?.error || err.message || 'El proceso falló. Revise la conexión con OnBase.';
-                setLogs(prev => [...prev, `Error: ${errMsg}`]);
-                setAutomationError(true);
-            }
-        } finally {
+            const errMsg = err.response?.data?.error || err.message || 'El proceso falló. Revise la conexión con OnBase.';
+            setLogs(prev => [...prev, `Error: ${errMsg}`]);
+            setAutomationError(true);
             eventSource.close();
             setAutomationLoading(false);
         }

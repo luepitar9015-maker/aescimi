@@ -10,6 +10,7 @@ const setLongTimeout = (req, res, next) => {
 };
 
 router.post('/execute', requireAuth, requireAdmin, setLongTimeout, automationController.executeAutomation);
+router.get('/status', requireAuth, requireAdmin, automationController.getAutomationStatus);
 router.post('/unity-execute', requireAuth, requireAdmin, setLongTimeout, automationController.executeUnityAutomation);
 router.get('/stream', requireAuth, requireAdmin, automationController.streamAutomation);
 router.post('/diagnostic', requireAuth, requireAdmin, automationController.executeDiagnostic);

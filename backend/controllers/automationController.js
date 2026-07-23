@@ -1507,12 +1507,101 @@ exports.executeAutomation = async (req, res) => {
         }
     }
 
+let currentJob = {
+    running: false,
+    jobId: null,
+    currentStep: '',
+    logs: [],
+    error: null,
+    completed: false,
+    screenshot: null,
+    startTime: null,
+    documentIds: []
+};
+
+exports.getAutomationStatus = async (req, res) => {
+    return res.json({
+        success: true,
+        ...currentJob
+    });
+};
+
+exports.executeAutomation = async (req, res) => {
+    const { url, username, password, documentIds } = req.body || {};
+    const logs = [];
+
     if (!url) return res.status(400).json({ error: 'URL de OnBase requerida' });
     if (!username || !password) return res.status(400).json({ error: 'Credenciales no configuradas' });
 
-    let browser;
+    if (currentJob.running) {
+        return res.json({
+            success: true,
+            jobId: currentJob.jobId,
+            message: 'La automatización ya se encuentra en ejecución.',
+            logs: currentJob.logs
+        });
+    }
 
-    const automationPromise = (async () => {
+    let docsToProcess = [];
+    if (Array.isArray(documentIds) && documentIds.length > 0) {
+        try {
+            const placeholders = documentIds.map(() => '?').join(',');
+            const rows = await new Promise((resolve, reject) => {
+                db.all(`
+                    SELECT d.*, e.expediente_code, e.title as exp_title, e.opening_date, e.subserie, e.metadata_values as exp_meta
+                    FROM documents d
+                    LEFT JOIN expedientes e ON d.expediente_id = e.id
+                    WHERE d.id IN (${placeholders})
+                `, documentIds, (err, rows) => {
+                    if (err) reject(err);
+                    else resolve(rows || []);
+                });
+            });
+
+            docsToProcess = rows.map(r => {
+                let meta = {};
+                try {
+                    meta = typeof r.exp_meta === 'string' ? JSON.parse(r.exp_meta) : (r.exp_meta || {});
+                } catch { }
+                return {
+                    ...r,
+                    joinedName: r.title || r.filename,
+                    parsedMeta: meta
+                };
+            });
+
+            logs.push(`[INFO] Lote preparado: ${docsToProcess.length} documento(s) a procesar.`);
+        } catch (e) {
+            logs.push(`[WARN] Error cargando lista de documentos: ${e.message}`);
+        }
+    }
+
+    const jobId = Date.now().toString();
+    currentJob = {
+        running: true,
+        jobId,
+        currentStep: 'Iniciando automatización',
+        logs,
+        error: null,
+        completed: false,
+        screenshot: null,
+        startTime: new Date().toISOString(),
+        documentIds: documentIds || []
+    };
+
+    automationEmitter.emit('status', currentJob);
+
+    // Responder INMEDIATAMENTE HTTP 200 para evitar 504 Gateway Timeout en Nginx
+    res.json({
+        success: true,
+        jobId,
+        message: 'Automatización iniciada exitosamente en segundo plano.',
+        logs: currentJob.logs
+    });
+
+    // Ejecutar Puppeteer en segundo plano
+    (async () => {
+        let browser;
         try {
             activeBrowser = await puppeteer.launch({
                 headless: process.platform === 'linux' ? true : false,
@@ -1537,8 +1626,8 @@ exports.executeAutomation = async (req, res) => {
             const allFrames = () => page.frames();
 
             // ── PASO 1: LOGIN ÚNICO ──
-            currentStep = 'PASO 1: Login';
-            const loginOk = await paso1_login(page, url, username, password, logs);
+            currentJob.currentStep = 'PASO 1: Login';
+            const loginOk = await paso1_login(page, url, username, password, currentJob.logs);
             if (!loginOk) {
                 const ss = await page.screenshot().catch(() => null);
                 if (activeBrowser) {
@@ -1546,57 +1635,57 @@ exports.executeAutomation = async (req, res) => {
                     activeBrowser = null;
                     activePage = null;
                 }
-                return {
-                    statusCode: 500,
-                    data: {
-                        error: 'Login fallido. Verifique URL, usuario y contraseña en Config. AES.',
-                        logs,
-                        screenshot: ss ? `data:image/png;base64,${ss.toString('base64')}` : null
-                    }
-                };
+                currentJob.running = false;
+                currentJob.completed = true;
+                currentJob.error = 'Login fallido. Verifique URL, usuario y contraseña en Config. AES.';
+                currentJob.screenshot = ss ? `data:image/png;base64,${ss.toString('base64')}` : null;
+                automationEmitter.emit('done', currentJob);
+                return;
             }
 
             // ── PROCESAR LOTE EN LA MISMA SESIÓN ──
             const totalDocs = Math.max(1, docsToProcess.length);
             for (let docIdx = 0; docIdx < totalDocs; docIdx++) {
+                if (!currentJob.running) {
+                    currentJob.logs.push('[INFO] Automatización cancelada por el usuario.');
+                    break;
+                }
+
                 const docInfo = docsToProcess[docIdx] || null;
                 const hasMoreDocs = docIdx < totalDocs - 1;
 
                 if (docInfo) {
-                    logs.push(`\n--------------------------------------------------`);
-                    logs.push(`[LOTE] Documento ${docIdx + 1} de ${totalDocs}: "${docInfo.filename}"`);
-                    logs.push(`--------------------------------------------------`);
+                    currentJob.logs.push(`\n--------------------------------------------------`);
+                    currentJob.logs.push(`[LOTE] Documento ${docIdx + 1} de ${totalDocs}: "${docInfo.filename}"`);
+                    currentJob.logs.push(`--------------------------------------------------`);
                 }
 
                 try {
                     // ── PASO 2 & 3: FORMULARIO SGDEA Y CÓDIGO DE EXPEDIENTE ──
                     if (docIdx === 0) {
-                        // El 1er documento abre el formulario completo en el PASO 2
-                        currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 2: Formulario SGDEA`;
-                        await paso2_abrirFormulario(page, browser, logs);
+                        currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 2: Formulario SGDEA`;
+                        await paso2_abrirFormulario(page, browser, currentJob.logs);
                         await wait(1500);
                     } else {
-                        // A partir del 2do documento en adelante, se inicia la automatización en la Etapa 3
-                        logs.push(`[Doc ${docIdx + 1}/${totalDocs}] ⏩ [ETAPA 3 DIRECTA] Iniciando automatización del documento ${docIdx + 1} de ${totalDocs} directamente en la Etapa 3 (Código de Expediente)...`);
+                        currentJob.logs.push(`[Doc ${docIdx + 1}/${totalDocs}] ⏩ [ETAPA 3 DIRECTA] Iniciando automatización del documento ${docIdx + 1} de ${totalDocs} directamente en la Etapa 3 (Código de Expediente)...`);
                     }
 
                     // ── PASO 3: CÓDIGO DE EXPEDIENTE ──
-                    currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 3: Código de Expediente`;
+                    currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 3: Código de Expediente`;
                     let formPage = page;
                     let formFrame = page.mainFrame();
 
                     if (docInfo?.expediente_code) {
                         let result = await paso3_codigoExpediente(
-                            page, browser, docInfo.expediente_code, logs
+                            page, browser, docInfo.expediente_code, currentJob.logs
                         );
 
-                        // Fallback de seguridad: Si para docIdx > 0 no se detectó el campo, re-ejecutar PASO 2 y reintentar PASO 3
                         if ((!result || !result.success) && docIdx > 0) {
-                            logs.push(`[Doc ${docIdx + 1}/${totalDocs}] [FALLBACK] Campo "Código Expediente" no detectado. Re-ejecutando PASO 2 para asegurar formulario...`);
-                            await paso2_abrirFormulario(page, browser, logs);
+                            currentJob.logs.push(`[Doc ${docIdx + 1}/${totalDocs}] [FALLBACK] Campo "Código Expediente" no detectado. Re-ejecutando PASO 2 para asegurar formulario...`);
+                            await paso2_abrirFormulario(page, browser, currentJob.logs);
                             await wait(1500);
                             result = await paso3_codigoExpediente(
-                                page, browser, docInfo.expediente_code, logs
+                                page, browser, docInfo.expediente_code, currentJob.logs
                             );
                         }
 
@@ -1605,21 +1694,21 @@ exports.executeAutomation = async (req, res) => {
                     }
 
                     // ── PASO 4: LLENAR CAMPOS ──
-                    currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 4: Llenar Campos`;
+                    currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 4: Llenar Campos`;
                     if (docInfo) {
-                        await paso4_llenarCampos(formPage, formFrame, docInfo, logs);
+                        await paso4_llenarCampos(formPage, formFrame, docInfo, currentJob.logs);
                     }
                     await wait(500);
 
                     // ── PASO 5: ADJUNTAR PDF ──
-                    currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 5: Adjuntar PDF`;
+                    currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 5: Adjuntar PDF`;
                     if (docInfo?.path) {
-                        await paso5_adjuntarPDF(page, allFrames, docInfo, logs);
+                        await paso5_adjuntarPDF(page, allFrames, docInfo, currentJob.logs);
                     }
 
                     // ── PASO 6: GUARDAR ──
-                    currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 6: Guardar`;
-                    await paso6_guardar(page, allFrames, logs, hasMoreDocs);
+                    currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 6: Guardar`;
+                    await paso6_guardar(page, allFrames, currentJob.logs, hasMoreDocs);
 
                     // Marcar documento como Cargado en la BD
                     if (docInfo?.id) {
@@ -1630,12 +1719,12 @@ exports.executeAutomation = async (req, res) => {
                                 () => resolve()
                             );
                         });
-                        logs.push(`[INFO] ✅ Documento "${docInfo.filename}" (ID ${docInfo.id}) actualizado a "Cargado" en BD`);
+                        currentJob.logs.push(`[INFO] ✅ Documento "${docInfo.filename}" (ID ${docInfo.id}) actualizado a "Cargado" en BD`);
                     }
 
                 } catch (docErr) {
-                    logs.push(`[ERROR DOC ${docIdx + 1}] Falló el procesamiento de "${docInfo?.filename || 'doc'}": ${docErr.message}`);
-                    await checkAndClearLocks(browser, logs).catch(() => {});
+                    currentJob.logs.push(`[ERROR DOC ${docIdx + 1}] Falló el procesamiento de "${docInfo?.filename || 'doc'}": ${docErr.message}`);
+                    await checkAndClearLocks(browser, currentJob.logs).catch(() => {});
                 }
 
                 if (hasMoreDocs) {
@@ -1644,10 +1733,9 @@ exports.executeAutomation = async (req, res) => {
             }
 
             // ── PASO 7: CERRAR SESIÓN TRAS TERMINAR LOTE ──
-            currentStep = 'PASO 7: Cerrar Sesión final';
-            await paso7_logout(page, allFrames, logs);
+            currentJob.currentStep = 'PASO 7: Cerrar Sesión final';
+            await paso7_logout(page, allFrames, currentJob.logs);
 
-            // Captura final
             const screenshotBuffer = await page.screenshot({ fullPage: false }).catch(() => null);
 
             if (activeBrowser) {
@@ -1656,14 +1744,11 @@ exports.executeAutomation = async (req, res) => {
                 activePage = null;
             }
 
-            return {
-                statusCode: 200,
-                data: {
-                    message: 'Automatización completada exitosamente',
-                    screenshot: screenshotBuffer ? `data:image/png;base64,${screenshotBuffer.toString('base64')}` : null,
-                    logs
-                }
-            };
+            currentJob.running = false;
+            currentJob.completed = true;
+            currentJob.screenshot = screenshotBuffer ? `data:image/png;base64,${screenshotBuffer.toString('base64')}` : null;
+            currentJob.logs.push('Proceso de cargue completado.');
+            automationEmitter.emit('done', currentJob);
 
         } catch (err) {
             if (activeBrowser) {
@@ -1671,33 +1756,13 @@ exports.executeAutomation = async (req, res) => {
                 activeBrowser = null;
                 activePage = null;
             }
-            throw err;
+            currentJob.running = false;
+            currentJob.completed = true;
+            currentJob.error = err.message;
+            currentJob.logs.push(`[ERROR CRÍTICO] ${err.message}`);
+            automationEmitter.emit('done', currentJob);
         }
     })();
-
-    // Timeout global dinámico (mínimo 4 minutos)
-    const totalDocs = Math.max(1, docsToProcess.length);
-    const dynamicTimeoutMs = Math.max(240000, totalDocs * 120000);
-
-    const timeout = new Promise((_, reject) =>
-        setTimeout(() =>
-            reject(new Error(`Timeout global en paso: "${currentStep}". Verifique OnBase.`)),
-            dynamicTimeoutMs
-        )
-    );
-
-    try {
-        const result = await Promise.race([automationPromise, timeout]);
-        try { fs.writeFileSync(path.join(__dirname, '../automation_run.log'), JSON.stringify(logs, null, 2), 'utf-8'); } catch(e) {}
-        console.log("[AUTOMATION-LOGS] Completed:", JSON.stringify(logs, null, 2));
-        if (result.statusCode === 500) return res.status(500).json(result.data);
-        return res.json(result.data);
-    } catch (error) {
-        logs.push(`[ERROR CRÍTICO] ${error.message}`);
-        try { fs.writeFileSync(path.join(__dirname, '../automation_run.log'), JSON.stringify(logs, null, 2), 'utf-8'); } catch(e) {}
-        console.log("[AUTOMATION-LOGS] Failed:", JSON.stringify(logs, null, 2));
-        return res.status(500).json({ error: error.message, logs });
-    }
 };
 
 // ─────────────────────────────────────────────────────────────────

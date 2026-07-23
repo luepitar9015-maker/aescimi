@@ -182,17 +182,34 @@ function Automation() {
         };
 
         try {
+            const token = localStorage.getItem('token');
+            const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
             const res = await axios.post('/api/automation/execute', { 
                 url, username, password
-            });
-            setLogs(prev => [...prev, ...res.data.logs, 'Automatización Web completada.']);
-            setScreenshot(res.data.screenshot);
+            }, { headers: authHeaders });
+
+            if (res.data?.logs) setLogs(res.data.logs);
+
+            const pollInterval = setInterval(async () => {
+                try {
+                    const statusRes = await axios.get('/api/automation/status', { headers: authHeaders });
+                    const st = statusRes.data;
+                    if (st.logs) setLogs(st.logs);
+                    if (st.screenshot) setScreenshot(st.screenshot);
+                    if (st.error) setError(st.error);
+
+                    if (!st.running) {
+                        clearInterval(pollInterval);
+                        eventSource.close();
+                        setLoading(false);
+                    }
+                } catch (e) {}
+            }, 2000);
         } catch (err) {
             setError(err.response?.data?.error || 'Error en automatización Web');
             setLogs(prev => [...prev, 'Error: Fallo en la automatización.']);
-        } finally {
-            setLoading(false);
             eventSource.close();
+            setLoading(false);
         }
     };
 
