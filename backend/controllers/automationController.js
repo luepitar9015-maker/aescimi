@@ -1715,12 +1715,37 @@ exports.executeAutomation = async (req, res) => {
 exports.streamAutomation = (req, res) => {
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive'
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
+        'Content-Encoding': 'none'
     });
-    const sendFrame = data => res.write(`data: ${data}\n\n`);
+    if (typeof res.flushHeaders === 'function') {
+        res.flushHeaders();
+    }
+
+    res.write(': sse connected\n\n');
+
+    const heartbeat = setInterval(() => {
+        try {
+            res.write(': heartbeat\n\n');
+        } catch (e) {
+            clearInterval(heartbeat);
+        }
+    }, 4000);
+
+    const sendFrame = data => {
+        try {
+            res.write(`data: ${data}\n\n`);
+        } catch (e) { }
+    };
+
     automationEmitter.on('frame', sendFrame);
-    req.on('close', () => automationEmitter.removeListener('frame', sendFrame));
+
+    req.on('close', () => {
+        clearInterval(heartbeat);
+        automationEmitter.removeListener('frame', sendFrame);
+    });
 };
 
 // ─────────────────────────────────────────────────────────────────
