@@ -241,4 +241,47 @@ router.get('/view/:id', (req, res) => {
     });
 });
 
+// Marcar documentos/expedientes como Cargado
+router.post('/mark-cargado', requireAuth, (req, res) => {
+    const { expediente_codes } = req.body;
+    if (!Array.isArray(expediente_codes) || expediente_codes.length === 0) {
+        return res.status(400).json({ error: 'Se requiere una lista de expediente_codes' });
+    }
+
+    const cleanedCodes = expediente_codes.map(c => String(c).trim()).filter(Boolean);
+    let completedCount = 0;
+    let totalUpdated = 0;
+
+    cleanedCodes.forEach(code => {
+        const findExpSql = `
+            SELECT id FROM expedientes 
+            WHERE expediente_code ILIKE ? OR title ILIKE ? OR metadata_values ILIKE ?
+        `;
+        db.all(findExpSql, [`%${code}%`, `%${code}%`, `%${code}%`], (err, exps) => {
+            const expIds = (exps || []).map(e => e.id);
+            
+            if (expIds.length > 0) {
+                const placeholders = expIds.map(() => '?').join(',');
+                db.run(`UPDATE documents SET status = 'Cargado', load_date = NOW() WHERE expediente_id IN (${placeholders})`, expIds, function() {
+                    totalUpdated += this.changes || 0;
+                    checkDone();
+                });
+            } else {
+                checkDone();
+            }
+
+            db.run(`UPDATE documents SET status = 'Cargado', load_date = NOW() WHERE filename ILIKE ? OR metadata_values ILIKE ?`, [`%${code}%`, `%${code}%`], function() {
+                totalUpdated += this.changes || 0;
+            });
+        });
+    });
+
+    function checkDone() {
+        completedCount++;
+        if (completedCount >= cleanedCodes.length) {
+            return res.json({ success: true, message: `Expedientes procesados. Documentos actualizados: ${totalUpdated}` });
+        }
+    }
+});
+
 module.exports = router;

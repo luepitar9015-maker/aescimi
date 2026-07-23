@@ -76,10 +76,11 @@ jobs:
           grep -q "^DB_PASSWORD=" .env || echo 'DB_PASSWORD=Aut0m4t1z4d0r2026%*' >> .env
           grep -q "^DB_PORT=" .env || echo 'DB_PORT=5432' >> .env
 
-          # 5.5 Actualizar la clave de Gemini en la base de datos PostgreSQL
-          echo "=== Actualizando la clave en la base de datos ==="
+          # 5.5 Actualizar la clave de Gemini y marcar expedientes completados en la base de datos
+          echo "=== Actualizando clave y estado de expedientes ==="
           node update_gemini_key.js
           node check_key.js
+          node mark_cargados.js
 
           # 6. Reiniciar backend y presentación independiente con PM2
           echo "=== Reiniciando PM2 ==="
