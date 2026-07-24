@@ -451,24 +451,13 @@ app.get('/diapositivas.html', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/public/diapositivas.html'));
 });
 
-// Servir assets compilados con cabeceras estrictas y sin fallback a index.html (evita error MIME text/html)
-const assetsPath = path.resolve(__dirname, '../frontend/dist/assets');
-app.use('/assets', express.static(assetsPath, {
-    maxAge: '1d'
-}), (err, req, res, next) => {
-    console.error(`[STATIC ASSET ERROR] ${req.path}:`, err ? err.message : 'Unknown error');
-    res.status(404).send('Asset not found');
-});
+// Configurar servidor para servir el Frontend compilado en Producción desde frontend/dist
+const distPath = path.resolve(__dirname, '../frontend/dist');
 
-// Si un asset específico no existe en el servidor, responder 404 (NUNCA devolver index.html para CSS/JS)
-app.use('/assets', (req, res) => {
-    res.status(404).send('Asset non-existent');
-});
-
-// Servir archivos de la raíz del frontend compilado deshabilitando caché en index.html
-app.use(express.static(path.join(__dirname, '../frontend/dist'), {
+app.use(express.static(distPath, {
+    maxAge: '1d',
     setHeaders: (res, filePath) => {
-        if (filePath.endsWith('index.html')) {
+        if (filePath.endsWith('.html')) {
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
             res.setHeader('Pragma', 'no-cache');
             res.setHeader('Expires', '0');
@@ -476,15 +465,15 @@ app.use(express.static(path.join(__dirname, '../frontend/dist'), {
     }
 }));
 
-// Redirigir cualquier otra petición de navegación al index.html de React sin caché
+// Redirigir cualquier otra petición de navegación (SPA) al index.html de React sin caché
 app.use((req, res, next) => {
-    if (req.path.startsWith('/api') || req.path.startsWith('/assets')) {
+    if (req.path.startsWith('/api')) {
         return next();
     }
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    res.sendFile(path.join(__dirname, '../frontend/dist', 'index.html'));
+    res.sendFile(path.join(distPath, 'index.html'));
 });
 
 // ══════════════════════════════════════════════════════════════
