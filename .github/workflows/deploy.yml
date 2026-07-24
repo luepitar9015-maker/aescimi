@@ -87,6 +87,14 @@ jobs:
           echo "Aut0m4t1z4d0r2026%*" | sudo -S chown -R cimi:cimi /home/cimi/aescimi
           echo "Aut0m4t1z4d0r2026%*" | sudo -S chmod -R 755 /home/cimi/aescimi/frontend/dist
 
+          # 5.7 Copiar frontend dist a todas las rutas estáticas habituales de Nginx como garantía total
+          echo "=== Copiando Frontend a directorios raíz globales de Nginx ==="
+          echo "Aut0m4t1z4d0r2026%*" | sudo -S mkdir -p /var/www/html/assets /usr/share/nginx/html/assets /var/www/aescimi/assets
+          echo "Aut0m4t1z4d0r2026%*" | sudo -S cp -rf /home/cimi/aescimi/frontend/dist/* /var/www/html/ 2>/dev/null || true
+          echo "Aut0m4t1z4d0r2026%*" | sudo -S cp -rf /home/cimi/aescimi/frontend/dist/* /usr/share/nginx/html/ 2>/dev/null || true
+          echo "Aut0m4t1z4d0r2026%*" | sudo -S cp -rf /home/cimi/aescimi/frontend/dist/* /var/www/aescimi/ 2>/dev/null || true
+          echo "Aut0m4t1z4d0r2026%*" | sudo -S chmod -R 755 /var/www/html /usr/share/nginx/html /var/www/aescimi 2>/dev/null || true
+
           # 6. Reiniciar backend y presentación independiente con PM2
           echo "=== Reiniciando PM2 ==="
           cd ~/aescimi
