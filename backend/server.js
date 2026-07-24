@@ -5,6 +5,32 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('[SERVER CRASH GUARD] Unhandled Rejection:', reason);
 });
 
+// Auto-cleanup leftover Puppeteer profiles on startup
+try {
+    if (process.platform === 'linux') {
+        const { execSync } = require('child_process');
+        execSync('rm -rf /tmp/puppeteer_dev_chrome_profile-* /tmp/.org.chromium.Chromium.* 2>/dev/null');
+        console.log('[STARTUP CLEANUP] Deleted old Puppeteer profile folders in /tmp');
+    }
+} catch (e) {
+    console.error('[STARTUP CLEANUP] Failed to cleanup old Puppeteer profiles:', e.message);
+}
+
+// Clean on graceful exit
+const cleanExit = () => {
+    try {
+        if (process.platform === 'linux') {
+            const { execSync } = require('child_process');
+            execSync('rm -rf /tmp/puppeteer_dev_chrome_profile-* /tmp/.org.chromium.Chromium.* 2>/dev/null');
+            console.log('[EXIT CLEANUP] Cleaned Puppeteer profiles.');
+        }
+    } catch (e) {}
+    process.exit(0);
+};
+process.on('SIGINT', cleanExit);
+process.on('SIGTERM', cleanExit);
+
+
 const express = require('express');
 const multer = require('multer');
 const xlsx = require('xlsx');
