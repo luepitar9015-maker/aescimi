@@ -408,7 +408,14 @@ const SuperuserModule = () => {
                             <td className="px-4 py-3 max-w-[280px]">
                               {log.details ? (
                                 <pre className="text-[10px] bg-gray-50 p-2 rounded max-h-[80px] overflow-y-auto overflow-x-auto font-mono text-gray-600 border border-gray-100">
-                                  {JSON.stringify(typeof log.details === 'string' ? JSON.parse(log.details) : log.details, null, 2)}
+                                  {(() => {
+                                    if (typeof log.details !== 'string') return JSON.stringify(log.details, null, 2);
+                                    try {
+                                      return JSON.stringify(JSON.parse(log.details), null, 2);
+                                    } catch (e) {
+                                      return log.details;
+                                    }
+                                  })()}
                                 </pre>
                               ) : (
                                 <span className="text-gray-400 text-xs italic">Sin detalles</span>
