@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { requireAuth, requireAdmin } = require('../middleware/authMiddleware');
 
-const SECRET_KEY = process.env.JWT_SECRET;
+const SECRET_KEY = process.env.JWT_SECRET || 'Aut0m4t1z4d0r2026%*SecretKeySuperSeguraSena2026!#';
 
 const { logActivity } = require('../middleware/auditMiddleware');
 
@@ -13,42 +13,40 @@ const { logActivity } = require('../middleware/auditMiddleware');
 router.post('/login', (req, res) => {
     const { document_no, password } = req.body;
     console.log(`[AUTH] Login attempt for doc: ${document_no}`);
-    require('fs').appendFileSync('login_debug.txt', `[AUTH] Recv doc: "${document_no}", pass: "${password}", length: ${password?.length}\n`);
 
     const cleanDoc = String(document_no || '').trim();
 
     db.get("SELECT * FROM users WHERE document_no::text = ?", [cleanDoc], (err, user) => {
         if (err) {
             console.error('[AUTH] DB Error:', err);
-            return res.status(500).json({ error: `Database error: ${err.message}` });
+            return res.status(500).json({ error: `Error de base de datos: ${err.message}` });
         }
         if (!user) {
             console.warn('[AUTH] User not found');
-            logActivity(null, 'Invitado', 'anonimo', 'LOGIN_FALLIDO_USUARIO_INEXISTENTE', `Intento de login con documento: ${document_no}`, req.ip);
+            try { logActivity(null, 'Invitado', 'anonimo', 'LOGIN_FALLIDO_USUARIO_INEXISTENTE', `Intento de login con documento: ${document_no}`, req.ip); } catch (e) {}
             return res.status(401).json({ error: 'Usuario no encontrado' });
         }
 
-        if (user.is_active === 0) {
+        if (user.is_active === 0 || user.is_active === false || user.is_active === '0') {
             console.warn('[AUTH] User suspended');
-            logActivity(user.id, user.full_name, user.role, 'LOGIN_FALLIDO_CUENTA_SUSPENDIDA', `Cuenta suspendida intentó ingresar: ${user.full_name}`, req.ip);
+            try { logActivity(user.id, user.full_name, user.role, 'LOGIN_FALLIDO_CUENTA_SUSPENDIDA', `Cuenta suspendida intentó ingresar: ${user.full_name}`, req.ip); } catch (e) {}
             return res.status(401).json({ error: 'Su cuenta ha sido suspendida. Contacte al administrador.' });
         }
 
         console.log(`[AUTH] User found: ${user.full_name}, checking password...`);
         const validPassword = bcrypt.compareSync(password, user.password_hash);
-        require('fs').appendFileSync('login_debug.txt', `[AUTH] validPassword=${validPassword}, hash=${user.password_hash}\n`);
         if (!validPassword) {
             console.warn('[AUTH] Invalid password');
-            logActivity(user.id, user.full_name, user.role, 'LOGIN_FALLIDO_CONTRASENA_INCORRECTA', `Contraseña incorrecta para: ${user.full_name}`, req.ip);
+            try { logActivity(user.id, user.full_name, user.role, 'LOGIN_FALLIDO_CONTRASENA_INCORRECTA', `Contraseña incorrecta para: ${user.full_name}`, req.ip); } catch (e) {}
             return res.status(401).json({ error: 'Contraseña incorrecta' });
         }
 
         console.log('[AUTH] Login successful');
         const token = jwt.sign({ id: user.id, role: user.role, name: user.full_name }, SECRET_KEY, { expiresIn: '8h' });
 
-        logActivity(user.id, user.full_name, user.role, 'LOGIN_EXITOSO', `Inicio de sesión exitoso`, req.ip);
+        try { logActivity(user.id, user.full_name, user.role, 'LOGIN_EXITOSO', `Inicio de sesión exitoso`, req.ip); } catch (e) {}
 
-        res.json({ token, user: { id: user.id, name: user.full_name, role: user.role, mustChangePassword: user.must_change_password === 1 } });
+        res.json({ token, user: { id: user.id, name: user.full_name, role: user.role, mustChangePassword: user.must_change_password === 1 || user.must_change_password === true } });
     });
 });
 
