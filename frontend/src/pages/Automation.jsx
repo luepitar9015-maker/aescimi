@@ -186,7 +186,7 @@ function Automation() {
                     const statusRes = await axios.get('/api/automation/status', { headers: authHeaders });
                     const st = statusRes.data;
                     if (st.logs) setLogs(st.logs);
-                    if (st.hasFrame) setLiveFrame(`/api/automation/frame?t=${Date.now()}`);
+                    if (st.hasFrame) setLiveFrame(`/api/automation/frame?t=${Date.now()}&token=${token}`);
                     if (st.screenshot) setScreenshot(st.screenshot);
                     if (st.error) setError(st.error);
 

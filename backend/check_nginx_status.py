@@ -1,0 +1,35 @@
+import paramiko
+import sys
+import io
+
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+
+def check_nginx():
+    ip = "192.168.8.164"
+    username = "cimi"
+    password = "Automatizador2026*"
+    
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    
+    try:
+        ssh.connect(ip, username=username, password=password, timeout=10)
+    except Exception as e:
+        print(f"Error: {e}")
+        return
+
+    print("===== NGINX SYSTEMD STATUS =====")
+    stdin, stdout, stderr = ssh.exec_command(f"echo '{password}' | sudo -S systemctl status nginx")
+    print(stdout.read().decode('utf-8', errors='replace'))
+    err = stderr.read().decode('utf-8', errors='replace')
+    if err:
+        print("Stderr:", err)
+
+    print("===== RUNNING PROCESSES FOR NGINX =====")
+    stdin, stdout, stderr = ssh.exec_command("ps aux | grep nginx")
+    print(stdout.read().decode('utf-8', errors='replace'))
+
+    ssh.close()
+
+if __name__ == "__main__":
+    check_nginx()

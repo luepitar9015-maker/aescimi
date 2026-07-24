@@ -240,7 +240,8 @@ function CargueAes() {
                         setLogs(st.logs);
                     }
                     if (st.hasFrame) {
-                        setLiveFrame(`/api/automation/frame?t=${Date.now()}`);
+                        const token = localStorage.getItem('token');
+                        setLiveFrame(`/api/automation/frame?t=${Date.now()}&token=${token}`);
                     }
                     if (st.error) {
                         setAutomationError(true);
