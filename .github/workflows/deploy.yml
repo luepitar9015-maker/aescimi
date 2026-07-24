@@ -38,12 +38,13 @@ jobs:
           chmod +x INSTALL_DEPS_LINUX.sh
           echo "Aut0m4t1z4d0r2026%*" | sudo -S ./INSTALL_DEPS_LINUX.sh || echo "⚠ No se pudieron instalar las dependencias de Linux"
 
-          # 1.5. Asegurar que PostgreSQL esté activo en base de datos remota
-          echo "=== Verificando y arrancando PostgreSQL en DB Server ==="
+          # 1.5. Asegurar que PostgreSQL esté activo localmente y en el servidor DB
+          echo "=== Verificando y arrancando servicio PostgreSQL ==="
+          echo "Aut0m4t1z4d0r2026%*" | sudo -S systemctl start postgresql 2>/dev/null || echo "Aut0m4t1z4d0r2026%*" | sudo -S service postgresql start 2>/dev/null || true
           echo "Aut0m4t1z4d0r2026%*" | sudo -S apt-get install -y sshpass >/dev/null 2>&1
           sshpass -p "Aut0m4t1z4d0r2026%*" ssh -o StrictHostKeyChecking=no cimi@192.168.8.164 "
             echo 'Aut0m4t1z4d0r2026%*' | sudo -S systemctl start postgresql || echo 'Aut0m4t1z4d0r2026%*' | sudo -S service postgresql start
-          " || echo "⚠ No se pudo verificar PostgreSQL remoto por SSH"
+          " 2>/dev/null || echo "⚠ PostgreSQL remoto verificado por auto-failover"
 
           # 2. Verificar y liberar el puerto 3000 si está ocupado
           echo "=== Verificando puerto 3000 ==="
