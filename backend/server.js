@@ -452,9 +452,13 @@ app.get('/diapositivas.html', (req, res) => {
 });
 
 // Servir assets compilados con cabeceras estrictas y sin fallback a index.html (evita error MIME text/html)
-app.use('/assets', express.static(path.join(__dirname, '../frontend/dist/assets'), {
+const assetsPath = path.resolve(__dirname, '../frontend/dist/assets');
+app.use('/assets', express.static(assetsPath, {
     maxAge: '1d'
-}));
+}), (err, req, res, next) => {
+    console.error(`[STATIC ASSET ERROR] ${req.path}:`, err ? err.message : 'Unknown error');
+    res.status(404).send('Asset not found');
+});
 
 // Si un asset específico no existe en el servidor, responder 404 (NUNCA devolver index.html para CSS/JS)
 app.use('/assets', (req, res) => {

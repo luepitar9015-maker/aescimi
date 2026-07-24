@@ -82,6 +82,11 @@ jobs:
           node check_key.js
           node mark_cargados.js
 
+          # 5.6 Asegurar permisos completos de lectura para cimi en frontend/dist
+          echo "=== Corrigiendo permisos de lectura en dist ==="
+          echo "Aut0m4t1z4d0r2026%*" | sudo -S chown -R cimi:cimi /home/cimi/aescimi
+          echo "Aut0m4t1z4d0r2026%*" | sudo -S chmod -R 755 /home/cimi/aescimi/frontend/dist
+
           # 6. Reiniciar backend y presentación independiente con PM2
           echo "=== Reiniciando PM2 ==="
           cd ~/aescimi
