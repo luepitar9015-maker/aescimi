@@ -161,12 +161,21 @@ async function paso1_login(page, url, username, password, logs) {
     await wait(3000);
 
     // Detectar si estamos en Microsoft SSO
-    const isMicrosoftSSO = await page.evaluate(() => {
-        return window.location.href.includes('microsoftonline.com') || 
-               document.title.includes('Iniciar sesión') || 
-               document.title.includes('Sign in') || 
-               !!document.querySelector('input[name="loginfmt"]');
-    });
+    let isMicrosoftSSO = false;
+    for (let i = 0; i < 5; i++) {
+        try {
+            isMicrosoftSSO = page.url().includes('microsoftonline.com') || await page.evaluate(() => {
+                return window.location.href.includes('microsoftonline.com') || 
+                       document.title.includes('Iniciar sesión') || 
+                       document.title.includes('Sign in') || 
+                       !!document.querySelector('input[name="loginfmt"]');
+            });
+            break;
+        } catch (e) {
+            logs.push(`[PASO 1][WARN] Esperando estabilidad de la página para SSO (intento ${i+1}): ${e.message}`);
+            await wait(2000);
+        }
+    }
 
     if (isMicrosoftSSO) {
         logs.push('[PASO 1] Detectado inicio de sesión de Microsoft (SSO)');
@@ -220,12 +229,21 @@ async function paso1_login(page, url, username, password, logs) {
         await wait(5000);
         
         // 3. Comprobar si hay pantalla "¿Quiere mantener la sesión iniciada?"
-        const staySignedIn = await page.evaluate(() => {
-            const hasStayText = document.body.innerText.includes('mantener la sesión') || 
-                                document.body.innerText.includes('Stay signed in');
-            const hasNoBtn = !!document.querySelector('#idBtn_Back');
-            return hasStayText && hasNoBtn;
-        });
+        let staySignedIn = false;
+        for (let i = 0; i < 5; i++) {
+            try {
+                staySignedIn = await page.evaluate(() => {
+                    const hasStayText = document.body ? (document.body.innerText.includes('mantener la sesión') || 
+                                        document.body.innerText.includes('Stay signed in')) : false;
+                    const hasNoBtn = !!document.querySelector('#idBtn_Back');
+                    return hasStayText && hasNoBtn;
+                });
+                break;
+            } catch (e) {
+                logs.push(`[PASO 1][WARN] Esperando estabilidad de la página para mantener sesión (intento ${i+1}): ${e.message}`);
+                await wait(2000);
+            }
+        }
         
         if (staySignedIn) {
             logs.push('[PASO 1] Detectada pantalla "Mantener sesión iniciada". Clic en "No"...');
