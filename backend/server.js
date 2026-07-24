@@ -44,14 +44,7 @@ const allowedOrigins = [
 ].filter(Boolean);
 
 app.use(cors({
-    origin: (origin, callback) => {
-        // Allow requests with no origin (e.g., mobile apps, curl, same-server)
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.some(pattern => pattern.test(origin))) {
-            return callback(null, true);
-        }
-        callback(new Error(`CORS: Origin '${origin}' is not allowed.`));
-    },
+    origin: true,
     credentials: true
 }));
 
