@@ -451,14 +451,35 @@ app.get('/diapositivas.html', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/public/diapositivas.html'));
 });
 
-// Configurar servidor para servir el Frontend compilado en Producción
-app.use(express.static(path.join(__dirname, '../frontend/dist')));
+// Servir assets compilados con cabeceras estrictas y sin fallback a index.html (evita error MIME text/html)
+app.use('/assets', express.static(path.join(__dirname, '../frontend/dist/assets'), {
+    maxAge: '1d'
+}));
 
-// Redirigir cualquier otra petición (que no sea API) al index.html de React
+// Si un asset específico no existe en el servidor, responder 404 (NUNCA devolver index.html para CSS/JS)
+app.use('/assets', (req, res) => {
+    res.status(404).send('Asset non-existent');
+});
+
+// Servir archivos de la raíz del frontend compilado deshabilitando caché en index.html
+app.use(express.static(path.join(__dirname, '../frontend/dist'), {
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('index.html')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+        }
+    }
+}));
+
+// Redirigir cualquier otra petición de navegación al index.html de React sin caché
 app.use((req, res, next) => {
-    if (req.path.startsWith('/api')) {
+    if (req.path.startsWith('/api') || req.path.startsWith('/assets')) {
         return next();
     }
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.sendFile(path.join(__dirname, '../frontend/dist', 'index.html'));
 });
 
