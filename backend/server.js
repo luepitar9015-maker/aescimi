@@ -1,4 +1,9 @@
-require('dotenv').config();
+process.on('uncaughtException', (err) => {
+    console.error('[SERVER CRASH GUARD] Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('[SERVER CRASH GUARD] Unhandled Rejection:', reason);
+});
 
 const express = require('express');
 const multer = require('multer');

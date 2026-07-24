@@ -239,8 +239,8 @@ function CargueAes() {
                     if (st.logs && st.logs.length > 0) {
                         setLogs(st.logs);
                     }
-                    if (st.liveFrame) {
-                        setLiveFrame(`data:image/jpeg;base64,${st.liveFrame}`);
+                    if (st.hasFrame) {
+                        setLiveFrame(`/api/automation/frame?t=${Date.now()}`);
                     }
                     if (st.error) {
                         setAutomationError(true);

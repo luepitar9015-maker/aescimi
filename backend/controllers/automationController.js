@@ -1464,10 +1464,39 @@ let currentJob = {
 };
 
 exports.getAutomationStatus = async (req, res) => {
-    return res.json({
-        success: true,
-        ...currentJob
-    });
+    try {
+        return res.json({
+            success: true,
+            running: currentJob.running,
+            jobId: currentJob.jobId,
+            currentStep: currentJob.currentStep,
+            logs: (currentJob.logs || []).slice(-100),
+            error: currentJob.error,
+            completed: currentJob.completed,
+            hasFrame: !!(currentJob.liveFrame || currentJob.screenshot)
+        });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+};
+
+exports.getAutomationFrame = async (req, res) => {
+    try {
+        const rawB64 = currentJob.liveFrame || currentJob.screenshot;
+        if (!rawB64) {
+            return res.status(404).send('No frame');
+        }
+        const b64Data = rawB64.replace(/^data:image\/\w+;base64,/, '');
+        const imgBuffer = Buffer.from(b64Data, 'base64');
+        res.writeHead(200, {
+            'Content-Type': 'image/jpeg',
+            'Content-Length': imgBuffer.length,
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+        });
+        return res.end(imgBuffer);
+    } catch (err) {
+        return res.status(500).send(err.message);
+    }
 };
 
 exports.executeAutomation = async (req, res) => {
