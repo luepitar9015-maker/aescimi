@@ -172,15 +172,6 @@ function Automation() {
         setScreenshot(null);
         setLiveFrame(null);
 
-        // --- START LIVE VIDEO STREAM ---
-        const eventSource = new EventSource('/api/automation/stream');
-        eventSource.onmessage = (event) => {
-            setLiveFrame(`data:image/jpeg;base64,${event.data}`);
-        };
-        eventSource.onerror = () => {
-            eventSource.close();
-        };
-
         try {
             const token = localStorage.getItem('token');
             const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
@@ -195,20 +186,19 @@ function Automation() {
                     const statusRes = await axios.get('/api/automation/status', { headers: authHeaders });
                     const st = statusRes.data;
                     if (st.logs) setLogs(st.logs);
+                    if (st.liveFrame) setLiveFrame(`data:image/jpeg;base64,${st.liveFrame}`);
                     if (st.screenshot) setScreenshot(st.screenshot);
                     if (st.error) setError(st.error);
 
                     if (!st.running) {
                         clearInterval(pollInterval);
-                        eventSource.close();
                         setLoading(false);
                     }
                 } catch (e) {}
-            }, 2000);
+            }, 1500);
         } catch (err) {
             setError(err.response?.data?.error || 'Error en automatización Web');
             setLogs(prev => [...prev, 'Error: Fallo en la automatización.']);
-            eventSource.close();
             setLoading(false);
         }
     };

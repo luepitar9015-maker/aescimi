@@ -219,15 +219,6 @@ function CargueAes() {
         setCurrentStepIndex(0);
         setAutomationError(false);
 
-        // START LIVE STREAM
-        const eventSource = new EventSource(`/api/automation/stream?token=${encodeURIComponent(token || '')}`);
-        eventSource.onmessage = (event) => {
-            setLiveFrame(`data:image/jpeg;base64,${event.data}`);
-        };
-        eventSource.onerror = () => {
-            eventSource.close();
-        };
-
         try {
             const res = await axios.post('/api/automation/execute', {
                 url: settings.ades_url,
@@ -240,7 +231,7 @@ function CargueAes() {
                 setLogs(res.data.logs);
             }
 
-            // Iniciar Polling de Estado cada 2 segundos hasta que termine la automatización
+            // Iniciar Polling de Estado cada 1.5 segundos hasta que termine la automatización
             const pollInterval = setInterval(async () => {
                 try {
                     const statusRes = await axios.get('/api/automation/status', { headers: authHeaders });
@@ -257,7 +248,6 @@ function CargueAes() {
 
                     if (!st.running) {
                         clearInterval(pollInterval);
-                        eventSource.close();
                         setAutomationLoading(false);
                         if (st.completed) {
                             setCurrentStepIndex(automationSteps.length);
@@ -268,14 +258,13 @@ function CargueAes() {
                 } catch (pollErr) {
                     console.error("Error al consultar estado de automatización:", pollErr);
                 }
-            }, 2000);
+            }, 1500);
 
         } catch (err) {
             console.error("Automation error:", err);
             const errMsg = err.response?.data?.error || err.message || 'El proceso falló. Revise la conexión con OnBase.';
             setLogs(prev => [...prev, `Error: ${errMsg}`]);
             setAutomationError(true);
-            eventSource.close();
             setAutomationLoading(false);
         }
     };
