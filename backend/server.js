@@ -491,8 +491,8 @@ function bindServer(initialPort) {
         srv.keepAliveTimeout = 600000;
 
         srv.on('error', (err) => {
-            if (err.code === 'EADDRINUSE') {
-                console.warn(`[SERVER WARN] Puerto ${currentPort} ocupado. Intentando siguiente puerto...`);
+            if (err.code === 'EADDRINUSE' || err.code === 'EACCES') {
+                console.warn(`[SERVER WARN] Puerto ${currentPort} no disponible (${err.code}). Intentando siguiente puerto...`);
                 tryNextPort();
             } else {
                 console.error(`[SERVER ERROR] Error en puerto ${currentPort}:`, err.message);
