@@ -1538,7 +1538,7 @@ exports.executeAutomation = async (req, res) => {
                 } catch { }
                 return {
                     ...r,
-                    joinedName: r.title || r.filename,
+                    joinedName: r.exp_title || r.filename,
                     parsedMeta: meta
                 };
             });
