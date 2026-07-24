@@ -471,16 +471,42 @@ app.use((req, res, next) => {
 
 // ══════════════════════════════════════════════════════════════
 // HTTP únicamente — SSL/TLS es responsabilidad del proxy Nginx.
-// NO se usan certificados autofirmados ni Let's Encrypt aquí.
-// Nginx recibe en 80/443 y reenvía a este proceso por HTTP.
 // ══════════════════════════════════════════════════════════════
 const http = require('http');
-const server = http.createServer(app);
-server.setTimeout(600000); // 10 minutos para automatizaciones largas
-server.headersTimeout = 600000;
-server.keepAliveTimeout = 600000;
-server.listen(port, '0.0.0.0', () => {
-    console.log(`[SERVER] ✅ HTTP escuchando en http://0.0.0.0:${port}`);
-    console.log(`[SERVER] 🔀 Proxy inverso Nginx maneja HTTPS externamente.`);
-});
+
+function bindServer(initialPort) {
+    const portsToTry = [parseInt(initialPort, 10), 80, 3001, 3000].filter((p, i, self) => p && self.indexOf(p) === i);
+    let portIndex = 0;
+
+    function tryNextPort() {
+        if (portIndex >= portsToTry.length) {
+            console.error('[SERVER CRITICAL] No se pudo vincular el servidor a ningún puerto.');
+            return;
+        }
+
+        const currentPort = portsToTry[portIndex++];
+        const srv = http.createServer(app);
+        srv.setTimeout(600000);
+        srv.headersTimeout = 600000;
+        srv.keepAliveTimeout = 600000;
+
+        srv.on('error', (err) => {
+            if (err.code === 'EADDRINUSE') {
+                console.warn(`[SERVER WARN] Puerto ${currentPort} ocupado. Intentando siguiente puerto...`);
+                tryNextPort();
+            } else {
+                console.error(`[SERVER ERROR] Error en puerto ${currentPort}:`, err.message);
+            }
+        });
+
+        srv.listen(currentPort, '0.0.0.0', () => {
+            console.log(`[SERVER] ✅ HTTP escuchando exitosamente en http://0.0.0.0:${currentPort}`);
+            console.log(`[SERVER] 🔀 Proxy inverso OpenResty/Nginx listo.`);
+        });
+    }
+
+    tryNextPort();
+}
+
+bindServer(port);
 

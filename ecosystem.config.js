@@ -13,7 +13,7 @@ module.exports = {
       watch: false,
       env: {
         NODE_ENV: "production",
-        PORT: 3000,           // Puerto upstream interno que Nginx usa como destino (evita conflicto con puerto 80)
+        PORT: 80,            // Puerto upstream que OpenResty / NPM usa como destino
         BEHIND_PROXY: "true" // Corre detrás de proxy reverso (NPM)
       }
     },
