@@ -470,43 +470,30 @@ app.use((req, res, next) => {
 });
 
 // ══════════════════════════════════════════════════════════════
-// HTTP únicamente — SSL/TLS es responsabilidad del proxy Nginx.
+// HTTP únicamente — SSL/TLS es responsabilidad del proxy Nginx/OpenResty.
 // ══════════════════════════════════════════════════════════════
 const http = require('http');
 
-function bindServer(initialPort) {
-    const portsToTry = [parseInt(initialPort, 10), 80, 3001, 3000].filter((p, i, self) => p && self.indexOf(p) === i);
-    let portIndex = 0;
+function startServer(targetPort, retries = 5) {
+    const srv = http.createServer(app);
+    srv.setTimeout(600000);
+    srv.headersTimeout = 600000;
+    srv.keepAliveTimeout = 600000;
 
-    function tryNextPort() {
-        if (portIndex >= portsToTry.length) {
-            console.error('[SERVER CRITICAL] No se pudo vincular el servidor a ningún puerto.');
-            return;
+    srv.on('error', (err) => {
+        if (err.code === 'EADDRINUSE' && retries > 0) {
+            console.warn(`[SERVER WARN] Puerto ${targetPort} en uso. Reintentando en 1s... (${retries} restantes)`);
+            setTimeout(() => startServer(targetPort, retries - 1), 1000);
+        } else {
+            console.error(`[SERVER CRITICAL] Error fatal escuchando en puerto ${targetPort}:`, err.message);
         }
+    });
 
-        const currentPort = portsToTry[portIndex++];
-        const srv = http.createServer(app);
-        srv.setTimeout(600000);
-        srv.headersTimeout = 600000;
-        srv.keepAliveTimeout = 600000;
-
-        srv.on('error', (err) => {
-            if (err.code === 'EADDRINUSE' || err.code === 'EACCES') {
-                console.warn(`[SERVER WARN] Puerto ${currentPort} no disponible (${err.code}). Intentando siguiente puerto...`);
-                tryNextPort();
-            } else {
-                console.error(`[SERVER ERROR] Error en puerto ${currentPort}:`, err.message);
-            }
-        });
-
-        srv.listen(currentPort, '0.0.0.0', () => {
-            console.log(`[SERVER] ✅ HTTP escuchando exitosamente en http://0.0.0.0:${currentPort}`);
-            console.log(`[SERVER] 🔀 Proxy inverso OpenResty/Nginx listo.`);
-        });
-    }
-
-    tryNextPort();
+    srv.listen(targetPort, '0.0.0.0', () => {
+        console.log(`[SERVER] ✅ HTTP escuchando exitosamente en http://0.0.0.0:${targetPort}`);
+        console.log(`[SERVER] 🔀 Proxy inverso OpenResty/Nginx listo.`);
+    });
 }
 
-bindServer(port);
+startServer(port);
 
