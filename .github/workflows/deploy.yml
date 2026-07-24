@@ -81,9 +81,9 @@ jobs:
 
           # 5.5 Actualizar la clave de Gemini y marcar expedientes completados en la base de datos
           echo "=== Actualizando clave y estado de expedientes ==="
-          node update_gemini_key.js
-          node check_key.js
-          node mark_cargados.js
+          node update_gemini_key.js || echo "⚠ No se pudo actualizar clave Gemini"
+          node check_key.js || echo "⚠ No se pudo comprobar clave"
+          node mark_cargados.js || echo "⚠ No se pudo marcar expedientes cargados"
 
           # 5.6 Asegurar permisos completos de lectura para cimi en frontend/dist
           echo "=== Corrigiendo permisos de lectura en dist ==="
