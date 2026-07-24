@@ -13,7 +13,7 @@ module.exports = {
       watch: false,
       env: {
         NODE_ENV: "production",
-        PORT: 3000,           // Puerto upstream que OpenResty / NPM usa como destino (3000)
+        PORT: 80,             // Puerto upstream que OpenResty / NPM usa como destino (80)
         BEHIND_PROXY: "true" // Corre detrás de proxy reverso (NPM)
       }
     },
