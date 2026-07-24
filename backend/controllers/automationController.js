@@ -1557,12 +1557,18 @@ exports.executeAutomation = async (req, res) => {
             const page = activePage;
             await page.setViewport({ width: 1366, height: 900 });
 
-            // Screencast en tiempo real
+            // Screencast en tiempo real con throttling (máximo 1 frame cada 600ms para evitar saturar HTTP/2 y Nginx)
             try {
                 const session = await page.target().createCDPSession();
-                await session.send('Page.startScreencast', { format: 'jpeg', quality: 65, maxWidth: 1366, maxHeight: 900 });
+                await session.send('Page.startScreencast', { format: 'jpeg', quality: 45, maxWidth: 1280, maxHeight: 800, everyNthFrame: 3 });
+                let lastFrameTime = 0;
                 session.on('Page.screencastFrame', ev => {
-                    automationEmitter.emit('frame', ev.data);
+                    const now = Date.now();
+                    currentJob.liveFrame = ev.data;
+                    if (now - lastFrameTime >= 600) {
+                        lastFrameTime = now;
+                        automationEmitter.emit('frame', ev.data);
+                    }
                     session.send('Page.screencastFrameAck', { sessionId: ev.sessionId }).catch(() => { });
                 });
             } catch { }
