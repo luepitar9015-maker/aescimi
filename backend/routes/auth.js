@@ -15,10 +15,12 @@ router.post('/login', (req, res) => {
     console.log(`[AUTH] Login attempt for doc: ${document_no}`);
     require('fs').appendFileSync('login_debug.txt', `[AUTH] Recv doc: "${document_no}", pass: "${password}", length: ${password?.length}\n`);
 
-    db.get("SELECT * FROM users WHERE document_no = ?", [document_no], (err, user) => {
+    const cleanDoc = String(document_no || '').trim();
+
+    db.get("SELECT * FROM users WHERE document_no::text = ?", [cleanDoc], (err, user) => {
         if (err) {
             console.error('[AUTH] DB Error:', err);
-            return res.status(500).json({ error: 'Database error' });
+            return res.status(500).json({ error: `Database error: ${err.message}` });
         }
         if (!user) {
             console.warn('[AUTH] User not found');
