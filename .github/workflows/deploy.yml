@@ -96,10 +96,10 @@ jobs:
           echo "Aut0m4t1z4d0r2026%*" | sudo -S chmod -R 755 /var/www/html /usr/share/nginx/html /var/www/aescimi 2>/dev/null || true
 
           # 6. Reiniciar backend y presentación independiente con PM2
-          echo "=== Reiniciando PM2 ==="
+          echo "=== Reiniciando PM2 con nueva configuración de puerto 3000 ==="
           cd ~/aescimi
-          pm2 restart all || pm2 start ecosystem.config.js
-          pm2 delete sena-frontend 2>/dev/null || true
+          pm2 delete sena-backend sena-presentacion 2>/dev/null || true
+          pm2 start ecosystem.config.js
           pm2 save
 
           # 7. Recargar Nginx para asegurar configuración vigente

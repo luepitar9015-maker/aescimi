@@ -13,7 +13,7 @@ module.exports = {
       watch: false,
       env: {
         NODE_ENV: "production",
-        PORT: 80,            // Puerto upstream que NPM usa como destino
+        PORT: 3000,           // Puerto upstream interno que Nginx usa como destino (evita conflicto con puerto 80)
         BEHIND_PROXY: "true" // Corre detrás de proxy reverso (NPM)
       }
     },
