@@ -1658,14 +1658,10 @@ exports.executeAutomation = async (req, res) => {
                 }
 
                 try {
-                    // ── PASO 2 & 3: FORMULARIO SGDEA Y CÓDIGO DE EXPEDIENTE ──
-                    if (docIdx === 0) {
-                        currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 2: Formulario SGDEA`;
-                        await paso2_abrirFormulario(page, browser, currentJob.logs);
-                        await wait(1500);
-                    } else {
-                        currentJob.logs.push(`[Doc ${docIdx + 1}/${totalDocs}] ⏩ [ETAPA 3 DIRECTA] Iniciando automatización del documento ${docIdx + 1} de ${totalDocs} directamente en la Etapa 3 (Código de Expediente)...`);
-                    }
+                    // ── PASO 2: FORMULARIO SGDEA (Siempre abrir un nuevo formulario limpio para cada documento del lote) ──
+                    currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 2: Formulario SGDEA`;
+                    await paso2_abrirFormulario(page, browser, currentJob.logs);
+                    await wait(1500);
 
                     // ── PASO 3: CÓDIGO DE EXPEDIENTE ──
                     currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 3: Código de Expediente`;
