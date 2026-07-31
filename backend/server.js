@@ -108,6 +108,37 @@ app.use((req, res, next) => {
     next();
 });
 
+// Auto-schema migration on startup to ensure audit_logs and user columns exist
+const ensureSchema = async () => {
+    try {
+        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_activity TIMESTAMP');
+        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1');
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER,
+                user_name TEXT,
+                user_role TEXT,
+                action TEXT NOT NULL,
+                details TEXT,
+                ip_address TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS system_settings (
+                key TEXT PRIMARY KEY NOT NULL,
+                value TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('[AUTO-SCHEMA] Database schema verified & missing columns added.');
+    } catch (err) {
+        console.error('[AUTO-SCHEMA] Schema check warning:', err.message);
+    }
+};
+ensureSchema();
+
 // Database auto-patch for TÉCNICO -> TECNÓLOGO
 const patchDatabaseMetadata = async () => {
     try {
