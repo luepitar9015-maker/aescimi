@@ -15,40 +15,24 @@ async function main() {
         console.log("=== AUTO-ASIGNANDO EXPEDIENTES SEGÚN PERMISOS DE TRD ===");
         await client.query("BEGIN");
 
-        // 1. Obtener usuarios administradores/superadministradores y asignarles todos los expedientes
-        const adminUsersRes = await client.query("SELECT id, full_name, role FROM users WHERE role IN ('admin', 'superadmin')");
-        const adminUsers = adminUsersRes.rows;
-
-        // 2. Obtener todas las series actuales con sus códigos
+        // 1. Obtener todas las series actuales con sus códigos
         const seriesRes = await client.query("SELECT id, series_code FROM trd_series");
         const series = seriesRes.rows;
 
-        // 3. Obtener todos los permisos activos de los usuarios de TRD
+        // 2. Obtener todos los permisos activos de los usuarios de TRD
         const permRes = await client.query("SELECT user_id, series_id FROM user_trd_permissions WHERE series_id IS NOT NULL");
         const permissions = permRes.rows;
 
-        // 4. Obtener todos los expedientes
+        // 3. Obtener todos los expedientes
         const expRes = await client.query("SELECT id, subserie FROM expedientes");
         const expedientes = expRes.rows;
 
         console.log(`Total expedientes a procesar: ${expedientes.length}`);
-        console.log(`Total administradores/superadministradores: ${adminUsers.length}`);
         console.log(`Total de mapeos de permisos de TRD: ${permissions.length}`);
 
         let assignmentsCreated = 0;
 
-        // Asignación 1: Asignar todos los expedientes a administradores/superadministradores (ej: Luis Ernesto, Leonardo Rincón)
-        for (const admin of adminUsers) {
-            await client.query(`
-                INSERT INTO expediente_assignments (expediente_id, user_id, assigned_by, observaciones)
-                SELECT id, $1, 1, 'Auto-asignado por rol de administración'
-                FROM expedientes
-                ON CONFLICT (expediente_id, user_id) DO NOTHING
-            `, [admin.id]);
-            console.log(`✅ Expedientes asignados a Administrador: ${admin.full_name} (ID ${admin.id})`);
-        }
-
-        // Asignación 2: Asignar expedientes a usuarios según sus permisos de TRD
+        // Asignar expedientes a usuarios según sus permisos de TRD
         for (const exp of expedientes) {
             const expSub = exp.subserie || '';
             
