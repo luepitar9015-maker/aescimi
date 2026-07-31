@@ -54,17 +54,25 @@ router.post('/', (req, res) => {
     });
 });
 
-// UPDATE organization entry (Storage Path)
+// UPDATE organization entry (Storage Path & OnBase credentials)
 router.put('/:id', (req, res) => {
     const { id } = req.params;
-    const { storage_path } = req.body;
+    const { storage_path, onbase_user, onbase_pass } = req.body;
 
-    db.run("UPDATE organization_structure SET storage_path = ? WHERE id = ?", [storage_path, id], function(err) {
-        if (err) {
-            return res.status(500).json({ error: err.message });
+    db.run(
+        `UPDATE organization_structure 
+         SET storage_path = COALESCE(?, storage_path),
+             onbase_user = ?,
+             onbase_pass = ?
+         WHERE id = ?`, 
+        [storage_path, onbase_user, onbase_pass, id], 
+        function(err) {
+            if (err) {
+                return res.status(500).json({ error: err.message });
+            }
+            res.json({ message: 'Updated successfully', changes: this.changes });
         }
-        res.json({ message: 'Updated successfully', changes: this.changes });
-    });
+    );
 });
 
 // DELETE organization entry

@@ -9,12 +9,12 @@ function AesSettings() {
         ades_password: '',
         gemini_api_key: ''
     });
-    const [seriesList, setSeriesList] = useState([]);
-    const [seriesCredentials, setSeriesCredentials] = useState({}); // { seriesId: { user, pass } }
+    const [dependenciesList, setDependenciesList] = useState([]);
+    const [dependenciesCredentials, setDependenciesCredentials] = useState({}); // { depId: { user, pass } }
     const [isAdmin, setIsAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [seriesSavingId, setSeriesSavingId] = useState(null);
+    const [depSavingId, setDepSavingId] = useState(null);
     const [message, setMessage] = useState({ text: '', type: '' });
 
     const fetchSettings = async () => {
@@ -32,24 +32,24 @@ function AesSettings() {
                 gemini_api_key: resSettings.data.gemini_api_key || ''
             });
 
-            // 2. Fetch series list
-            const resSeries = await axios.get('/api/trd/series/all', { headers: authHeaders });
-            const list = resSeries.data.data || [];
-            setSeriesList(list);
+            // 2. Fetch dependencies list (organization_structure)
+            const resDeps = await axios.get('/api/organization', { headers: authHeaders });
+            const list = resDeps.data.data || [];
+            setDependenciesList(list);
 
-            // Rebuild series credentials map
+            // Rebuild dependencies credentials map
             const creds = {};
-            list.forEach(s => {
-                creds[s.id] = {
-                    onbase_user: s.onbase_user || '',
-                    onbase_pass: s.onbase_pass || ''
+            list.forEach(d => {
+                creds[d.id] = {
+                    onbase_user: d.onbase_user || '',
+                    onbase_pass: d.onbase_pass || ''
                 };
             });
-            setSeriesCredentials(creds);
+            setDependenciesCredentials(creds);
 
         } catch (err) {
             console.error("Error fetching AES settings:", err);
-            setMessage({ text: 'Error al cargar la configuración de AES', type: 'error' });
+            setMessage({ text: 'Error al cargar la configuración de AES y Dependencias', type: 'error' });
         } finally {
             setLoading(false);
         }
@@ -70,11 +70,11 @@ function AesSettings() {
         setSettings(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleSeriesChange = (seriesId, field, value) => {
-        setSeriesCredentials(prev => ({
+    const handleDepChange = (depId, field, value) => {
+        setDependenciesCredentials(prev => ({
             ...prev,
-            [seriesId]: {
-                ...prev[seriesId],
+            [depId]: {
+                ...prev[depId],
                 [field]: value
             }
         }));
@@ -101,29 +101,29 @@ function AesSettings() {
         }
     };
 
-    const handleSaveSeriesCreds = async (seriesId) => {
-        setSeriesSavingId(seriesId);
+    const handleSaveDepCreds = async (depId) => {
+        setDepSavingId(depId);
         setMessage({ text: '', type: '' });
         try {
             const token = localStorage.getItem('token');
             const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
-            const creds = seriesCredentials[seriesId] || { onbase_user: '', onbase_pass: '' };
+            const creds = dependenciesCredentials[depId] || { onbase_user: '', onbase_pass: '' };
             
-            await axios.put(`/api/trd/series/${seriesId}/onbase`, {
+            await axios.put(`/api/organization/${depId}`, {
                 onbase_user: creds.onbase_user,
                 onbase_pass: creds.onbase_pass
             }, { headers: authHeaders });
 
-            setMessage({ text: 'Credenciales de la serie actualizadas con éxito', type: 'success' });
+            setMessage({ text: 'Credenciales de la dependencia actualizadas con éxito', type: 'success' });
         } catch (err) {
-            console.error("Error saving series credentials:", err);
-            setMessage({ text: 'Error al guardar credenciales de la serie', type: 'error' });
+            console.error("Error saving dependency credentials:", err);
+            setMessage({ text: 'Error al guardar credenciales de la dependencia', type: 'error' });
         } finally {
-            setSeriesSavingId(null);
+            setDepSavingId(null);
         }
     };
 
-    if (loading) return <div className="p-4">Cargando configuración de AES y Series...</div>;
+    if (loading) return <div className="p-4">Cargando configuración de AES y Dependencias...</div>;
 
     return (
         <div className="settings-container" style={{ padding: '24px', maxWidth: '1000px', margin: '0 auto' }}>
@@ -196,44 +196,47 @@ function AesSettings() {
                     </div>
                 </form>
 
-                {/* CARD 2: Credenciales específicas por Dependencia / Serie TRD */}
+                {/* CARD 2: Credenciales específicas por Dependencia */}
                 <div className="card" style={{ padding: '24px', backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
                         <FolderKey size={22} className="text-purple-600" />
                         <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'semibold', color: '#1f2937' }}>
-                            Usuarios de OnBase específicos por Serie Documental (Dependencias)
+                            Usuarios de OnBase específicos por Dependencia (Estructura Organizacional)
                         </h3>
                     </div>
                     <p style={{ color: '#6b7280', fontSize: '12px', marginBottom: '20px', lineHeight: '1.4' }}>
-                        Configure credenciales personalizadas para cada serie. Si se dejan en blanco, el automatizador usará el Usuario General (Fallback) configurado arriba.
+                        Configure credenciales personalizadas para cada dependencia. Si se dejan en blanco, el automatizador usará el Usuario General (Fallback) configurado arriba.
                     </p>
 
                     <div style={{ overflowX: 'auto' }}>
                         <table className="w-full text-left" style={{ borderCollapse: 'collapse', fontSize: '12px' }}>
                             <thead>
                                 <tr style={{ borderBottom: '2px solid #f3f4f6', color: '#4b5563' }}>
-                                    <th style={{ padding: '10px 8px', fontWeight: '600' }}>Código TRD</th>
-                                    <th style={{ padding: '10px 8px', fontWeight: '600' }}>Nombre Serie</th>
-                                    <th style={{ padding: '10px 8px', fontWeight: '600' }}>Sección / Dependencia</th>
-                                    <th style={{ padding: '10px 8px', fontWeight: '600', width: '180px' }}>Usuario OnBase</th>
-                                    <th style={{ padding: '10px 8px', fontWeight: '600', width: '180px' }}>Contraseña OnBase</th>
+                                    <th style={{ padding: '10px 8px', fontWeight: '600' }}>Código</th>
+                                    <th style={{ padding: '10px 8px', fontWeight: '600' }}>Nombre Dependencia</th>
+                                    <th style={{ padding: '10px 8px', fontWeight: '600' }}>Sección / Tipo</th>
+                                    <th style={{ padding: '10px 8px', fontWeight: '600', width: '200px' }}>Usuario OnBase</th>
+                                    <th style={{ padding: '10px 8px', fontWeight: '600', width: '200px' }}>Contraseña OnBase</th>
                                     <th style={{ padding: '10px 8px', fontWeight: '600', width: '90px', textAlign: 'center' }}>Acción</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {seriesList.map(s => {
-                                    const cred = seriesCredentials[s.id] || { onbase_user: '', onbase_pass: '' };
-                                    const depName = s.subsection_name || s.section_name || 'General';
+                                {dependenciesList.map(d => {
+                                    const cred = dependenciesCredentials[d.id] || { onbase_user: '', onbase_pass: '' };
+                                    const depName = d.subsection_name || d.section_name;
+                                    const depCode = d.subsection_code || d.section_code || 'N/A';
+                                    const sectionType = d.subsection_name ? 'Subsección' : 'Sección Principal';
+                                    
                                     return (
-                                        <tr key={s.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                                            <td style={{ padding: '8px', fontWeight: '500', color: '#374151' }}>
-                                                {s.series_code}
+                                        <tr key={d.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                                            <td style={{ padding: '12px 8px', fontWeight: '500', color: '#374151' }}>
+                                                {depCode}
                                             </td>
-                                            <td style={{ padding: '8px', color: '#4b5563' }}>
-                                                {s.series_name}
-                                            </td>
-                                            <td style={{ padding: '8px', color: '#6b7280', fontStyle: 'italic' }}>
+                                            <td style={{ padding: '12px 8px', color: '#1f2937', fontWeight: '500' }}>
                                                 {depName}
+                                            </td>
+                                            <td style={{ padding: '12px 8px', color: '#6b7280', fontStyle: 'italic' }}>
+                                                {sectionType}
                                             </td>
                                             <td style={{ padding: '8px' }}>
                                                 <div style={{ position: 'relative' }}>
@@ -241,7 +244,7 @@ function AesSettings() {
                                                     <input 
                                                         type="text" 
                                                         value={cred.onbase_user}
-                                                        onChange={(e) => handleSeriesChange(s.id, 'onbase_user', e.target.value)}
+                                                        onChange={(e) => handleDepChange(d.id, 'onbase_user', e.target.value)}
                                                         placeholder="Usuario OnBase"
                                                         style={{ width: '100%', padding: '6px 8px 6px 26px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '12px' }}
                                                     />
@@ -253,7 +256,7 @@ function AesSettings() {
                                                     <input 
                                                         type="password" 
                                                         value={cred.onbase_pass}
-                                                        onChange={(e) => handleSeriesChange(s.id, 'onbase_pass', e.target.value)}
+                                                        onChange={(e) => handleDepChange(d.id, 'onbase_pass', e.target.value)}
                                                         placeholder="••••••••"
                                                         style={{ width: '100%', padding: '6px 8px 6px 26px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '12px' }}
                                                     />
@@ -262,12 +265,12 @@ function AesSettings() {
                                             <td style={{ padding: '8px', textAlign: 'center' }}>
                                                 <button
                                                     type="button"
-                                                    onClick={() => handleSaveSeriesCreds(s.id)}
-                                                    disabled={seriesSavingId === s.id}
+                                                    onClick={() => handleSaveDepCreds(d.id)}
+                                                    disabled={depSavingId === d.id}
                                                     className="btn btn-primary"
                                                     style={{ padding: '6px 12px', fontSize: '11px', borderRadius: '4px', width: '100%' }}
                                                 >
-                                                    {seriesSavingId === s.id ? 'Guardando' : 'Guardar'}
+                                                    {depSavingId === d.id ? 'Guardando' : 'Guardar'}
                                                 </button>
                                             </td>
                                         </tr>

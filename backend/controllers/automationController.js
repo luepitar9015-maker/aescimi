@@ -1630,30 +1630,45 @@ exports.executeAutomation = async (req, res) => {
             
             if (docsToProcess.length > 0) {
                 const firstDoc = docsToProcess[0];
+                const orgId = firstDoc.organization_id;
                 const seriesId = firstDoc.trd_series_id;
                 const subserieCode = firstDoc.subserie;
                 
                 let querySql = "";
                 let queryParam = null;
                 
-                if (seriesId) {
-                    querySql = "SELECT onbase_user, onbase_pass FROM trd_series WHERE id = ?";
+                if (orgId) {
+                    querySql = "SELECT onbase_user, onbase_pass FROM organization_structure WHERE id = ?";
+                    queryParam = orgId;
+                } else if (seriesId) {
+                    querySql = `
+                        SELECT os.onbase_user, os.onbase_pass 
+                        FROM organization_structure os
+                        JOIN trd_series s ON s.dependency_id = os.id
+                        WHERE s.id = ?
+                    `;
                     queryParam = seriesId;
                 } else if (subserieCode) {
-                    querySql = "SELECT onbase_user, onbase_pass FROM trd_series WHERE series_code = ? OR series_code LIKE ?";
+                    querySql = `
+                        SELECT os.onbase_user, os.onbase_pass 
+                        FROM organization_structure os
+                        JOIN trd_series s ON s.dependency_id = os.id
+                        WHERE s.series_code = ? OR s.series_code LIKE ?
+                    `;
                     queryParam = subserieCode;
                 }
                 
                 if (querySql) {
-                    const seriesRow = await new Promise((resolve) => {
-                        db.get(querySql, [queryParam, `%${queryParam}`], (err, row) => {
+                    const params = querySql.includes('LIKE') ? [queryParam, `%${queryParam}`] : [queryParam];
+                    const depRow = await new Promise((resolve) => {
+                        db.get(querySql, params, (err, row) => {
                             resolve(row || null);
                         });
                     });
-                    if (seriesRow && seriesRow.onbase_user && seriesRow.onbase_pass) {
-                        activeUsername = seriesRow.onbase_user;
-                        activePassword = seriesRow.onbase_pass;
-                        currentJob.logs.push(`[INFO] 🔑 Usando credenciales de OnBase específicas para la serie: "${activeUsername}"`);
+                    if (depRow && depRow.onbase_user && depRow.onbase_pass) {
+                        activeUsername = depRow.onbase_user;
+                        activePassword = depRow.onbase_pass;
+                        currentJob.logs.push(`[INFO] 🔑 Usando credenciales de OnBase específicas para la dependencia: "${activeUsername}"`);
                     }
                 }
             }
