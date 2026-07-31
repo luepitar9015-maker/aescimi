@@ -67,8 +67,14 @@ function TreeNode({ node, selected, onToggleSelect, onNavigate, depth = 0 }) {
 
                 {/* Nombre */}
                 <span
-                    className="text-xs font-medium truncate flex-1"
-                    onClick={() => isFolder ? setOpen(o => !o) : null}
+                    className="text-xs font-medium truncate flex-1 hover:text-purple-700 hover:underline cursor-pointer"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        if (isFolder) {
+                            setOpen(true);
+                            if (onNavigate) onNavigate(node);
+                        }
+                    }}
                     title={node.name}
                 >
                     {node.name}
@@ -146,11 +152,12 @@ function FileListView({ items, selected, onToggleSelect, onEnterFolder }) {
                     return (
                         <tr
                             key={item.path}
+                            onClick={() => item.type === 'folder' && onEnterFolder(item)}
                             onDoubleClick={() => item.type === 'folder' && onEnterFolder(item)}
-                            className={`border-b border-gray-50 group transition-colors cursor-default
-                                ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                            className={`border-b border-gray-50 group transition-colors cursor-pointer
+                                ${isSelected ? 'bg-blue-50' : 'hover:bg-purple-50/60'}`}
                         >
-                            <td className="px-3 py-1.5">
+                            <td className="px-3 py-1.5" onClick={e => e.stopPropagation()}>
                                 <button onClick={() => onToggleSelect(item)}>
                                     {isSelected
                                         ? <CheckSquare size={14} className="text-blue-600" />
@@ -183,6 +190,7 @@ function FileListView({ items, selected, onToggleSelect, onEnterFolder }) {
                                     <a
                                         href={`/api/superuser/files/download?path=${encodeURIComponent(item.path)}`}
                                         download
+                                        onClick={e => e.stopPropagation()}
                                         className="text-blue-500 hover:text-blue-700 transition-colors"
                                         title="Descargar archivo"
                                     >
@@ -190,7 +198,7 @@ function FileListView({ items, selected, onToggleSelect, onEnterFolder }) {
                                     </a>
                                 ) : (
                                     <button
-                                        onClick={() => onEnterFolder(item)}
+                                        onClick={e => { e.stopPropagation(); onEnterFolder(item); }}
                                         className="text-amber-500 hover:text-amber-700 transition-colors"
                                         title="Abrir carpeta"
                                     >
@@ -236,11 +244,25 @@ export default function ExploradorDocumental() {
 
     useEffect(() => { fetchFiles(); }, [fetchFiles]);
 
-    // Navegar a subcarpeta
+    // Navegar a subcarpeta (soporta tanto del árbol izquierdo como de la tabla central)
     const enterFolder = (folder) => {
-        setBreadcrumb(prev => [...prev, { name: folder.name, path: folder.path }]);
-        const items = folder.children || [];
-        setCurrentItems(items);
+        if (!folder) return;
+        const parts = (folder.path || '').split('/');
+        let currentPath = '';
+        let items = tree;
+        const newCrumbs = [];
+
+        for (const part of parts) {
+            currentPath = currentPath ? `${currentPath}/${part}` : part;
+            const found = items.find(n => n.path === currentPath);
+            newCrumbs.push({ name: part, path: currentPath });
+            if (found && found.children) {
+                items = found.children;
+            }
+        }
+
+        setBreadcrumb(newCrumbs);
+        setCurrentItems(folder.children || items || []);
         setSelected(new Set());
         setSearch('');
     };
