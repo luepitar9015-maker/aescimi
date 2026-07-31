@@ -725,5 +725,33 @@ router.post('/metadata-labels', (req, res) => {
     });
 });
 
+// GET all series (flat list of series with dependency info and OnBase credentials)
+router.get('/series/all', (req, res) => {
+    const query = `
+        SELECT s.id, s.series_code, s.series_name, s.onbase_user, s.onbase_pass,
+               d.section_name, d.subsection_name, d.section_code, d.subsection_code
+        FROM trd_series s
+        LEFT JOIN organization_structure d ON s.dependency_id = d.id
+        ORDER BY s.series_code ASC
+    `;
+    db.all(query, [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ data: rows });
+    });
+});
+
+// PUT update OnBase credentials for a series
+router.put('/series/:id/onbase', (req, res) => {
+    const { onbase_user, onbase_pass } = req.body;
+    db.run(
+        "UPDATE trd_series SET onbase_user = ?, onbase_pass = ? WHERE id = ?",
+        [onbase_user || null, onbase_pass || null, req.params.id],
+        function (err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ message: 'Credenciales OnBase de la serie actualizadas con éxito' });
+        }
+    );
+});
+
 module.exports = router;
 

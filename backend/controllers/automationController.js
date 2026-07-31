@@ -1624,7 +1624,41 @@ exports.executeAutomation = async (req, res) => {
 
             // ── PASO 1: LOGIN ÚNICO ──
             currentJob.currentStep = 'PASO 1: Login';
-            const loginOk = await paso1_login(page, url, username, password, currentJob.logs);
+            
+            let activeUsername = username;
+            let activePassword = password;
+            
+            if (docsToProcess.length > 0) {
+                const firstDoc = docsToProcess[0];
+                const seriesId = firstDoc.trd_series_id;
+                const subserieCode = firstDoc.subserie;
+                
+                let querySql = "";
+                let queryParam = null;
+                
+                if (seriesId) {
+                    querySql = "SELECT onbase_user, onbase_pass FROM trd_series WHERE id = ?";
+                    queryParam = seriesId;
+                } else if (subserieCode) {
+                    querySql = "SELECT onbase_user, onbase_pass FROM trd_series WHERE series_code = ? OR series_code LIKE ?";
+                    queryParam = subserieCode;
+                }
+                
+                if (querySql) {
+                    const seriesRow = await new Promise((resolve) => {
+                        db.get(querySql, [queryParam, `%${queryParam}`], (err, row) => {
+                            resolve(row || null);
+                        });
+                    });
+                    if (seriesRow && seriesRow.onbase_user && seriesRow.onbase_pass) {
+                        activeUsername = seriesRow.onbase_user;
+                        activePassword = seriesRow.onbase_pass;
+                        currentJob.logs.push(`[INFO] 🔑 Usando credenciales de OnBase específicas para la serie: "${activeUsername}"`);
+                    }
+                }
+            }
+
+            const loginOk = await paso1_login(page, url, activeUsername, activePassword, currentJob.logs);
             if (!loginOk) {
                 const ss = await page.screenshot().catch(() => null);
                 if (activeBrowser) {
