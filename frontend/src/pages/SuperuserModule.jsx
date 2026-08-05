@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
   Database, Trash2, Edit2, Save, X, Calendar, AlertTriangle, RefreshCw, 
-  ShieldAlert, CheckCircle2, Activity, Wifi, Clock, UserCheck, FileText, Search, Users 
+  ShieldAlert, CheckCircle2, Activity, Wifi, Clock, UserCheck, FileText, Search, Users, Download
 } from 'lucide-react';
 
 const API_URL = '/api/superuser';
@@ -17,6 +17,11 @@ const SuperuserModule = () => {
   const [editValues, setEditValues] = useState({});
   const [expirationDate, setExpirationDate] = useState('');
   const [message, setMessage] = useState({ type: '', text: '' });
+
+  // ── Reportes Excel ─────────────────────────────────
+  const [reportDate, setReportDate] = useState('');
+  const [loadingAesReport, setLoadingAesReport] = useState(false);
+  const [loadingNoCodeReport, setLoadingNoCodeReport] = useState(false);
 
   // ── Monitoreo y Bitácora ──────────────────────────
   const [onlineUsers, setOnlineUsers] = useState([]);
@@ -223,6 +228,59 @@ const SuperuserModule = () => {
     setTimeout(() => setMessage({ type: '', text: '' }), 3000);
   };
 
+  const downloadAesReport = async () => {
+    setLoadingAesReport(true);
+    try {
+      const res = await axios.get(`${API_URL}/reports/aes-loaded`, {
+        headers,
+        params: { date: reportDate },
+        responseType: 'blob'
+      });
+      
+      const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', reportDate ? `Reporte_AES_Cargados_${reportDate}.xlsx` : 'Reporte_AES_Cargados_Todos.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      showSuccess('Reporte de cargados en AES descargado con éxito.');
+    } catch (err) {
+      console.error("Error downloading AES report:", err);
+      showError('Error al descargar el reporte de cargados en AES.');
+    } finally {
+      setLoadingAesReport(false);
+    }
+  };
+
+  const downloadNoCodeReport = async () => {
+    setLoadingNoCodeReport(true);
+    try {
+      const res = await axios.get(`${API_URL}/reports/no-code-documents`, {
+        headers,
+        responseType: 'blob'
+      });
+      
+      const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'Expedientes_Sin_Codigo_Para_Regional.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      showSuccess('Reporte para la Regional descargado con éxito.');
+    } catch (err) {
+      console.error("Error downloading no code report:", err);
+      showError('Error al descargar el reporte para la Regional.');
+    } finally {
+      setLoadingNoCodeReport(false);
+    }
+  };
+
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
@@ -298,6 +356,20 @@ const SuperuserModule = () => {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                   </span>
+                </button>
+                <button
+                  onClick={() => { setActiveSection('reportes'); }}
+                  className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all flex items-center justify-between ${
+                    activeSection === 'reportes'
+                      ? 'bg-purple-50 text-purple-700 font-semibold shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <FileText size={16} className={activeSection === 'reportes' ? 'text-purple-600' : 'text-gray-400'} />
+                    <span>Reportes Excel</span>
+                  </div>
+                  <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold">Nuevo</span>
                 </button>
               </div>
             </div>
@@ -601,6 +673,119 @@ const SuperuserModule = () => {
                     Esta tabla está vacía.
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* 4. SECCIÓN: REPORTES EXCEL */}
+            {activeSection === 'reportes' && (
+              <div className="p-6">
+                <div className="border-b border-gray-100 pb-4 mb-6">
+                  <h2 className="font-semibold text-gray-700 flex items-center gap-2 text-lg">
+                    <FileText size={20} className="text-purple-600" />
+                    Generación de Reportes Excel
+                  </h2>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Descarga reportes especializados y plantillas en formato Excel para la gestión de expedientes.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Tarjeta 1: AES Cargados */}
+                  <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="bg-purple-100 p-2.5 rounded-xl text-purple-700">
+                          <CheckCircle2 size={24} />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-gray-800 text-sm leading-snug">Expedientes Cargados en AES</h3>
+                          <p className="text-xs text-purple-600 font-semibold uppercase">OnBase / AES</p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 mb-6 leading-relaxed">
+                        Genera un reporte detallado con los datos de todos los expedientes y sus respectivos archivos que ya han sido cargados en AES. Puedes especificar una fecha de cargue para filtrar los resultados.
+                      </p>
+
+                      <div className="space-y-2 mb-6">
+                        <label className="text-xs font-semibold text-gray-600 block">Fecha de Cargue Específica (Opcional):</label>
+                        <div className="flex items-center gap-2">
+                          <Calendar size={16} className="text-gray-400" />
+                          <input
+                            type="date"
+                            value={reportDate}
+                            onChange={(e) => setReportDate(e.target.value)}
+                            className="border border-gray-200 rounded-lg px-3 py-2 text-xs w-full focus:ring-2 focus:ring-purple-500 outline-none"
+                          />
+                          {reportDate && (
+                            <button
+                              onClick={() => setReportDate('')}
+                              className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                              title="Limpiar fecha"
+                            >
+                              <X size={16} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={downloadAesReport}
+                      disabled={loadingAesReport}
+                      className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 px-4 rounded-xl text-xs transition-colors shadow-sm"
+                    >
+                      {loadingAesReport ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                          Generando...
+                        </>
+                      ) : (
+                        <>
+                          <Download size={16} />
+                          Descargar Reporte AES
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Tarjeta 2: Expedientes sin código */}
+                  <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="bg-green-100 p-2.5 rounded-xl text-green-700">
+                          <AlertTriangle size={24} />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-gray-800 text-sm leading-snug">Expedientes Sin Código (Para Regional)</h3>
+                          <p className="text-xs text-green-600 font-semibold uppercase">Plantilla de Creación</p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 mb-6 leading-relaxed">
+                        Obtiene el listado de expedientes que tienen documentos guardados en el almacenamiento local pero no poseen un Código de Expediente en la base de datos. Se exporta con la estructura y metadatos (Valor 1 a 8) requeridos para enviarse a la Regional.
+                      </p>
+                    </div>
+
+                    <div className="mt-auto pt-6">
+                      <button
+                        onClick={downloadNoCodeReport}
+                        disabled={loadingNoCodeReport}
+                        className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-4 rounded-xl text-xs transition-colors shadow-sm"
+                      >
+                        {loadingNoCodeReport ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                            Generando...
+                          </>
+                        ) : (
+                          <>
+                            <Download size={16} />
+                            Descargar Listado Regional
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>

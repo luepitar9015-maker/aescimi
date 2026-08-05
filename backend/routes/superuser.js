@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../database');
 const { pool } = require('../database_pg');
 const { requireAuth, requireSuperAdmin } = require('../middleware/authMiddleware');
+const xlsx = require('xlsx');
 
 // Whitelist of tables that can be accessed via the generic superuser API
 const ALLOWED_TABLES = [
@@ -347,6 +348,165 @@ router.get('/audit-logs', async (req, res) => {
     } catch (err) {
         console.error('[SUPERUSER] Error fetching audit logs:', err);
         res.status(500).json({ error: 'Error al obtener bitácora de auditoría.' });
+    }
+});
+
+// GET /api/superuser/reports/aes-loaded
+router.get('/reports/aes-loaded', async (req, res) => {
+    const { date } = req.query; // YYYY-MM-DD format
+    try {
+        let query = `
+            SELECT 
+                e.expediente_code AS "Código Expediente",
+                e.title AS "Título Expediente",
+                e.subserie AS "Subserie",
+                e.box_id AS "Caja",
+                e.regional AS "Regional",
+                e.centro AS "Centro",
+                e.dependencia AS "Dependencia",
+                e.storage_type AS "Tipo Almacenamiento",
+                TO_CHAR(e.opening_date, 'YYYY-MM-DD') AS "Fecha Apertura",
+                d.filename AS "Nombre de Archivo",
+                d.typology_name AS "Tipología",
+                d.ades_id AS "ID AES",
+                TO_CHAR(d.load_date, 'YYYY-MM-DD HH24:MI:SS') AS "Fecha de Cargue",
+                (
+                    SELECT STRING_AGG(u.full_name, ', ')
+                    FROM expediente_assignments ea
+                    JOIN users u ON ea.user_id = u.id
+                    WHERE ea.expediente_id = e.id
+                ) AS "Responsable(s)"
+            FROM expedientes e
+            INNER JOIN documents d ON d.expediente_id = e.id
+            WHERE d.status = 'Cargado'
+        `;
+        const params = [];
+        if (date && date.trim() !== '') {
+            query += ` AND TO_CHAR(d.load_date, 'YYYY-MM-DD') = $1`;
+            params.push(date.trim());
+        }
+        query += ` ORDER BY d.load_date DESC, e.id DESC`;
+
+        const result = await pool.query(query, params);
+        
+        // Generate Workbook
+        const wb = xlsx.utils.book_new();
+        const ws = xlsx.utils.json_to_sheet(result.rows);
+        
+        // Auto column widths
+        if (result.rows.length > 0) {
+            const keys = Object.keys(result.rows[0]);
+            ws['!cols'] = keys.map(key => {
+                const maxLen = Math.max(
+                    key.length,
+                    ...result.rows.map(row => String(row[key] || '').length)
+                );
+                return { wch: Math.min(Math.max(maxLen + 2, 10), 50) };
+            });
+        }
+        
+        xlsx.utils.book_append_sheet(wb, ws, 'AES Cargados');
+        
+        const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+        
+        const filename = date ? `Reporte_AES_Cargados_${date}.xlsx` : 'Reporte_AES_Cargados_Todos.xlsx';
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.send(buffer);
+    } catch (err) {
+        console.error('[SUPERUSER] Error generating loaded AES report:', err);
+        res.status(500).json({ error: 'Error al generar el reporte de cargados en AES.' });
+    }
+});
+
+// GET /api/superuser/reports/no-code-documents
+router.get('/reports/no-code-documents', async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                e.id,
+                e.box_id,
+                TO_CHAR(e.opening_date, 'YYYY-MM-DD') AS opening_date,
+                e.subserie,
+                e.storage_type,
+                e.title,
+                e.metadata_values,
+                (
+                    SELECT STRING_AGG(u.full_name, ', ')
+                    FROM expediente_assignments ea
+                    JOIN users u ON ea.user_id = u.id
+                    WHERE ea.expediente_id = e.id
+                ) AS responsable
+            FROM expedientes e
+            WHERE (e.expediente_code IS NULL OR TRIM(e.expediente_code) = '' OR e.expediente_code = 'Sin Código')
+              AND EXISTS (
+                  SELECT 1 FROM documents d 
+                  WHERE d.expediente_id = e.id
+              )
+            ORDER BY e.created_at DESC
+        `;
+
+        const result = await pool.query(query);
+        
+        // Map to regional template format
+        const reportRows = result.rows.map(row => {
+            let meta = {};
+            if (row.metadata_values) {
+                try {
+                    meta = typeof row.metadata_values === 'string' 
+                        ? JSON.parse(row.metadata_values) 
+                        : row.metadata_values;
+                } catch (e) {
+                    console.error('Error parsing metadata_values for row', row.id, e);
+                }
+            }
+            
+            return {
+                'Codigo Expediente': '',
+                'Id Caja': row.box_id || '',
+                'Fecha Apertura': row.opening_date || '',
+                'Subserie': row.subserie || '',
+                'Tipo Almacenamiento': row.storage_type || '',
+                'Titulo': row.title || '',
+                'Responsable': row.responsable || '',
+                'Valor 1': meta.valor1 || '',
+                'Valor 2': meta.valor2 || '',
+                'Valor 3': meta.valor3 || '',
+                'Valor 4': meta.valor4 || '',
+                'Valor 5': meta.valor5 || '',
+                'Valor 6': meta.valor6 || '',
+                'Valor 7': meta.valor7 || '',
+                'Valor 8': meta.valor8 || ''
+            };
+        });
+        
+        const wb = xlsx.utils.book_new();
+        const ws = xlsx.utils.json_to_sheet(reportRows);
+        
+        // Auto column widths
+        const headers = [
+            'Codigo Expediente', 'Id Caja', 'Fecha Apertura', 'Subserie', 'Tipo Almacenamiento',
+            'Titulo', 'Responsable', 'Valor 1', 'Valor 2', 'Valor 3', 'Valor 4', 'Valor 5',
+            'Valor 6', 'Valor 7', 'Valor 8'
+        ];
+        ws['!cols'] = headers.map(key => {
+            const maxLen = Math.max(
+                key.length,
+                ...reportRows.map(row => String(row[key] || '').length)
+            );
+            return { wch: Math.min(Math.max(maxLen + 2, 12), 50) };
+        });
+        
+        xlsx.utils.book_append_sheet(wb, ws, 'Plantilla_Expedientes');
+        
+        const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+        
+        res.setHeader('Content-Disposition', 'attachment; filename="Expedientes_Sin_Codigo_Para_Regional.xlsx"');
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.send(buffer);
+    } catch (err) {
+        console.error('[SUPERUSER] Error generating no code report:', err);
+        res.status(500).json({ error: 'Error al generar el reporte de expedientes sin código.' });
     }
 });
 
