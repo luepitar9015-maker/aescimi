@@ -691,7 +691,7 @@ async function paso3_codigoExpediente(page, browser, code, logs) {
 
     let dropdownHandled = false;
 
-    for (let t = 0; t < 24 && !dropdownHandled; t++) {
+    for (let t = 0; t < 8 && !dropdownHandled; t++) {
         await wait(500);
         const allPages = await browser.pages();
 
@@ -1600,9 +1600,30 @@ exports.executeAutomation = async (req, res) => {
             });
             browser = activeBrowser;
 
+            // Manejador global de diálogos en nuevas pestañas/páginas
+            activeBrowser.on('targetcreated', async target => {
+                if (target.type() === 'page') {
+                    const newPage = await target.page().catch(() => null);
+                    if (newPage) {
+                        newPage.on('dialog', async dialog => {
+                            const msg = dialog.message();
+                            currentJob.logs.push(`[DIALOG] 💬 Diálogo nativo detectado en pestaña: "${msg}" (${dialog.type()}). Aceptando automáticamente...`);
+                            await dialog.accept().catch(() => {});
+                        });
+                    }
+                }
+            });
+
             activePage = await activeBrowser.newPage();
             const page = activePage;
             await page.setViewport({ width: 1366, height: 900 });
+
+            // Manejador de diálogos en la página principal
+            page.on('dialog', async dialog => {
+                const msg = dialog.message();
+                currentJob.logs.push(`[DIALOG] 💬 Diálogo nativo detectado: "${msg}" (${dialog.type()}). Aceptando automáticamente...`);
+                await dialog.accept().catch(() => {});
+            });
 
             // Screencast en tiempo real con throttling (máximo 1 frame cada 600ms para evitar saturar HTTP/2 y Nginx)
             try {
@@ -1731,6 +1752,10 @@ exports.executeAutomation = async (req, res) => {
                             );
                         }
 
+                        if (!result || !result.success) {
+                            throw new Error("No se pudo escribir el Código de Expediente o no se encontró el campo.");
+                        }
+
                         if (result?.formPage) formPage = result.formPage;
                         if (result?.formFrame) formFrame = result.formFrame;
                     }
@@ -1745,12 +1770,18 @@ exports.executeAutomation = async (req, res) => {
                     // ── PASO 5: ADJUNTAR PDF ──
                     currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 5: Adjuntar PDF`;
                     if (docInfo?.path) {
-                        await paso5_adjuntarPDF(page, allFrames, docInfo, currentJob.logs);
+                        const attachOk = await paso5_adjuntarPDF(page, allFrames, docInfo, currentJob.logs);
+                        if (!attachOk) {
+                            throw new Error("Fallo al adjuntar el archivo PDF (Importar falló o archivo no encontrado).");
+                        }
                     }
 
                     // ── PASO 6: GUARDAR ──
                     currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 6: Guardar`;
-                    await paso6_guardar(page, allFrames, currentJob.logs, hasMoreDocs);
+                    const saveOk = await paso6_guardar(page, allFrames, currentJob.logs, hasMoreDocs);
+                    if (!saveOk) {
+                        throw new Error("El guardado falló o el botón Guardar no estuvo disponible.");
+                    }
 
                     // Marcar documento como Cargado en la BD
                     if (docInfo?.id) {
