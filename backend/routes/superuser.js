@@ -355,37 +355,72 @@ router.get('/audit-logs', async (req, res) => {
 router.get('/reports/aes-loaded', async (req, res) => {
     const { date } = req.query; // YYYY-MM-DD format
     try {
-        let query = `
-            SELECT 
-                e.expediente_code AS "Código Expediente",
-                e.title AS "Título Expediente",
-                e.subserie AS "Subserie",
-                e.box_id AS "Caja",
-                e.regional AS "Regional",
-                e.centro AS "Centro",
-                e.dependencia AS "Dependencia",
-                e.storage_type AS "Tipo Almacenamiento",
-                TO_CHAR(e.opening_date, 'YYYY-MM-DD') AS "Fecha Apertura",
-                d.filename AS "Nombre de Archivo",
-                d.typology_name AS "Tipología",
-                d.ades_id AS "ID AES",
-                TO_CHAR(d.load_date, 'YYYY-MM-DD HH24:MI:SS') AS "Fecha de Cargue",
-                (
-                    SELECT STRING_AGG(u.full_name, ', ')
-                    FROM expediente_assignments ea
-                    JOIN users u ON ea.user_id = u.id
-                    WHERE ea.expediente_id = e.id
-                ) AS "Responsable(s)"
-            FROM expedientes e
-            INNER JOIN documents d ON d.expediente_id = e.id
-            WHERE d.status = 'Cargado'
-        `;
+        let query = '';
         const params = [];
+        
         if (date && date.trim() !== '') {
-            query += ` AND TO_CHAR(d.load_date, 'YYYY-MM-DD') = $1`;
+            query = `
+                SELECT 
+                    e.expediente_code AS "Código Expediente",
+                    e.title AS "Título Expediente",
+                    e.subserie AS "Subserie",
+                    e.box_id AS "Caja",
+                    e.regional AS "Regional",
+                    e.centro AS "Centro",
+                    e.dependencia AS "Dependencia",
+                    e.storage_type AS "Tipo Almacenamiento",
+                    TO_CHAR(e.opening_date, 'YYYY-MM-DD') AS "Fecha Apertura",
+                    'SÍ' AS "Cargado en AES",
+                    TO_CHAR(MAX(d.load_date), 'YYYY-MM-DD HH24:MI:SS') AS "Fecha de Cargue",
+                    COUNT(CASE WHEN d.status = 'Cargado' THEN 1 END) AS "Documentos Cargados",
+                    (SELECT COUNT(*) FROM documents d2 WHERE d2.expediente_id = e.id) AS "Total Documentos",
+                    COALESCE(STRING_AGG(DISTINCT d.ades_id, ', '), '') AS "IDs AES",
+                    (
+                        SELECT STRING_AGG(u.full_name, ', ')
+                        FROM expediente_assignments ea
+                        JOIN users u ON ea.user_id = u.id
+                        WHERE ea.expediente_id = e.id
+                    ) AS "Responsable(s)"
+                FROM expedientes e
+                INNER JOIN documents d ON d.expediente_id = e.id
+                WHERE d.status = 'Cargado'
+                  AND TO_CHAR(d.load_date, 'YYYY-MM-DD') = $1
+                GROUP BY e.id, e.expediente_code, e.title, e.subserie, e.box_id, e.regional, e.centro, e.dependencia, e.storage_type, e.opening_date
+                ORDER BY "Fecha de Cargue" DESC, e.id DESC
+            `;
             params.push(date.trim());
+        } else {
+            query = `
+                SELECT 
+                    e.expediente_code AS "Código Expediente",
+                    e.title AS "Título Expediente",
+                    e.subserie AS "Subserie",
+                    e.box_id AS "Caja",
+                    e.regional AS "Regional",
+                    e.centro AS "Centro",
+                    e.dependencia AS "Dependencia",
+                    e.storage_type AS "Tipo Almacenamiento",
+                    TO_CHAR(e.opening_date, 'YYYY-MM-DD') AS "Fecha Apertura",
+                    CASE 
+                        WHEN COUNT(CASE WHEN d.status = 'Cargado' THEN 1 END) > 0 THEN 'SÍ' 
+                        ELSE 'NO' 
+                    END AS "Cargado en AES",
+                    COALESCE(TO_CHAR(MAX(d.load_date), 'YYYY-MM-DD HH24:MI:SS'), '') AS "Fecha de Cargue",
+                    COUNT(CASE WHEN d.status = 'Cargado' THEN 1 END) AS "Documentos Cargados",
+                    COUNT(d.id) AS "Total Documentos",
+                    COALESCE(STRING_AGG(DISTINCT d.ades_id, ', '), '') AS "IDs AES",
+                    (
+                        SELECT STRING_AGG(u.full_name, ', ')
+                        FROM expediente_assignments ea
+                        JOIN users u ON ea.user_id = u.id
+                        WHERE ea.expediente_id = e.id
+                    ) AS "Responsable(s)"
+                FROM expedientes e
+                LEFT JOIN documents d ON d.expediente_id = e.id
+                GROUP BY e.id, e.expediente_code, e.title, e.subserie, e.box_id, e.regional, e.centro, e.dependencia, e.storage_type, e.opening_date
+                ORDER BY "Cargado en AES" DESC, "Fecha de Cargue" DESC NULLS LAST, e.id DESC
+            `;
         }
-        query += ` ORDER BY d.load_date DESC, e.id DESC`;
 
         const result = await pool.query(query, params);
         
