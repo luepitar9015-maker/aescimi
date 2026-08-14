@@ -1,7 +1,7 @@
 import { useState, useEffect, Fragment } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
-import { Play, CheckCircle, Clock, AlertCircle, FileText, Search, RefreshCw, Monitor, X, Globe, Settings as SettingsIcon, Save, Download, Trash, Database, Eye, ChevronDown, ChevronRight, Maximize2 } from 'lucide-react';
+import { Play, CheckCircle, CheckSquare, Clock, AlertCircle, FileText, Search, RefreshCw, Monitor, X, Globe, Settings as SettingsIcon, Save, Download, Trash, Database, Eye, ChevronDown, ChevronRight, Maximize2 } from 'lucide-react';
 
 function CargueAes() {
     const currentUser = (() => { try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; } })();
@@ -449,6 +449,65 @@ function CargueAes() {
             console.log(`[CARGUE-AES] Código de expediente actualizado silenciosamente a: ${newCode}`);
         } catch (err) {
             console.error("Error al actualizar código de expediente:", err);
+        }
+    };
+
+    // Marcar manualmente lote de documentos seleccionados como Cargado
+    const handleMarkSelectedAsCargado = async () => {
+        if (selectedDocs.length === 0) {
+            alert('Seleccione al menos un documento marcando las casillas.');
+            return;
+        }
+        if (!window.confirm(`¿Confirmas marcar ${selectedDocs.length} documento(s) seleccionado(s) como "Cargado" en AES (OnBase)?`)) {
+            return;
+        }
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.post('/api/ades/mark-documents-cargado',
+                { document_ids: selectedDocs },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            alert(`✅ ${res.data?.message || 'Documentos marcados como Cargados correctamente en AES.'}`);
+            setSelectedDocs([]);
+            fetchPending();
+        } catch (err) {
+            alert('Error al marcar como cargado: ' + (err.response?.data?.error || err.message));
+        }
+    };
+
+    // Marcar todo un expediente como Cargado
+    const handleMarkExpedienteAsCargado = async (exp) => {
+        if (!window.confirm(`¿Confirmas marcar TODOS los documentos del expediente "${exp.title}" (${exp.expediente_code}) como "Cargado" en AES (OnBase)?`)) {
+            return;
+        }
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.post('/api/ades/mark-documents-cargado',
+                { expediente_ids: [exp.expediente_id] },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            alert(`✅ ${res.data?.message || 'Expediente marcado como Cargado correctamente en AES.'}`);
+            fetchPending();
+        } catch (err) {
+            alert('Error al marcar expediente: ' + (err.response?.data?.error || err.message));
+        }
+    };
+
+    // Marcar un solo documento como Cargado
+    const handleMarkSingleDocumentAsCargado = async (doc) => {
+        if (!window.confirm(`¿Confirmas marcar el documento "${doc.typology_name}" (${doc.filename}) como "Cargado" en AES?`)) {
+            return;
+        }
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.post('/api/ades/mark-documents-cargado',
+                { document_ids: [doc.id] },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            alert(`✅ Documento marcado como Cargado en AES.`);
+            fetchPending();
+        } catch (err) {
+            alert('Error al marcar documento: ' + (err.response?.data?.error || err.message));
         }
     };
 
@@ -1126,6 +1185,27 @@ function CargueAes() {
                                                                 }}>
                                                                     {pendingDocs.length === 0 ? 'Completado' : `${pendingDocs.length} pendiente(s)`}
                                                                 </span>
+                                                                {pendingDocs.length > 0 && (
+                                                                    <button
+                                                                        onClick={() => handleMarkExpedienteAsCargado(exp)}
+                                                                        title="Marcar todos los documentos de este expediente como cargados en AES"
+                                                                        style={{ 
+                                                                            padding: '6px 10px', 
+                                                                            background: '#e8f5e9', 
+                                                                            border: '1px solid #a5d6a7', 
+                                                                            color: '#1b5e20',
+                                                                            borderRadius: '6px', 
+                                                                            cursor: 'pointer', 
+                                                                            fontSize: '12px', 
+                                                                            fontWeight: 'bold',
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '4px'
+                                                                        }}
+                                                                    >
+                                                                        <CheckCircle size={14} /> Marcar Cargado
+                                                                    </button>
+                                                                )}
                                                                 <button
                                                                     onClick={() => toggleExpediente(exp.expediente_id)}
                                                                     style={{ 
@@ -1218,37 +1298,44 @@ function CargueAes() {
                                                                                                 <Eye size={13} />
                                                                                             </button>
                                                                                             {doc.status === 'Cargado' ? (
-                                                                                                <>
-                                                                                                    <button
-                                                                                                        title="Revertir a Pendiente"
-                                                                                                        onClick={async () => {
-                                                                                                            if (!window.confirm(`¿Revertir "${doc.typology_name}" a estado Pendiente?`)) return;
-                                                                                                            try {
-                                                                                                                const token = localStorage.getItem('token');
-                                                                                                                await axios.post('/api/ades/update-status',
-                                                                                                                    { id: doc.id, status: 'Pendiente', ades_id: null },
-                                                                                                                    { headers: { Authorization: `Bearer ${token}` } }
-                                                                                                                );
-                                                                                                                alert(`✅ Documento "${doc.typology_name}" revertido a Pendiente.`);
-                                                                                                                fetchPending();
-                                                                                                            } catch (err) {
-                                                                                                                alert('Error al revertir: ' + (err.response?.data?.error || err.message));
-                                                                                                            }
-                                                                                                        }}
-                                                                                                        style={{ padding: '3px 8px', background: '#fff3e0', border: '1px solid #ffcc02', borderRadius: '4px', color: '#e65100', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '3px' }}
-                                                                                                    >
-                                                                                                        <RefreshCw size={11} /> Revertir
-                                                                                                    </button>
-                                                                                                </>
-                                                                                            ) : (
                                                                                                 <button
-                                                                                                    onClick={() => handleConfig(doc)}
-                                                                                                    className="btn-config"
-                                                                                                    title="Formulario de Configuración"
-                                                                                                    style={{ padding: '3px 8px', background: '#e3f2fd', border: '1px solid #90caf9', borderRadius: '4px', color: '#1976d2', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '3px' }}
+                                                                                                    title="Revertir a Pendiente"
+                                                                                                    onClick={async () => {
+                                                                                                        if (!window.confirm(`¿Revertir "${doc.typology_name}" a estado Pendiente?`)) return;
+                                                                                                        try {
+                                                                                                            const token = localStorage.getItem('token');
+                                                                                                            await axios.post('/api/ades/update-status',
+                                                                                                                { id: doc.id, status: 'Pendiente', ades_id: null },
+                                                                                                                { headers: { Authorization: `Bearer ${token}` } }
+                                                                                                            );
+                                                                                                            alert(`✅ Documento "${doc.typology_name}" revertido a Pendiente.`);
+                                                                                                            fetchPending();
+                                                                                                        } catch (err) {
+                                                                                                            alert('Error al revertir: ' + (err.response?.data?.error || err.message));
+                                                                                                        }
+                                                                                                    }}
+                                                                                                    style={{ padding: '3px 8px', background: '#fff3e0', border: '1px solid #ffcc02', borderRadius: '4px', color: '#e65100', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '3px' }}
                                                                                                 >
-                                                                                                    <SettingsIcon size={12} /> Config
+                                                                                                    <RefreshCw size={11} /> Revertir
                                                                                                 </button>
+                                                                                            ) : (
+                                                                                                <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                                                                                                    <button
+                                                                                                        onClick={() => handleMarkSingleDocumentAsCargado(doc)}
+                                                                                                        title="Marcar este documento como Cargado en AES (OnBase)"
+                                                                                                        style={{ padding: '3px 8px', background: '#e8f5e9', border: '1px solid #a5d6a7', borderRadius: '4px', color: '#1b5e20', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '3px' }}
+                                                                                                    >
+                                                                                                        <CheckCircle size={11} /> Cargado
+                                                                                                    </button>
+                                                                                                    <button
+                                                                                                        onClick={() => handleConfig(doc)}
+                                                                                                        className="btn-config"
+                                                                                                        title="Formulario de Configuración"
+                                                                                                        style={{ padding: '3px 8px', background: '#e3f2fd', border: '1px solid #90caf9', borderRadius: '4px', color: '#1976d2', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '3px' }}
+                                                                                                    >
+                                                                                                        <SettingsIcon size={12} /> Config
+                                                                                                    </button>
+                                                                                                </div>
                                                                                             )}
                                                                                         </div>
                                                                                     </td>
@@ -1294,14 +1381,37 @@ function CargueAes() {
                             </div>
 
                             {filteredDocs.length > 0 && (
-                                <div style={{ marginTop: '20px' }}>
+                                <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
                                     <button
                                         className="btn btn-primary"
                                         onClick={() => handleRunAutomation()}
                                         disabled={automationLoading}
-                                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px' }}
+                                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px' }}
                                     >
                                         {automationLoading ? 'Ejecutando proceso en OnBase...' : <><Play size={18} /> Iniciar Cargue AES ({selectedDocs.length} de {filteredDocs.filter(d => d.status === 'Pendiente').length} Docs seleccionados)</>}
+                                    </button>
+
+                                    <button
+                                        className="btn"
+                                        onClick={handleMarkSelectedAsCargado}
+                                        disabled={automationLoading || selectedDocs.length === 0}
+                                        style={{ 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            justifyContent: 'center', 
+                                            gap: '8px', 
+                                            padding: '12px 20px', 
+                                            backgroundColor: selectedDocs.length > 0 ? '#2e7d32' : '#cccccc',
+                                            color: '#ffffff',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            fontWeight: 'bold',
+                                            cursor: selectedDocs.length > 0 ? 'pointer' : 'not-allowed',
+                                            whiteSpace: 'nowrap'
+                                        }}
+                                        title="Marcar manualmente los documentos seleccionados como cargados en AES"
+                                    >
+                                        <CheckSquare size={18} /> Marcar Seleccionados como Cargados ({selectedDocs.length})
                                     </button>
                                 </div>
                             )}

@@ -354,4 +354,27 @@ router.post('/mark-cargado', requireAuth, (req, res) => {
     }
 });
 
+// Marcar IDs de documentos o expedientes específicos como Cargado
+router.post('/mark-documents-cargado', requireAuth, (req, res) => {
+    const { document_ids, expediente_ids } = req.body;
+    
+    if (Array.isArray(document_ids) && document_ids.length > 0) {
+        const placeholders = document_ids.map(() => '?').join(',');
+        const sql = `UPDATE documents SET status = 'Cargado', load_date = NOW() WHERE id IN (${placeholders})`;
+        db.run(sql, document_ids, function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            return res.json({ success: true, count: this.changes || 0, message: `${this.changes || 0} documento(s) marcados como Cargado en AES` });
+        });
+    } else if (Array.isArray(expediente_ids) && expediente_ids.length > 0) {
+        const placeholders = expediente_ids.map(() => '?').join(',');
+        const sql = `UPDATE documents SET status = 'Cargado', load_date = NOW() WHERE expediente_id IN (${placeholders})`;
+        db.run(sql, expediente_ids, function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            return res.json({ success: true, count: this.changes || 0, message: `Documentos del expediente marcados como Cargado en AES` });
+        });
+    } else {
+        return res.status(400).json({ error: 'Se requieren document_ids o expediente_ids' });
+    }
+});
+
 module.exports = router;
