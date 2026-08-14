@@ -436,16 +436,19 @@ function CargueAes() {
     const saveExpedienteCode = async (docId) => {
         try {
             const doc = documents.find(d => d.id === docId);
+            if (!doc) return;
+            const newCode = editingCode[docId];
+            if (newCode === undefined || newCode === doc.expediente_code) return;
+
             await axios.put(`/api/expedientes/${doc.expediente_id}`, {
-                expediente_code: editingCode[docId]
+                expediente_code: newCode
             });
             setDocuments(prev => prev.map(d =>
-                d.expediente_id === doc.expediente_id ? { ...d, expediente_code: editingCode[docId] } : d
+                d.expediente_id === doc.expediente_id ? { ...d, expediente_code: newCode } : d
             ));
-            alert("Código de expediente actualizado");
+            console.log(`[CARGUE-AES] Código de expediente actualizado silenciosamente a: ${newCode}`);
         } catch (err) {
-            console.error(err);
-            alert("Error al actualizar código");
+            console.error("Error al actualizar código de expediente:", err);
         }
     };
 

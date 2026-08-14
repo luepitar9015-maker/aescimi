@@ -4,7 +4,7 @@ import io
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
-def check_pm2():
+def test_curl():
     ip = "192.168.8.164"
     username = "cimi"
     password = "Automatizador2026*"
@@ -18,17 +18,17 @@ def check_pm2():
         print(f"Error al conectar por SSH: {e}")
         return
 
-    cmd = "pm2 env 0 | grep -i port"
+    cmd = "curl -sI http://localhost:3000/api/ades/view/6630"
     stdin, stdout, stderr = ssh.exec_command(cmd)
-    print("PM2 port env:")
+    print("Headers for ID 6630:")
     print(stdout.read().decode('utf-8'))
 
-    cmd2 = "ss -tulpn | grep node"
-    stdin2, stdout2, stderr2 = ssh.exec_command(cmd2)
-    print("\nListening Node ports:")
-    print(stdout2.read().decode('utf-8'))
+    cmd8 = "curl -sI http://localhost:3000/api/ades/view/8"
+    stdin8, stdout8, stderr8 = ssh.exec_command(cmd8)
+    print("Headers for ID 8:")
+    print(stdout8.read().decode('utf-8'))
 
     ssh.close()
 
 if __name__ == "__main__":
-    check_pm2()
+    test_curl()
