@@ -24,6 +24,7 @@ def deploy_files():
         ("quitar_tilde.js", "quitar_tilde.js"),
         ("sync_storage_to_db.js", "sync_storage_to_db.js"),
         ("routes/ades.js", "routes/ades.js"),
+        ("routes/deserciones.js", "routes/deserciones.js"),
         ("controllers/automationController.js", "controllers/automationController.js")
     ]
     

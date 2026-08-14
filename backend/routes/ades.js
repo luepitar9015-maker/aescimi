@@ -2,7 +2,57 @@ const express = require('express');
 const router = express.Router();
 const db = require('../database');
 const fs = require('fs');
+const path = require('path');
 const { requireAuth } = require('../middleware/authMiddleware');
+
+// Resolutor inteligente de rutas físicas de documentos en servidor (soporta /mnt/almacen/9224 vs /689224/ y rutas relativas)
+const resolveDocumentPath = (docPath, filename) => {
+    if (!docPath) return null;
+    
+    // 1. Verificación directa de ruta original
+    if (fs.existsSync(docPath)) return docPath;
+
+    // Normalizar barras inclinadas
+    const normalizedPath = docPath.replace(/\\/g, '/');
+    if (fs.existsSync(normalizedPath)) return normalizedPath;
+
+    // 2. Variaciones directas del almacenamiento SENA
+    const variations = [
+        normalizedPath.replace('/mnt/almacen/689224/', '/mnt/almacen/9224/'),
+        normalizedPath.replace('/689224/', '/9224/'),
+        normalizedPath.replace('/689224/', '/68/9224/'),
+        normalizedPath.replace('/mnt/almacen/', '/mnt/almacen/9224/')
+    ];
+
+    for (const v of variations) {
+        if (fs.existsSync(v)) return v;
+    }
+
+    // 3. Fallback por nombre de archivo y carpeta de radicado/expediente
+    const fileBasename = filename || path.basename(normalizedPath);
+    const parts = normalizedPath.split('/').filter(Boolean);
+    const folderRadicado = parts.length >= 2 ? parts[parts.length - 2] : null;
+
+    if (folderRadicado && fileBasename) {
+        const candidatePaths = [
+            `/mnt/almacen/9224/68922427/${folderRadicado}/${fileBasename}`,
+            `/mnt/almacen/9224/68922437/${folderRadicado}/${fileBasename}`,
+            `/mnt/almacen/9224/${folderRadicado}/${fileBasename}`,
+            `/mnt/almacen/${folderRadicado}/${fileBasename}`
+        ];
+        for (const cp of candidatePaths) {
+            if (fs.existsSync(cp)) return cp;
+        }
+    }
+
+    // 4. Intentar ruta relativa dentro de uploads/
+    if (fileBasename) {
+        const uploadsPath = path.join(__dirname, '../uploads', fileBasename);
+        if (fs.existsSync(uploadsPath)) return uploadsPath;
+    }
+
+    return null;
+};
 
 // Helper to validate if an expediente has at least its first three typologies uploaded
 const validateExpedienteTypologies = (expedienteId, callback) => {
@@ -142,8 +192,11 @@ router.get('/pending', requireAuth, (req, res) => {
                 return; // skip
             }
 
+            const resolvedPath = resolveDocumentPath(row.path, row.filename) || row.path;
+
             processed.push({
                 ...row,
+                path: resolvedPath,
                 document_metadata: docMeta && typeof docMeta === 'object' ? docMeta : {},
                 expediente_metadata: expMeta && typeof expMeta === 'object' ? expMeta : {},
                 has_first_three_typologies: hasFirstThree
@@ -197,8 +250,10 @@ router.get('/all', requireAuth, (req, res) => {
             let expMeta = {};
             try { if (row.metadata_values) docMeta = JSON.parse(row.metadata_values); } catch (e) {}
             try { if (row.expediente_metadata) expMeta = JSON.parse(row.expediente_metadata); } catch (e) {}
+            const resolvedPath = resolveDocumentPath(row.path, row.filename) || row.path;
             return {
                 ...row,
+                path: resolvedPath,
                 document_metadata: docMeta && typeof docMeta === 'object' ? docMeta : {},
                 expediente_metadata: expMeta && typeof expMeta === 'object' ? expMeta : {}
             };
@@ -224,20 +279,35 @@ router.post('/update-status', (req, res) => {
     });
 });
 
-// Serve document file content
+// Serve document file content con auto-resolución de rutas
 router.get('/view/:id', (req, res) => {
     const { id } = req.params;
-    db.get("SELECT path, filename FROM documents WHERE id = ?", [id], (err, doc) => {
+    db.get("SELECT id, path, filename FROM documents WHERE id = ?", [id], (err, doc) => {
         if (err || !doc) return res.status(404).json({ error: 'Documento no encontrado' });
 
-        if (!fs.existsSync(doc.path)) {
-            console.error(`[VIEW] Archivo no encontrado en disco: ${doc.path}`);
-            return res.status(404).json({ error: 'Archivo no encontrado en el servidor' });
+        const validPath = resolveDocumentPath(doc.path, doc.filename);
+
+        if (!validPath) {
+            console.error(`[VIEW] Archivo no encontrado en disco ni rutas alternativas: ID=${id}, Path=${doc.path}`);
+            return res.status(404).json({ error: 'Archivo no encontrado en el servidor. La ruta física especificada no existe en el almacenamiento del servidor.' });
         }
 
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `inline; filename="${doc.filename}"`);
-        fs.createReadStream(doc.path).pipe(res);
+        // Auto-reparar ruta en la base de datos si la ruta resuelta difiere
+        if (validPath !== doc.path) {
+            db.run("UPDATE documents SET path = ? WHERE id = ?", [validPath, id], (uErr) => {
+                if (!uErr) console.log(`[AUTO-HEAL] Ruta física actualizada en BD para documento ID=${id}: ${validPath}`);
+            });
+        }
+
+        const ext = path.extname(validPath).toLowerCase();
+        let contentType = 'application/pdf';
+        if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
+        else if (ext === '.png') contentType = 'image/png';
+        else if (ext === '.txt') contentType = 'text/plain';
+
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `inline; filename="${doc.filename || path.basename(validPath)}"`);
+        fs.createReadStream(validPath).pipe(res);
     });
 });
 
