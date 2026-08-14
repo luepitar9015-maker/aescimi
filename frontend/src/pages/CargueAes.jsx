@@ -1031,22 +1031,28 @@ function CargueAes() {
                                     />
                                 </div>
                                 <div style={{ display: 'flex', gap: '5px', background: '#f0f0f0', padding: '5px', borderRadius: '8px' }}>
-                                    {['Todos', 'Pendiente', 'Cargado'].map(st => (
+                                    {[
+                                        { id: 'SinCódigo', label: 'Sin Código' },
+                                        { id: 'Pendiente', label: 'Pendientes (Con Código)' },
+                                        { id: 'Cargado', label: 'Cargados' },
+                                        { id: 'Todos', label: 'Todos' }
+                                    ].map(tab => (
                                         <button
-                                            key={st}
-                                            onClick={() => setStatusFilter(st)}
+                                            key={tab.id}
+                                            onClick={() => setStatusFilter(tab.id)}
                                             style={{
-                                                padding: '6px 12px',
+                                                padding: '6px 14px',
                                                 border: 'none',
-                                                background: statusFilter === st ? '#2e7d32' : 'transparent',
-                                                color: statusFilter === st ? '#fff' : '#666',
+                                                background: statusFilter === tab.id ? '#2e7d32' : 'transparent',
+                                                color: statusFilter === tab.id ? '#fff' : '#444',
                                                 borderRadius: '6px',
                                                 fontSize: '12px',
                                                 fontWeight: 'bold',
-                                                cursor: 'pointer'
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s'
                                             }}
                                         >
-                                            {st}
+                                            {tab.label}
                                         </button>
                                     ))}
                                 </div>

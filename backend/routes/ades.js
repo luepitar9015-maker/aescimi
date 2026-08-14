@@ -102,6 +102,22 @@ router.get('/pending', requireAuth, (req, res) => {
 
     if (activeStatus === 'Todos') {
         whereClause = 'WHERE 1=1';
+    } else if (activeStatus === 'SinCódigo' || activeStatus === 'Sin Código') {
+        let subPerms = '';
+        const subParams = [];
+        if (req.user && req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+            subPerms = ` AND organization_id = ? 
+                         AND (trd_series_id IN (SELECT series_id FROM user_trd_permissions WHERE user_id = ?) 
+                              OR trd_subseries_id IN (SELECT subseries_id FROM user_trd_permissions WHERE user_id = ?))`;
+            subParams.push(req.user.organization_id || 0, req.user.id, req.user.id);
+        }
+        whereClause = `WHERE (
+            (d.expediente_id IS NOT NULL AND d.expediente_id IN (
+                SELECT DISTINCT expediente_id FROM documents WHERE status = 'Pendiente' AND expediente_id IS NOT NULL ${subPerms}
+            )) OR 
+            (d.expediente_id IS NULL AND d.status = 'Pendiente')
+        ) AND (e.expediente_code IS NULL OR TRIM(COALESCE(e.expediente_code, '')) = '')`;
+        params.push(...subParams);
     } else if (activeStatus === 'Pendiente') {
         let subPerms = '';
         const subParams = [];
@@ -116,7 +132,7 @@ router.get('/pending', requireAuth, (req, res) => {
                 SELECT DISTINCT expediente_id FROM documents WHERE status = 'Pendiente' AND expediente_id IS NOT NULL ${subPerms}
             )) OR 
             (d.expediente_id IS NULL AND d.status = 'Pendiente')
-        )`;
+        ) AND (e.expediente_code IS NOT NULL AND TRIM(e.expediente_code) != '')`;
         params.push(...subParams);
     } else {
         whereClause = `WHERE d.status = '${activeStatus}'`;
