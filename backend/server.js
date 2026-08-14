@@ -233,6 +233,7 @@ app.use('/api/seguimiento', require('./routes/seguimiento'));
 app.use('/api/ai', require('./routes/ai')); // AI Assistant & Classifier Routes
 app.use('/api/system', require('./routes/system')); // System Routes (Backup, etc)
 app.use('/api/audit', require('./routes/audit')); // Audit Log Routes
+app.use('/api/deserciones', require('./routes/deserciones')); // Módulo de Deserciones (OnBase)
 
 // ── RUTA TEMPORAL: Reproductor de video para análisis (SOLO USO LOCAL) ──
 app.get('/video-player', (req, res) => {

@@ -20,6 +20,7 @@ import SuperuserModule from './pages/SuperuserModule'; // New
 import ExploradorDocumental from './pages/ExploradorDocumental'; // Explorador archivos
 import Formatos from './pages/Formatos'; // Nuevo módulo de Formatos
 import ComunicacionesProducidas from './pages/ComunicacionesProducidas'; // Nuevo módulo
+import DesercionesModule from './pages/DesercionesModule'; // Nuevo módulo de Deserciones
 import SeguimientoExpedientes from './pages/SeguimientoExpedientes'; // Seguimiento
 import AIChatBot from './components/AIChatBot'; // IA Assistant
 import InteractivePresentation from './pages/InteractivePresentation'; // New
@@ -496,7 +497,8 @@ function Layout({ children }) {
           {canView('documents') && <Link to="/documents" className="nav-item"><Folder size={18} /> Gestión Documental</Link>}
           {canView('query') && <Link to="/query" className="nav-item"><Globe size={18} /> Consulta de Documentos</Link>}
           {canView('cargue-aes') && (currentUser?.role === 'admin' || currentUser?.role === 'superadmin') && <Link to="/cargue-aes" className="nav-item"><Play size={18} /> Cargue AES</Link>}
-          {canView('comunicaciones-producidas') && <Link to="/comunicaciones-producidas" className="nav-item"><Upload size={18} /> Com. Producidas</Link>}
+          {canView('cargue-aes') && <Link to="/comunicaciones-producidas" className="nav-item"><Network size={18} /> Comunicaciones Producidas</Link>}
+          <Link to="/deserciones" className="nav-item"><FileSpreadsheet size={18} /> Deserciones (OnBase)</Link>
           {canView('formatos') && <Link to="/formatos" className="nav-item"><FileSpreadsheet size={18} /> Formatos (FUID/Control)</Link>}
           {canView('trd_query') && <Link to="/trd-query" className="nav-item"><Database size={18} /> Consulta TRD</Link>}
 
@@ -518,6 +520,9 @@ function Layout({ children }) {
           {currentUser.role === 'superadmin' && (
             <div style={{ marginTop: '20px' }}>
               <div style={{ fontSize: '11px', color: '#f472b6', padding: '0 12px', fontWeight: 'bold' }}>SUPERUSUARIO</div>
+              <Link to="/deserciones" className="nav-item" style={{ color: '#db2777' }}>
+                <FileSpreadsheet size={18} /> Módulo Deserciones
+              </Link>
               <Link to="/superuser" className="nav-item" style={{ color: '#db2777' }}>
                 <Database size={18} /> Gestión de Sistema
               </Link>
@@ -599,6 +604,9 @@ function App() {
         } />
         <Route path="/comunicaciones-producidas" element={
           <ProtectedRoute><Layout><ComunicacionesProducidas /></Layout></ProtectedRoute>
+        } />
+        <Route path="/deserciones" element={
+          <ProtectedRoute><Layout><DesercionesModule /></Layout></ProtectedRoute>
         } />
         <Route path="/superuser" element={
           <ProtectedRoute><Layout><SuperuserModule /></Layout></ProtectedRoute>
