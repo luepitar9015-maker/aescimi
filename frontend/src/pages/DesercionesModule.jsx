@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { 
   FileSpreadsheet, 
@@ -24,6 +24,7 @@ import {
 
 export default function DesercionesModule() {
   const [activeTab, setActiveTab] = useState('citacion'); // 'citacion' | 'resolucion' | 'historico'
+  const textareaRef = useRef(null);
 
   // Excel & File States
   const [excelFile, setExcelFile] = useState(null);
@@ -279,13 +280,37 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
     }
   };
 
-  // 3. Insertar Chip de Variable en el Editor de Texto
+  // 3. Insertar Chip de Variable en el Editor de Texto (en la posición actual del cursor)
   const insertChip = (chipText) => {
-    if (activeTab === 'citacion') {
-      setTextoInicialCitacion(prev => prev + ' ' + chipText);
-    } else {
-      setTextoInicialResolucion(prev => prev + ' ' + chipText);
+    const textarea = textareaRef.current;
+    const currentText = activeTab === 'citacion' ? textoInicialCitacion : textoInicialResolucion;
+
+    if (!textarea) {
+      if (activeTab === 'citacion') {
+        setTextoInicialCitacion(prev => prev + ' ' + chipText);
+      } else {
+        setTextoInicialResolucion(prev => prev + ' ' + chipText);
+      }
+      return;
     }
+
+    const start = textarea.selectionStart !== undefined ? textarea.selectionStart : currentText.length;
+    const end = textarea.selectionEnd !== undefined ? textarea.selectionEnd : currentText.length;
+
+    const newText = currentText.substring(0, start) + chipText + currentText.substring(end);
+
+    if (activeTab === 'citacion') {
+      setTextoInicialCitacion(newText);
+    } else {
+      setTextoInicialResolucion(newText);
+    }
+
+    // Mantener enfoque y mover cursor justo después de la variable insertada
+    setTimeout(() => {
+      textarea.focus();
+      const nextPos = start + chipText.length;
+      textarea.setSelectionRange(nextPos, nextPos);
+    }, 0);
   };
 
   // 4. Agregar / Eliminar Correos CC
@@ -607,6 +632,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
               </div>
 
               <textarea 
+                ref={textareaRef}
                 rows={8}
                 value={activeTab === 'citacion' ? textoInicialCitacion : textoInicialResolucion}
                 onChange={(e) => activeTab === 'citacion' ? setTextoInicialCitacion(e.target.value) : setTextoInicialResolucion(e.target.value)}

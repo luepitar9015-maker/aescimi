@@ -187,30 +187,48 @@ const mergeText = (template, row) => {
     let merged = template;
     
     const replacements = {
-        '{{aprendiz_nombre}}': row.aprendiz_nombre || '',
-        '{{aprendiz_doc_tipo}}': row.aprendiz_doc_tipo || 'CC',
-        '{{aprendiz_doc_numero}}': row.aprendiz_doc_numero || '',
-        '{{ficha}}': row.ficha || '',
-        '{{programa}}': row.programa || '',
-        '{{aprendiz_correo}}': row.aprendiz_correo || '',
-        '{{causal_desercion}}': row.causal_desercion || '',
-        '{{fecha_comite}}': row.fecha_comite || '',
-        '{{hora_comite}}': row.hora_comite || '',
-        '{{lugar_comite}}': row.lugar_comite || '',
-        '{{fecha_actual}}': new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })
+        'aprendiz_nombre': row.aprendiz_nombre || '',
+        'aprendiz_doc_tipo': row.aprendiz_doc_tipo || 'CC',
+        'aprendiz_doc_numero': row.aprendiz_doc_numero || '',
+        'ficha': row.ficha || '',
+        'programa': row.programa || '',
+        'aprendiz_correo': row.aprendiz_correo || '',
+        'causal_desercion': row.causal_desercion || '',
+        'fecha_comite': row.fecha_comite || '',
+        'hora_comite': row.hora_comite || '',
+        'lugar_comite': row.lugar_comite || '',
+        'fecha_actual': new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })
     };
 
-    // Reemplazo dinámico de variables {{campo}}
+    // Reemplazo dinámico de variables predefinidas en múltiples sintaxis
     Object.keys(replacements).forEach(key => {
-        const regex = new RegExp(key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'gi');
-        merged = merged.replace(regex, replacements[key]);
+        const val = replacements[key];
+        const escKey = key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const patterns = [
+            new RegExp(`\\{\\{\\s*${escKey}\\s*\\}\\}`, 'gi'),
+            new RegExp(`«\\s*${escKey}\\s*[_.]*\\s*»`, 'gi'),
+            new RegExp(`<<\\s*${escKey}\\s*>>`, 'gi'),
+            new RegExp(`\\[\\s*${escKey}\\s*\\]`, 'gi')
+        ];
+        patterns.forEach(p => { merged = merged.replace(p, val); });
     });
 
-    // Reemplazo de variables genéricas de columnas del Excel {{nombre_columna}}
+    // Reemplazo de variables genéricas de columnas del Excel (ej. {{DOCUMENTO}}, «DOCUMENTO_», etc.)
     if (row.raw_row && typeof row.raw_row === 'object') {
         Object.keys(row.raw_row).forEach(colKey => {
-            const pattern = new RegExp(`\\{\\{\\s*${colKey.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}\\s*\\}\\}`, 'gi');
-            merged = merged.replace(pattern, row.raw_row[colKey] || '');
+            const val = row.raw_row[colKey] !== undefined && row.raw_row[colKey] !== null ? String(row.raw_row[colKey]) : '';
+            const escCol = colKey.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            
+            const patterns = [
+                new RegExp(`\\{\\{\\s*${escCol}\\s*\\}\\}`, 'gi'),
+                new RegExp(`«\\s*${escCol}\\s*[_.]*\\s*»`, 'gi'),
+                new RegExp(`<<\\s*${escCol}\\s*>>`, 'gi'),
+                new RegExp(`\\[\\s*${escCol}\\s*\\]`, 'gi')
+            ];
+
+            patterns.forEach(pattern => {
+                merged = merged.replace(pattern, val);
+            });
         });
     }
 
