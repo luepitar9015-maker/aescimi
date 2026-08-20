@@ -453,6 +453,21 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
     }
   };
 
+  // 8. Limpiar / vaciar histórico de casos de prueba
+  const handleLimpiarCasos = async () => {
+    if (!window.confirm('¿Está seguro de que desea eliminar todos los datos de prueba del histórico de OnBase?')) {
+      return;
+    }
+    try {
+      const res = await axios.post('/api/deserciones/limpiar-casos');
+      setStatusMessage({ type: 'success', text: res.data.message });
+      fetchHistorico();
+    } catch (err) {
+      console.error('Error al vaciar histórico:', err);
+      alert('Error al vaciar el histórico de casos.');
+    }
+  };
+
   return (
     <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto', fontFamily: 'system-ui, sans-serif' }}>
       
@@ -961,27 +976,50 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                 Monitoreo general de citaciones y resoluciones generadas y su estado en el trámite de OnBase.
               </p>
             </div>
-            <button 
-              onClick={() => {
-                const pendIds = historico.filter(h => h.status === 'Pendiente').map(h => h.id);
-                handleCargueOnBaseBatch(pendIds);
-              }}
-              disabled={processingOnBase || historico.filter(h => h.status === 'Pendiente').length === 0}
-              style={{
-                background: '#00324d',
-                color: '#fff',
-                border: 'none',
-                padding: '12px 20px',
-                borderRadius: '8px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              <Send size={18} /> Cargar Pendientes a OnBase Web ({historico.filter(h => h.status === 'Pendiente').length})
-            </button>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              {historico.length > 0 && (
+                <button 
+                  onClick={handleLimpiarCasos}
+                  style={{
+                    background: '#fef2f2',
+                    color: '#dc2626',
+                    border: '1px solid #fca5a5',
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                  title="Eliminar todos los registros de prueba del histórico"
+                >
+                  <Trash2 size={16} /> Limpiar Histórico
+                </button>
+              )}
+
+              <button 
+                onClick={() => {
+                  const pendIds = historico.filter(h => h.status === 'Pendiente').map(h => h.id);
+                  handleCargueOnBaseBatch(pendIds);
+                }}
+                disabled={processingOnBase || historico.filter(h => h.status === 'Pendiente').length === 0}
+                style={{
+                  background: '#00324d',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '12px 20px',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <Send size={18} /> Cargar Pendientes a OnBase Web ({historico.filter(h => h.status === 'Pendiente').length})
+              </button>
+            </div>
           </div>
 
           {loadingHistorico ? (

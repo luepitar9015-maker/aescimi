@@ -450,4 +450,16 @@ router.post('/cargue-onbase', requireAuth, async (req, res) => {
     }
 });
 
+// 7. Limpiar/vaciar histórico de casos de prueba
+router.post('/limpiar-casos', requireAuth, async (req, res) => {
+    try {
+        await ensureDesercionesTable();
+        await pool.query('TRUNCATE TABLE deserciones_casos RESTART IDENTITY;');
+        res.json({ message: 'El histórico de casos de prueba se ha limpiado correctamente.' });
+    } catch (err) {
+        console.error('[DESERCIONES] Error limpiando casos:', err);
+        res.status(500).json({ error: 'Error al vaciar el histórico de casos.' });
+    }
+});
+
 module.exports = router;
