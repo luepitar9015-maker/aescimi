@@ -159,6 +159,28 @@ router.post('/upload-anexo', requireAuth, upload.single('anexo'), (req, res) => 
     }
 });
 
+// 2.1 Carga masiva de paquete de anexos (PDFs/Documentos en lote)
+router.post('/upload-masivo-anexos', requireAuth, upload.array('anexos', 200), (req, res) => {
+    try {
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ error: 'No se adjuntó ningún paquete de anexos.' });
+        }
+        const uploadedFiles = req.files.map(f => ({
+            originalName: f.originalname,
+            path: f.path,
+            filename: f.filename
+        }));
+
+        res.json({
+            message: `Se subieron ${uploadedFiles.length} archivos de anexos en paquete exitosamente.`,
+            files: uploadedFiles
+        });
+    } catch (err) {
+        console.error('[DESERCIONES] Error en carga masiva de anexos:', err);
+        res.status(500).json({ error: 'Error procesando la carga masiva de anexos.' });
+    }
+});
+
 // Helper de fusión de texto inicial con campos de fila
 const mergeText = (template, row) => {
     if (!template) return '';
@@ -206,9 +228,9 @@ router.post('/preview-merge', requireAuth, (req, res) => {
     res.json({ mergedText: merged });
 });
 
-// 4. Guardar casos y generar comunicaciones oficiales en PDF
+// 4. Guardar casos y preparar comunicaciones (opcionalmente generando PDF o directo para robot OnBase)
 router.post('/guardar-casos', requireAuth, async (req, res) => {
-    const { etapa, casos, texto_inicial, onbase_target_user, copy_emails } = req.body;
+    const { etapa, casos, texto_inicial, onbase_target_user, copy_emails, generate_pdf = true } = req.body;
 
     if (!etapa || !casos || !Array.isArray(casos) || casos.length === 0) {
         return res.status(400).json({ error: 'Datos de casos incompletos o inválidos.' });
@@ -219,18 +241,20 @@ router.post('/guardar-casos', requireAuth, async (req, res) => {
 
         const copyEmailsStr = typeof copy_emails === 'string' ? copy_emails : JSON.stringify(copy_emails || []);
         const outputDir = path.join(__dirname, '..', 'uploads', 'deserciones_pdf');
-        if (!fs.existsSync(outputDir)) {
+        if (generate_pdf && !fs.existsSync(outputDir)) {
             fs.mkdirSync(outputDir, { recursive: true });
         }
 
         let browser = null;
-        try {
-            browser = await puppeteer.launch({
-                headless: 'new',
-                args: ['--no-sandbox', '--disable-setuid-sandbox']
-            });
-        } catch (e) {
-            console.warn('[DESERCIONES] Advertencia lanzando Puppeteer:', e.message);
+        if (generate_pdf) {
+            try {
+                browser = await puppeteer.launch({
+                    headless: 'new',
+                    args: ['--no-sandbox', '--disable-setuid-sandbox']
+                });
+            } catch (e) {
+                console.warn('[DESERCIONES] Advertencia lanzando Puppeteer:', e.message);
+            }
         }
 
         const createdRecords = [];

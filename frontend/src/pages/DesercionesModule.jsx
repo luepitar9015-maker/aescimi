@@ -31,9 +31,10 @@ export default function DesercionesModule() {
   const [columns, setColumns] = useState([]);
   const [uploadingExcel, setUploadingExcel] = useState(false);
 
-  // Template State (Texto Inicial)
-  const [textoInicialCitacion, setTextoInicialCitacion] = useState(
-    `Por medio de la presente, se le cita a Comité de Evaluación y Seguimiento de acuerdo con el Reglamento del Aprendiz SENA.
+  // Template State (Texto Inicial) con Persistencia en localStorage
+  const [textoInicialCitacion, setTextoInicialCitacion] = useState(() => {
+    return localStorage.getItem('sena_deserciones_citacion_text') || 
+`Por medio de la presente, se le cita a Comité de Evaluación y Seguimiento de acuerdo con el Reglamento del Aprendiz SENA.
 
 Ficha de Formación: {{ficha}}
 Programa: {{programa}}
@@ -43,16 +44,26 @@ Fecha de la Cita: {{fecha_comite}}
 Hora: {{hora_comite}}
 Lugar / Enlace: {{lugar_comite}}
 
-Es indispensable su asistencia para ejercer su derecho a la defensa y presentar los descargos correspondientes.`
-  );
+Es indispensable su asistencia para ejercer su derecho a la defensa y presentar los descargos correspondientes.`;
+  });
 
-  const [textoInicialResolucion, setTextoInicialResolucion] = useState(
-    `Por medio de la presente, se le notifica formalmente la emisión de la Resolución de Cancelación de Matrícula por causa de deserción del programa de formación {{programa}} correspondiente a la Ficha No. {{ficha}}.
+  const [textoInicialResolucion, setTextoInicialResolucion] = useState(() => {
+    return localStorage.getItem('sena_deserciones_resolucion_text') || 
+`Por medio de la presente, se le notifica formalmente la emisión de la Resolución de Cancelación de Matrícula por causa de deserción del programa de formación {{programa}} correspondiente a la Ficha No. {{ficha}}.
 
 Se adjunta de manera explícita la Resolución correspondiente a su trámite para su conocimiento y fines legales.
 
-Usted cuenta con los recursos de ley de conformidad con la normatividad institucional SENA.`
-  );
+Usted cuenta con los recursos de ley de conformidad con la normatividad institucional SENA.`;
+  });
+
+  // Persistir plantillas de texto en localStorage cuando cambian
+  useEffect(() => {
+    localStorage.setItem('sena_deserciones_citacion_text', textoInicialCitacion);
+  }, [textoInicialCitacion]);
+
+  useEffect(() => {
+    localStorage.setItem('sena_deserciones_resolucion_text', textoInicialResolucion);
+  }, [textoInicialResolucion]);
 
   // OnBase User & CC Emails
   const [onbaseUsers, setOnbaseUsers] = useState([]);
@@ -68,6 +79,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
   const [selectedRows, setSelectedRows] = useState({});
   const [rowAttachments, setRowAttachments] = useState({}); // { [rowId]: { name, path } }
   const [uploadingAttachmentId, setUploadingAttachmentId] = useState(null);
+  const [uploadingBatchAttachments, setUploadingBatchAttachments] = useState(false);
 
   // Preview Modal State
   const [previewItem, setPreviewItem] = useState(null);
@@ -81,8 +93,8 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
   const [processingOnBase, setProcessingOnBase] = useState(false);
   const [statusMessage, setStatusMessage] = useState({ type: '', text: '' });
 
-  // Variables disponibles para combinar
-  const availableChips = [
+  // Variables estándar SENA por defecto
+  const standardChips = [
     '{{aprendiz_nombre}}',
     '{{aprendiz_doc_tipo}}',
     '{{aprendiz_doc_numero}}',
@@ -94,6 +106,11 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
     '{{hora_comite}}',
     '{{lugar_comite}}'
   ];
+
+  // Variables disponibles para combinar: dinámicas desde los títulos de columna del Excel cargado
+  const availableChips = columns && columns.length > 0
+    ? Array.from(new Set([...columns.map(col => `{{${col.trim()}}}`), ...standardChips]))
+    : standardChips;
 
   // Fetch active users for OnBase assignment & Historico on mount
   useEffect(() => {
@@ -196,6 +213,72 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
     }
   };
 
+  // 2.1 Manejo de Carga Masiva de Paquete de Anexos con Auto-reconocimiento por documento/aprendiz
+  const handleBatchAttachmentsUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    if (excelData.length === 0) {
+      alert('Por favor cargue primero el archivo Excel con los datos de los aprendices para realizar el emparejamiento automático.');
+      return;
+    }
+
+    setUploadingBatchAttachments(true);
+    setStatusMessage({ type: 'info', text: `Subiendo paquete masivo de ${files.length} anexos...` });
+
+    const formData = new FormData();
+    files.forEach(f => formData.append('anexos', f));
+
+    try {
+      const res = await axios.post('/api/deserciones/upload-masivo-anexos', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      const uploadedFiles = res.data.files || [];
+      const newAttachments = { ...rowAttachments };
+      let matchedCount = 0;
+
+      uploadedFiles.forEach(file => {
+        const cleanFileName = file.originalName.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        // Buscar en excelData la fila que coincida en número de documento, ficha o nombre
+        const matchedRow = excelData.find(row => {
+          const docNum = String(row.aprendiz_doc_numero || '').replace(/[^a-z0-9]/g, '');
+          const fichaNum = String(row.ficha || '').replace(/[^a-z0-9]/g, '');
+          const nameClean = String(row.aprendiz_nombre || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+          const docMatch = docNum && docNum.length >= 4 && cleanFileName.includes(docNum);
+          const fichaMatch = fichaNum && fichaNum.length >= 4 && cleanFileName.includes(fichaNum);
+          const nameMatch = nameClean && nameClean.length >= 6 && cleanFileName.includes(nameClean);
+
+          return docMatch || fichaMatch || nameMatch;
+        });
+
+        if (matchedRow) {
+          newAttachments[matchedRow.id_temp] = {
+            name: file.originalName,
+            path: file.path
+          };
+          matchedCount++;
+        }
+      });
+
+      setRowAttachments(newAttachments);
+      setStatusMessage({
+        type: 'success',
+        text: `Carga masiva completada: ${uploadedFiles.length} archivos subidos. ${matchedCount} anexos reconocidos y emparejados automáticamente con sus oficios.`
+      });
+    } catch (err) {
+      console.error('Error en carga masiva de anexos:', err);
+      setStatusMessage({
+        type: 'error',
+        text: err.response?.data?.error || 'Error al procesar el paquete masivo de anexos.'
+      });
+    } finally {
+      setUploadingBatchAttachments(false);
+    }
+  };
+
   // 3. Insertar Chip de Variable en el Editor de Texto
   const insertChip = (chipText) => {
     if (activeTab === 'citacion') {
@@ -233,17 +316,20 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
     }
   };
 
-  // 6. Guardar y Generar Comunicaciones PDF
-  const handleGuardarYGenerar = async () => {
+  // 6. Guardar casos (con opción de generar PDF o directo para Robot OnBase)
+  const handleGuardarYGenerar = async (opts = { generatePdf: true }) => {
     const rowsToProcess = excelData.filter(r => selectedRows[r.id_temp]);
 
     if (rowsToProcess.length === 0) {
-      setStatusMessage({ type: 'warning', text: 'Debe seleccionar al menos un aprendizaje/fila de la tabla.' });
+      setStatusMessage({ type: 'warning', text: 'Debe seleccionar al menos un aprendiz/fila de la tabla.' });
       return;
     }
 
     setProcessingSave(true);
-    setStatusMessage({ type: 'info', text: 'Generando correspondencias combinadas en PDF...' });
+    setStatusMessage({ 
+      type: 'info', 
+      text: opts.generatePdf ? 'Generando correspondencias combinadas en PDF...' : 'Guardando campos de formulario y anexos para el Robot OnBase...' 
+    });
 
     const etapa = activeTab === 'citacion' ? 'CITACION_COMITE' : 'NOTIFICACION_RESOLUCION';
     const textoInicial = activeTab === 'citacion' ? textoInicialCitacion : textoInicialResolucion;
@@ -260,7 +346,8 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
         texto_inicial: textoInicial,
         casos: casosConAnexos,
         onbase_target_user: selectedOnbaseUser,
-        copy_emails: ccEmails
+        copy_emails: ccEmails,
+        generate_pdf: opts.generatePdf
       });
 
       setStatusMessage({
@@ -486,14 +573,17 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                   <FileText size={20} color="#39a900" />
                   2. Redactar Texto Inicial y Combinar Campos
                 </h3>
+                <span style={{ fontSize: '12px', background: '#ecfdf5', color: '#047857', padding: '4px 10px', borderRadius: '6px', fontWeight: '600', border: '1px solid #a7f3d0' }}>
+                  ✓ Plantilla Almacenada
+                </span>
               </div>
               
               <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#64748b' }}>
-                Haz clic en cualquier etiqueta/chip para insertar la variable del Excel en la plantilla:
+                Haz clic en cualquier etiqueta/chip para insertar la variable {columns.length > 0 ? 'extraída del Excel cargado' : 'estándar SENA'} en la plantilla:
               </p>
 
-              {/* Chips de variables */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+              {/* Chips de variables (Campos de Excel de los títulos de cada columna) */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px', maxHeight: '120px', overflowY: 'auto', padding: '6px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                 {availableChips.map(chip => (
                   <button 
                     key={chip}
@@ -502,12 +592,14 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                       background: '#e0f2fe',
                       color: '#0369a1',
                       border: '1px solid #bae6fd',
-                      padding: '4px 10px',
+                      padding: '5px 12px',
                       borderRadius: '6px',
                       fontSize: '12px',
                       fontWeight: '600',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
                     }}
+                    title={`Haga clic para insertar la variable ${chip}`}
                   >
                     + {chip}
                   </button>
@@ -528,15 +620,46 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                   fontFamily: 'inherit',
                   boxSizing: 'border-box'
                 }}
+                placeholder="Escriba aquí el texto inicial de la comunicación..."
               />
             </div>
 
-            {/* Box 3: Tabla de Aprendices y Anexos Explícitos */}
+            {/* Box 3: Tabla de Aprendices y Anexos Explícitos / Masivos */}
             <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-              <h3 style={{ margin: '0 0 16px 0', color: '#0f172a', fontSize: '17px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Paperclip size={20} color="#39a900" />
-                3. Tabla Combinada y Anexo Explícito por Aprendiz ({activeTab === 'citacion' ? 'Anexo del Comité' : 'Anexo de Resolución'})
-              </h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                <h3 style={{ margin: 0, color: '#0f172a', fontSize: '17px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Paperclip size={20} color="#39a900" />
+                  3. Tabla Combinada y Anexo Explícito por Aprendiz ({activeTab === 'citacion' ? 'Anexo del Comité' : 'Anexo de Resolución'})
+                </h3>
+
+                {/* Botón de Cargue Masivo de Paquete de Anexos */}
+                {excelData.length > 0 && (
+                  <label style={{
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    background: '#00324d',
+                    color: '#ffffff',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    boxShadow: '0 2px 6px rgba(0,50,77,0.2)'
+                  }}>
+                    <Upload size={16} />
+                    {uploadingBatchAttachments ? 'Cargando Paquete Masivo...' : 'Cargar Paquete Masivo de Adjuntos'}
+                    <input 
+                      type="file" 
+                      multiple 
+                      accept=".pdf,.doc,.docx"
+                      onChange={handleBatchAttachmentsUpload}
+                      style={{ display: 'none' }}
+                      disabled={uploadingBatchAttachments}
+                    />
+                  </label>
+                )}
+              </div>
 
               {excelData.length === 0 ? (
                 <div style={{ padding: '40px', textIndent: 'center', textAlign: 'center', color: '#94a3b8', background: '#f8fafc', borderRadius: '8px' }}>
@@ -553,7 +676,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                         <th style={{ padding: '10px', textAlign: 'left' }}>Ficha</th>
                         <th style={{ padding: '10px', textAlign: 'left' }}>Programa</th>
                         <th style={{ padding: '10px', textAlign: 'left' }}>Causal</th>
-                        <th style={{ padding: '10px', textAlign: 'center' }}>Anexo Explícito</th>
+                        <th style={{ padding: '10px', textAlign: 'center' }}>Anexo Explícito / Masivo</th>
                         <th style={{ padding: '10px', textAlign: 'center' }}>Acción</th>
                       </tr>
                     </thead>
@@ -708,31 +831,55 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
               </div>
             </div>
 
-            {/* Acciones Finales */}
-            <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '12px', padding: '20px' }}>
+            {/* Acciones Finales (Robot OnBase sin PDF vs Generar PDF) */}
+            <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <button 
-                onClick={handleGuardarYGenerar}
+                onClick={() => handleGuardarYGenerar({ generatePdf: false })}
+                disabled={processingSave || excelData.length === 0}
+                style={{
+                  width: '100%',
+                  background: 'linear-gradient(135deg, #00324d 0%, #00507a 100%)',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '14px',
+                  borderRadius: '10px',
+                  fontSize: '14px',
+                  fontWeight: '700',
+                  cursor: (processingSave || excelData.length === 0) ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 12px rgba(0,50,77,0.25)',
+                  opacity: excelData.length === 0 ? 0.6 : 1
+                }}
+              >
+                <Play size={18} color="#39a900" />
+                {processingSave ? 'Procesando...' : 'Guardar y Preparar para Robot OnBase (Sin PDF)'}
+              </button>
+
+              <button 
+                onClick={() => handleGuardarYGenerar({ generatePdf: true })}
                 disabled={processingSave || excelData.length === 0}
                 style={{
                   width: '100%',
                   background: 'linear-gradient(135deg, #39a900 0%, #2e8b00 100%)',
                   color: '#fff',
                   border: 'none',
-                  padding: '14px',
+                  padding: '12px',
                   borderRadius: '10px',
-                  fontSize: '15px',
-                  fontWeight: '700',
-                  cursor: processingSave ? 'not-allowed' : 'pointer',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  cursor: (processingSave || excelData.length === 0) ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '10px',
-                  boxShadow: '0 4px 12px rgba(57,169,0,0.3)',
+                  gap: '8px',
                   opacity: excelData.length === 0 ? 0.6 : 1
                 }}
               >
-                <FileText size={20} />
-                {processingSave ? 'Generando Cartas PDF...' : 'Generar Correspondencias PDF'}
+                <FileText size={16} />
+                Generar Correspondencias PDF y Guardar
               </button>
             </div>
 
