@@ -240,19 +240,56 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
       let matchedCount = 0;
 
       uploadedFiles.forEach(file => {
-        const cleanFileName = file.originalName.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const originalFileName = (file.originalName || '').trim();
+        const baseFileName = originalFileName.substring(0, originalFileName.lastIndexOf('.')) || originalFileName;
+        const cleanFileName = baseFileName.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-        // Buscar en excelData la fila que coincida en número de documento, ficha o nombre
+        // Buscar en excelData la fila que coincida por resolución, documento, ficha, nombre o cualquier casilla de la fila
         const matchedRow = excelData.find(row => {
-          const docNum = String(row.aprendiz_doc_numero || '').replace(/[^a-z0-9]/g, '');
-          const fichaNum = String(row.ficha || '').replace(/[^a-z0-9]/g, '');
-          const nameClean = String(row.aprendiz_nombre || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          // 1. Verificar coincidencia con cualquier celda del raw_row (ej. Resolución, No. Resolución, etc.)
+          if (row.raw_row && typeof row.raw_row === 'object') {
+            for (const [colKey, cellVal] of Object.entries(row.raw_row)) {
+              if (cellVal === undefined || cellVal === null) continue;
+              const strVal = String(cellVal).trim();
+              if (!strVal || strVal.length < 3) continue;
 
-          const docMatch = docNum && docNum.length >= 4 && cleanFileName.includes(docNum);
-          const fichaMatch = fichaNum && fichaNum.length >= 4 && cleanFileName.includes(fichaNum);
-          const nameMatch = nameClean && nameClean.length >= 6 && cleanFileName.includes(nameClean);
+              const cleanVal = strVal.toLowerCase().replace(/[^a-z0-9]/g, '');
+              if (!cleanVal || cleanVal.length < 3) continue;
 
-          return docMatch || fichaMatch || nameMatch;
+              // Coincidencia limpia si el archivo contiene el valor de la celda de resolución o viceversa
+              if (cleanFileName.includes(cleanVal) || cleanVal.includes(cleanFileName)) {
+                return true;
+              }
+
+              // Coincidencia directa insensible a mayúsculas
+              if (baseFileName.toLowerCase().includes(strVal.toLowerCase()) || strVal.toLowerCase().includes(baseFileName.toLowerCase())) {
+                return true;
+              }
+            }
+          }
+
+          // 2. Verificar coincidencia con campos mapeados principales
+          const candidates = [
+            row.resolucion,
+            row.aprendiz_doc_numero,
+            row.ficha,
+            row.aprendiz_nombre
+          ];
+
+          for (const cand of candidates) {
+            if (!cand) continue;
+            const strCand = String(cand).trim();
+            if (!strCand || strCand.length < 3) continue;
+
+            const cleanCand = strCand.toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (cleanCand && cleanCand.length >= 3) {
+              if (cleanFileName.includes(cleanCand) || cleanCand.includes(cleanFileName)) {
+                return true;
+              }
+            }
+          }
+
+          return false;
         });
 
         if (matchedRow) {

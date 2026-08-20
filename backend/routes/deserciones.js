@@ -122,6 +122,7 @@ router.post('/upload-excel', requireAuth, upload.single('excel'), (req, res) => 
                 fecha_comite: getVal(['fecha_comite', 'fecha', 'fecha_citacion']),
                 hora_comite: getVal(['hora_comite', 'hora', 'hora_citacion']),
                 lugar_comite: getVal(['lugar_comite', 'lugar', 'enlace', 'ubicacion']),
+                resolucion: getVal(['resolucion', 'resolución', 'num_resolucion', 'numero_resolucion', 'no_resolucion', 'no._resolucion', 'acto_administrativo', 'comunicacion']),
                 raw_row: row
             };
         });
