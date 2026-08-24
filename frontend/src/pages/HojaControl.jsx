@@ -24,6 +24,27 @@ function HojaControl() {
 
     const templateRef = useRef(null);
 
+    const extractDateISO = (val) => {
+        if (!val) return '';
+        const str = String(val).trim();
+        // 1. Matches YYYY-MM-DD at start or inside ISO string
+        const matchISO = str.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+        if (matchISO) {
+            return `${matchISO[1]}-${matchISO[2].padStart(2, '0')}-${matchISO[3].padStart(2, '0')}`;
+        }
+        // 2. Matches DD/MM/YYYY or DD-MM-YYYY
+        const matchCol = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+        if (matchCol) {
+            return `${matchCol[3]}-${matchCol[2].padStart(2, '0')}-${matchCol[1].padStart(2, '0')}`;
+        }
+        // 3. Fallback to Date object parsing
+        const d = new Date(str);
+        if (!isNaN(d.getTime())) {
+            return d.toISOString().split('T')[0];
+        }
+        return '';
+    };
+
     const getAuthHeaders = () => {
         const token = localStorage.getItem('token');
         return token ? { Authorization: `Bearer ${token}` } : {};
@@ -56,24 +77,38 @@ function HojaControl() {
             const expDetail = expRes.data.data;
             setSelectedExp(expDetail);
 
+            const metaObj = expDetail.metadata_values || {};
+
             // Load documents for this expediente
             const res = await axios.get(`/api/documents/expediente/${exp.id}`);
             const docs = res.data.data || [];
             
+            // Map saved docs metadata if present
+            const savedDocsMap = {};
+            if (metaObj.hoja_control_documentos && Array.isArray(metaObj.hoja_control_documentos)) {
+                metaObj.hoja_control_documentos.forEach(sd => {
+                    if (sd.id) savedDocsMap[sd.id] = sd;
+                    if (sd.tipo) savedDocsMap[sd.tipo] = sd;
+                });
+            }
+
             // Format documents for the table
-            const formattedDocs = docs.map(d => ({
-                id: d.id,
-                fecha: d.document_date ? d.document_date.split('T')[0] : '',
-                tipo: d.typology_name || d.filename,
-                soporte: d.origen || 'ELECTRONICO', // Mapping Origen to Soporte
-                folios: '',
-                obs: expDetail.expediente_code || ''
-            }));
+            const formattedDocs = docs.map(d => {
+                const saved = savedDocsMap[d.id] || savedDocsMap[d.typology_name] || {};
+                const rawDate = saved.fecha || d.document_date || d.created_at || d.load_date;
+                return {
+                    id: d.id,
+                    fecha: extractDateISO(rawDate),
+                    tipo: d.typology_name || d.filename,
+                    soporte: saved.soporte || d.origen || 'ELECTRONICO',
+                    folios: saved.folios || '',
+                    obs: saved.obs || expDetail.expediente_code || ''
+                };
+            });
             
             setDocumentos(formattedDocs);
             
             // Pre-fill fields based on Expediente detail data and metadata_values
-            const metaObj = expDetail.metadata_values || {};
             setResponsable(metaObj.responsable_hoja_control || '');
             setFormSede(expDetail.regional_name || expDetail.regional || '');
             setFormCodSede(metaObj.regional_code || expDetail.regional_code || '');
