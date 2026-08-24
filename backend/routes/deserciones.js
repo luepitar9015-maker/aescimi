@@ -7,7 +7,7 @@ const fs = require('fs');
 const puppeteer = require('puppeteer');
 const { pool } = require('../database_pg');
 const db = require('../database');
-const { requireAuth } = require('../middleware/authMiddleware');
+const { requireAuth, requireAdmin } = require('../middleware/authMiddleware');
 
 // Configuración de almacenamiento para multer (Excel y Anexos PDF/Docs)
 const storage = multer.diskStorage({
