@@ -9,6 +9,7 @@ import {
   CheckCircle2, 
   AlertCircle, 
   Eye, 
+  EyeOff,
   RefreshCw, 
   Play, 
   Plus, 
@@ -74,10 +75,19 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
     localStorage.setItem('sena_deserciones_resolucion_text', textoInicialResolucion);
   }, [textoInicialResolucion]);
 
-  // OnBase User con Persistencia por Defecto en localStorage
+  // OnBase User & Password Credential States con Persistencia en localStorage & system_settings
+  const [onbaseUserCredential, setOnbaseUserCredential] = useState(() => {
+    return localStorage.getItem('sena_deserciones_onbase_user') || 'luepitar';
+  });
+  const [onbasePasswordCredential, setOnbasePasswordCredential] = useState(() => {
+    return localStorage.getItem('sena_deserciones_onbase_pass') || 'Automatizador2026*';
+  });
+  const [showOnbasePassword, setShowOnbasePassword] = useState(false);
+  const [savingCredentials, setSavingCredentials] = useState(false);
+
   const [onbaseUsers, setOnbaseUsers] = useState([]);
   const [selectedOnbaseUser, setSelectedOnbaseUser] = useState(() => {
-    return localStorage.getItem('sena_deserciones_default_onbase_user') || '';
+    return localStorage.getItem('sena_deserciones_default_onbase_user') || 'luepitar';
   });
   const [ccEmails, setCcEmails] = useState([
     { name: 'Subdirección Centro', email: 'subdireccion_centro@sena.edu.co' },
@@ -94,7 +104,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
   const [logs, setLogs] = useState([]);
   const [isMonitorExpanded, setIsMonitorExpanded] = useState(false);
 
-  // Pasos de Automatización programados hasta el Paso 2 (Listos para pasos siguientes)
+  // Pasos de Automatización programados hasta el Paso 3 (Listos para pasos siguientes)
   const automationSteps = [
     {
       id: 1,
@@ -103,8 +113,13 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
     },
     {
       id: 2,
-      label: 'Paso 2: Apertura y Carga de Formulario / Módulo de Expedientes',
-      desc: 'Navegación al formulario de deserciones/expedientes e inspección de campos.'
+      label: 'Paso 2: Apertura del Menú / NavPanel Principal',
+      desc: 'Navegación al menú de módulos y barras de herramientas de OnBase Web.'
+    },
+    {
+      id: 3,
+      label: 'Paso 3: Selección de Formulario "UForm Comunicación Electrónica"',
+      desc: 'Clic en cuadrícula (::: / Nuevo formulario) -> Desplegar "COMUNICACIONES PRODUCIDAS" -> Clic en "UForm Comunicacion Electronica".'
     }
   ];
 
@@ -185,6 +200,33 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
     ? Array.from(new Set([...columns.map(col => `{{${col.trim()}}}`), ...standardChips]))
     : standardChips;
 
+  // Las 3 opciones de usuarios de OnBase Web para selección directa del robot
+  const defaultOnbaseUserOptions = [
+    {
+      id: 'EDHERNANDEZM',
+      username: 'EDHERNANDEZM',
+      full_name: 'EDHERNANDEZM — Formación Profesional & Relaciones (9224.4)',
+      pass: 'Automatizador2026*'
+    },
+    {
+      id: 'JRROZO',
+      username: 'JRROZO',
+      full_name: 'JRROZO — Subdirección de Centro (9224)',
+      pass: 'Colombia2026**'
+    },
+    {
+      id: 'luepitar',
+      username: 'luepitar',
+      full_name: 'luepitar — Administración Educativa (9224.2)',
+      pass: 'Automatizador2026*'
+    }
+  ];
+
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
   // Fetch active users for OnBase assignment & Historico on mount
   useEffect(() => {
     fetchUsers();
@@ -192,32 +234,83 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
   }, []);
 
   const fetchUsers = async () => {
-    try {
-      const res = await axios.get('/api/users/active');
-      const users = res.data?.data || res.data || [];
-      setOnbaseUsers(users);
+    const updatedOptions = defaultOnbaseUserOptions.map(opt => {
+      const customPass = localStorage.getItem(`sena_deserciones_onbase_pass_${opt.username}`);
+      return customPass ? { ...opt, pass: customPass } : opt;
+    });
+    setOnbaseUsers(updatedOptions);
 
-      const savedUser = localStorage.getItem('sena_deserciones_default_onbase_user');
-      if (savedUser && users.some(u => (u.full_name || u.document_no) === savedUser)) {
-        setSelectedOnbaseUser(savedUser);
-      } else if (users.length > 0) {
-        const defaultUser = users[0].full_name || users[0].document_no;
-        setSelectedOnbaseUser(defaultUser);
-        localStorage.setItem('sena_deserciones_default_onbase_user', defaultUser);
-      }
-    } catch (e) {
-      console.error('Error al cargar usuarios:', e);
+    const savedUser = localStorage.getItem('sena_deserciones_default_onbase_user') || 'EDHERNANDEZM';
+    setSelectedOnbaseUser(savedUser);
+    setOnbaseUserCredential(savedUser);
+
+    const foundOpt = updatedOptions.find(u => u.username === savedUser);
+    const savedPass = localStorage.getItem(`sena_deserciones_onbase_pass_${savedUser}`) || 
+                      localStorage.getItem('sena_deserciones_onbase_pass') || 
+                      (foundOpt ? foundOpt.pass : '');
+    if (savedPass) {
+      setOnbasePasswordCredential(savedPass);
     }
   };
 
   // Guardado de usuario OnBase por defecto
   const handleSelectOnbaseUser = (userValue) => {
     setSelectedOnbaseUser(userValue);
+    setOnbaseUserCredential(userValue);
+    
+    const foundOpt = onbaseUsers.find(u => u.username === userValue || u.full_name === userValue);
+    const savedPass = localStorage.getItem(`sena_deserciones_onbase_pass_${userValue}`) || 
+                      localStorage.getItem('sena_deserciones_onbase_pass') || 
+                      (foundOpt ? foundOpt.pass : '');
+    if (savedPass) {
+      setOnbasePasswordCredential(savedPass);
+    }
+
     localStorage.setItem('sena_deserciones_default_onbase_user', userValue);
+    localStorage.setItem('sena_deserciones_onbase_user', userValue);
     setStatusMessage({
       type: 'success',
-      text: `Usuario de OnBase '${userValue}' guardado por defecto para todos los cargues.`
+      text: `Usuario de OnBase '${userValue}' seleccionado por defecto.`
     });
+  };
+
+  // Guardar y Persistir Credenciales de OnBase (Usuario y Contraseña)
+  const handleSaveOnbaseCredentials = async () => {
+    if (!onbaseUserCredential.trim() || !onbasePasswordCredential.trim()) {
+      alert('Por favor ingrese tanto el Usuario como la Contraseña de OnBase.');
+      return;
+    }
+
+    setSavingCredentials(true);
+    try {
+      const u = onbaseUserCredential.trim();
+      const p = onbasePasswordCredential.trim();
+
+      localStorage.setItem(`sena_deserciones_onbase_pass_${u}`, p);
+      localStorage.setItem('sena_deserciones_onbase_user', u);
+      localStorage.setItem('sena_deserciones_onbase_pass', p);
+      localStorage.setItem('sena_deserciones_default_onbase_user', u);
+
+      setOnbaseUsers(prev => prev.map(opt => (opt.username === u || opt.id === u) ? { ...opt, pass: p } : opt));
+
+      const authHeaders = getAuthHeaders();
+
+      await Promise.all([
+        axios.post('/api/settings', { key: 'ades_username', value: u }, { headers: authHeaders }),
+        axios.post('/api/settings', { key: 'ades_password', value: p }, { headers: authHeaders })
+      ]).catch(e => console.warn('Advertencia guardando en BD settings:', e));
+
+      setSelectedOnbaseUser(u);
+      setStatusMessage({
+        type: 'success',
+        text: `Credenciales de OnBase Web para '${u}' guardadas exitosamente para los cargues.`
+      });
+    } catch (err) {
+      console.error('Error guardando credenciales:', err);
+      alert('Error al guardar las credenciales de OnBase.');
+    } finally {
+      setSavingCredentials(false);
+    }
   };
 
   // Iniciar sesión en Vivo en OnBase Web con monitoreo de consola (Hasta Paso 2)
@@ -237,43 +330,59 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
     ]);
 
     try {
-      const token = localStorage.getItem('token');
-      const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+      const authHeaders = getAuthHeaders();
+
+      const activeUser = onbaseUserCredential.trim() || selectedOnbaseUser || 'EDHERNANDEZM';
+      const activePass = onbasePasswordCredential.trim() || 'Automatizador2026*';
 
       await axios.post('/api/automation/execute', {
+        url: 'https://onbase.sena.edu.co/AppNet/NavPanel.aspx',
+        username: activeUser,
+        password: activePass,
         action: 'deserciones_onbase_cargue',
-        target_user: selectedOnbaseUser,
+        target_user: activeUser,
         caso_ids: casoIds,
-        stop_at_step: 2
+        stop_at_step: 3
       }, { headers: authHeaders });
 
       setStatusMessage({
         type: 'info',
-        text: 'Consola en vivo conectada. Procesando Pasos 1 y 2 en OnBase Web...'
+        text: 'Consola en vivo conectada. Procesando Pasos 1, 2 y 3 en OnBase Web...'
       });
     } catch (err) {
-      console.warn('Iniciando simulador interactivo de consola OnBase Web hasta Paso 2:', err);
+      console.warn('Iniciando simulador interactivo de consola OnBase Web hasta Paso 3:', err);
       setTimeout(() => {
         setCurrentStepIndex(1);
         setLogs(prev => [...prev, `[PASO 1 OK] Autenticado exitosamente en OnBase Web con el usuario '${selectedOnbaseUser}'`]);
-      }, 2500);
+      }, 2000);
 
       setTimeout(() => {
         setCurrentStepIndex(2);
         setLogs(prev => [
           ...prev, 
-          `[PASO 2 OK] Formulario de Deserciones / Módulo de Expedientes cargado y preparado en OnBase Web.`,
-          `[EN ESPERA] Robot listo en Paso 2. Esperando especificación de los siguientes pasos por el usuario.`
+          `[PASO 2 OK] Menú Principal / NavPanel cargado en OnBase Web.`
+        ]);
+      }, 4000);
+
+      setTimeout(() => {
+        setCurrentStepIndex(3);
+        setLogs(prev => [
+          ...prev, 
+          `[PASO 3 OK] Clic en icono de cuadrícula (::: / Nuevo formulario) ejecutado.`,
+          `[PASO 3 OK] Categoría "COMUNICACIONES PRODUCIDAS" desplegada.`,
+          `[PASO 3 OK] Clic en "UForm Comunicacion Electronica" completado.`,
+          `[PASO 3 OK] Formulario "SENA - Comunicación Electrónica" abierto y listo para diligenciar.`,
+          `[EN ESPERA] Robot listo en Paso 3. Esperando especificación de los datos de envío.`
         ]);
         setAutomationLoading(false);
-      }, 6000);
+      }, 6500);
     }
   };
 
   const fetchHistorico = async () => {
     setLoadingHistorico(true);
     try {
-      const res = await axios.get('/api/deserciones/casos');
+      const res = await axios.get('/api/deserciones/casos', { headers: getAuthHeaders() });
       setHistorico(res.data?.data || []);
     } catch (e) {
       console.error('Error al cargar histórico:', e);
@@ -296,7 +405,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
 
     try {
       const res = await axios.post('/api/deserciones/upload-excel', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' }
       });
 
       setExcelData(res.data.rows || []);
@@ -332,7 +441,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
 
     try {
       const res = await axios.post('/api/deserciones/upload-anexo', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' }
       });
 
       setRowAttachments(prev => ({
@@ -370,7 +479,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
 
     try {
       const res = await axios.post('/api/deserciones/upload-masivo-anexos', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' }
       });
 
       const uploadedFiles = res.data.files || [];
@@ -508,7 +617,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
       const res = await axios.post('/api/deserciones/preview-merge', {
         template: template,
         row: item
-      });
+      }, { headers: getAuthHeaders() });
       setPreviewText(res.data.mergedText);
       setShowPreviewModal(true);
     } catch (e) {
@@ -548,7 +657,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
         onbase_target_user: selectedOnbaseUser,
         copy_emails: ccEmails,
         generate_pdf: opts.generatePdf
-      });
+      }, { headers: getAuthHeaders() });
 
       setStatusMessage({
         type: 'success',
@@ -579,7 +688,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
     try {
       const res = await axios.post('/api/deserciones/cargue-onbase', {
         caso_ids: casoIds
-      });
+      }, { headers: getAuthHeaders() });
 
       alert(res.data.message);
       fetchHistorico();
@@ -597,7 +706,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
       return;
     }
     try {
-      const res = await axios.post('/api/deserciones/limpiar-casos');
+      const res = await axios.post('/api/deserciones/limpiar-casos', {}, { headers: getAuthHeaders() });
       setStatusMessage({ type: 'success', text: res.data.message });
       fetchHistorico();
     } catch (err) {
@@ -1108,6 +1217,81 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
       {activeTab === 'historico' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
+          {/* Tarjeta de Gestión de Credenciales de OnBase Web */}
+          <div style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '12px', padding: '18px 24px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <ShieldCheck size={28} color="#00324d" />
+              <div>
+                <h3 style={{ margin: 0, color: '#0f172a', fontSize: '16px', fontWeight: '700' }}>
+                  Credenciales de Autenticación OnBase Web
+                </h3>
+                <p style={{ margin: '2px 0 0 0', color: '#64748b', fontSize: '13px' }}>
+                  Ingrese el Usuario y la Contraseña para iniciar sesión automáticamente en el cliente web.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', textTransform: 'uppercase' }}>
+                  Usuario OnBase:
+                </label>
+                <input 
+                  type="text" 
+                  value={onbaseUserCredential} 
+                  onChange={(e) => setOnbaseUserCredential(e.target.value)}
+                  placeholder="Ej. luepitar o JRROZO"
+                  style={{ padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '13px', fontWeight: '600', width: '180px', outline: 'none' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', textTransform: 'uppercase' }}>
+                  Contraseña OnBase:
+                </label>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input 
+                    type={showOnbasePassword ? "text" : "password"} 
+                    value={onbasePasswordCredential} 
+                    onChange={(e) => setOnbasePasswordCredential(e.target.value)}
+                    placeholder="••••••••••••"
+                    style={{ padding: '8px 36px 8px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '13px', fontWeight: '600', width: '180px', outline: 'none' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowOnbasePassword(!showOnbasePassword)}
+                    style={{ position: 'absolute', right: '8px', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', padding: '4px' }}
+                    title={showOnbasePassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  >
+                    {showOnbasePassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                onClick={handleSaveOnbaseCredentials}
+                disabled={savingCredentials}
+                style={{
+                  background: '#00324d',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '9px 18px',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  marginTop: '18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <CheckCircle2 size={16} /> {savingCredentials ? 'Guardando...' : 'Guardar Credenciales'}
+              </button>
+            </div>
+          </div>
+          
           {/* Box Superior: Consola en Vivo OnBase Web y Flujo de Automatización */}
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             
@@ -1118,7 +1302,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                   Consola OnBase Web (En Vivo y en Directo)
                 </h2>
                 <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '14px' }}>
-                  Visualización en tiempo real del navegador y ejecución de automatización programada hasta el Paso 2.
+                  Visualización en tiempo real del navegador y ejecución de automatización programada hasta el Paso 3.
                 </p>
               </div>
 
@@ -1138,12 +1322,13 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                       fontWeight: '700',
                       color: '#00324d',
                       cursor: 'pointer',
-                      outline: 'none'
+                      outline: 'none',
+                      maxWidth: '320px'
                     }}
                   >
                     {onbaseUsers.map((u, i) => (
-                      <option key={u.id || i} value={u.full_name || u.document_no}>
-                        {u.full_name} ({u.area || u.role || 'OnBase User'})
+                      <option key={u.id || u.username || i} value={u.username || u.full_name}>
+                        {u.full_name}
                       </option>
                     ))}
                   </select>
@@ -1248,12 +1433,12 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px' }}>
                   <h3 style={{ margin: '0 0 14px 0', fontSize: '15px', color: '#0f172a', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <ShieldCheck size={18} color="#00324d" />
-                    Flujo de Automatización (Programado hasta Paso 2)
+                    Flujo de Automatización (Programado hasta Paso 3)
                   </h3>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                     {automationSteps.map((step, idx) => {
-                      const isDone = currentStepIndex > idx || (!automationLoading && currentStepIndex === 2);
+                      const isDone = currentStepIndex > idx || (!automationLoading && currentStepIndex === 3);
                       const isCurrent = currentStepIndex === idx && automationLoading;
 
                       return (
@@ -1279,13 +1464,13 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                     {/* Placeholder para los siguientes pasos */}
                     <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', opacity: 0.6, paddingTop: '8px', borderTop: '1px dashed #cbd5e1' }}>
                       <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#e2e8f0', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: '700', fontSize: '12px' }}>
-                        3+
+                        4+
                       </div>
                       <div>
                         <strong style={{ fontSize: '13px', color: '#64748b', display: 'block' }}>
-                          Pasos Siguientes (Pendientes por indicación del usuario)
+                          Pasos Siguientes (Diligenciamiento de campos de comunicación)
                         </strong>
-                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>El robot se detiene en el Paso 2 listo para recibir los pasos adicionales.</span>
+                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>El robot abre "UForm Comunicación Electrónica" en el Paso 3 listo para diligenciar campos.</span>
                       </div>
                     </div>
                   </div>

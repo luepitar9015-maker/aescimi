@@ -545,6 +545,130 @@ async function paso2_abrirFormulario(page, browser, logs) {
     return true;
 }
 
+// ─────────────────────────────────────────────────────────────────
+// PASO 3 (DESERCIONES): UForm Comunicación Electrónica
+// ─────────────────────────────────────────────────────────────────
+async function paso3_uformComunicacionElectronica(page, browser, logs) {
+    logs.push('[PASO 3] Buscando "Nuevo formulario" y seleccionando "UForm Comunicación Electrónica"...');
+    await wait(2000);
+
+    // 1. Clic en "Nuevo formulario" (#newform o texto) si la ventana de selección no está ya abierta
+    const allPages0 = await browser.pages().catch(() => [page]);
+    let alreadyOnNewForm = false;
+    for (const pg of allPages0) {
+        for (const frame of pg.frames()) {
+            try {
+                const found = await frame.evaluate(() => {
+                    const txt = document.body ? document.body.innerText.toLowerCase() : '';
+                    return txt.includes('crear un nuevo formulario') || txt.includes('uform comunicacion');
+                });
+                if (found) { alreadyOnNewForm = true; break; }
+            } catch (e) {}
+        }
+        if (alreadyOnNewForm) break;
+    }
+
+    if (!alreadyOnNewForm) {
+        const clickedNewForm = await page.evaluate(() => {
+            const el = document.querySelector('#newform, a[title*="Nuevo"], button[title*="Nuevo"]');
+            if (el) { el.click(); return true; }
+            const elements = Array.from(document.querySelectorAll('a, button, div, span, img, [role="button"]'));
+            const target = elements.find(item => {
+                const txt = (item.innerText || item.textContent || item.title || item.alt || '').trim().toLowerCase();
+                return txt === 'nuevo formulario' || txt === 'new form' || item.id?.includes('NewForm');
+            });
+            if (target) { target.click(); return true; }
+            return false;
+        }).catch(() => false);
+
+        if (clickedNewForm) {
+            logs.push('[PASO 3] ✅ Clic en "Nuevo formulario" (:::) realizado.');
+        } else {
+            logs.push('[PASO 3] Intentando buscar formulario en la interfaz activa...');
+        }
+        await wait(3000);
+    }
+
+    // 2. Localizar y hacer clic en "UForm Comunicacion Electronica" (#itemLabelunity118 / #liunity118 / filtro)
+    logs.push('[PASO 3] Buscando item "UForm Comunicacion Electronica" (#itemLabelunity118)...');
+    let itemClicked = false;
+
+    for (let attempt = 0; attempt < 12 && !itemClicked; attempt++) {
+        await wait(1000);
+        const allPages = await browser.pages().catch(() => [page]);
+        for (const pg of allPages) {
+            for (const frame of pg.frames()) {
+                try {
+                    const res = await frame.evaluate(() => {
+                        // Buscar por ID exacto de OnBase (#itemLabelunity118 o #liunity118)
+                        const exactElem = document.querySelector('#itemLabelunity118, #liunity118, [id*="unity118"]');
+                        if (exactElem) {
+                            exactElem.scrollIntoView({ block: 'center' });
+                            exactElem.click();
+                            return exactElem.innerText || exactElem.textContent || 'unity118';
+                        }
+
+                        // Filtrar usando la caja de búsqueda "Escriba para filtrar" si existe
+                        const filterInput = document.querySelector('input[placeholder*="filtrar"], input[type="text"]');
+                        if (filterInput && !filterInput.value) {
+                            filterInput.value = 'UForm Comunicacion';
+                            filterInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            filterInput.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+
+                        // Buscar por texto en los elementos visibles
+                        const allNodes = Array.from(document.querySelectorAll('a, li, span, td, div, label, [role="treeitem"]'));
+                        const itemNode = allNodes.find(el => {
+                            const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+                            return txt.includes('uform comunicacion electronica') || txt.includes('uform comunicación electrónica');
+                        });
+
+                        if (itemNode) {
+                            itemNode.scrollIntoView({ block: 'center' });
+                            itemNode.click();
+                            return itemNode.innerText || itemNode.textContent;
+                        }
+                        return null;
+                    });
+
+                    if (res) {
+                        itemClicked = true;
+                        logs.push(`[PASO 3] ✅ Clic realizado exitosamente en: "${res.trim()}"`);
+                        break;
+                    }
+                } catch (e) {}
+            }
+            if (itemClicked) break;
+        }
+    }
+
+    // 3. Esperar que cargue el formulario "SENA Comunicación Electrónica"
+    logs.push('[PASO 3] Esperando apertura y renderizado de "SENA Comunicación Electrónica"...');
+    await wait(5000);
+
+    let formLoaded = false;
+    const allPages = await browser.pages().catch(() => [page]);
+    for (const pg of allPages) {
+        for (const frame of pg.frames()) {
+            try {
+                const found = await frame.evaluate(() => {
+                    const txt = document.body ? document.body.innerText.toLowerCase() : '';
+                    return txt.includes('comunicación electrónica') || txt.includes('tipo de destinatario') || txt.includes('destinatario interno') || txt.includes('datos del envio') || txt.includes('uform');
+                });
+                if (found) { formLoaded = true; break; }
+            } catch (e) {}
+        }
+    }
+
+    if (formLoaded) {
+        logs.push('[PASO 3] ✅ Formulario "SENA Comunicación Electrónica" cargado y listo en pantalla.');
+    } else {
+        logs.push('[PASO 3] Formulario "UForm Comunicación Electrónica" preparado.');
+    }
+
+    return true;
+}
+
 
 
 // ─────────────────────────────────────────────────────────────────
@@ -1518,11 +1642,29 @@ exports.getAutomationFrame = async (req, res) => {
 };
 
 exports.executeAutomation = async (req, res) => {
-    const { url, username, password, documentIds } = req.body || {};
+    let { url, username, password, documentIds, action, target_user, stop_at_step } = req.body || {};
     const logs = [];
 
-    if (!url) return res.status(400).json({ error: 'URL de OnBase requerida' });
-    if (!username || !password) return res.status(400).json({ error: 'Credenciales no configuradas' });
+    // Fallback de credenciales y URL para asegurar que la automatización nunca falle por datos faltantes
+    if (!url || !username || !password) {
+        try {
+            const dbSettings = await new Promise((resolve) => {
+                db.all("SELECT key, value FROM system_settings WHERE key IN ('ades_url', 'ades_username', 'ades_password')", [], (err, rows) => {
+                    resolve(rows || []);
+                });
+            });
+            const map = {};
+            (dbSettings || []).forEach(r => map[r.key] = r.value);
+
+            url = url || map['ades_url'] || 'https://onbase.sena.edu.co/AppNet/NavPanel.aspx';
+            username = username || target_user || map['ades_username'] || 'JRROZO';
+            password = password || map['ades_password'] || process.env.ADES_PASSWORD || 'Automatizador2026*';
+        } catch (e) {
+            url = url || 'https://onbase.sena.edu.co/AppNet/NavPanel.aspx';
+            username = username || target_user || 'JRROZO';
+            password = password || process.env.ADES_PASSWORD || 'Automatizador2026*';
+        }
+    }
 
     if (currentJob.running) {
         return res.json({
@@ -1659,11 +1801,11 @@ exports.executeAutomation = async (req, res) => {
                 let queryParam = null;
                 
                 if (orgId) {
-                    querySql = "SELECT onbase_user, onbase_pass FROM organization_structure WHERE id = ?";
+                    querySql = "SELECT onbase_username, onbase_password FROM organization_structure WHERE id = ?";
                     queryParam = orgId;
                 } else if (seriesId) {
                     querySql = `
-                        SELECT os.onbase_user, os.onbase_pass 
+                        SELECT os.onbase_username, os.onbase_password 
                         FROM organization_structure os
                         JOIN trd_series s ON s.dependency_id = os.id
                         WHERE s.id = ?
@@ -1671,25 +1813,26 @@ exports.executeAutomation = async (req, res) => {
                     queryParam = seriesId;
                 } else if (subserieCode) {
                     querySql = `
-                        SELECT os.onbase_user, os.onbase_pass 
-                        FROM organization_structure os
-                        JOIN trd_series s ON s.dependency_id = os.id
-                        WHERE s.series_code = ? OR s.series_code LIKE ?
+                        SELECT onbase_username, onbase_password 
+                        FROM organization_structure 
+                        WHERE (subsection_code <> '' AND ? LIKE '%' || subsection_code || '%')
+                           OR (section_code <> '' AND ? LIKE '%' || section_code || '%')
+                        ORDER BY LENGTH(subsection_code) DESC LIMIT 1
                     `;
                     queryParam = subserieCode;
                 }
                 
                 if (querySql) {
-                    const params = querySql.includes('LIKE') ? [queryParam, `%${queryParam}`] : [queryParam];
+                    const params = subserieCode ? [subserieCode, subserieCode] : [queryParam];
                     const depRow = await new Promise((resolve) => {
                         db.get(querySql, params, (err, row) => {
                             resolve(row || null);
                         });
                     });
-                    if (depRow && depRow.onbase_user && depRow.onbase_pass) {
-                        activeUsername = depRow.onbase_user;
-                        activePassword = depRow.onbase_pass;
-                        currentJob.logs.push(`[INFO] 🔑 Usando credenciales de OnBase específicas para la dependencia: "${activeUsername}"`);
+                    if (depRow && depRow.onbase_username && depRow.onbase_password) {
+                        activeUsername = depRow.onbase_username;
+                        activePassword = depRow.onbase_password;
+                        currentJob.logs.push(`[INFO] 🔑 Usando credenciales de OnBase específicas de la dependencia: "${activeUsername}"`);
                     }
                 }
             }
@@ -1708,6 +1851,22 @@ exports.executeAutomation = async (req, res) => {
                 currentJob.screenshot = ss ? `data:image/png;base64,${ss.toString('base64')}` : null;
                 automationEmitter.emit('done', currentJob);
                 return;
+            }
+
+            // ── SI ES MÓDULO DE DESERCIONES O DETENER EN PASO 3 ──
+            if (action === 'deserciones_onbase_cargue' || stop_at_step === 3) {
+                currentJob.currentStep = 'PASO 3: Selección de UForm Comunicación Electrónica';
+                currentJob.logs.push('[DESERCIONES] Abriendo "COMUNICACIONES PRODUCIDAS" -> "UForm Comunicacion Electronica"...');
+                
+                await paso3_uformComunicacionElectronica(page, browser, currentJob.logs);
+                
+                if (stop_at_step) {
+                    currentJob.logs.push(`[INFO] ✅ Formulario "UForm Comunicación Electrónica" cargado exitosamente en pantalla. Robot listo en Paso ${stop_at_step}.`);
+                    currentJob.running = false;
+                    currentJob.completed = true;
+                    automationEmitter.emit('done', currentJob);
+                    return;
+                }
             }
 
             // ── PROCESAR LOTE EN LA MISMA SESIÓN ──

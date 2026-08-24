@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Save, Globe, RefreshCw, Brain, Key, Lock, FolderKey } from 'lucide-react';
+import { Save, Globe, RefreshCw, Brain, Key, Lock, FolderKey, Eye, EyeOff } from 'lucide-react';
 
 function AesSettings() {
     const [settings, setSettings] = useState({
@@ -16,6 +16,8 @@ function AesSettings() {
     const [saving, setSaving] = useState(false);
     const [depSavingId, setDepSavingId] = useState(null);
     const [message, setMessage] = useState({ text: '', type: '' });
+    const [showGeneralPass, setShowGeneralPass] = useState(false);
+    const [showDepPassMap, setShowDepPassMap] = useState({});
 
     const fetchSettings = async () => {
         setLoading(true);
@@ -178,13 +180,23 @@ function AesSettings() {
                                 <label style={{ fontSize: '12px', fontWeight: '500', color: '#374151', marginBottom: '6px', display: 'block' }}>
                                     Contraseña General (Fallback)
                                 </label>
-                                <input 
-                                    type="password" 
-                                    name="ades_password" 
-                                    value={settings.ades_password} 
-                                    onChange={handleChange} 
-                                    style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '13px' }}
-                                />
+                                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                    <input 
+                                        type={showGeneralPass ? "text" : "password"} 
+                                        name="ades_password" 
+                                        value={settings.ades_password} 
+                                        onChange={handleChange} 
+                                        style={{ width: '100%', padding: '8px 36px 8px 12px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '13px' }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowGeneralPass(!showGeneralPass)}
+                                        style={{ position: 'absolute', right: '8px', background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', display: 'flex', alignItems: 'center', padding: '4px' }}
+                                        title={showGeneralPass ? "Ocultar contraseña" : "Mostrar contraseña"}
+                                    >
+                                        {showGeneralPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -251,15 +263,23 @@ function AesSettings() {
                                                 </div>
                                             </td>
                                             <td style={{ padding: '8px' }}>
-                                                <div style={{ position: 'relative' }}>
+                                                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                                                     <Lock size={13} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
                                                     <input 
-                                                        type="password" 
+                                                        type={showDepPassMap[d.id] ? "text" : "password"} 
                                                         value={cred.onbase_pass}
                                                         onChange={(e) => handleDepChange(d.id, 'onbase_pass', e.target.value)}
                                                         placeholder="••••••••"
-                                                        style={{ width: '100%', padding: '6px 8px 6px 26px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '12px' }}
+                                                        style={{ width: '100%', padding: '6px 30px 6px 26px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '12px' }}
                                                     />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowDepPassMap(prev => ({ ...prev, [d.id]: !prev[d.id] }))}
+                                                        style={{ position: 'absolute', right: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', display: 'flex', alignItems: 'center', padding: '2px' }}
+                                                        title={showDepPassMap[d.id] ? "Ocultar contraseña" : "Mostrar contraseña"}
+                                                    >
+                                                        {showDepPassMap[d.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                                                    </button>
                                                 </div>
                                             </td>
                                             <td style={{ padding: '8px', textAlign: 'center' }}>

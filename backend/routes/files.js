@@ -25,7 +25,7 @@ router.post('/split', async (req, res) => {
 
     try {
         const existingPdfBytes = fs.readFileSync(filePath);
-        const pdfDoc = await PDFDocument.load(existingPdfBytes);
+        const pdfDoc = await PDFDocument.load(existingPdfBytes, { ignoreEncryption: true });
 
         const results = [];
 

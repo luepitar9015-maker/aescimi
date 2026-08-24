@@ -447,7 +447,7 @@ app.post('/api/generate-letters', requireAuth, upload.fields([{ name: 'file', ma
         const mergedPdf = await PDFDocument.create();
 
         for (const pdfBuffer of pdfBuffers) {
-            const pdf = await PDFDocument.load(pdfBuffer);
+            const pdf = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true });
             const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
             copiedPages.forEach((page) => mergedPdf.addPage(page));
         }

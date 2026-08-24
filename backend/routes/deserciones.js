@@ -67,15 +67,7 @@ const ensureDesercionesTable = async () => {
 
 ensureDesercionesTable();
 
-// Middleware para restringir el acceso exclusivamente al Superusuario
-const requireSuperadmin = (req, res, next) => {
-    if (!req.user || req.user.role !== 'superadmin') {
-        return res.status(403).json({ error: 'Acceso denegado. Este módulo está restringido exclusivamente para el Superusuario.' });
-    }
-    next();
-};
-
-router.use(requireAuth, requireSuperadmin);
+router.use(requireAuth, requireAdmin);
 
 // 1. Carga y parseo de Excel con registros de aprendices
 router.post('/upload-excel', requireAuth, upload.single('excel'), (req, res) => {

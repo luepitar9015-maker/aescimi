@@ -249,7 +249,7 @@ router.post('/upload', requireAuth, upload.single('file'), async (req, res) => {
         // Load the PDF into pdf-lib (either the original PDF or the converted one)
         let pdfDoc;
         try {
-            pdfDoc = await PDFDocument.load(sourcePdfBytes);
+            pdfDoc = await PDFDocument.load(sourcePdfBytes, { ignoreEncryption: true });
         } catch (loadErr) {
             console.error("Error loading PDF in pdf-lib:", loadErr);
             throw new Error(`El archivo no es un PDF válido o la conversión falló: ${loadErr.message}`);
@@ -1132,9 +1132,9 @@ router.post('/merge-upload', requireAuth, upload.array('files'), async (req, res
                     page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
                 }
                 const tempPdfBytes = await pdfDocTemp.save();
-                pagePdfDoc = await PDFDocument.load(tempPdfBytes);
+                pagePdfDoc = await PDFDocument.load(tempPdfBytes, { ignoreEncryption: true });
             } else {
-                pagePdfDoc = await PDFDocument.load(fileBytes);
+                pagePdfDoc = await PDFDocument.load(fileBytes, { ignoreEncryption: true });
             }
 
             const copiedPages = await mergedPdf.copyPages(pagePdfDoc, pagePdfDoc.getPageIndices());
