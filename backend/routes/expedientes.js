@@ -245,6 +245,96 @@ router.get('/search', (req, res) => {
     });
 });
 
+// POST /hoja-control/:id - Actualizar metadatos y documentos de la Hoja de Control de un expediente
+router.post('/hoja-control/:id', async (req, res) => {
+    const { id } = req.params;
+    const {
+        regional_name,
+        regional_code,
+        center_name,
+        center_code,
+        section_name,
+        section_code,
+        responsable,
+        documentos
+    } = req.body;
+
+    try {
+        const { pool } = require('../database_pg');
+
+        // 1. Obtener expediente actual
+        const currentRes = await pool.query('SELECT * FROM expedientes WHERE id = $1', [id]);
+        if (currentRes.rows.length === 0) {
+            return res.status(404).json({ error: 'Expediente no encontrado.' });
+        }
+
+        const currentExp = currentRes.rows[0];
+        let metaObj = {};
+        if (currentExp.metadata_values) {
+            try {
+                metaObj = typeof currentExp.metadata_values === 'string' ? JSON.parse(currentExp.metadata_values) : currentExp.metadata_values;
+            } catch (e) {}
+        }
+
+        // Actualizar metadatos de Hoja de Control
+        metaObj.responsable_hoja_control = responsable || '';
+        metaObj.regional_code = regional_code || '';
+        metaObj.center_code = center_code || '';
+        metaObj.section_code = section_code || '';
+        metaObj.hoja_control_documentos = documentos || [];
+
+        // 2. Actualizar expedientes
+        await pool.query(
+            `UPDATE expedientes SET 
+                regional = COALESCE($1, regional),
+                centro = COALESCE($2, centro),
+                dependencia = COALESCE($3, dependencia),
+                metadata_values = $4
+             WHERE id = $5`,
+            [
+                regional_name || null,
+                center_name || null,
+                section_name || null,
+                JSON.stringify(metaObj),
+                id
+            ]
+        );
+
+        // 3. Procesar / actualizar los tipos documentales
+        if (documentos && Array.isArray(documentos)) {
+            for (const doc of documentos) {
+                if (doc.id && typeof doc.id === 'number' && !doc.isManuallyAdded) {
+                    // Documento existente en la BD -> Actualizar
+                    await pool.query(
+                        `UPDATE documents SET 
+                            document_date = CASE WHEN $1 <> '' THEN $1::timestamp ELSE document_date END,
+                            typology_name = COALESCE(NULLIF($2, ''), typology_name),
+                            origen = COALESCE($3, origen)
+                         WHERE id = $4`,
+                        [doc.fecha || '', doc.tipo || '', doc.soporte || 'ELECTRONICO', doc.id]
+                    ).catch(e => console.warn('[HOJA CONTROL] Warn actualizando documento:', e.message));
+                } else if (doc.isManuallyAdded && doc.tipo) {
+                    // Documento agregado manualmente -> Insertar
+                    await pool.query(
+                        `INSERT INTO documents (expediente_id, filename, typology_name, document_date, origen, status)
+                         VALUES ($1, $2, $3, CASE WHEN $4 <> '' THEN $4::timestamp ELSE CURRENT_TIMESTAMP END, $5, 'Pendiente')`,
+                        [id, doc.tipo, doc.tipo, doc.fecha || '', doc.soporte || 'ELECTRONICO']
+                    ).catch(e => console.warn('[HOJA CONTROL] Warn insertando documento manual:', e.message));
+                }
+            }
+        }
+
+        res.json({
+            success: true,
+            message: 'Hoja de Control y expediente actualizados exitosamente.'
+        });
+
+    } catch (err) {
+        console.error('[HOJA CONTROL] Error guardando Hoja de Control:', err);
+        res.status(500).json({ error: `Error al guardar la Hoja de Control: ${err.message}` });
+    }
+});
+
 // GET all expedientes
 router.get('/', (req, res) => {
     const query = "SELECT * FROM expedientes ORDER BY created_at DESC";

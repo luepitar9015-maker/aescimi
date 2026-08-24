@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import html2pdf from 'html2pdf.js';
-import { Search, FileText, Download, Check, Briefcase } from 'lucide-react';
+import { Search, FileText, Download, Check, Briefcase, Save, CheckCircle2, AlertCircle } from 'lucide-react';
 
 function HojaControl() {
     const [searchTerm, setSearchTerm] = useState('');
@@ -10,6 +10,8 @@ function HojaControl() {
     const [documentos, setDocumentos] = useState([]);
     const [loading, setLoading] = useState(false);
     const [generandoPDF, setGenerandoPDF] = useState(false);
+    const [guardando, setGuardando] = useState(false);
+    const [mensajeEstado, setMensajeEstado] = useState({ type: '', text: '' });
     
     // Form fields State
     const [responsable, setResponsable] = useState('');
@@ -22,10 +24,16 @@ function HojaControl() {
 
     const templateRef = useRef(null);
 
+    const getAuthHeaders = () => {
+        const token = localStorage.getItem('token');
+        return token ? { Authorization: `Bearer ${token}` } : {};
+    };
+
     const handleSearch = async (e) => {
         e.preventDefault();
         if (!searchTerm) return;
         setLoading(true);
+        setMensajeEstado({ type: '', text: '' });
         try {
             const res = await axios.get(`/api/expedientes/search?term=${encodeURIComponent(searchTerm)}`);
             setSearchResults(res.data.data);
@@ -41,6 +49,7 @@ function HojaControl() {
 
     const handleSelectExpediente = async (exp) => {
         setLoading(true);
+        setMensajeEstado({ type: '', text: '' });
         try {
             // Load full details for this expediente
             const expRes = await axios.get(`/api/expedientes/detail/${exp.id}`);
@@ -63,15 +72,17 @@ function HojaControl() {
             
             setDocumentos(formattedDocs);
             
-            // Pre-fill fields based on Expediente detail data
-            setFormSede(expDetail.regional_name || '');
-            setFormCodSede(expDetail.regional_code || '');
-            setFormUnidad(expDetail.center_name || '');
-            setFormCodUnidad((expDetail.regional_code && expDetail.center_code) ? `${expDetail.regional_code}.${expDetail.center_code}` : '');
-            setFormOficina(expDetail.section_name || '');
+            // Pre-fill fields based on Expediente detail data and metadata_values
+            const metaObj = expDetail.metadata_values || {};
+            setResponsable(metaObj.responsable_hoja_control || '');
+            setFormSede(expDetail.regional_name || expDetail.regional || '');
+            setFormCodSede(metaObj.regional_code || expDetail.regional_code || '');
+            setFormUnidad(expDetail.center_name || expDetail.centro || '');
+            setFormCodUnidad(metaObj.center_code || ((expDetail.regional_code && expDetail.center_code) ? `${expDetail.regional_code}.${expDetail.center_code}` : ''));
+            setFormOficina(expDetail.section_name || expDetail.dependencia || '');
             
-            let oficiaCode = expDetail.section_code || '';
-            if (expDetail.regional_code && expDetail.center_code && expDetail.section_code) {
+            let oficiaCode = metaObj.section_code || expDetail.section_code || '';
+            if (!metaObj.section_code && expDetail.regional_code && expDetail.center_code && expDetail.section_code) {
                 if (expDetail.section_code === expDetail.center_code) {
                     oficiaCode = `${expDetail.regional_code}.${expDetail.center_code}`;
                 } else {
@@ -103,6 +114,40 @@ function HojaControl() {
     const removeDocRow = (idx) => {
         const newDocs = documentos.filter((_, i) => i !== idx);
         setDocumentos(newDocs);
+    };
+
+    const guardarHojaControl = async () => {
+        if (!selectedExp) {
+            alert("Por favor seleccione un expediente primero.");
+            return;
+        }
+        setGuardando(true);
+        setMensajeEstado({ type: '', text: '' });
+        try {
+            const res = await axios.post(`/api/expedientes/hoja-control/${selectedExp.id}`, {
+                regional_name: formSede,
+                regional_code: formCodSede,
+                center_name: formUnidad,
+                center_code: formCodUnidad,
+                section_name: formOficina,
+                section_code: formCodOficina,
+                responsable: responsable,
+                documentos: documentos
+            }, { headers: getAuthHeaders() });
+
+            setMensajeEstado({
+                type: 'success',
+                text: res.data.message || 'Hoja de Control y Expediente guardados y actualizados exitosamente en la base de datos.'
+            });
+        } catch (err) {
+            console.error("Error guardando Hoja de Control:", err);
+            setMensajeEstado({
+                type: 'error',
+                text: err.response?.data?.error || 'Error al guardar los cambios de la Hoja de Control.'
+            });
+        } finally {
+            setGuardando(false);
+        }
     };
 
     const generarPDF = () => {
@@ -203,14 +248,18 @@ function HojaControl() {
             {selectedExp && (
                 <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-200 max-w-5xl mx-auto">
                     {/* Header App */}
-                    <div className="bg-[#39A900] p-6 text-white flex justify-between items-center">
+                    <div className="bg-[#39A900] p-6 text-white flex justify-between items-center flex-wrap gap-4">
                         <div>
                             <h1 className="text-xl font-bold flex items-center gap-2"><Briefcase size={20}/> Diligenciamiento de Hoja de Control</h1>
                             <p className="text-green-100 text-sm mt-1">Expediente: {selectedExp.expediente_code || selectedExp.title}</p>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-wrap items-center">
                              <button onClick={() => setSelectedExp(null)} className="bg-white/20 text-white hover:bg-white/30 font-bold py-2 px-4 rounded shadow transition-colors text-sm">
                                 Cambiar Exp.
+                            </button>
+                            <button onClick={guardarHojaControl} disabled={guardando} className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-2 px-4 rounded shadow transition-colors flex items-center gap-2 text-sm disabled:opacity-50 border border-emerald-500">
+                                <Save size={18} />
+                                {guardando ? 'Guardando...' : 'Guardar Exp.'}
                             </button>
                             <button onClick={generarPDF} disabled={generandoPDF} className="bg-white text-[#39A900] hover:bg-gray-100 font-bold py-2 px-4 rounded shadow transition-colors flex items-center gap-2 text-sm disabled:opacity-50">
                                 <Download size={18} />
@@ -220,6 +269,18 @@ function HojaControl() {
                     </div>
 
                     <div className="p-8">
+                        {/* Mensaje de Estado (Éxito / Error) */}
+                        {mensajeEstado.text && (
+                            <div className={`mb-6 p-4 rounded-xl flex items-center gap-3 border ${
+                                mensajeEstado.type === 'success' 
+                                    ? 'bg-green-50 border-green-200 text-green-800' 
+                                    : 'bg-red-50 border-red-200 text-red-800'
+                            }`}>
+                                {mensajeEstado.type === 'success' ? <CheckCircle2 size={20} className="text-green-600 flex-shrink-0" /> : <AlertCircle size={20} className="text-red-600 flex-shrink-0" />}
+                                <span className="font-semibold text-sm">{mensajeEstado.text}</span>
+                            </div>
+                        )}
+
                         <div className="space-y-8">
                             {/* SECCIÓN: METADATOS DEL EXPEDIENTE */}
                             <div>
@@ -297,7 +358,7 @@ function HojaControl() {
                                                 <th className="p-2 border">Identificación del Tipo Documental</th>
                                                 <th className="p-2 border w-28">Soporte</th>
                                                 <th className="p-2 border w-24">Folios (Del-Al)</th>
-                                                <th class="p-2 border">Observaciones</th>
+                                                <th className="p-2 border">Observaciones</th>
                                                 <th className="p-2 border w-10 text-center">X</th>
                                             </tr>
                                         </thead>
@@ -325,10 +386,21 @@ function HojaControl() {
                                 </div>
                             </div>
 
-                            {/* SECCIÓN: RESPONSABLE */}
-                            <div>
+                            {/* SECCIÓN: RESPONSABLE Y BOTÓN DE GUARDADO AL PIE */}
+                            <div className="pt-4 border-t border-gray-200">
                                 <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">Nombres y Apellidos del Responsable de Archivar la Información:</label>
                                 <input type="text" value={responsable} onChange={e=>setResponsable(e.target.value)} className="w-full border border-gray-300 rounded p-2 focus:ring-[#39A900] outline-none" />
+                            </div>
+
+                            <div className="flex justify-end pt-4">
+                                <button 
+                                    onClick={guardarHojaControl} 
+                                    disabled={guardando} 
+                                    className="bg-[#39A900] hover:bg-green-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg transition-all flex items-center gap-2 text-base disabled:opacity-50"
+                                >
+                                    <Save size={20} />
+                                    {guardando ? 'Guardando cambios...' : 'Guardar Cambios de Hoja de Control'}
+                                </button>
                             </div>
 
                         </div>
