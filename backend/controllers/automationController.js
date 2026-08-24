@@ -666,6 +666,71 @@ async function paso3_uformComunicacionElectronica(page, browser, logs) {
         logs.push('[PASO 3] Formulario "UForm Comunicación Electrónica" preparado.');
     }
 
+    // 4. Seleccionar opción "Externo" en "Por favor seleccione tipo de destinatario:"
+    logs.push('[PASO 3] Seleccionando tipo de destinatario: "Externo"...');
+    let selectedExterno = false;
+
+    for (let attempt = 0; attempt < 10 && !selectedExterno; attempt++) {
+        await wait(1000);
+        const allPages = await browser.pages().catch(() => [page]);
+        for (const pg of allPages) {
+            for (const frame of pg.frames()) {
+                try {
+                    const res = await frame.evaluate(() => {
+                        // 1. Buscar radios por id, name, value, title o id conteniendo 'externo'
+                        const radios = Array.from(document.querySelectorAll('input[type="radio"]'));
+                        const radioExterno = radios.find(r => {
+                            const val = (r.value || r.id || r.name || r.title || '').toLowerCase();
+                            const nextText = (r.nextSibling?.textContent || r.parentElement?.textContent || '').toLowerCase();
+                            return val.includes('externo') || nextText.includes('externo');
+                        });
+
+                        if (radioExterno) {
+                            radioExterno.scrollIntoView({ block: 'center' });
+                            radioExterno.click();
+                            radioExterno.checked = true;
+                            radioExterno.dispatchEvent(new Event('change', { bubbles: true }));
+                            radioExterno.dispatchEvent(new Event('click', { bubbles: true }));
+                            return 'Radio "Externo" marcado activamente.';
+                        }
+
+                        // 2. Buscar label/span conteniendo la palabra "Externo"
+                        const labels = Array.from(document.querySelectorAll('label, span, font, td, b, strong, div'));
+                        const labelExterno = labels.find(el => {
+                            const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+                            return txt === 'externo' || txt === 'externo:';
+                        });
+
+                        if (labelExterno) {
+                            labelExterno.scrollIntoView({ block: 'center' });
+                            labelExterno.click();
+                            
+                            const parent = labelExterno.closest('td, tr, div, p, fieldset') || labelExterno.parentElement;
+                            if (parent) {
+                                const inputInParent = parent.querySelector('input[type="radio"]');
+                                if (inputInParent) {
+                                    inputInParent.click();
+                                    inputInParent.checked = true;
+                                    inputInParent.dispatchEvent(new Event('change', { bubbles: true }));
+                                }
+                            }
+                            return 'Label "Externo" cliqueado correctamente.';
+                        }
+
+                        return null;
+                    });
+
+                    if (res) {
+                        selectedExterno = true;
+                        logs.push(`[PASO 3] ✅ "Por favor seleccione tipo de destinatario: Externo" seleccionado exitosamente (${res}).`);
+                        break;
+                    }
+                } catch (e) {}
+            }
+            if (selectedExterno) break;
+        }
+    }
+
     return true;
 }
 
