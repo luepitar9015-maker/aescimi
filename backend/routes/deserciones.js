@@ -145,14 +145,33 @@ router.post('/upload-excel', requireAuth, upload.single('excel'), (req, res) => 
                 return '';
             };
 
+            const nombres = getVal(['nombre', 'nombres', 'primer_nombre', 'aprendiz_nombre']);
+            const apellidos = getVal(['apellidos', 'apellido', 'primer_apellido', 'aprendiz_apellido']);
+            const rawNombreComp = getVal(['aprendiz', 'nombre_aprendiz', 'nombres_y_apellidos', 'nombre_completo', 'nombres_apellidos']);
+
+            let nombreCompleto = rawNombreComp;
+            if (!nombreCompleto) {
+                if (nombres && apellidos) {
+                    nombreCompleto = `${nombres} ${apellidos}`;
+                } else {
+                    nombreCompleto = nombres || apellidos || '';
+                }
+            }
+
+            const tipoDoc = getVal(['tipo_doc', 'tipo_documento', 'tipo', 'td', 'tipo_id', 'tipo_doc_aprendiz']) || 'CC';
+            const numDoc = getVal(['documento', 'num_documento', 'identificacion', 'cedula', 'numero_documento', 'no_documento']);
+            const correoSofia = getVal(['correo registrado en sofía', 'correo registrado en sofia', 'correo_sofia', 'correo', 'email', 'correo_aprendiz', 'mail', 'correo_electronico']);
+
             return {
                 id_temp: `row-${index + 1}`,
                 ficha: getVal(['ficha', 'num_ficha', 'numero_ficha', 'codigo_ficha']),
                 programa: getVal(['programa', 'programa_formacion', 'nombre_programa']),
-                aprendiz_nombre: getVal(['nombre', 'aprendiz', 'nombre_aprendiz', 'nombres_y_apellidos', 'nombre_completo']),
-                aprendiz_doc_tipo: getVal(['tipo_doc', 'tipo_documento', 'td', 'tipo_id']) || 'CC',
-                aprendiz_doc_numero: getVal(['documento', 'num_documento', 'identificacion', 'cedula', 'numero_documento']),
-                aprendiz_correo: getVal(['correo', 'email', 'correo_aprendiz', 'mail', 'correo_electronico']),
+                aprendiz_nombres: nombres,
+                aprendiz_apellidos: apellidos,
+                aprendiz_nombre: nombreCompleto || 'APRENDIZ',
+                aprendiz_doc_tipo: tipoDoc,
+                aprendiz_doc_numero: numDoc,
+                aprendiz_correo: correoSofia,
                 causal_desercion: getVal(['causal', 'causal_desercion', 'motivo', 'razon_desercion']),
                 fecha_comite: getVal(['fecha_comite', 'fecha', 'fecha_citacion']),
                 hora_comite: getVal(['hora_comite', 'hora', 'hora_citacion']),
@@ -223,11 +242,19 @@ const mergeText = (template, row) => {
     let merged = template;
     
     const replacements = {
+        'nombre': row.aprendiz_nombres || row.aprendiz_nombre || '',
+        'nombres': row.aprendiz_nombres || row.aprendiz_nombre || '',
+        'apellidos': row.aprendiz_apellidos || '',
         'aprendiz_nombre': row.aprendiz_nombre || '',
+        'tipo': row.aprendiz_doc_tipo || 'CC',
         'aprendiz_doc_tipo': row.aprendiz_doc_tipo || 'CC',
+        'documento': row.aprendiz_doc_numero || '',
         'aprendiz_doc_numero': row.aprendiz_doc_numero || '',
         'ficha': row.ficha || '',
         'programa': row.programa || '',
+        'correo': row.aprendiz_correo || '',
+        'correo registrado en sofía': row.aprendiz_correo || '',
+        'correo registrado en sofia': row.aprendiz_correo || '',
         'aprendiz_correo': row.aprendiz_correo || '',
         'causal_desercion': row.causal_desercion || '',
         'fecha_comite': row.fecha_comite || '',

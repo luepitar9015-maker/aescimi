@@ -1059,75 +1059,101 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                     <thead>
                       <tr style={{ background: '#f1f5f9', textTransform: 'uppercase', fontSize: '11px', color: '#475569' }}>
                         <th style={{ padding: '10px', textAlign: 'center' }}>Sel</th>
-                        <th style={{ padding: '10px', textAlign: 'left' }}>Aprendiz</th>
+                        <th style={{ padding: '10px', textAlign: 'left' }}>Aprendiz (Nombres y Apellidos)</th>
+                        <th style={{ padding: '10px', textAlign: 'left' }}>Tipo Doc</th>
                         <th style={{ padding: '10px', textAlign: 'left' }}>Documento</th>
                         <th style={{ padding: '10px', textAlign: 'left' }}>Ficha</th>
                         <th style={{ padding: '10px', textAlign: 'left' }}>Programa</th>
+                        <th style={{ padding: '10px', textAlign: 'left' }}>Correo Registrado en Sofía</th>
                         <th style={{ padding: '10px', textAlign: 'left' }}>Causal</th>
                         <th style={{ padding: '10px', textAlign: 'center' }}>Anexo Explícito / Masivo</th>
                         <th style={{ padding: '10px', textAlign: 'center' }}>Acción</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {excelData.map((row, idx) => (
-                        <tr key={row.id_temp || idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                          <td style={{ padding: '10px', textAlign: 'center' }}>
-                            <input 
-                              type="checkbox"
-                              checked={!!selectedRows[row.id_temp]}
-                              onChange={(e) => setSelectedRows(prev => ({ ...prev, [row.id_temp]: e.target.checked }))}
-                            />
-                          </td>
-                          <td style={{ padding: '10px', fontWeight: '600', color: '#0f172a' }}>{row.aprendiz_nombre || 'N/A'}</td>
-                          <td style={{ padding: '10px' }}>{row.aprendiz_doc_tipo} {row.aprendiz_doc_numero}</td>
-                          <td style={{ padding: '10px' }}>{row.ficha}</td>
-                          <td style={{ padding: '10px' }}>{row.programa}</td>
-                          <td style={{ padding: '10px' }}>{row.causal_desercion || 'DESERCIÓN'}</td>
-                          
-                          {/* Adjunto Explícito por comunicación */}
-                          <td style={{ padding: '10px', textAlign: 'center' }}>
-                            <label style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                              <input 
-                                type="file" 
-                                onChange={(e) => handleRowAttachmentUpload(row.id_temp, e.target.files[0])}
-                                style={{ display: 'none' }}
-                              />
-                              <span style={{
-                                padding: '4px 10px',
-                                borderRadius: '6px',
-                                fontSize: '11px',
-                                fontWeight: '600',
-                                background: rowAttachments[row.id_temp] ? '#dcfce7' : '#f1f5f9',
-                                color: rowAttachments[row.id_temp] ? '#15803d' : '#64748b',
-                                border: `1px solid ${rowAttachments[row.id_temp] ? '#86efac' : '#cbd5e1'}`
-                              }}>
-                                {uploadingAttachmentId === row.id_temp ? 'Subiendo...' : rowAttachments[row.id_temp] ? `✓ ${rowAttachments[row.id_temp].name}` : '+ Adjuntar Anexo'}
-                              </span>
-                            </label>
-                          </td>
+                      {excelData.map((row, idx) => {
+                        const nombres = row.aprendiz_nombres || row.raw_row?.['NOMBRE'] || row.raw_row?.['NOMBRES'] || '';
+                        const apellidos = row.aprendiz_apellidos || row.raw_row?.['APELLIDOS'] || row.raw_row?.['APELLIDO'] || '';
+                        const fullName = row.aprendiz_nombre || [nombres, apellidos].filter(Boolean).join(' ') || 'N/A';
+                        const tipoDoc = row.aprendiz_doc_tipo || row.raw_row?.['TIPO'] || row.raw_row?.['TIPO_DOC'] || 'CC';
+                        const numDoc = row.aprendiz_doc_numero || row.raw_row?.['DOCUMENTO'] || row.raw_row?.['NUM_DOCUMENTO'] || '';
+                        const correoSofia = row.aprendiz_correo || row.raw_row?.['CORREO REGISTRADO EN SOFÍA'] || row.raw_row?.['CORREO REGISTRADO EN SOFIA'] || row.raw_row?.['CORREO'] || row.raw_row?.['EMAIL'] || 'Sin correo';
 
-                          <td style={{ padding: '10px', textAlign: 'center' }}>
-                            <button 
-                              onClick={() => handleOpenPreview(row)}
-                              style={{
-                                background: '#e0f2fe',
-                                color: '#0284c7',
-                                border: 'none',
-                                padding: '5px 10px',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                fontSize: '12px',
-                                fontWeight: '600'
-                              }}
-                            >
-                              <Eye size={14} /> Ver Carta
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                        return (
+                          <tr key={row.id_temp || idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                            <td style={{ padding: '10px', textAlign: 'center' }}>
+                              <input 
+                                type="checkbox"
+                                checked={!!selectedRows[row.id_temp]}
+                                onChange={(e) => setSelectedRows(prev => ({ ...prev, [row.id_temp]: e.target.checked }))}
+                              />
+                            </td>
+                            <td style={{ padding: '10px', color: '#0f172a' }}>
+                              <strong style={{ display: 'block', fontSize: '13px', color: '#00324d' }}>{fullName}</strong>
+                              {(nombres && apellidos && fullName !== `${nombres} ${apellidos}`) && (
+                                <span style={{ fontSize: '11px', color: '#64748b' }}>Nombres: {nombres} | Apellidos: {apellidos}</span>
+                              )}
+                            </td>
+                            <td style={{ padding: '10px' }}>
+                              <span style={{ background: '#e2e8f0', color: '#334155', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: '700' }}>
+                                {tipoDoc}
+                              </span>
+                            </td>
+                            <td style={{ padding: '10px', fontWeight: '600' }}>{numDoc}</td>
+                            <td style={{ padding: '10px' }}>{row.ficha}</td>
+                            <td style={{ padding: '10px', maxWidth: '200px', whiteSpace: 'normal', wordBreak: 'break-word' }}>{row.programa}</td>
+                            <td style={{ padding: '10px' }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f8fafc', padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', color: '#0369a1', fontWeight: '600' }}>
+                                📧 {correoSofia}
+                              </span>
+                            </td>
+                            <td style={{ padding: '10px' }}>{row.causal_desercion || 'DESERCIÓN'}</td>
+                            
+                            {/* Adjunto Explícito por comunicación */}
+                            <td style={{ padding: '10px', textAlign: 'center' }}>
+                              <label style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                <input 
+                                  type="file" 
+                                  onChange={(e) => handleRowAttachmentUpload(row.id_temp, e.target.files[0])}
+                                  style={{ display: 'none' }}
+                                />
+                                <span style={{
+                                  padding: '4px 10px',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  fontWeight: '600',
+                                  background: rowAttachments[row.id_temp] ? '#dcfce7' : '#f1f5f9',
+                                  color: rowAttachments[row.id_temp] ? '#15803d' : '#64748b',
+                                  border: `1px solid ${rowAttachments[row.id_temp] ? '#86efac' : '#cbd5e1'}`
+                                }}>
+                                  {uploadingAttachmentId === row.id_temp ? 'Subiendo...' : rowAttachments[row.id_temp] ? `✓ ${rowAttachments[row.id_temp].name}` : '+ Adjuntar Anexo'}
+                                </span>
+                              </label>
+                            </td>
+
+                            <td style={{ padding: '10px', textAlign: 'center' }}>
+                              <button 
+                                onClick={() => handleOpenPreview(row)}
+                                style={{
+                                  background: '#e0f2fe',
+                                  color: '#0284c7',
+                                  border: 'none',
+                                  padding: '5px 10px',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  fontSize: '12px',
+                                  fontWeight: '600'
+                                }}
+                              >
+                                <Eye size={14} /> Ver Carta
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
