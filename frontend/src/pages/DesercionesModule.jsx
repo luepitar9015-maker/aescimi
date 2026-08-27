@@ -232,6 +232,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
 
   // Historico & Actions State
   const [historico, setHistorico] = useState([]);
+  const [selectedHistoricoRows, setSelectedHistoricoRows] = useState({}); // { [casoId]: boolean }
   const [loadingHistorico, setLoadingHistorico] = useState(false);
   const [processingSave, setProcessingSave] = useState(false);
   const [processingOnBase, setProcessingOnBase] = useState(false);
@@ -483,7 +484,17 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
     setLoadingHistorico(true);
     try {
       const res = await axios.get('/api/deserciones/casos', { headers: getAuthHeaders() });
-      setHistorico(res.data?.data || []);
+      const data = res.data?.data || [];
+      setHistorico(data);
+      
+      // Pre-seleccionar por defecto los casos que están en estado 'Pendiente'
+      const initialSel = {};
+      data.forEach(item => {
+        if (item.status === 'Pendiente') {
+          initialSel[item.id] = true;
+        }
+      });
+      setSelectedHistoricoRows(initialSel);
     } catch (e) {
       console.error('Error al cargar histórico:', e);
     } finally {
@@ -1724,33 +1735,66 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
 
           {/* Tabla de Histórico de Comunicaciones */}
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
               <div>
                 <h3 style={{ margin: 0, color: '#0f172a', fontSize: '18px' }}>Histórico de Comunicaciones Registradas</h3>
                 <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '13px' }}>
-                  Casos de citación y notificación preparados para el cargue con el usuario por defecto.
+                  Seleccione uno o varios casos preparados para iniciar el cargue automatizado a OnBase Web.
                 </p>
               </div>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 {historico.length > 0 && (
-                  <button 
-                    onClick={handleLimpiarCasos}
-                    style={{
-                      background: '#fef2f2',
-                      color: '#dc2626',
-                      border: '1px solid #fca5a5',
-                      padding: '10px 16px',
-                      borderRadius: '8px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}
-                    title="Eliminar todos los registros de prueba del histórico"
-                  >
-                    <Trash2 size={16} /> Limpiar Histórico
-                  </button>
+                  <>
+                    {/* Botón para Cargar Seleccionados a OnBase */}
+                    <button 
+                      onClick={() => {
+                        const selectedIds = Object.keys(selectedHistoricoRows).filter(id => selectedHistoricoRows[id]).map(id => parseInt(id, 10));
+                        if (selectedIds.length === 0) {
+                          alert('Por favor seleccione al menos un caso de la lista para realizar el cargue a OnBase Web.');
+                          return;
+                        }
+                        handleStartOnBaseLiveSession(selectedIds, null);
+                      }}
+                      style={{
+                        background: 'linear-gradient(135deg, #00324d 0%, #39a900 100%)',
+                        color: '#ffffff',
+                        border: 'none',
+                        padding: '10px 18px',
+                        borderRadius: '8px',
+                        fontWeight: '700',
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        boxShadow: '0 2px 6px rgba(0,50,77,0.25)'
+                      }}
+                      title="Cargar los casos seleccionados automáticamente en OnBase Web"
+                    >
+                      <Play size={16} /> 
+                      Cargar {Object.keys(selectedHistoricoRows).filter(id => selectedHistoricoRows[id]).length > 0 ? `(${Object.keys(selectedHistoricoRows).filter(id => selectedHistoricoRows[id]).length}) ` : ''}Seleccionados a OnBase
+                    </button>
+
+                    <button 
+                      onClick={handleLimpiarCasos}
+                      style={{
+                        background: '#fef2f2',
+                        color: '#dc2626',
+                        border: '1px solid #fca5a5',
+                        padding: '10px 16px',
+                        borderRadius: '8px',
+                        fontWeight: '600',
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}
+                      title="Eliminar todos los registros del histórico"
+                    >
+                      <Trash2 size={16} /> Limpiar Histórico
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -1768,6 +1812,20 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                   <thead>
                     <tr style={{ background: '#f1f5f9', textTransform: 'uppercase', fontSize: '11px', color: '#475569' }}>
+                      <th style={{ padding: '12px', textAlign: 'center', width: '40px' }}>
+                        <input 
+                          type="checkbox"
+                          checked={historico.length > 0 && historico.every(c => selectedHistoricoRows[c.id])}
+                          onChange={(e) => {
+                            const isChecked = e.target.checked;
+                            const newSel = {};
+                            historico.forEach(c => { newSel[c.id] = isChecked; });
+                            setSelectedHistoricoRows(newSel);
+                          }}
+                          style={{ cursor: 'pointer', transform: 'scale(1.2)' }}
+                          title="Seleccionar / deseleccionar todos los casos"
+                        />
+                      </th>
                       <th style={{ padding: '12px', textAlign: 'left' }}>ID / Fecha</th>
                       <th style={{ padding: '12px', textAlign: 'left' }}>Etapa</th>
                       <th style={{ padding: '12px', textAlign: 'left' }}>Aprendiz</th>
@@ -1777,11 +1835,25 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                       <th style={{ padding: '12px', textAlign: 'center' }}>Carta PDF</th>
                       <th style={{ padding: '12px', textAlign: 'center' }}>Anexo Explícito</th>
                       <th style={{ padding: '12px', textAlign: 'center' }}>Estado</th>
+                      <th style={{ padding: '12px', textAlign: 'center' }}>Acciones Cargue</th>
                     </tr>
                   </thead>
                   <tbody>
                     {historico.map(caso => (
-                      <tr key={caso.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <tr key={caso.id} style={{ borderBottom: '1px solid #e2e8f0', background: selectedHistoricoRows[caso.id] ? '#f0fdf4' : 'transparent' }}>
+                        <td style={{ padding: '12px', textAlign: 'center' }}>
+                          <input 
+                            type="checkbox"
+                            checked={!!selectedHistoricoRows[caso.id]}
+                            onChange={(e) => {
+                              setSelectedHistoricoRows(prev => ({
+                                ...prev,
+                                [caso.id]: e.target.checked
+                              }));
+                            }}
+                            style={{ cursor: 'pointer', transform: 'scale(1.2)' }}
+                          />
+                        </td>
                         <td style={{ padding: '12px', fontWeight: '600' }}>
                           #{caso.id}<br/>
                           <span style={{ fontSize: '11px', color: '#64748b' }}>{new Date(caso.created_at).toLocaleDateString('es-CO')}</span>
@@ -1851,6 +1923,28 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                           }}>
                             {caso.status}
                           </span>
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'center' }}>
+                          <button 
+                            onClick={() => handleStartOnBaseLiveSession([caso.id], null)}
+                            style={{
+                              background: '#39a900',
+                              color: '#ffffff',
+                              border: 'none',
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              boxShadow: '0 2px 4px rgba(57,169,0,0.2)'
+                            }}
+                            title="Ejecutar cargue automático en OnBase Web para este caso especifico"
+                          >
+                            <Play size={12} /> Cargar OnBase
+                          </button>
                         </td>
                       </tr>
                     ))}
