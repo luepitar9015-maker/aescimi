@@ -645,7 +645,7 @@ async function paso3_uformComunicacionElectronica(page, browser, logs) {
                             const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
                             return (txt.includes('uform comunicacion electronica') || 
                                    txt.includes('uform comunicación electrónica') ||
-                                   (txt.includes('comunicacion electronica') && !txt.includes('portal') && !txt.includes('recibida') && !txt.includes('envio'));
+                                   (txt.includes('comunicacion electronica') && !txt.includes('portal') && !txt.includes('recibida') && !txt.includes('envio')));
                         });
 
                         if (itemNode) {
