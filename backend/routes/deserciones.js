@@ -69,6 +69,49 @@ ensureDesercionesTable();
 
 router.use(requireAuth, requireAdmin);
 
+// 0. Gestor de Correos en Copia (CC) Configurados Persistentes en Base de Datos
+router.get('/cc-emails', requireAuth, async (req, res) => {
+    try {
+        const result = await pool.query("SELECT value FROM system_settings WHERE key = 'sena_deserciones_cc_emails'");
+        if (result.rows && result.rows.length > 0 && result.rows[0].value) {
+            try {
+                const emails = JSON.parse(result.rows[0].value);
+                return res.json({ cc_emails: emails });
+            } catch (pErr) {
+                console.warn('[DESERCIONES] Error parseando JSON de cc_emails:', pErr);
+            }
+        }
+        const defaultEmails = [
+            { name: 'Subdirección Centro', email: 'subdireccion_centro@sena.edu.co' },
+            { name: 'Coordinación Académica', email: 'coordinacion_academica@sena.edu.co' }
+        ];
+        res.json({ cc_emails: defaultEmails });
+    } catch (err) {
+        console.error('[DESERCIONES] Error obteniendo correos CC:', err);
+        res.status(500).json({ error: 'Error al consultar correos CC.' });
+    }
+});
+
+router.post('/cc-emails', requireAuth, async (req, res) => {
+    const { cc_emails } = req.body;
+    if (!Array.isArray(cc_emails)) {
+        return res.status(400).json({ error: 'El formato de correos CC debe ser una lista.' });
+    }
+    try {
+        const valueStr = JSON.stringify(cc_emails);
+        await pool.query(`
+            INSERT INTO system_settings (key, value)
+            VALUES ('sena_deserciones_cc_emails', $1)
+            ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = CURRENT_TIMESTAMP
+        `, [valueStr]);
+
+        res.json({ message: 'Correos en Copia (CC) guardados y almacenados exitosamente en el sistema.', cc_emails });
+    } catch (err) {
+        console.error('[DESERCIONES] Error guardando correos CC:', err);
+        res.status(500).json({ error: 'Error al almacenar correos CC.' });
+    }
+});
+
 // 1. Carga y parseo de Excel con registros de aprendices
 router.post('/upload-excel', requireAuth, upload.single('excel'), (req, res) => {
     try {

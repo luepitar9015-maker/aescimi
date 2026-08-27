@@ -89,10 +89,21 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
   const [selectedOnbaseUser, setSelectedOnbaseUser] = useState(() => {
     return localStorage.getItem('sena_deserciones_default_onbase_user') || 'luepitar';
   });
-  const [ccEmails, setCcEmails] = useState([
-    { name: 'Subdirección Centro', email: 'subdireccion_centro@sena.edu.co' },
-    { name: 'Coordinación Académica', email: 'coordinacion_academica@sena.edu.co' }
-  ]);
+  const [ccEmails, setCcEmails] = useState(() => {
+    const saved = localStorage.getItem('sena_deserciones_cc_emails');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        console.error('Error parseando correos CC de localStorage:', e);
+      }
+    }
+    return [
+      { name: 'Subdirección Centro', email: 'subdireccion_centro@sena.edu.co' },
+      { name: 'Coordinación Académica', email: 'coordinacion_academica@sena.edu.co' }
+    ];
+  });
   const [newCcName, setNewCcName] = useState('');
   const [newCcEmail, setNewCcEmail] = useState('');
 
@@ -227,11 +238,34 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
     return token ? { Authorization: `Bearer ${token}` } : {};
   };
 
-  // Fetch active users for OnBase assignment & Historico on mount
+  // Fetch active users for OnBase assignment, Historico & CC Emails on mount
   useEffect(() => {
     fetchUsers();
     fetchHistorico();
+    fetchCcEmails();
   }, []);
+
+  const fetchCcEmails = async () => {
+    try {
+      const res = await axios.get('/api/deserciones/cc-emails', { headers: getAuthHeaders() });
+      if (res.data && Array.isArray(res.data.cc_emails) && res.data.cc_emails.length > 0) {
+        setCcEmails(res.data.cc_emails);
+        localStorage.setItem('sena_deserciones_cc_emails', JSON.stringify(res.data.cc_emails));
+      }
+    } catch (err) {
+      console.warn('[DESERCIONES] Usando correos CC en localStorage o por defecto:', err.message);
+    }
+  };
+
+  const persistCcEmails = async (updatedCcList) => {
+    setCcEmails(updatedCcList);
+    localStorage.setItem('sena_deserciones_cc_emails', JSON.stringify(updatedCcList));
+    try {
+      await axios.post('/api/deserciones/cc-emails', { cc_emails: updatedCcList }, { headers: getAuthHeaders() });
+    } catch (err) {
+      console.error('[DESERCIONES] Error persistiendo correos CC en la base de datos:', err.message);
+    }
+  };
 
   const fetchUsers = async () => {
     const updatedOptions = defaultOnbaseUserOptions.map(opt => {
@@ -597,16 +631,45 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
     }, 0);
   };
 
-  // 4. Agregar / Eliminar Correos CC
-  const handleAddCcEmail = () => {
-    if (!newCcEmail.trim()) return;
-    setCcEmails(prev => [...prev, { name: newCcName.trim() || newCcEmail.split('@')[0], email: newCcEmail.trim() }]);
+  // 4. Agregar / Eliminar / Restablecer Correos CC Persistentes
+  const handleAddCcEmail = async () => {
+    if (!newCcEmail.trim()) {
+      setStatusMessage({ type: 'warning', text: 'Por favor ingrese un correo electrónico para la copia CC.' });
+      return;
+    }
+    const cleanEmail = newCcEmail.trim().toLowerCase();
+    const cleanName = newCcName.trim() || cleanEmail.split('@')[0];
+
+    if (!cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      setStatusMessage({ type: 'warning', text: 'La dirección de correo electrónico no tiene un formato válido.' });
+      return;
+    }
+
+    if (ccEmails.some(item => item.email.toLowerCase() === cleanEmail)) {
+      setStatusMessage({ type: 'warning', text: 'Este correo electrónico ya se encuentra registrado en la lista de CC.' });
+      return;
+    }
+
+    const updated = [...ccEmails, { name: cleanName, email: cleanEmail }];
+    await persistCcEmails(updated);
     setNewCcName('');
     setNewCcEmail('');
+    setStatusMessage({ type: 'success', text: 'Correo en copia (CC) guardado y almacenado correctamente en el sistema.' });
   };
 
-  const handleRemoveCcEmail = (idx) => {
-    setCcEmails(prev => prev.filter((_, i) => i !== idx));
+  const handleRemoveCcEmail = async (idx) => {
+    const updated = ccEmails.filter((_, i) => i !== idx);
+    await persistCcEmails(updated);
+    setStatusMessage({ type: 'info', text: 'Correo en copia eliminado de la configuración guardada.' });
+  };
+
+  const handleResetCcEmails = async () => {
+    const defaultCc = [
+      { name: 'Subdirección Centro', email: 'subdireccion_centro@sena.edu.co' },
+      { name: 'Coordinación Académica', email: 'coordinacion_academica@sena.edu.co' }
+    ];
+    await persistCcEmails(defaultCc);
+    setStatusMessage({ type: 'info', text: 'Correos CC restablecidos a los valores por defecto del SENA.' });
   };
 
   // 5. Vista Previa de Correspondencia Combinada
@@ -1107,26 +1170,38 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
 
             {/* Correos en Copia (CC) */}
             <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-              <h3 style={{ margin: '0 0 14px 0', color: '#0f172a', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Mail size={18} color="#00324d" />
-                Correos en Copia (CC desde OnBase)
-              </h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <h3 style={{ margin: 0, color: '#0f172a', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Mail size={18} color="#00324d" />
+                  Correos en Copia (CC desde OnBase)
+                </h3>
+                <span style={{ fontSize: '11px', color: '#39a900', fontWeight: '600', background: '#e8f5e9', padding: '3px 8px', borderRadius: '10px' }}>
+                  ✓ Guardados en OnBase/BD
+                </span>
+              </div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
-                {ccEmails.map((cc, idx) => (
-                  <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '8px 12px', borderRadius: '6px', fontSize: '13px' }}>
-                    <div>
-                      <strong style={{ color: '#0f172a' }}>{cc.name}</strong>
-                      <div style={{ fontSize: '11px', color: '#64748b' }}>{cc.email}</div>
-                    </div>
-                    <button 
-                      onClick={() => handleRemoveCcEmail(idx)}
-                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                {ccEmails.length === 0 ? (
+                  <div style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic', padding: '8px 0' }}>
+                    No hay correos en copia configurados.
                   </div>
-                ))}
+                ) : (
+                  ccEmails.map((cc, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', borderLeft: '3px solid #00324d' }}>
+                      <div>
+                        <strong style={{ color: '#0f172a' }}>{cc.name}</strong>
+                        <div style={{ fontSize: '11px', color: '#64748b' }}>{cc.email}</div>
+                      </div>
+                      <button 
+                        onClick={() => handleRemoveCcEmail(idx)}
+                        title="Eliminar correo de la lista guardada"
+                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
 
               {/* Form de agregar nuevo correo */}
@@ -1148,9 +1223,18 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                   />
                   <button 
                     onClick={handleAddCcEmail}
-                    style={{ background: '#00324d', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}
+                    title="Almacenar y guardar correo en copia"
+                    style={{ background: '#00324d', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}
                   >
-                    <Plus size={16} />
+                    <Plus size={16} /> Guardar
+                  </button>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                  <button 
+                    onClick={handleResetCcEmails}
+                    style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '11px', cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    Restablecer correos SENA por defecto
                   </button>
                 </div>
               </div>
@@ -1545,6 +1629,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                       <th style={{ padding: '12px', textAlign: 'left' }}>Aprendiz</th>
                       <th style={{ padding: '12px', textAlign: 'left' }}>Ficha</th>
                       <th style={{ padding: '12px', textAlign: 'left' }}>Usuario OnBase</th>
+                      <th style={{ padding: '12px', textAlign: 'left' }}>Correos CC</th>
                       <th style={{ padding: '12px', textAlign: 'center' }}>Carta PDF</th>
                       <th style={{ padding: '12px', textAlign: 'center' }}>Anexo Explícito</th>
                       <th style={{ padding: '12px', textAlign: 'center' }}>Estado</th>
@@ -1575,6 +1660,28 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                         </td>
                         <td style={{ padding: '12px' }}>{caso.ficha}</td>
                         <td style={{ padding: '12px' }}>{caso.onbase_target_user || selectedOnbaseUser}</td>
+                        <td style={{ padding: '12px' }}>
+                          {(() => {
+                            let parsedCc = [];
+                            if (caso.copy_emails) {
+                              try {
+                                parsedCc = typeof caso.copy_emails === 'string' ? JSON.parse(caso.copy_emails) : caso.copy_emails;
+                              } catch (e) {}
+                            }
+                            if (!Array.isArray(parsedCc) || parsedCc.length === 0) {
+                              return <span style={{ color: '#94a3b8', fontSize: '11px' }}>Sin CC</span>;
+                            }
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                {parsedCc.map((cc, i) => (
+                                  <span key={i} style={{ fontSize: '11px', color: '#0f172a', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', display: 'inline-block' }} title={cc.email}>
+                                    📧 {cc.name || cc.email}
+                                  </span>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                        </td>
                         <td style={{ padding: '12px', textAlign: 'center' }}>
                           {caso.comunicacion_pdf_path ? (
                             <span style={{ color: '#39a900', fontWeight: '600', fontSize: '12px' }}>✓ Creada</span>
