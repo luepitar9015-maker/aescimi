@@ -775,7 +775,7 @@ async function paso3_uformComunicacionElectronica(page, browser, logs) {
 // 4. Descripción del Asunto: 'Notificación' (o valor configurado)
 // 5. Campo de Texto: Texto completo de la carta combinada
 // 6. Adjuntar anexo: Resolución / Documento PDF / Anexo explícito
-// 7. Copias Externas: Para cada correo en copia guardado, clic en 'Agregar' e ingresar Nombre y Correo
+// 7. Copias Externas: Para cada correo en copia guardado, clic en 'Add' e ingresar Nombre y Correo
 // 8. Enviar: Clic en el botón "Enviar"
 // ─────────────────────────────────────────────────────────────────
 async function paso4_diligenciarComunicacionElectronica(page, browser, casoData, logs, opts = {}) {
@@ -796,7 +796,7 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
                     const found = await frame.evaluate(() => {
                         const txt = document.body ? document.body.innerText.toLowerCase() : '';
                         const hasInputs = document.querySelectorAll('input[type="text"], input[type="email"], textarea').length > 0;
-                        return (txt.includes('nombre destinatario') || txt.includes('email destinatario') || txt.includes('externo') || txt.includes('comunicación electrónica')) && hasInputs;
+                        return (txt.includes('nombre destinatario') || txt.includes('email destinatario') || txt.includes('destinatario externo') || txt.includes('comunicación electrónica')) && hasInputs;
                     });
                     if (found) {
                         targetFrame = frame;
@@ -814,55 +814,46 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
         logs.push('[PASO 4] ✅ Marco/Iframe de formulario localizado.');
     }
 
-    // 1. Nombre Destinatario: Aprendiz (Nombres y Apellidos)
+    // 1 y 2. Destinatario Externo: Nombre Destinatario y Email Destinatario
     const nombreAprendiz = casoData.aprendiz_nombre || `${casoData.aprendiz_nombres || ''} ${casoData.aprendiz_apellidos || ''}`.trim() || 'APRENDIZ';
-    logs.push(`[PASO 4] 1/8 Llenando "Nombre Destinatario": "${nombreAprendiz}"...`);
-
-    await targetFrame.evaluate((nombre) => {
-        const inputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])'));
-        const nameInput = inputs.find(inp => {
-            const attr = (inp.id || inp.name || inp.placeholder || inp.title || '').toLowerCase();
-            const parentTxt = (inp.parentElement?.innerText || inp.closest('td, div, tr')?.innerText || '').toLowerCase();
-            return attr.includes('nombredestinatario') || attr.includes('nombre_destinatario') || parentTxt.includes('nombre destinatario');
-        }) || inputs[0];
-
-        if (nameInput) {
-            nameInput.scrollIntoView({ block: 'center' });
-            nameInput.focus();
-            nameInput.value = nombre;
-            nameInput.dispatchEvent(new Event('input', { bubbles: true }));
-            nameInput.dispatchEvent(new Event('change', { bubbles: true }));
-            nameInput.dispatchEvent(new Event('blur', { bubbles: true }));
-        }
-    }, nombreAprendiz).catch(() => {});
-    logs.push(`[PASO 4] ✅ "Nombre Destinatario" completado: "${nombreAprendiz}".`);
-    await wait(1000);
-
-    // 2. Email Destinatario: Correo Registrado en Sofía
     const emailAprendiz = casoData.aprendiz_correo || casoData.raw_row?.['CORREO REGISTRADO EN SOFÍA'] || 'correo@sena.edu.co';
+    
+    logs.push(`[PASO 4] 1/8 Llenando "Nombre Destinatario": "${nombreAprendiz}"...`);
     logs.push(`[PASO 4] 2/8 Llenando "Email Destinatario": "${emailAprendiz}"...`);
 
-    await targetFrame.evaluate((email) => {
-        const inputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input:not([type])'));
-        const emailInput = inputs.find(inp => {
-            const attr = (inp.id || inp.name || inp.placeholder || inp.title || '').toLowerCase();
-            const parentTxt = (inp.parentElement?.innerText || inp.closest('td, div, tr, p')?.innerText || '').toLowerCase();
-            return attr.includes('emaildestinatario') || attr.includes('email_destinatario') || attr.includes('correodestinatario') || parentTxt.includes('email destinatario') || parentTxt.includes('correo registrado');
-        }) || inputs.find(inp => {
-            const parentTxt = (inp.parentElement?.innerText || inp.closest('td, div, tr, p')?.innerText || '').toLowerCase();
-            return parentTxt.includes('email') || parentTxt.includes('correo');
-        }) || inputs[1];
+    await targetFrame.evaluate((nombre, email) => {
+        // Localizar el contenedor de "Destinatario Externo"
+        const allElements = Array.from(document.querySelectorAll('div, td, tr, fieldset, table, span, b, strong'));
+        const extHeader = allElements.find(el => {
+            const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+            return txt.includes('destinatario externo');
+        });
 
-        if (emailInput) {
-            emailInput.scrollIntoView({ block: 'center' });
-            emailInput.focus();
-            emailInput.value = email;
-            emailInput.dispatchEvent(new Event('input', { bubbles: true }));
-            emailInput.dispatchEvent(new Event('change', { bubbles: true }));
-            emailInput.dispatchEvent(new Event('blur', { bubbles: true }));
+        const extSection = extHeader?.closest('fieldset, table, div, tr') || document.body;
+        const inputs = Array.from(extSection.querySelectorAll('input[type="text"], input[type="email"], input:not([type])'));
+
+        // Input 0: Nombre Destinatario
+        if (inputs.length >= 1) {
+            const nameInp = inputs[0];
+            nameInp.focus();
+            nameInp.value = nombre;
+            nameInp.dispatchEvent(new Event('input', { bubbles: true }));
+            nameInp.dispatchEvent(new Event('change', { bubbles: true }));
+            nameInp.dispatchEvent(new Event('blur', { bubbles: true }));
         }
-    }, emailAprendiz).catch(() => {});
-    logs.push(`[PASO 4] ✅ "Email Destinatario" completado: "${emailAprendiz}".`);
+
+        // Input 1: Email Destinatario
+        if (inputs.length >= 2) {
+            const emailInp = inputs[1];
+            emailInp.focus();
+            emailInp.value = email;
+            emailInp.dispatchEvent(new Event('input', { bubbles: true }));
+            emailInp.dispatchEvent(new Event('change', { bubbles: true }));
+            emailInp.dispatchEvent(new Event('blur', { bubbles: true }));
+        }
+    }, nombreAprendiz, emailAprendiz).catch(() => {});
+
+    logs.push(`[PASO 4] ✅ "Nombre Destinatario" y "Email Destinatario" completados.`);
     await wait(1000);
 
     // 3. Asunto ('NOVEDADES DE ALUMNOS')
@@ -934,10 +925,10 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
     logs.push(`[PASO 4] 5/8 Llenando "Texto" (Carta Combinada)...`);
 
     await targetFrame.evaluate((texto) => {
-        const textareas = Array.from(document.querySelectorAll('textarea, [contenteditable="true"]'));
+        const textareas = Array.from(document.querySelectorAll('textarea, [contenteditable="true"], div[id*="txt"], div[id*="Texto"]'));
         const mainTextarea = textareas.find(ta => {
-            const parentTxt = (ta.parentElement?.innerText || ta.closest('td, div, fieldset')?.innerText || '').toLowerCase();
-            return parentTxt.includes('texto') || ta.rows > 2 || ta.id?.includes('texto') || ta.name?.includes('texto');
+            const parentTxt = (ta.parentElement?.innerText || ta.closest('td, div, fieldset, tr')?.innerText || '').toLowerCase();
+            return parentTxt.includes('texto') || ta.tagName.toLowerCase() === 'textarea';
         }) || textareas[0];
 
         if (mainTextarea) {
@@ -960,44 +951,59 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
     logs.push(`[PASO 4] 6/8 Adjuntando anexo PDF: "${pdfPathToAttach ? path.basename(pdfPathToAttach) : 'Sin ruta'}"...`);
 
     if (pdfPathToAttach && fs.existsSync(pdfPathToAttach)) {
-        let fileUploaded = false;
-        const allPages = await browser.pages().catch(() => [page]);
-
-        for (const pg of allPages) {
-            for (const frame of pg.frames()) {
-                try {
-                    const fileInputs = await frame.$$('input[type="file"]');
-                    if (fileInputs && fileInputs.length > 0) {
-                        for (const fInput of fileInputs) {
-                            await fInput.uploadFile(pdfPathToAttach);
-                            fileUploaded = true;
-                            logs.push(`[PASO 4] ✅ Archivo PDF (${path.basename(pdfPathToAttach)}) adjuntado exitosamente en el marco del formulario.`);
-                            break;
-                        }
+        try {
+            // Método 1: FileChooser con clic en el botón "Adjuntar Anexo"
+            const [fileChooser] = await Promise.all([
+                page.waitForFileChooser({ timeout: 4000 }).catch(() => null),
+                targetFrame.evaluate(() => {
+                    const btns = Array.from(document.querySelectorAll('input[type="button"], button, a, span'));
+                    const attachBtn = btns.find(b => {
+                        const txt = (b.value || b.innerText || b.textContent || '').trim().toLowerCase();
+                        return txt.includes('adjuntar anexo') || txt.includes('adjuntar');
+                    });
+                    if (attachBtn) {
+                        attachBtn.scrollIntoView({ block: 'center' });
+                        attachBtn.click();
+                        return true;
                     }
-                } catch (e) {}
-                if (fileUploaded) break;
-            }
-            if (fileUploaded) break;
-        }
+                    return false;
+                }).catch(() => false)
+            ]);
 
-        if (!fileUploaded) {
-            logs.push(`[PASO 4] ⚠️ No se encontró input[type="file"] directo. Ejecutando clic en botón de anexo...`);
-            await targetFrame.evaluate(() => {
-                const btns = Array.from(document.querySelectorAll('input[type="button"], button, a, span, label'));
-                const attachBtn = btns.find(b => {
-                    const txt = (b.value || b.innerText || b.textContent || '').trim().toLowerCase();
-                    return txt.includes('adjuntar anexo') || txt.includes('adjuntar') || txt.includes('examinar');
-                });
-                if (attachBtn) attachBtn.click();
-            }).catch(() => {});
+            if (fileChooser) {
+                await fileChooser.accept([pdfPathToAttach]);
+                logs.push(`[PASO 4] ✅ Archivo PDF (${path.basename(pdfPathToAttach)}) cargado exitosamente mediante selector de archivos.`);
+            } else {
+                // Método 2: Subir a cualquier input[type="file"] presente en los marcos
+                const allPages = await browser.pages().catch(() => [page]);
+                let uploaded = false;
+                for (const pg of allPages) {
+                    for (const frame of pg.frames()) {
+                        try {
+                            const fileInputs = await frame.$$('input[type="file"]');
+                            if (fileInputs && fileInputs.length > 0) {
+                                for (const fInput of fileInputs) {
+                                    await fInput.uploadFile(pdfPathToAttach);
+                                    uploaded = true;
+                                    logs.push(`[PASO 4] ✅ Archivo PDF cargado en input file del formulario.`);
+                                    break;
+                                }
+                            }
+                        } catch (e) {}
+                        if (uploaded) break;
+                    }
+                    if (uploaded) break;
+                }
+            }
+        } catch (attachErr) {
+            logs.push(`[WARN] No se pudo adjuntar automáticamente el PDF: ${attachErr.message}`);
         }
     } else {
         logs.push(`[PASO 4] ⚠️ Archivo PDF no encontrado o sin ruta registrada.`);
     }
     await wait(1500);
 
-    // 7. Copias Externas (Agregar correos en copia CC)
+    // 7. Copias Externas (Agregar correos en copia CC haciendo clic en el botón "Add")
     let copyEmailsList = [];
     if (casoData.copy_emails) {
         try {
@@ -1015,36 +1021,45 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
 
             if (!ccEmail) continue;
 
-            logs.push(`[PASO 4] -> Clic "Agregar" en Copias Externas para: ${ccName} (${ccEmail})...`);
+            logs.push(`[PASO 4] -> Clic "Add" en Copias Externas para: ${ccName} (${ccEmail})...`);
 
+            // Clic en el botón "Add" de la barra "Copias Externas"
             await targetFrame.evaluate(() => {
-                const buttons = Array.from(document.querySelectorAll('button, input[type="button"], a, div[role="button"], span'));
-                const addCcBtn = buttons.find(b => {
-                    const txt = (b.innerText || b.value || b.textContent || '').trim().toLowerCase();
-                    const parentTxt = (b.closest('fieldset, div, tr, td')?.innerText || '').toLowerCase();
-                    return (txt === 'agregar' || txt.includes('agregar')) && (parentTxt.includes('copias externas') || parentTxt.includes('copia externa') || parentTxt.includes('copias'));
-                }) || buttons.find(b => (b.innerText || b.value || '').trim().toLowerCase() === 'agregar');
+                const allHeaders = Array.from(document.querySelectorAll('div, td, tr, table, span, b, strong'));
+                const ccHeader = allHeaders.find(el => {
+                    const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+                    return txt === 'copias externas' || txt === 'copia externa';
+                });
 
-                if (addCcBtn) {
-                    addCcBtn.scrollIntoView({ block: 'center' });
-                    addCcBtn.click();
+                const parentContainer = ccHeader?.closest('tr, table, div, fieldset') || document.body;
+                const buttons = Array.from(parentContainer.querySelectorAll('button, input[type="button"], a, span, div[role="button"]'));
+                const addBtn = buttons.find(b => {
+                    const txt = (b.innerText || b.value || b.textContent || '').trim().toLowerCase();
+                    return txt === 'add' || txt === 'agregar' || txt === '+';
+                }) || buttons[buttons.length - 1];
+
+                if (addBtn) {
+                    addBtn.scrollIntoView({ block: 'center' });
+                    addBtn.click();
                 }
             }).catch(() => {});
 
             await wait(1200);
 
+            // Llenar los dos campos de la nueva fila (Nombre Destinatario y Correo)
             await targetFrame.evaluate((name, email) => {
-                const ccContainers = Array.from(document.querySelectorAll('div, fieldset, table, tr')).filter(el => {
-                    const txt = (el.innerText || el.textContent || '').toLowerCase();
-                    return txt.includes('copias externas') || txt.includes('copia externa') || txt.includes('copias');
+                const allHeaders = Array.from(document.querySelectorAll('div, td, tr, table, span, b, strong'));
+                const ccHeader = allHeaders.find(el => {
+                    const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+                    return txt === 'copias externas' || txt === 'copia externa';
                 });
 
-                const ccContainer = ccContainers[ccContainers.length - 1];
-                const targetInputs = ccContainer ? Array.from(ccContainer.querySelectorAll('input[type="text"], input[type="email"], input:not([type])')) : Array.from(document.querySelectorAll('input[type="text"], input[type="email"]'));
+                const parentContainer = ccHeader?.closest('tr, table, div, fieldset') || document.body;
+                const inputs = Array.from(parentContainer.querySelectorAll('input[type="text"], input[type="email"], input:not([type])'));
 
-                if (targetInputs.length >= 2) {
-                    const nameInp = targetInputs[targetInputs.length - 2];
-                    const emailInp = targetInputs[targetInputs.length - 1];
+                if (inputs.length >= 2) {
+                    const nameInp = inputs[inputs.length - 2];
+                    const emailInp = inputs[inputs.length - 1];
 
                     if (nameInp) {
                         nameInp.focus();
@@ -1064,7 +1079,7 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
                 }
             }, ccName, ccEmail).catch(() => {});
 
-            await wait(1000);
+            await wait(800);
         }
         logs.push(`[PASO 4] ✅ ${copyEmailsList.length} Copias Externas (CC) registradas en el formulario.`);
     } else {
