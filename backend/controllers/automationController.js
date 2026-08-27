@@ -654,25 +654,32 @@ async function paso3_uformComunicacionElectronica(page, browser, logs) {
         }
     }
 
-    // 3. Esperar que cargue el formulario "SENA Comunicación Electrónica"
-    logs.push('[PASO 3] Esperando apertura y renderizado de "SENA Comunicación Electrónica"...');
-    await wait(5000);
+    // 3. Esperar que cargue el formulario "SENA Comunicación Electrónica" (esperar que el spinner termine)
+    logs.push('[PASO 3] Esperando apertura y renderizado completo del formulario en OnBase Web...');
+    let formLoadedFrame = null;
 
-    let formLoaded = false;
-    const allPages = await browser.pages().catch(() => [page]);
-    for (const pg of allPages) {
-        for (const frame of pg.frames()) {
-            try {
-                const found = await frame.evaluate(() => {
-                    const txt = document.body ? document.body.innerText.toLowerCase() : '';
-                    return txt.includes('comunicación electrónica') || txt.includes('tipo de destinatario') || txt.includes('destinatario interno') || txt.includes('datos del envio') || txt.includes('uform');
-                });
-                if (found) { formLoaded = true; break; }
-            } catch (e) {}
+    for (let attempt = 0; attempt < 20 && !formLoadedFrame; attempt++) {
+        await wait(1000);
+        const allPages = await browser.pages().catch(() => [page]);
+        for (const pg of allPages) {
+            for (const frame of pg.frames()) {
+                try {
+                    const ready = await frame.evaluate(() => {
+                        const txt = document.body ? document.body.innerText.toLowerCase() : '';
+                        const hasInputs = document.querySelectorAll('input[type="radio"], input[type="text"]').length > 0;
+                        return (txt.includes('comunicación electrónica') || txt.includes('tipo de destinatario') || txt.includes('destinatario externo')) && hasInputs;
+                    });
+                    if (ready) {
+                        formLoadedFrame = frame;
+                        break;
+                    }
+                } catch (e) {}
+            }
+            if (formLoadedFrame) break;
         }
     }
 
-    if (formLoaded) {
+    if (formLoadedFrame) {
         logs.push('[PASO 3] ✅ Formulario "SENA Comunicación Electrónica" cargado y listo en pantalla.');
     } else {
         logs.push('[PASO 3] Formulario "UForm Comunicación Electrónica" preparado.');
@@ -763,22 +770,35 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
     await wait(2000);
 
     // 0. Encontrar el frame donde está el formulario Comunicación Electrónica
-    let targetFrame = page;
-    const allPages = await browser.pages().catch(() => [page]);
+    let targetFrame = null;
+    logs.push('[PASO 4] Localizando marco / iframe activo del formulario Comunicación Electrónica...');
 
-    for (const pg of allPages) {
-        for (const frame of pg.frames()) {
-            try {
-                const found = await frame.evaluate(() => {
-                    const txt = document.body ? document.body.innerText.toLowerCase() : '';
-                    return txt.includes('comunicación electrónica') || txt.includes('nombre destinatario') || txt.includes('destinatario externo');
-                });
-                if (found) {
-                    targetFrame = frame;
-                    break;
-                }
-            } catch (e) {}
+    for (let fAttempt = 0; fAttempt < 15 && !targetFrame; fAttempt++) {
+        await wait(1000);
+        const allPages = await browser.pages().catch(() => [page]);
+
+        for (const pg of allPages) {
+            for (const frame of pg.frames()) {
+                try {
+                    const found = await frame.evaluate(() => {
+                        const txt = document.body ? document.body.innerText.toLowerCase() : '';
+                        const hasInputs = document.querySelectorAll('input[type="text"], input[type="email"], textarea').length > 0;
+                        return (txt.includes('nombre destinatario') || txt.includes('email destinatario') || txt.includes('externo') || txt.includes('comunicación electrónica')) && hasInputs;
+                    });
+                    if (found) {
+                        targetFrame = frame;
+                        break;
+                    }
+                } catch (e) {}
+            }
+            if (targetFrame) break;
         }
+    }
+
+    if (!targetFrame) {
+        targetFrame = page;
+    } else {
+        logs.push('[PASO 4] ✅ Marco/Iframe de formulario localizado.');
     }
 
     // 1. Nombre Destinatario: Aprendiz (Nombres y Apellidos)
