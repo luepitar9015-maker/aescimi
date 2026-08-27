@@ -547,13 +547,28 @@ async function paso2_abrirFormulario(page, browser, logs) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// PASO 3 (DESERCIONES): UForm Comunicación Electrónica
+// PASO 3: UForm Comunicación Electrónica
 // ─────────────────────────────────────────────────────────────────
 async function paso3_uformComunicacionElectronica(page, browser, logs) {
     logs.push('[PASO 3] Buscando "Nuevo formulario" y seleccionando "UForm Comunicación Electrónica"...');
     await wait(2000);
 
-    // 1. Clic en "Nuevo formulario" (#newform o texto) si la ventana de selección no está ya abierta
+    // 0. Si la interfaz se desvió a Document Retrieval (Búsqueda), hacer clic en icono de Nuevo Formulario (#newform)
+    const isOnDocRetrieval = await page.evaluate(() => {
+        const txt = document.body ? document.body.innerText.toLowerCase() : '';
+        return txt.includes('document retrieval') || txt.includes('document types');
+    }).catch(() => false);
+
+    if (isOnDocRetrieval) {
+        logs.push('[PASO 3] ⚠️ Interfaz en "Document Retrieval". Redirigiendo a "Nuevo formulario"...');
+        await page.evaluate(() => {
+            const btn = document.querySelector('#newform, [id*="NewForm"], [id*="newform"], [onclick*="NewForm"]');
+            if (btn) btn.click();
+        }).catch(() => {});
+        await wait(3000);
+    }
+
+    // 1. Clic en "Nuevo formulario" (#newform) si la ventana de selección no está ya abierta
     const allPages0 = await browser.pages().catch(() => [page]);
     let alreadyOnNewForm = false;
     for (const pg of allPages0) {
@@ -571,26 +586,24 @@ async function paso3_uformComunicacionElectronica(page, browser, logs) {
 
     if (!alreadyOnNewForm) {
         const clickedNewForm = await page.evaluate(() => {
-            const el = document.querySelector('#newform, a[title*="Nuevo"], button[title*="Nuevo"]');
-            if (el) { el.click(); return true; }
-            const elements = Array.from(document.querySelectorAll('a, button, div, span, img, [role="button"]'));
-            const target = elements.find(item => {
-                const txt = (item.innerText || item.textContent || item.title || item.alt || '').trim().toLowerCase();
-                return txt === 'nuevo formulario' || txt === 'new form' || item.id?.includes('NewForm');
-            });
-            if (target) { target.click(); return true; }
+            // Clic únicamente en el botón exacto de Nuevo Formulario (#newform)
+            const exactBtn = document.querySelector('#newform, [id*="NewForm"], [id*="newform"], [onclick*="NewForm"], [title="Nuevo formulario"], [title="New Form"]');
+            if (exactBtn) {
+                exactBtn.click();
+                return true;
+            }
             return false;
         }).catch(() => false);
 
         if (clickedNewForm) {
             logs.push('[PASO 3] ✅ Clic en "Nuevo formulario" (:::) realizado.');
         } else {
-            logs.push('[PASO 3] Intentando buscar formulario en la interfaz activa...');
+            logs.push('[PASO 3] Buscando formulario en la interfaz activa...');
         }
         await wait(3000);
     }
 
-    // 2. Localizar y hacer clic en "UForm Comunicacion Electronica" (#itemLabelunity118 / #liunity118 / filtro)
+    // 2. Localizar y hacer clic en "UForm Comunicacion Electronica"
     logs.push('[PASO 3] Buscando item "UForm Comunicacion Electronica"...');
     let itemClicked = false;
 
@@ -618,7 +631,7 @@ async function paso3_uformComunicacionElectronica(page, browser, logs) {
                             if (producerHeader) producerHeader.click();
                         }
 
-                        // 3. Filtrar usando estrictamente la caja de búsqueda "filtrar" (NO input de texto genérico)
+                        // 3. Filtrar usando estrictamente la caja de búsqueda "filtrar"
                         const filterInput = document.querySelector('input[placeholder*="filtrar"], #txtFilter, #filterInput, input[id*="filter"]');
                         if (filterInput && !filterInput.value && att === 3) {
                             filterInput.value = 'Electronica';
@@ -626,11 +639,11 @@ async function paso3_uformComunicacionElectronica(page, browser, logs) {
                             filterInput.dispatchEvent(new Event('change', { bubbles: true }));
                         }
 
-                        // 4. Buscar por texto en los elementos visibles
+                        // 4. Buscar por texto en los elementos visibles (excluyendo Document Retrieval / PAPEL / FRM)
                         const allNodes = Array.from(document.querySelectorAll('a, li, span, td, div, label, [role="treeitem"]'));
                         const itemNode = allNodes.find(el => {
                             const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-                            return txt.includes('uform comunicacion electronica') || 
+                            return (txt.includes('uform comunicacion electronica') || 
                                    txt.includes('uform comunicación electrónica') ||
                                    (txt.includes('comunicacion electronica') && !txt.includes('portal') && !txt.includes('recibida') && !txt.includes('envio'));
                         });
@@ -2448,7 +2461,14 @@ exports.executeAutomation = async (req, res) => {
             currentJob.logs.push(`[ERROR CRÍTICO] ${err.message}`);
             automationEmitter.emit('done', currentJob);
         }
-    })();
+    })().catch(unhandledErr => {
+        console.error('[AUTOMATION UNHANDLED PROMISE ERROR]', unhandledErr);
+        currentJob.running = false;
+        currentJob.completed = true;
+        currentJob.error = unhandledErr.message;
+        currentJob.logs.push(`[ERROR CRÍTICO INESPERADO] ${unhandledErr.message}`);
+        automationEmitter.emit('done', currentJob);
+    });
 };
 
 // ─────────────────────────────────────────────────────────────────
