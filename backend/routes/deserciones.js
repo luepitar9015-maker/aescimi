@@ -49,6 +49,8 @@ const ensureDesercionesTable = async () => {
                 lugar_comite TEXT,
                 texto_inicial TEXT,
                 texto_combinado TEXT,
+                asunto TEXT,
+                descripcion_asunto TEXT,
                 comunicacion_pdf_path TEXT,
                 anexo_path TEXT,
                 onbase_target_user TEXT,
@@ -60,6 +62,8 @@ const ensureDesercionesTable = async () => {
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
+        await pool.query(`ALTER TABLE deserciones_casos ADD COLUMN IF NOT EXISTS asunto TEXT;`);
+        await pool.query(`ALTER TABLE deserciones_casos ADD COLUMN IF NOT EXISTS descripcion_asunto TEXT;`);
     } catch (e) {
         console.error('[DESERCIONES] Error asegurando tabla deserciones_casos:', e.message);
     }
@@ -311,7 +315,7 @@ router.post('/preview-merge', requireAuth, (req, res) => {
 
 // 4. Guardar casos y preparar comunicaciones (opcionalmente generando PDF o directo para robot OnBase)
 router.post('/guardar-casos', requireAuth, async (req, res) => {
-    const { etapa, casos, texto_inicial, onbase_target_user, copy_emails, generate_pdf = true } = req.body;
+    const { etapa, casos, texto_inicial, asunto = 'NOVEDADES DE ALUMNOS', descripcion_asunto = 'Notificación', onbase_target_user, copy_emails, generate_pdf = true } = req.body;
 
     if (!etapa || !casos || !Array.isArray(casos) || casos.length === 0) {
         return res.status(400).json({ error: 'Datos de casos incompletos o inválidos.' });
@@ -403,9 +407,9 @@ router.post('/guardar-casos', requireAuth, async (req, res) => {
                 INSERT INTO deserciones_casos (
                     etapa, ficha, programa, aprendiz_nombre, aprendiz_doc_tipo, aprendiz_doc_numero,
                     aprendiz_correo, causal_desercion, fecha_comite, hora_comite, lugar_comite,
-                    texto_inicial, texto_combinado, comunicacion_pdf_path, anexo_path,
+                    texto_inicial, texto_combinado, asunto, descripcion_asunto, comunicacion_pdf_path, anexo_path,
                     onbase_target_user, copy_emails, status
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 'Pendiente')
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, 'Pendiente')
                 RETURNING *
             `, [
                 etapa,
@@ -421,6 +425,8 @@ router.post('/guardar-casos', requireAuth, async (req, res) => {
                 item.lugar_comite || '',
                 texto_inicial || '',
                 textoCombinado,
+                asunto || 'NOVEDADES DE ALUMNOS',
+                descripcion_asunto || 'Notificación',
                 pdfPath,
                 item.anexo_path || '',
                 onbase_target_user || '',

@@ -66,7 +66,22 @@ Se adjunta de manera explícita la Resolución correspondiente a su trámite par
 Usted cuenta con los recursos de ley de conformidad con la normatividad institucional SENA.`;
   });
 
-  // Persistir plantillas de texto en localStorage cuando cambian
+  // Estados de Asunto y Descripción del Asunto con Persistencia en localStorage
+  const [asuntoCitacion, setAsuntoCitacion] = useState(() => {
+    return localStorage.getItem('sena_deserciones_citacion_asunto') || 'NOVEDADES DE ALUMNOS';
+  });
+  const [descripcionAsuntoCitacion, setDescripcionAsuntoCitacion] = useState(() => {
+    return localStorage.getItem('sena_deserciones_citacion_desc_asunto') || 'Citación a Comité';
+  });
+
+  const [asuntoResolucion, setAsuntoResolucion] = useState(() => {
+    return localStorage.getItem('sena_deserciones_resolucion_asunto') || 'NOVEDADES DE ALUMNOS';
+  });
+  const [descripcionAsuntoResolucion, setDescripcionAsuntoResolucion] = useState(() => {
+    return localStorage.getItem('sena_deserciones_resolucion_desc_asunto') || 'Notificación';
+  });
+
+  // Persistir plantillas de texto y asuntos en localStorage cuando cambian
   useEffect(() => {
     localStorage.setItem('sena_deserciones_citacion_text', textoInicialCitacion);
   }, [textoInicialCitacion]);
@@ -74,6 +89,22 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
   useEffect(() => {
     localStorage.setItem('sena_deserciones_resolucion_text', textoInicialResolucion);
   }, [textoInicialResolucion]);
+
+  useEffect(() => {
+    localStorage.setItem('sena_deserciones_citacion_asunto', asuntoCitacion);
+  }, [asuntoCitacion]);
+
+  useEffect(() => {
+    localStorage.setItem('sena_deserciones_citacion_desc_asunto', descripcionAsuntoCitacion);
+  }, [descripcionAsuntoCitacion]);
+
+  useEffect(() => {
+    localStorage.setItem('sena_deserciones_resolucion_asunto', asuntoResolucion);
+  }, [asuntoResolucion]);
+
+  useEffect(() => {
+    localStorage.setItem('sena_deserciones_resolucion_desc_asunto', descripcionAsuntoResolucion);
+  }, [descripcionAsuntoResolucion]);
 
   // OnBase User & Password Credential States con Persistencia en localStorage & system_settings
   const [onbaseUserCredential, setOnbaseUserCredential] = useState(() => {
@@ -716,6 +747,8 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
       const res = await axios.post('/api/deserciones/guardar-casos', {
         etapa: etapa,
         texto_inicial: textoInicial,
+        asunto: activeTab === 'citacion' ? asuntoCitacion : asuntoResolucion,
+        descripcion_asunto: activeTab === 'citacion' ? descripcionAsuntoCitacion : descripcionAsuntoResolucion,
         casos: casosConAnexos,
         onbase_target_user: selectedOnbaseUser,
         copy_emails: ccEmails,
@@ -991,6 +1024,37 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                     + {chip}
                   </button>
                 ))}
+              </div>
+
+              {/* Casillas de Asunto y Descripción del Asunto (Campos de OnBase Web) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px', background: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0f172a', marginBottom: '6px' }}>
+                    Asunto: <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input 
+                    type="text" 
+                    value={activeTab === 'citacion' ? asuntoCitacion : asuntoResolucion}
+                    onChange={(e) => activeTab === 'citacion' ? setAsuntoCitacion(e.target.value) : setAsuntoResolucion(e.target.value)}
+                    placeholder="NOVEDADES DE ALUMNOS"
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: '600', color: '#00324d', background: '#fff', boxSizing: 'border-box' }}
+                  />
+                  <span style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', display: 'block' }}>Selección / Asunto para el formulario OnBase Web</span>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0f172a', marginBottom: '6px' }}>
+                    Descripción del Asunto: <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input 
+                    type="text" 
+                    value={activeTab === 'citacion' ? descripcionAsuntoCitacion : descripcionAsuntoResolucion}
+                    onChange={(e) => activeTab === 'citacion' ? setDescripcionAsuntoCitacion(e.target.value) : setDescripcionAsuntoResolucion(e.target.value)}
+                    placeholder="Notificación"
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: '600', color: '#00324d', background: '#fff', boxSizing: 'border-box' }}
+                  />
+                  <span style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', display: 'block' }}>Texto para la casilla "Descripción del Asunto" en OnBase Web</span>
+                </div>
               </div>
 
               <textarea 
