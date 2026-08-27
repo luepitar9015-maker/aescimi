@@ -818,69 +818,52 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
     const nombreAprendiz = casoData.aprendiz_nombre || `${casoData.aprendiz_nombres || ''} ${casoData.aprendiz_apellidos || ''}`.trim() || 'APRENDIZ';
     logs.push(`[PASO 4] 1/8 Llenando "Nombre Destinatario": "${nombreAprendiz}"...`);
 
-    let nombreFilled = false;
-    for (let attempt = 0; attempt < 5 && !nombreFilled; attempt++) {
-        const res = await targetFrame.evaluate((nombre) => {
-            const inputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])'));
-            const nameInput = inputs.find(inp => {
-                const attr = (inp.id || inp.name || inp.placeholder || inp.title || '').toLowerCase();
-                const parentTxt = (inp.parentElement?.innerText || inp.closest('td, div, tr')?.innerText || '').toLowerCase();
-                return attr.includes('nombredestinatario') || attr.includes('nombre_destinatario') || parentTxt.includes('nombre destinatario');
-            }) || inputs[0];
+    await targetFrame.evaluate((nombre) => {
+        const inputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])'));
+        const nameInput = inputs.find(inp => {
+            const attr = (inp.id || inp.name || inp.placeholder || inp.title || '').toLowerCase();
+            const parentTxt = (inp.parentElement?.innerText || inp.closest('td, div, tr')?.innerText || '').toLowerCase();
+            return attr.includes('nombredestinatario') || attr.includes('nombre_destinatario') || parentTxt.includes('nombre destinatario');
+        }) || inputs[0];
 
-            if (nameInput) {
-                nameInput.scrollIntoView({ block: 'center' });
-                nameInput.focus();
-                nameInput.value = nombre;
-                nameInput.dispatchEvent(new Event('input', { bubbles: true }));
-                nameInput.dispatchEvent(new Event('change', { bubbles: true }));
-                nameInput.dispatchEvent(new Event('blur', { bubbles: true }));
-                return nameInput.value;
-            }
-            return null;
-        }, nombreAprendiz).catch(() => null);
-
-        if (res) {
-            nombreFilled = true;
-            logs.push(`[PASO 4] ✅ "Nombre Destinatario" completado: "${res}".`);
-        } else {
-            await wait(1000);
+        if (nameInput) {
+            nameInput.scrollIntoView({ block: 'center' });
+            nameInput.focus();
+            nameInput.value = nombre;
+            nameInput.dispatchEvent(new Event('input', { bubbles: true }));
+            nameInput.dispatchEvent(new Event('change', { bubbles: true }));
+            nameInput.dispatchEvent(new Event('blur', { bubbles: true }));
         }
-    }
+    }, nombreAprendiz).catch(() => {});
+    logs.push(`[PASO 4] ✅ "Nombre Destinatario" completado: "${nombreAprendiz}".`);
+    await wait(1000);
 
     // 2. Email Destinatario: Correo Registrado en Sofía
     const emailAprendiz = casoData.aprendiz_correo || casoData.raw_row?.['CORREO REGISTRADO EN SOFÍA'] || 'correo@sena.edu.co';
     logs.push(`[PASO 4] 2/8 Llenando "Email Destinatario": "${emailAprendiz}"...`);
 
-    let emailFilled = false;
-    for (let attempt = 0; attempt < 5 && !emailFilled; attempt++) {
-        const res = await targetFrame.evaluate((email) => {
-            const inputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input:not([type])'));
-            const emailInput = inputs.find(inp => {
-                const attr = (inp.id || inp.name || inp.placeholder || inp.title || '').toLowerCase();
-                const parentTxt = (inp.parentElement?.innerText || inp.closest('td, div, tr')?.innerText || '').toLowerCase();
-                return attr.includes('emaildestinatario') || attr.includes('email_destinatario') || attr.includes('correodestinatario') || parentTxt.includes('email destinatario');
-            }) || inputs[1];
+    await targetFrame.evaluate((email) => {
+        const inputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input:not([type])'));
+        const emailInput = inputs.find(inp => {
+            const attr = (inp.id || inp.name || inp.placeholder || inp.title || '').toLowerCase();
+            const parentTxt = (inp.parentElement?.innerText || inp.closest('td, div, tr, p')?.innerText || '').toLowerCase();
+            return attr.includes('emaildestinatario') || attr.includes('email_destinatario') || attr.includes('correodestinatario') || parentTxt.includes('email destinatario') || parentTxt.includes('correo registrado');
+        }) || inputs.find(inp => {
+            const parentTxt = (inp.parentElement?.innerText || inp.closest('td, div, tr, p')?.innerText || '').toLowerCase();
+            return parentTxt.includes('email') || parentTxt.includes('correo');
+        }) || inputs[1];
 
-            if (emailInput) {
-                emailInput.scrollIntoView({ block: 'center' });
-                emailInput.focus();
-                emailInput.value = email;
-                emailInput.dispatchEvent(new Event('input', { bubbles: true }));
-                emailInput.dispatchEvent(new Event('change', { bubbles: true }));
-                emailInput.dispatchEvent(new Event('blur', { bubbles: true }));
-                return emailInput.value;
-            }
-            return null;
-        }, emailAprendiz).catch(() => null);
-
-        if (res) {
-            emailFilled = true;
-            logs.push(`[PASO 4] ✅ "Email Destinatario" completado: "${res}".`);
-        } else {
-            await wait(1000);
+        if (emailInput) {
+            emailInput.scrollIntoView({ block: 'center' });
+            emailInput.focus();
+            emailInput.value = email;
+            emailInput.dispatchEvent(new Event('input', { bubbles: true }));
+            emailInput.dispatchEvent(new Event('change', { bubbles: true }));
+            emailInput.dispatchEvent(new Event('blur', { bubbles: true }));
         }
-    }
+    }, emailAprendiz).catch(() => {});
+    logs.push(`[PASO 4] ✅ "Email Destinatario" completado: "${emailAprendiz}".`);
+    await wait(1000);
 
     // 3. Asunto ('NOVEDADES DE ALUMNOS')
     const asuntoVal = casoData.asunto || 'NOVEDADES DE ALUMNOS';
@@ -974,29 +957,43 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
 
     // 6. Adjuntar Anexo (Resolución / Documento PDF)
     const pdfPathToAttach = casoData.anexo_path || casoData.comunicacion_pdf_path || '';
+    logs.push(`[PASO 4] 6/8 Adjuntando anexo PDF: "${pdfPathToAttach ? path.basename(pdfPathToAttach) : 'Sin ruta'}"...`);
+
     if (pdfPathToAttach && fs.existsSync(pdfPathToAttach)) {
-        logs.push(`[PASO 4] 6/8 Adjuntando anexo PDF: "${path.basename(pdfPathToAttach)}"...`);
-        try {
-            const fileInputs = await page.$$('input[type="file"]');
-            if (fileInputs && fileInputs.length > 0) {
-                await fileInputs[0].uploadFile(pdfPathToAttach);
-                logs.push(`[PASO 4] ✅ Archivo PDF adjuntado correctamente.`);
-            } else {
-                await targetFrame.evaluate(() => {
-                    const btns = Array.from(document.querySelectorAll('input[type="button"], button, a, span'));
-                    const attachBtn = btns.find(b => {
-                        const txt = (b.value || b.innerText || b.textContent || '').trim().toLowerCase();
-                        return txt.includes('adjuntar anexo') || txt.includes('adjuntar');
-                    });
-                    if (attachBtn) attachBtn.click();
-                });
-                logs.push(`[PASO 4] ✅ Clic en botón "Adjuntar Anexo" ejecutado.`);
+        let fileUploaded = false;
+        const allPages = await browser.pages().catch(() => [page]);
+
+        for (const pg of allPages) {
+            for (const frame of pg.frames()) {
+                try {
+                    const fileInputs = await frame.$$('input[type="file"]');
+                    if (fileInputs && fileInputs.length > 0) {
+                        for (const fInput of fileInputs) {
+                            await fInput.uploadFile(pdfPathToAttach);
+                            fileUploaded = true;
+                            logs.push(`[PASO 4] ✅ Archivo PDF (${path.basename(pdfPathToAttach)}) adjuntado exitosamente en el marco del formulario.`);
+                            break;
+                        }
+                    }
+                } catch (e) {}
+                if (fileUploaded) break;
             }
-        } catch (attachErr) {
-            logs.push(`[WARN] No se pudo adjuntar automáticamente el PDF: ${attachErr.message}`);
+            if (fileUploaded) break;
+        }
+
+        if (!fileUploaded) {
+            logs.push(`[PASO 4] ⚠️ No se encontró input[type="file"] directo. Ejecutando clic en botón de anexo...`);
+            await targetFrame.evaluate(() => {
+                const btns = Array.from(document.querySelectorAll('input[type="button"], button, a, span, label'));
+                const attachBtn = btns.find(b => {
+                    const txt = (b.value || b.innerText || b.textContent || '').trim().toLowerCase();
+                    return txt.includes('adjuntar anexo') || txt.includes('adjuntar') || txt.includes('examinar');
+                });
+                if (attachBtn) attachBtn.click();
+            }).catch(() => {});
         }
     } else {
-        logs.push(`[PASO 4] 6/8 Sin archivo PDF adjunto registrado o archivo no encontrado.`);
+        logs.push(`[PASO 4] ⚠️ Archivo PDF no encontrado o sin ruta registrada.`);
     }
     await wait(1500);
 
@@ -1013,13 +1010,15 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
 
         for (let i = 0; i < copyEmailsList.length; i++) {
             const ccItem = copyEmailsList[i];
-            const ccName = ccItem.name || ccItem.email.split('@')[0];
-            const ccEmail = ccItem.email;
+            const ccName = ccItem.name || (ccItem.email ? ccItem.email.split('@')[0] : 'Destinatario CC');
+            const ccEmail = ccItem.email || '';
+
+            if (!ccEmail) continue;
 
             logs.push(`[PASO 4] -> Clic "Agregar" en Copias Externas para: ${ccName} (${ccEmail})...`);
 
             await targetFrame.evaluate(() => {
-                const buttons = Array.from(document.querySelectorAll('button, input[type="button"], a, div[role="button"]'));
+                const buttons = Array.from(document.querySelectorAll('button, input[type="button"], a, div[role="button"], span'));
                 const addCcBtn = buttons.find(b => {
                     const txt = (b.innerText || b.value || b.textContent || '').trim().toLowerCase();
                     const parentTxt = (b.closest('fieldset, div, tr, td')?.innerText || '').toLowerCase();
@@ -1032,25 +1031,36 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
                 }
             }).catch(() => {});
 
-            await wait(1000);
+            await wait(1200);
 
             await targetFrame.evaluate((name, email) => {
-                const inputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"]'));
-                const ccContainer = Array.from(document.querySelectorAll('div, fieldset, table, tr')).find(el => {
+                const ccContainers = Array.from(document.querySelectorAll('div, fieldset, table, tr')).filter(el => {
                     const txt = (el.innerText || el.textContent || '').toLowerCase();
-                    return txt.includes('copias externas') || txt.includes('copia externa');
+                    return txt.includes('copias externas') || txt.includes('copia externa') || txt.includes('copias');
                 });
 
-                const targetInputs = ccContainer ? Array.from(ccContainer.querySelectorAll('input')) : inputs;
-                const emptyInputs = targetInputs.filter(inp => !inp.value || inp.value.trim() === '');
-                if (emptyInputs.length >= 2) {
-                    emptyInputs[0].value = name;
-                    emptyInputs[0].dispatchEvent(new Event('input', { bubbles: true }));
-                    emptyInputs[0].dispatchEvent(new Event('change', { bubbles: true }));
+                const ccContainer = ccContainers[ccContainers.length - 1];
+                const targetInputs = ccContainer ? Array.from(ccContainer.querySelectorAll('input[type="text"], input[type="email"], input:not([type])')) : Array.from(document.querySelectorAll('input[type="text"], input[type="email"]'));
 
-                    emptyInputs[1].value = email;
-                    emptyInputs[1].dispatchEvent(new Event('input', { bubbles: true }));
-                    emptyInputs[1].dispatchEvent(new Event('change', { bubbles: true }));
+                if (targetInputs.length >= 2) {
+                    const nameInp = targetInputs[targetInputs.length - 2];
+                    const emailInp = targetInputs[targetInputs.length - 1];
+
+                    if (nameInp) {
+                        nameInp.focus();
+                        nameInp.value = name;
+                        nameInp.dispatchEvent(new Event('input', { bubbles: true }));
+                        nameInp.dispatchEvent(new Event('change', { bubbles: true }));
+                        nameInp.dispatchEvent(new Event('blur', { bubbles: true }));
+                    }
+
+                    if (emailInp) {
+                        emailInp.focus();
+                        emailInp.value = email;
+                        emailInp.dispatchEvent(new Event('input', { bubbles: true }));
+                        emailInp.dispatchEvent(new Event('change', { bubbles: true }));
+                        emailInp.dispatchEvent(new Event('blur', { bubbles: true }));
+                    }
                 }
             }, ccName, ccEmail).catch(() => {});
 
@@ -1082,15 +1092,14 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
         }).catch(() => false);
 
         if (sent) {
-            logs.push(`[PASO 4] ✅ Clic en botón "Enviar" realizado exitosamente.`);
+            logs.push(`[PASO 4] ✅ Clic en el botón "Enviar" completado exitosamente.`);
         } else {
-            logs.push(`[WARN] Botón "Enviar" cliqueado o formulario listo para radicación.`);
+            logs.push(`[PASO 4] ⚠️ Botón "Enviar" no localizado automáticamente en el marco.`);
         }
     } else {
-        logs.push(`[PASO 4] ✅ Formulario "Comunicación Electrónica" totalmente diligenciado y listo.`);
+        logs.push(`[PASO 4] Formulario completamente diligenciado. Listo para inspección antes de enviar.`);
     }
 
-    await wait(3000);
     return true;
 }
 
