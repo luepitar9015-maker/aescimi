@@ -591,7 +591,7 @@ async function paso3_uformComunicacionElectronica(page, browser, logs) {
     }
 
     // 2. Localizar y hacer clic en "UForm Comunicacion Electronica" (#itemLabelunity118 / #liunity118 / filtro)
-    logs.push('[PASO 3] Buscando item "UForm Comunicacion Electronica" (#itemLabelunity118)...');
+    logs.push('[PASO 3] Buscando item "UForm Comunicacion Electronica"...');
     let itemClicked = false;
 
     for (let attempt = 0; attempt < 12 && !itemClicked; attempt++) {
@@ -600,8 +600,8 @@ async function paso3_uformComunicacionElectronica(page, browser, logs) {
         for (const pg of allPages) {
             for (const frame of pg.frames()) {
                 try {
-                    const res = await frame.evaluate(() => {
-                        // Buscar por ID exacto de OnBase (#itemLabelunity118 o #liunity118)
+                    const res = await frame.evaluate((att) => {
+                        // 1. Buscar por ID exacto de OnBase (#itemLabelunity118 o #liunity118)
                         const exactElem = document.querySelector('#itemLabelunity118, #liunity118, [id*="unity118"]');
                         if (exactElem) {
                             exactElem.scrollIntoView({ block: 'center' });
@@ -609,19 +609,30 @@ async function paso3_uformComunicacionElectronica(page, browser, logs) {
                             return exactElem.innerText || exactElem.textContent || 'unity118';
                         }
 
-                        // Filtrar usando la caja de búsqueda "Escriba para filtrar" si existe
-                        const filterInput = document.querySelector('input[placeholder*="filtrar"], input[type="text"]');
-                        if (filterInput && !filterInput.value) {
-                            filterInput.value = 'UForm Comunicacion';
+                        // 2. Desplegar categoría "COMUNICACIONES PRODUCIDAS" si está cerrada
+                        if (att === 1 || att === 2) {
+                            const producerHeader = Array.from(document.querySelectorAll('a, li, span, td, div, label')).find(el => {
+                                const txt = (el.innerText || el.textContent || '').trim().toUpperCase();
+                                return txt === 'COMUNICACIONES PRODUCIDAS' || txt.includes('COMUNICACIONES PRODUCIDAS');
+                            });
+                            if (producerHeader) producerHeader.click();
+                        }
+
+                        // 3. Filtrar usando estrictamente la caja de búsqueda "filtrar" (NO input de texto genérico)
+                        const filterInput = document.querySelector('input[placeholder*="filtrar"], #txtFilter, #filterInput, input[id*="filter"]');
+                        if (filterInput && !filterInput.value && att === 3) {
+                            filterInput.value = 'Electronica';
                             filterInput.dispatchEvent(new Event('input', { bubbles: true }));
                             filterInput.dispatchEvent(new Event('change', { bubbles: true }));
                         }
 
-                        // Buscar por texto en los elementos visibles
+                        // 4. Buscar por texto en los elementos visibles
                         const allNodes = Array.from(document.querySelectorAll('a, li, span, td, div, label, [role="treeitem"]'));
                         const itemNode = allNodes.find(el => {
                             const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-                            return txt.includes('uform comunicacion electronica') || txt.includes('uform comunicación electrónica');
+                            return txt.includes('uform comunicacion electronica') || 
+                                   txt.includes('uform comunicación electrónica') ||
+                                   (txt.includes('comunicacion electronica') && !txt.includes('portal') && !txt.includes('recibida') && !txt.includes('envio'));
                         });
 
                         if (itemNode) {
@@ -630,7 +641,7 @@ async function paso3_uformComunicacionElectronica(page, browser, logs) {
                             return itemNode.innerText || itemNode.textContent;
                         }
                         return null;
-                    });
+                    }, attempt);
 
                     if (res) {
                         itemClicked = true;

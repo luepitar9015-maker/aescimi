@@ -183,20 +183,29 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
 
           if (st.logs && st.logs.length > 0) {
             setLogs(st.logs);
+
+            // Calcular el número del paso actual según los logs de OnBase Web
+            const logsTxt = st.logs.join(' ');
+            if (logsTxt.includes('[PASO 4]')) {
+              setCurrentStepIndex(3);
+            } else if (logsTxt.includes('[PASO 3]')) {
+              setCurrentStepIndex(2);
+            } else if (logsTxt.includes('[PASO 2]')) {
+              setCurrentStepIndex(1);
+            } else if (logsTxt.includes('[PASO 1]')) {
+              setCurrentStepIndex(0);
+            }
           }
 
           if (st.hasFrame) {
             setLiveFrame(`/api/automation/frame?t=${Date.now()}&token=${token}`);
           }
 
-          if (st.step !== undefined && st.step !== null) {
-            setCurrentStepIndex(st.step);
-          }
-
-          if (st.status === 'done') {
+          if (st.completed || st.running === false) {
             setAutomationLoading(false);
-            setCurrentStepIndex(2);
-          } else if (st.status === 'error') {
+          }
+          
+          if (st.error) {
             setAutomationLoading(false);
             setAutomationError(true);
           }
