@@ -2067,8 +2067,9 @@ exports.getAutomationFrame = async (req, res) => {
 };
 
 exports.executeAutomation = async (req, res) => {
-    let { url, username, password, documentIds, action, target_user, stop_at_step } = req.body || {};
-    const logs = [];
+    try {
+        let { url, username, password, documentIds, action, target_user, stop_at_step, caso_ids } = req.body || {};
+        const logs = [];
 
     // Fallback de credenciales y URL para asegurar que la automatización nunca falle por datos faltantes
     if (!url || !username || !password) {
@@ -2469,6 +2470,13 @@ exports.executeAutomation = async (req, res) => {
         currentJob.logs.push(`[ERROR CRÍTICO INESPERADO] ${unhandledErr.message}`);
         automationEmitter.emit('done', currentJob);
     });
+    } catch (routeErr) {
+        console.error('[EXECUTE AUTOMATION ROUTE ERROR]', routeErr);
+        return res.status(500).json({
+            success: false,
+            error: routeErr.message || 'Error interno al iniciar la automatización'
+        });
+    }
 };
 
 // ─────────────────────────────────────────────────────────────────
