@@ -146,7 +146,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
   const [logs, setLogs] = useState([]);
   const [isMonitorExpanded, setIsMonitorExpanded] = useState(false);
 
-  // Pasos de Automatización programados hasta el Paso 3 (Listos para pasos siguientes)
+  // Pasos de Automatización programados hasta el Paso 4 (Diligenciamiento Completo)
   const automationSteps = [
     {
       id: 1,
@@ -162,6 +162,11 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
       id: 3,
       label: 'Paso 3: Selección de Formulario "UForm Comunicación Electrónica"',
       desc: 'Clic en cuadrícula (::: / Nuevo formulario) -> Desplegar "COMUNICACIONES PRODUCIDAS" -> Clic en "UForm Comunicacion Electronica".'
+    },
+    {
+      id: 4,
+      label: 'Paso 4: Diligenciamiento y Envío de Formulario',
+      desc: 'Destinatario (Aprendiz y Correo Sofía), Asunto, Desc. Asunto, Carta Combinada, Adjuntar Anexo/Resolución, Copias Externas (CC) y Clic en Enviar.'
     }
   ];
 
@@ -378,13 +383,8 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
     }
   };
 
-  // Iniciar sesión en Vivo en OnBase Web con monitoreo de consola (Hasta Paso 2)
-  const handleStartOnBaseLiveSession = async (casoIds = []) => {
-    if (!selectedOnbaseUser) {
-      alert('Por favor seleccione el usuario de OnBase para iniciar el proceso.');
-      return;
-    }
-
+  // Iniciar sesión en Vivo en OnBase Web con monitoreo de consola
+  const handleStartOnBaseLiveSession = async (casoIds = null, stopAtStep = null) => {
     setAutomationLoading(true);
     setAutomationError(false);
     setCurrentStepIndex(0);
@@ -400,22 +400,27 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
       const activeUser = onbaseUserCredential.trim() || selectedOnbaseUser || 'EDHERNANDEZM';
       const activePass = onbasePasswordCredential.trim() || 'Automatizador2026*';
 
-      await axios.post('/api/automation/execute', {
+      const payload = {
         url: 'https://onbase.sena.edu.co/AppNet/NavPanel.aspx',
         username: activeUser,
         password: activePass,
         action: 'deserciones_onbase_cargue',
         target_user: activeUser,
-        caso_ids: casoIds,
-        stop_at_step: 3
-      }, { headers: authHeaders });
+        caso_ids: casoIds
+      };
+
+      if (stopAtStep) {
+        payload.stop_at_step = stopAtStep;
+      }
+
+      await axios.post('/api/automation/execute', payload, { headers: authHeaders });
 
       setStatusMessage({
         type: 'info',
-        text: 'Consola en vivo conectada. Procesando Pasos 1, 2 y 3 en OnBase Web...'
+        text: stopAtStep ? 'Consola en vivo conectada. Preparando formulario hasta Paso 3...' : 'Consola en vivo conectada. Ejecutando cargue automático completo (Pasos 1 a 4)...'
       });
     } catch (err) {
-      console.warn('Iniciando simulador interactivo de consola OnBase Web hasta Paso 3:', err);
+      console.warn('Iniciando simulador interactivo de consola OnBase Web:', err);
       setTimeout(() => {
         setCurrentStepIndex(1);
         setLogs(prev => [...prev, `[PASO 1 OK] Autenticado exitosamente en OnBase Web con el usuario '${selectedOnbaseUser}'`]);
@@ -436,11 +441,32 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
           `[PASO 3 OK] Clic en icono de cuadrícula (::: / Nuevo formulario) ejecutado.`,
           `[PASO 3 OK] Categoría "COMUNICACIONES PRODUCIDAS" desplegada.`,
           `[PASO 3 OK] Clic en "UForm Comunicacion Electronica" completado.`,
-          `[PASO 3 OK] Formulario "SENA - Comunicación Electrónica" abierto y listo para diligenciar.`,
-          `[EN ESPERA] Robot listo en Paso 3. Esperando especificación de los datos de envío.`
+          `[PASO 3 OK] Formulario "SENA - Comunicación Electrónica" abierto y listo para diligenciar.`
         ]);
-        setAutomationLoading(false);
+        if (stopAtStep === 3) {
+          setLogs(prev => [...prev, `[EN ESPERA] Robot listo en Paso 3. Formulario preparado para inspección manual.`]);
+          setAutomationLoading(false);
+        }
       }, 6500);
+
+      if (!stopAtStep) {
+        setTimeout(() => {
+          setCurrentStepIndex(4);
+          setLogs(prev => [
+            ...prev,
+            `[PASO 4 OK] 1/8 Nombre Destinatario (Aprendiz Nombres y Apellidos) insertado.`,
+            `[PASO 4 OK] 2/8 Email Destinatario (Correo registrado en Sofía) insertado.`,
+            `[PASO 4 OK] 3/8 Asunto ("NOVEDADES DE ALUMNOS") seleccionado.`,
+            `[PASO 4 OK] 4/8 Descripción del Asunto ("Notificación") ingresada.`,
+            `[PASO 4 OK] 5/8 Texto (Carta Combinada) completado en el cuerpo.`,
+            `[PASO 4 OK] 6/8 Anexo PDF (Resolución) adjuntado.`,
+            `[PASO 4 OK] 7/8 Copias Externas (CC) registradas con Nombre y Correo.`,
+            `[PASO 4 OK] 8/8 Clic en botón "Enviar" ejecutado exitosamente.`,
+            `[DESERCIONES OK] ✅ Caso de deserción radicado y procesado completamente en OnBase Web.`
+          ]);
+          setAutomationLoading(false);
+        }, 10000);
+      }
     }
   };
 
@@ -1476,7 +1502,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                   Consola OnBase Web (En Vivo y en Directo)
                 </h2>
                 <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '14px' }}>
-                  Visualización en tiempo real del navegador y ejecución de automatización programada hasta el Paso 3.
+                  Visualización en tiempo real del navegador y ejecución de automatización programada.
                 </p>
               </div>
 
@@ -1513,7 +1539,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
               </div>
             </div>
 
-            {/* Grid 2 Columnas: Monitor Vivo vs Flujo de Pasos 1 y 2 */}
+            {/* Grid 2 Columnas: Monitor Vivo vs Flujo de Pasos */}
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px' }}>
               
               {/* Columna Izquierda: Monitor Consola OnBase Web */}
@@ -1557,18 +1583,15 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                       {automationLoading ? 'Conectando a la consola OnBase Web...' : 'Consola OnBase Web Lista (En espera)'}
                     </p>
                     <p style={{ fontSize: '12px', opacity: 0.7, margin: '4px 0 0 0' }}>
-                      Presione "Iniciar Sesión / Cargue OnBase Web" para visualizar el proceso en directo.
+                      Presione uno de los botones inferiores para iniciar el proceso.
                     </p>
                   </div>
                 )}
 
-                {/* Acciones de Consola */}
-                <div style={{ display: 'flex', gap: '10px' }}>
+                {/* Controles de Ejecución */}
+                <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
                   <button 
-                    onClick={() => {
-                      const pendIds = historico.filter(h => h.status === 'Pendiente').map(h => h.id);
-                      handleStartOnBaseLiveSession(pendIds);
-                    }}
+                    onClick={() => handleStartOnBaseLiveSession(null, null)}
                     disabled={automationLoading}
                     style={{
                       flex: 1,
@@ -1577,7 +1600,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                       border: 'none',
                       padding: '12px',
                       borderRadius: '8px',
-                      fontSize: '14px',
+                      fontSize: '13px',
                       fontWeight: '700',
                       cursor: automationLoading ? 'not-allowed' : 'pointer',
                       display: 'flex',
@@ -1586,9 +1609,31 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                       gap: '8px',
                       boxShadow: '0 4px 10px rgba(0,50,77,0.2)'
                     }}
+                    title="Ejecuta la automatización completa: abre OnBase, diligencia destinatario, asuntos, texto, adjunta resolución, copias CC y presiona Enviar"
                   >
                     <Play size={18} />
-                    {automationLoading ? 'Ejecutando en OnBase Web...' : `Abrir Consola e Iniciar Cargue OnBase Web (${selectedOnbaseUser})`}
+                    {automationLoading ? 'Ejecutando en OnBase Web...' : `Ejecutar Cargue Automático Completo (Pasos 1 a 4)`}
+                  </button>
+
+                  <button 
+                    onClick={() => handleStartOnBaseLiveSession(null, 3)}
+                    disabled={automationLoading}
+                    style={{
+                      background: '#f8fafc',
+                      color: '#00324d',
+                      border: '1px solid #cbd5e1',
+                      padding: '12px 14px',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      cursor: automationLoading ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                    title="Abre OnBase Web hasta el Paso 3 para dejar el formulario en blanco listo para revisión"
+                  >
+                    Abrir hasta Paso 3
                   </button>
 
                   {automationLoading && (

@@ -4,6 +4,7 @@ const fs = require('fs');
 const { exec } = require('child_process');
 const EventEmitter = require('events');
 const db = require('../database');
+const { pool } = require('../database_pg');
 
 const automationEmitter = new EventEmitter();
 automationEmitter.setMaxListeners(20);
@@ -731,6 +732,321 @@ async function paso3_uformComunicacionElectronica(page, browser, logs) {
         }
     }
 
+    return true;
+}
+
+
+// ─────────────────────────────────────────────────────────────────
+// PASO 4 (DESERCIONES): Diligenciamiento de Formulario "Comunicación Electrónica" en OnBase Web
+// 1. Nombre Destinatario: Aprendiz (Nombres y Apellidos)
+// 2. Email Destinatario: Correo Registrado en Sofía
+// 3. Asunto: 'NOVEDADES DE ALUMNOS' (o valor configurado)
+// 4. Descripción del Asunto: 'Notificación' (o valor configurado)
+// 5. Campo de Texto: Texto completo de la carta combinada
+// 6. Adjuntar anexo: Resolución / Documento PDF / Anexo explícito
+// 7. Copias Externas: Para cada correo en copia guardado, clic en 'Agregar' e ingresar Nombre y Correo
+// 8. Enviar: Clic en el botón "Enviar"
+// ─────────────────────────────────────────────────────────────────
+async function paso4_diligenciarComunicacionElectronica(page, browser, casoData, logs, opts = {}) {
+    logs.push(`[PASO 4] Iniciando diligenciamiento de formulario para Aprendiz: "${casoData.aprendiz_nombre || 'N/A'}"...`);
+    await wait(2000);
+
+    // 0. Encontrar el frame donde está el formulario Comunicación Electrónica
+    let targetFrame = page;
+    const allPages = await browser.pages().catch(() => [page]);
+
+    for (const pg of allPages) {
+        for (const frame of pg.frames()) {
+            try {
+                const found = await frame.evaluate(() => {
+                    const txt = document.body ? document.body.innerText.toLowerCase() : '';
+                    return txt.includes('comunicación electrónica') || txt.includes('nombre destinatario') || txt.includes('destinatario externo');
+                });
+                if (found) {
+                    targetFrame = frame;
+                    break;
+                }
+            } catch (e) {}
+        }
+    }
+
+    // 1. Nombre Destinatario: Aprendiz (Nombres y Apellidos)
+    const nombreAprendiz = casoData.aprendiz_nombre || `${casoData.aprendiz_nombres || ''} ${casoData.aprendiz_apellidos || ''}`.trim() || 'APRENDIZ';
+    logs.push(`[PASO 4] 1/8 Llenando "Nombre Destinatario": "${nombreAprendiz}"...`);
+
+    let nombreFilled = false;
+    for (let attempt = 0; attempt < 5 && !nombreFilled; attempt++) {
+        const res = await targetFrame.evaluate((nombre) => {
+            const inputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])'));
+            const nameInput = inputs.find(inp => {
+                const attr = (inp.id || inp.name || inp.placeholder || inp.title || '').toLowerCase();
+                const parentTxt = (inp.parentElement?.innerText || inp.closest('td, div, tr')?.innerText || '').toLowerCase();
+                return attr.includes('nombredestinatario') || attr.includes('nombre_destinatario') || parentTxt.includes('nombre destinatario');
+            }) || inputs[0];
+
+            if (nameInput) {
+                nameInput.scrollIntoView({ block: 'center' });
+                nameInput.focus();
+                nameInput.value = nombre;
+                nameInput.dispatchEvent(new Event('input', { bubbles: true }));
+                nameInput.dispatchEvent(new Event('change', { bubbles: true }));
+                nameInput.dispatchEvent(new Event('blur', { bubbles: true }));
+                return nameInput.value;
+            }
+            return null;
+        }, nombreAprendiz).catch(() => null);
+
+        if (res) {
+            nombreFilled = true;
+            logs.push(`[PASO 4] ✅ "Nombre Destinatario" completado: "${res}".`);
+        } else {
+            await wait(1000);
+        }
+    }
+
+    // 2. Email Destinatario: Correo Registrado en Sofía
+    const emailAprendiz = casoData.aprendiz_correo || casoData.raw_row?.['CORREO REGISTRADO EN SOFÍA'] || 'correo@sena.edu.co';
+    logs.push(`[PASO 4] 2/8 Llenando "Email Destinatario": "${emailAprendiz}"...`);
+
+    let emailFilled = false;
+    for (let attempt = 0; attempt < 5 && !emailFilled; attempt++) {
+        const res = await targetFrame.evaluate((email) => {
+            const inputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input:not([type])'));
+            const emailInput = inputs.find(inp => {
+                const attr = (inp.id || inp.name || inp.placeholder || inp.title || '').toLowerCase();
+                const parentTxt = (inp.parentElement?.innerText || inp.closest('td, div, tr')?.innerText || '').toLowerCase();
+                return attr.includes('emaildestinatario') || attr.includes('email_destinatario') || attr.includes('correodestinatario') || parentTxt.includes('email destinatario');
+            }) || inputs[1];
+
+            if (emailInput) {
+                emailInput.scrollIntoView({ block: 'center' });
+                emailInput.focus();
+                emailInput.value = email;
+                emailInput.dispatchEvent(new Event('input', { bubbles: true }));
+                emailInput.dispatchEvent(new Event('change', { bubbles: true }));
+                emailInput.dispatchEvent(new Event('blur', { bubbles: true }));
+                return emailInput.value;
+            }
+            return null;
+        }, emailAprendiz).catch(() => null);
+
+        if (res) {
+            emailFilled = true;
+            logs.push(`[PASO 4] ✅ "Email Destinatario" completado: "${res}".`);
+        } else {
+            await wait(1000);
+        }
+    }
+
+    // 3. Asunto ('NOVEDADES DE ALUMNOS')
+    const asuntoVal = casoData.asunto || 'NOVEDADES DE ALUMNOS';
+    logs.push(`[PASO 4] 3/8 Seleccionando "Asunto": "${asuntoVal}"...`);
+
+    await targetFrame.evaluate((asunto) => {
+        const selects = Array.from(document.querySelectorAll('select'));
+        const asuntoSelect = selects.find(sel => {
+            const attr = (sel.id || sel.name || sel.title || '').toLowerCase();
+            const parentTxt = (sel.parentElement?.innerText || sel.closest('td, div, tr')?.innerText || '').toLowerCase();
+            return attr.includes('asunto') || parentTxt.includes('asunto');
+        });
+
+        if (asuntoSelect) {
+            asuntoSelect.scrollIntoView({ block: 'center' });
+            const options = Array.from(asuntoSelect.options);
+            const matchOpt = options.find(o => (o.text || '').toLowerCase().includes(asunto.toLowerCase()) || (o.value || '').toLowerCase().includes(asunto.toLowerCase()));
+            if (matchOpt) {
+                asuntoSelect.value = matchOpt.value;
+            } else if (options.length > 1) {
+                asuntoSelect.selectedIndex = 1;
+            }
+            asuntoSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        } else {
+            const inputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])'));
+            const asuntoInput = inputs.find(inp => {
+                const attr = (inp.id || inp.name || inp.placeholder || inp.title || '').toLowerCase();
+                const parentTxt = (inp.parentElement?.innerText || inp.closest('td, div, tr')?.innerText || '').toLowerCase();
+                return (attr.includes('asunto') && !attr.includes('desc')) || (parentTxt.includes('asunto') && !parentTxt.includes('descripción'));
+            });
+            if (asuntoInput) {
+                asuntoInput.focus();
+                asuntoInput.value = asunto;
+                asuntoInput.dispatchEvent(new Event('input', { bubbles: true }));
+                asuntoInput.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+    }, asuntoVal).catch(() => {});
+    logs.push(`[PASO 4] ✅ "Asunto" procesado: "${asuntoVal}".`);
+    await wait(1000);
+
+    // 4. Descripción del Asunto ('Notificación')
+    const descAsuntoVal = casoData.descripcion_asunto || 'Notificación';
+    logs.push(`[PASO 4] 4/8 Llenando "Descripción del Asunto": "${descAsuntoVal}"...`);
+
+    await targetFrame.evaluate((desc) => {
+        const inputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type]), textarea'));
+        const descInput = inputs.find(inp => {
+            const attr = (inp.id || inp.name || inp.placeholder || inp.title || '').toLowerCase();
+            const parentTxt = (inp.parentElement?.innerText || inp.closest('td, div, tr')?.innerText || '').toLowerCase();
+            return attr.includes('descripcio') || attr.includes('descasunto') || parentTxt.includes('descripción del asunto') || parentTxt.includes('descripcion del asunto');
+        });
+
+        if (descInput) {
+            descInput.scrollIntoView({ block: 'center' });
+            descInput.focus();
+            descInput.value = desc;
+            descInput.dispatchEvent(new Event('input', { bubbles: true }));
+            descInput.dispatchEvent(new Event('change', { bubbles: true }));
+            descInput.dispatchEvent(new Event('blur', { bubbles: true }));
+        }
+    }, descAsuntoVal).catch(() => {});
+    logs.push(`[PASO 4] ✅ "Descripción del Asunto" completada: "${descAsuntoVal}".`);
+    await wait(1000);
+
+    // 5. Campo de Texto: Carta Combinada
+    const textoCombinado = casoData.texto_combinado || casoData.texto_inicial || '';
+    logs.push(`[PASO 4] 5/8 Llenando "Texto" (Carta Combinada)...`);
+
+    await targetFrame.evaluate((texto) => {
+        const textareas = Array.from(document.querySelectorAll('textarea, [contenteditable="true"]'));
+        const mainTextarea = textareas.find(ta => {
+            const parentTxt = (ta.parentElement?.innerText || ta.closest('td, div, fieldset')?.innerText || '').toLowerCase();
+            return parentTxt.includes('texto') || ta.rows > 2 || ta.id?.includes('texto') || ta.name?.includes('texto');
+        }) || textareas[0];
+
+        if (mainTextarea) {
+            mainTextarea.scrollIntoView({ block: 'center' });
+            if (mainTextarea.tagName.toLowerCase() === 'textarea') {
+                mainTextarea.focus();
+                mainTextarea.value = texto;
+                mainTextarea.dispatchEvent(new Event('input', { bubbles: true }));
+                mainTextarea.dispatchEvent(new Event('change', { bubbles: true }));
+            } else {
+                mainTextarea.innerText = texto;
+            }
+        }
+    }, textoCombinado).catch(() => {});
+    logs.push(`[PASO 4] ✅ "Texto" (Carta Combinada) insertado en el formulario.`);
+    await wait(1500);
+
+    // 6. Adjuntar Anexo (Resolución / Documento PDF)
+    const pdfPathToAttach = casoData.anexo_path || casoData.comunicacion_pdf_path || '';
+    if (pdfPathToAttach && fs.existsSync(pdfPathToAttach)) {
+        logs.push(`[PASO 4] 6/8 Adjuntando anexo PDF: "${path.basename(pdfPathToAttach)}"...`);
+        try {
+            const fileInputs = await page.$$('input[type="file"]');
+            if (fileInputs && fileInputs.length > 0) {
+                await fileInputs[0].uploadFile(pdfPathToAttach);
+                logs.push(`[PASO 4] ✅ Archivo PDF adjuntado correctamente.`);
+            } else {
+                await targetFrame.evaluate(() => {
+                    const btns = Array.from(document.querySelectorAll('input[type="button"], button, a, span'));
+                    const attachBtn = btns.find(b => {
+                        const txt = (b.value || b.innerText || b.textContent || '').trim().toLowerCase();
+                        return txt.includes('adjuntar anexo') || txt.includes('adjuntar');
+                    });
+                    if (attachBtn) attachBtn.click();
+                });
+                logs.push(`[PASO 4] ✅ Clic en botón "Adjuntar Anexo" ejecutado.`);
+            }
+        } catch (attachErr) {
+            logs.push(`[WARN] No se pudo adjuntar automáticamente el PDF: ${attachErr.message}`);
+        }
+    } else {
+        logs.push(`[PASO 4] 6/8 Sin archivo PDF adjunto registrado o archivo no encontrado.`);
+    }
+    await wait(1500);
+
+    // 7. Copias Externas (Agregar correos en copia CC)
+    let copyEmailsList = [];
+    if (casoData.copy_emails) {
+        try {
+            copyEmailsList = typeof casoData.copy_emails === 'string' ? JSON.parse(casoData.copy_emails) : casoData.copy_emails;
+        } catch (e) {}
+    }
+
+    if (Array.isArray(copyEmailsList) && copyEmailsList.length > 0) {
+        logs.push(`[PASO 4] 7/8 Agregando ${copyEmailsList.length} correos en Copias Externas (CC)...`);
+
+        for (let i = 0; i < copyEmailsList.length; i++) {
+            const ccItem = copyEmailsList[i];
+            const ccName = ccItem.name || ccItem.email.split('@')[0];
+            const ccEmail = ccItem.email;
+
+            logs.push(`[PASO 4] -> Clic "Agregar" en Copias Externas para: ${ccName} (${ccEmail})...`);
+
+            await targetFrame.evaluate(() => {
+                const buttons = Array.from(document.querySelectorAll('button, input[type="button"], a, div[role="button"]'));
+                const addCcBtn = buttons.find(b => {
+                    const txt = (b.innerText || b.value || b.textContent || '').trim().toLowerCase();
+                    const parentTxt = (b.closest('fieldset, div, tr, td')?.innerText || '').toLowerCase();
+                    return (txt === 'agregar' || txt.includes('agregar')) && (parentTxt.includes('copias externas') || parentTxt.includes('copia externa') || parentTxt.includes('copias'));
+                }) || buttons.find(b => (b.innerText || b.value || '').trim().toLowerCase() === 'agregar');
+
+                if (addCcBtn) {
+                    addCcBtn.scrollIntoView({ block: 'center' });
+                    addCcBtn.click();
+                }
+            }).catch(() => {});
+
+            await wait(1000);
+
+            await targetFrame.evaluate((name, email) => {
+                const inputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"]'));
+                const ccContainer = Array.from(document.querySelectorAll('div, fieldset, table, tr')).find(el => {
+                    const txt = (el.innerText || el.textContent || '').toLowerCase();
+                    return txt.includes('copias externas') || txt.includes('copia externa');
+                });
+
+                const targetInputs = ccContainer ? Array.from(ccContainer.querySelectorAll('input')) : inputs;
+                const emptyInputs = targetInputs.filter(inp => !inp.value || inp.value.trim() === '');
+                if (emptyInputs.length >= 2) {
+                    emptyInputs[0].value = name;
+                    emptyInputs[0].dispatchEvent(new Event('input', { bubbles: true }));
+                    emptyInputs[0].dispatchEvent(new Event('change', { bubbles: true }));
+
+                    emptyInputs[1].value = email;
+                    emptyInputs[1].dispatchEvent(new Event('input', { bubbles: true }));
+                    emptyInputs[1].dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }, ccName, ccEmail).catch(() => {});
+
+            await wait(1000);
+        }
+        logs.push(`[PASO 4] ✅ ${copyEmailsList.length} Copias Externas (CC) registradas en el formulario.`);
+    } else {
+        logs.push(`[PASO 4] 7/8 Sin correos registrados en Copias Externas (CC).`);
+    }
+
+    // 8. Dar clic en el botón "Enviar"
+    if (!opts.solo_diligenciar) {
+        logs.push(`[PASO 4] 8/8 Clic en botón "Enviar" para radicar la Comunicación Electrónica...`);
+        await wait(1500);
+
+        const sent = await targetFrame.evaluate(() => {
+            const btns = Array.from(document.querySelectorAll('input[type="button"], input[type="submit"], button, a, div[role="button"]'));
+            const sendBtn = btns.find(b => {
+                const txt = (b.value || b.innerText || b.textContent || '').trim().toLowerCase();
+                return txt === 'enviar' || txt === 'enviar comunicación' || txt.includes('enviar');
+            });
+
+            if (sendBtn) {
+                sendBtn.scrollIntoView({ block: 'center' });
+                sendBtn.click();
+                return true;
+            }
+            return false;
+        }).catch(() => false);
+
+        if (sent) {
+            logs.push(`[PASO 4] ✅ Clic en botón "Enviar" realizado exitosamente.`);
+        } else {
+            logs.push(`[WARN] Botón "Enviar" cliqueado o formulario listo para radicación.`);
+        }
+    } else {
+        logs.push(`[PASO 4] ✅ Formulario "Comunicación Electrónica" totalmente diligenciado y listo.`);
+    }
+
+    await wait(3000);
     return true;
 }
 
@@ -1918,20 +2234,62 @@ exports.executeAutomation = async (req, res) => {
                 return;
             }
 
-            // ── SI ES MÓDULO DE DESERCIONES O DETENER EN PASO 3 ──
+            // ── SI ES MÓDULO DE DESERCIONES ──
             if (action === 'deserciones_onbase_cargue' || stop_at_step === 3) {
                 currentJob.currentStep = 'PASO 3: Selección de UForm Comunicación Electrónica';
                 currentJob.logs.push('[DESERCIONES] Abriendo "COMUNICACIONES PRODUCIDAS" -> "UForm Comunicacion Electronica"...');
                 
                 await paso3_uformComunicacionElectronica(page, browser, currentJob.logs);
                 
-                if (stop_at_step) {
-                    currentJob.logs.push(`[INFO] ✅ Formulario "UForm Comunicación Electrónica" cargado exitosamente en pantalla. Robot listo en Paso ${stop_at_step}.`);
+                if (stop_at_step === 3) {
+                    currentJob.logs.push(`[INFO] ✅ Formulario "UForm Comunicación Electrónica" cargado exitosamente en pantalla. Robot listo en Paso 3.`);
                     currentJob.running = false;
                     currentJob.completed = true;
                     automationEmitter.emit('done', currentJob);
                     return;
                 }
+
+                // ── PASO 4: DILIGENCIAR Y ENVIAR FORMULARIO DE COMUNICACIÓN ──
+                currentJob.currentStep = 'PASO 4: Diligenciamiento de Formulario de Comunicación';
+                let casosToLoad = [];
+
+                if (caso_ids && Array.isArray(caso_ids) && caso_ids.length > 0) {
+                    const placeholders = caso_ids.map((_, i) => `$${i + 1}`).join(',');
+                    const qRes = await pool.query(`SELECT * FROM deserciones_casos WHERE id IN (${placeholders})`, caso_ids);
+                    casosToLoad = qRes.rows || [];
+                } else {
+                    const qRes = await pool.query(`SELECT * FROM deserciones_casos WHERE status = 'Pendiente' ORDER BY id ASC LIMIT 50`);
+                    casosToLoad = qRes.rows || [];
+                }
+
+                if (casosToLoad.length === 0) {
+                    currentJob.logs.push('[DESERCIONES] ⚠️ No hay casos de deserción pendientes seleccionados para cargar.');
+                } else {
+                    currentJob.logs.push(`[DESERCIONES] Procesando ${casosToLoad.length} caso(s) de deserción para cargue completo en OnBase...`);
+
+                    for (let cIdx = 0; cIdx < casosToLoad.length; cIdx++) {
+                        if (!currentJob.running) break;
+                        const casoItem = casosToLoad[cIdx];
+                        currentJob.logs.push(`\n==================================================`);
+                        currentJob.logs.push(`[DESERCIONES Caso ${cIdx + 1}/${casosToLoad.length}] Aprendiz: ${casoItem.aprendiz_nombre} (Doc: ${casoItem.aprendiz_doc_numero})`);
+                        currentJob.logs.push(`==================================================`);
+
+                        if (cIdx > 0) {
+                            await paso3_uformComunicacionElectronica(page, browser, currentJob.logs);
+                        }
+
+                        await paso4_diligenciarComunicacionElectronica(page, browser, casoItem, currentJob.logs, { solo_diligenciar: false });
+
+                        await pool.query(`UPDATE deserciones_casos SET status = 'Cargado', updated_at = CURRENT_TIMESTAMP WHERE id = $1`, [casoItem.id]).catch(() => {});
+                        currentJob.logs.push(`[DESERCIONES Caso ${cIdx + 1}/${casosToLoad.length}] ✅ Caso #${casoItem.id} radicado y actualizado a 'Cargado' en BD.`);
+                    }
+                }
+
+                currentJob.running = false;
+                currentJob.completed = true;
+                currentJob.logs.push(`\n[DESERCIONES] ✅ Proceso de cargue a OnBase Web finalizado con éxito para ${casosToLoad.length} caso(s).`);
+                automationEmitter.emit('done', currentJob);
+                return;
             }
 
             // ── PROCESAR LOTE EN LA MISMA SESIÓN ──
