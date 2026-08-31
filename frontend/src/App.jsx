@@ -1,30 +1,30 @@
-// Force update
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { LogOut, FileText, User, Settings as SettingsIcon, FolderKanban, Database, Play, Network, Folder, Cloud, Globe, Shield, FileSpreadsheet, Upload, BarChart2 } from 'lucide-react';
-import * as XLSX from 'xlsx';
-import CreationModule from './pages/CreationModule'; // New
-import ExpedienteCreation from './pages/ExpedienteCreation'; // New Module
-import UsersManagement from './pages/UsersManagement';
-import Automation from './pages/Automation';
-import DocumentManagement from './pages/DocumentManagement'; // New Module
-import DocumentQuery from './pages/DocumentQuery'; // New Module
-import CargueAes from './pages/CargueAes'; // New Module
-import OneDriveSettings from './pages/OneDriveSettings'; // New
-import AesSettings from './pages/AesSettings'; // New
-import PermissionsManagement from './pages/PermissionsManagement'; // New
-import Dashboard from './pages/Dashboard'; // New
-import TRDQuery from './pages/TRDQuery'; // New
-import SuperuserModule from './pages/SuperuserModule'; // New
-import ExploradorDocumental from './pages/ExploradorDocumental'; // Explorador archivos
-import Formatos from './pages/Formatos'; // Nuevo módulo de Formatos
-import ComunicacionesProducidas from './pages/ComunicacionesProducidas'; // Nuevo módulo
-import DesercionesModule from './pages/DesercionesModule'; // Nuevo módulo de Deserciones
-import SeguimientoExpedientes from './pages/SeguimientoExpedientes'; // Seguimiento
 import AIChatBot from './components/AIChatBot'; // IA Assistant
-import InteractivePresentation from './pages/InteractivePresentation'; // New
 import './App.css';
+
+// Lazy loaded page components to optimize bundle size and speed up page switching
+const CreationModule = lazy(() => import('./pages/CreationModule'));
+const ExpedienteCreation = lazy(() => import('./pages/ExpedienteCreation'));
+const UsersManagement = lazy(() => import('./pages/UsersManagement'));
+const Automation = lazy(() => import('./pages/Automation'));
+const DocumentManagement = lazy(() => import('./pages/DocumentManagement'));
+const DocumentQuery = lazy(() => import('./pages/DocumentQuery'));
+const CargueAes = lazy(() => import('./pages/CargueAes'));
+const OneDriveSettings = lazy(() => import('./pages/OneDriveSettings'));
+const AesSettings = lazy(() => import('./pages/AesSettings'));
+const PermissionsManagement = lazy(() => import('./pages/PermissionsManagement'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const TRDQuery = lazy(() => import('./pages/TRDQuery'));
+const SuperuserModule = lazy(() => import('./pages/SuperuserModule'));
+const ExploradorDocumental = lazy(() => import('./pages/ExploradorDocumental'));
+const Formatos = lazy(() => import('./pages/Formatos'));
+const ComunicacionesProducidas = lazy(() => import('./pages/ComunicacionesProducidas'));
+const DesercionesModule = lazy(() => import('./pages/DesercionesModule'));
+const SeguimientoExpedientes = lazy(() => import('./pages/SeguimientoExpedientes'));
+const InteractivePresentation = lazy(() => import('./pages/InteractivePresentation'));
 
 // --- Global Axios Interceptors ---
 axios.interceptors.request.use(
@@ -546,7 +546,16 @@ function Layout({ children }) {
       <main className="content-area">
         {isLoadingPerms ? (
           <div className="p-8 text-center text-gray-500">Verificando permisos...</div>
-        ) : children}
+        ) : (
+          <Suspense fallback={
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '350px', color: '#00324d', fontWeight: '600', gap: '12px' }}>
+              <div style={{ width: '32px', height: '32px', border: '3px solid #e2e8f0', borderTopColor: '#39a900', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+              <span>Cargando módulo...</span>
+            </div>
+          }>
+            {children}
+          </Suspense>
+        )}
       </main>
       
       {/* Bot Chat de Inteligencia Artificial Flotante */}

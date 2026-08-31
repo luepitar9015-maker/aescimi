@@ -89,7 +89,9 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 const { auditMiddleware } = require('./middleware/auditMiddleware');
 app.use(auditMiddleware);
 
-// Auth Middleware to extract user from token and update last activity
+// Auth Middleware to extract user from token and update last activity with throttling
+const lastActivityCache = new Map();
+
 app.use((req, res, next) => {
     const token = req.headers['authorization']?.split(' ')[1];
     if (token) {
@@ -97,10 +99,15 @@ app.use((req, res, next) => {
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
             req.user = decoded;
             
-            // Actualizar last_activity en segundo plano para el monitoreo
-            pool.query('UPDATE users SET last_activity = CURRENT_TIMESTAMP WHERE id = $1', [decoded.id]).catch(err => {
-                console.error('[USERS] Error actualizando last_activity:', err.message);
-            });
+            // Actualizar last_activity en segundo plano con throttling (máximo una vez cada 60 segundos por usuario)
+            const now = Date.now();
+            const lastUpdate = lastActivityCache.get(decoded.id) || 0;
+            if (now - lastUpdate > 60000) {
+                lastActivityCache.set(decoded.id, now);
+                pool.query('UPDATE users SET last_activity = CURRENT_TIMESTAMP WHERE id = $1', [decoded.id]).catch(err => {
+                    console.error('[USERS] Error actualizando last_activity:', err.message);
+                });
+            }
         } catch (err) {
             // Token invalid - ignore but continue
         }
@@ -132,7 +139,12 @@ const ensureSchema = async () => {
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
-        console.log('[AUTO-SCHEMA] Database schema verified & missing columns added.');
+        // Indexes for performance optimization
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_deserciones_casos_status ON deserciones_casos (status)').catch(() => {});
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_documents_status ON documents (status)').catch(() => {});
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_documents_expediente_id ON documents (expediente_id)').catch(() => {});
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs (created_at)').catch(() => {});
+        console.log('[AUTO-SCHEMA] Database schema verified, missing columns & performance indexes added.');
     } catch (err) {
         console.error('[AUTO-SCHEMA] Schema check warning:', err.message);
     }

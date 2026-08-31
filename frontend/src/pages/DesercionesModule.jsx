@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import axios from 'axios';
 import { 
   FileSpreadsheet, 
@@ -30,6 +30,41 @@ import {
   Terminal,
   Square
 } from 'lucide-react';
+
+const OnBaseLiveFrame = memo(function OnBaseLiveFrame({ liveFrame, onExpand, selectedUser, automationLoading }) {
+  if (liveFrame) {
+    return (
+      <div style={{ border: '2px solid #00324d', borderRadius: '10px', overflow: 'hidden', background: '#000', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+        <img 
+          src={liveFrame} 
+          alt="Live Console OnBase Web" 
+          onClick={onExpand}
+          style={{ width: '100%', display: 'block', maxHeight: '340px', objectFit: 'contain', cursor: 'pointer' }}
+          title="Haz clic para ampliar pantalla"
+        />
+        <div style={{ background: '#00324d', color: '#fff', fontSize: '11px', padding: '6px 12px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '8px', height: '8px', background: '#22c55e', borderRadius: '50%', display: 'inline-block' }}></span>
+            🔴 TRANSMISIÓN EN VIVO — OnBase Web
+          </div>
+          <span style={{ opacity: 0.8 }}>Usuario: {selectedUser}</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ height: '310px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#0f172a', borderRadius: '10px', color: '#94a3b8', border: '2px dashed #334155' }}>
+      <Monitor size={48} style={{ marginBottom: '12px', opacity: 0.5, color: '#38bdf8' }} />
+      <p style={{ fontSize: '14px', fontWeight: '600', margin: 0, color: '#f8fafc' }}>
+        {automationLoading ? 'Conectando a la consola OnBase Web...' : 'Consola OnBase Web Lista (En espera)'}
+      </p>
+      <p style={{ fontSize: '12px', opacity: 0.7, margin: '4px 0 0 0' }}>
+        Presione uno de los botones inferiores para iniciar el proceso.
+      </p>
+    </div>
+  );
+});
 
 export default function DesercionesModule() {
   const [activeTab, setActiveTab] = useState('citacion'); // 'citacion' | 'resolucion' | 'historico'
@@ -1578,35 +1613,13 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                   )}
                 </div>
 
-                {/* Frame de Pantalla Live Stream */}
-                {liveFrame ? (
-                  <div style={{ border: '2px solid #00324d', borderRadius: '10px', overflow: 'hidden', background: '#000', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
-                    <img 
-                      src={liveFrame} 
-                      alt="Live Console OnBase Web" 
-                      onClick={() => setIsMonitorExpanded(true)}
-                      style={{ width: '100%', display: 'block', maxHeight: '340px', objectFit: 'contain', cursor: 'pointer' }}
-                      title="Haz clic para ampliar pantalla"
-                    />
-                    <div style={{ background: '#00324d', color: '#fff', fontSize: '11px', padding: '6px 12px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ width: '8px', height: '8px', background: '#22c55e', borderRadius: '50%', display: 'inline-block' }}></span>
-                        🔴 TRANSMISIÓN EN VIVO — OnBase Web
-                      </div>
-                      <span style={{ opacity: 0.8 }}>Usuario: {selectedOnbaseUser}</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ height: '310px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#0f172a', borderRadius: '10px', color: '#94a3b8', border: '2px dashed #334155' }}>
-                    <Monitor size={48} style={{ marginBottom: '12px', opacity: 0.5, color: '#38bdf8' }} />
-                    <p style={{ fontSize: '14px', fontWeight: '600', margin: 0, color: '#f8fafc' }}>
-                      {automationLoading ? 'Conectando a la consola OnBase Web...' : 'Consola OnBase Web Lista (En espera)'}
-                    </p>
-                    <p style={{ fontSize: '12px', opacity: 0.7, margin: '4px 0 0 0' }}>
-                      Presione uno de los botones inferiores para iniciar el proceso.
-                    </p>
-                  </div>
-                )}
+                {/* Frame de Pantalla Live Stream Optimizado */}
+                <OnBaseLiveFrame 
+                  liveFrame={liveFrame} 
+                  onExpand={() => setIsMonitorExpanded(true)} 
+                  selectedUser={selectedOnbaseUser} 
+                  automationLoading={automationLoading} 
+                />
 
                 {/* Controles de Ejecución */}
                 <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
