@@ -65,6 +65,30 @@ def deploy_files():
             print(f"Archivo local no encontrado: {local_path}")
             
     sftp.close()
+
+    # Copiar todo frontend/dist recursivamente
+    local_frontend_dist = os.path.abspath(os.path.join(local_backend_dir, '..', 'frontend', 'dist'))
+    remote_frontend_dist = "/home/cimi/aescimi/frontend/dist"
+    print("\nDesplegando frontend/dist al servidor remoto...")
+
+    def put_dir(sftp_client, source, target):
+        for item in os.listdir(source):
+            s_path = os.path.join(source, item)
+            t_path = f"{target}/{item}"
+            if os.path.isdir(s_path):
+                try:
+                    sftp_client.mkdir(t_path)
+                except IOError:
+                    pass
+                put_dir(sftp_client, s_path, t_path)
+            else:
+                sftp_client.put(s_path, t_path)
+
+    sftp2 = ssh.open_sftp()
+    if os.path.exists(local_frontend_dist):
+        put_dir(sftp2, local_frontend_dist, remote_frontend_dist)
+        print("✅ Frontend dist desplegado correctamente.")
+    sftp2.close()
     
     # Reiniciar backend en PM2
     print("\nReiniciando servidor backend (PM2)...")

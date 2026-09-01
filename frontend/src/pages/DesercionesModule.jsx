@@ -260,10 +260,12 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
   const [uploadingAttachmentId, setUploadingAttachmentId] = useState(null);
   const [uploadingBatchAttachments, setUploadingBatchAttachments] = useState(false);
 
-  // Preview Modal State
+  // Preview & Detail Modal States
   const [previewItem, setPreviewItem] = useState(null);
   const [previewText, setPreviewText] = useState('');
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [detailCaso, setDetailCaso] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   // Historico & Actions State
   const [historico, setHistorico] = useState([]);
@@ -429,7 +431,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
   };
 
   // Iniciar sesión en Vivo en OnBase Web con monitoreo de consola
-  const handleStartOnBaseLiveSession = async (casoIds = null, stopAtStep = null) => {
+  const handleStartOnBaseLiveSession = async (casoIds = null, opts = null) => {
     setAutomationLoading(true);
     setAutomationError(false);
     setCurrentStepIndex(0);
@@ -454,15 +456,18 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
         caso_ids: casoIds
       };
 
-      if (stopAtStep) {
-        payload.stop_at_step = stopAtStep;
+      if (typeof opts === 'number') {
+        payload.stop_at_step = opts;
+      } else if (opts && typeof opts === 'object') {
+        if (opts.stop_at_step) payload.stop_at_step = opts.stop_at_step;
+        if (opts.solo_diligenciar) payload.solo_diligenciar = true;
       }
 
       await axios.post('/api/automation/execute', payload, { headers: authHeaders });
 
       setStatusMessage({
         type: 'info',
-        text: stopAtStep ? 'Consola en vivo conectada. Preparando formulario hasta Paso 3...' : 'Consola en vivo conectada. Ejecutando cargue automático completo (Pasos 1 a 4)...'
+        text: payload.solo_diligenciar ? 'Consola en vivo conectada. Diligenciando formulario en OnBase sin enviar para inspección...' : 'Consola en vivo conectada. Ejecutando cargue automático completo (Pasos 1 a 4)...'
       });
     } catch (err) {
       console.warn('Iniciando simulador interactivo de consola OnBase Web:', err);
@@ -1852,115 +1857,224 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                     </tr>
                   </thead>
                   <tbody>
-                    {historico.map(caso => (
-                      <tr key={caso.id} style={{ borderBottom: '1px solid #e2e8f0', background: selectedHistoricoRows[caso.id] ? '#f0fdf4' : 'transparent' }}>
-                        <td style={{ padding: '12px', textAlign: 'center' }}>
-                          <input 
-                            type="checkbox"
-                            checked={!!selectedHistoricoRows[caso.id]}
-                            onChange={(e) => {
-                              setSelectedHistoricoRows(prev => ({
-                                ...prev,
-                                [caso.id]: e.target.checked
-                              }));
-                            }}
-                            style={{ cursor: 'pointer', transform: 'scale(1.2)' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px', fontWeight: '600' }}>
-                          #{caso.id}<br/>
-                          <span style={{ fontSize: '11px', color: '#64748b' }}>{new Date(caso.created_at).toLocaleDateString('es-CO')}</span>
-                        </td>
-                        <td style={{ padding: '12px' }}>
-                          <span style={{
-                            padding: '4px 10px',
-                            borderRadius: '12px',
-                            fontSize: '11px',
-                            fontWeight: '700',
-                            background: caso.etapa === 'CITACION_COMITE' ? '#e0f2fe' : '#fef3c7',
-                            color: caso.etapa === 'CITACION_COMITE' ? '#0369a1' : '#b45309'
-                          }}>
-                            {caso.etapa === 'CITACION_COMITE' ? 'Citación Comité' : 'Notif. Resolución'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px' }}>
-                          <strong style={{ color: '#0f172a' }}>{caso.aprendiz_nombre}</strong><br/>
-                          <span style={{ fontSize: '11px', color: '#64748b' }}>{caso.aprendiz_doc_tipo} {caso.aprendiz_doc_numero}</span>
-                        </td>
-                        <td style={{ padding: '12px' }}>{caso.ficha}</td>
-                        <td style={{ padding: '12px' }}>{caso.onbase_target_user || selectedOnbaseUser}</td>
-                        <td style={{ padding: '12px' }}>
-                          {(() => {
-                            let parsedCc = [];
-                            if (caso.copy_emails) {
-                              try {
-                                parsedCc = typeof caso.copy_emails === 'string' ? JSON.parse(caso.copy_emails) : caso.copy_emails;
-                              } catch (e) {}
-                            }
-                            if (!Array.isArray(parsedCc) || parsedCc.length === 0) {
-                              return <span style={{ color: '#94a3b8', fontSize: '11px' }}>Sin CC</span>;
-                            }
-                            return (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                                {parsedCc.map((cc, i) => (
-                                  <span key={i} style={{ fontSize: '11px', color: '#0f172a', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', display: 'inline-block' }} title={cc.email}>
-                                    📧 {cc.name || cc.email}
-                                  </span>
-                                ))}
-                              </div>
-                            );
-                          })()}
-                        </td>
-                        <td style={{ padding: '12px', textAlign: 'center' }}>
-                          {caso.comunicacion_pdf_path ? (
-                            <span style={{ color: '#39a900', fontWeight: '600', fontSize: '12px' }}>✓ Creada</span>
-                          ) : (
-                            <span style={{ color: '#94a3b8' }}>-</span>
-                          )}
-                        </td>
-                        <td style={{ padding: '12px', textAlign: 'center' }}>
-                          {caso.anexo_path ? (
-                            <span style={{ color: '#0284c7', fontWeight: '600', fontSize: '12px' }}>✓ Adjunto</span>
-                          ) : (
-                            <span style={{ color: '#94a3b8' }}>Sin anexo</span>
-                          )}
-                        </td>
-                        <td style={{ padding: '12px', textAlign: 'center' }}>
-                          <span style={{
-                            padding: '4px 12px',
-                            borderRadius: '12px',
-                            fontSize: '11px',
-                            fontWeight: '700',
-                            background: caso.status === 'Cargado' ? '#dcfce7' : '#f3f4f6',
-                            color: caso.status === 'Cargado' ? '#15803d' : '#4b5563'
-                          }}>
-                            {caso.status}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px', textAlign: 'center' }}>
-                          <button 
-                            onClick={() => handleStartOnBaseLiveSession([caso.id], null)}
-                            style={{
-                              background: '#39a900',
-                              color: '#ffffff',
-                              border: 'none',
-                              padding: '6px 12px',
-                              borderRadius: '6px',
+                    {historico.map(caso => {
+                      const emailSofia = caso.aprendiz_correo || caso.raw_row?.['CORREO REGISTRADO EN SOFÍA'] || caso.raw_row?.['CORREO REGISTRADO EN SOFIA'] || caso.raw_row?.['CORREO'] || 'correo@sena.edu.co';
+                      
+                      let parsedCc = [];
+                      if (caso.copy_emails) {
+                        try {
+                          parsedCc = typeof caso.copy_emails === 'string' ? JSON.parse(caso.copy_emails) : caso.copy_emails;
+                        } catch (e) {}
+                      }
+
+                      return (
+                        <tr key={caso.id} style={{ borderBottom: '1px solid #e2e8f0', background: selectedHistoricoRows[caso.id] ? '#f0fdf4' : 'transparent' }}>
+                          <td style={{ padding: '12px', textAlign: 'center' }}>
+                            <input 
+                              type="checkbox"
+                              checked={!!selectedHistoricoRows[caso.id]}
+                              onChange={(e) => {
+                                setSelectedHistoricoRows(prev => ({
+                                  ...prev,
+                                  [caso.id]: e.target.checked
+                                }));
+                              }}
+                              style={{ cursor: 'pointer', transform: 'scale(1.2)' }}
+                            />
+                          </td>
+                          <td style={{ padding: '12px', fontWeight: '600' }}>
+                            #{caso.id}<br/>
+                            <span style={{ fontSize: '11px', color: '#64748b' }}>{new Date(caso.created_at).toLocaleDateString('es-CO')}</span>
+                          </td>
+                          <td style={{ padding: '12px' }}>
+                            <span style={{
+                              padding: '4px 10px',
+                              borderRadius: '12px',
                               fontSize: '11px',
                               fontWeight: '700',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              boxShadow: '0 2px 4px rgba(57,169,0,0.2)'
-                            }}
-                            title="Ejecutar cargue automático en OnBase Web para este caso especifico"
-                          >
-                            <Play size={12} /> Cargar OnBase
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                              background: caso.etapa === 'CITACION_COMITE' ? '#e0f2fe' : '#fef3c7',
+                              color: caso.etapa === 'CITACION_COMITE' ? '#0369a1' : '#b45309'
+                            }}>
+                              {caso.etapa === 'CITACION_COMITE' ? 'Citación Comité' : 'Notif. Resolución'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px' }}>
+                            <strong style={{ color: '#0f172a' }}>{caso.aprendiz_nombre}</strong><br/>
+                            <span style={{ fontSize: '11px', color: '#64748b' }}>{caso.aprendiz_doc_tipo} {caso.aprendiz_doc_numero}</span><br/>
+                            <span style={{ fontSize: '11px', color: '#0284c7', fontWeight: '600' }}>📧 {emailSofia}</span>
+                          </td>
+                          <td style={{ padding: '12px', fontWeight: '600' }}>{caso.ficha}</td>
+                          <td style={{ padding: '12px' }}>{caso.onbase_target_user || selectedOnbaseUser}</td>
+                          <td style={{ padding: '12px' }}>
+                            {!Array.isArray(parsedCc) || parsedCc.length === 0 ? (
+                              <span style={{ color: '#94a3b8', fontSize: '11px' }}>Sin CC</span>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                {parsedCc.map((cc, i) => (
+                                  <div key={i} style={{ fontSize: '11px', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '4px 8px', borderRadius: '6px' }}>
+                                    <div style={{ fontWeight: '600', color: '#0f172a' }}>👤 {cc.name || 'Destinatario CC'}</div>
+                                    <div style={{ color: '#0284c7', fontSize: '10px' }}>📧 {cc.email}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: '12px', textAlign: 'center' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                              <button
+                                onClick={() => {
+                                  setPreviewItem(caso);
+                                  setPreviewText(caso.texto_combinado || caso.texto_inicial || '');
+                                  setShowPreviewModal(true);
+                                }}
+                                style={{
+                                  background: '#e0f2fe',
+                                  color: '#0369a1',
+                                  border: '1px solid #bae6fd',
+                                  padding: '4px 8px',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  fontWeight: '700',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                                title="Ver texto completo de la Carta / Oficio"
+                              >
+                                <Eye size={12} /> Ver Carta
+                              </button>
+                              {caso.comunicacion_pdf_path && (
+                                <a
+                                  href={`/${caso.comunicacion_pdf_path.replace(/\\/g, '/')}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{
+                                    color: '#39a900',
+                                    fontWeight: '700',
+                                    fontSize: '11px',
+                                    textDecoration: 'none'
+                                  }}
+                                >
+                                  📄 Abrir PDF
+                                </a>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px', textAlign: 'center' }}>
+                            {caso.anexo_path ? (
+                              <a
+                                href={`/${caso.anexo_path.replace(/\\/g, '/')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  background: '#f0fdf4',
+                                  color: '#166534',
+                                  border: '1px solid #bbf7d0',
+                                  padding: '4px 8px',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  fontWeight: '700',
+                                  textDecoration: 'none',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                              >
+                                <Paperclip size={12} /> Ver Resol. PDF
+                              </a>
+                            ) : (
+                              <span style={{ color: '#94a3b8', fontSize: '11px' }}>Sin anexo</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '12px', textAlign: 'center' }}>
+                            <span style={{
+                              padding: '4px 10px',
+                              borderRadius: '12px',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              background: caso.status === 'Cargado' ? '#dcfce7' : '#f3f4f6',
+                              color: caso.status === 'Cargado' ? '#15803d' : '#4b5563'
+                            }}>
+                              {caso.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px', textAlign: 'center' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
+                              <button 
+                                onClick={() => handleStartOnBaseLiveSession([caso.id], null)}
+                                style={{
+                                  background: '#39a900',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  padding: '6px 10px',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  fontWeight: '700',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  width: '100%',
+                                  justifyContent: 'center',
+                                  boxShadow: '0 2px 4px rgba(57,169,0,0.2)'
+                                }}
+                                title="Ejecutar cargue automático en OnBase Web para este caso especifico"
+                              >
+                                <Play size={12} /> Cargar OnBase
+                              </button>
+
+                              <button 
+                                onClick={() => handleStartOnBaseLiveSession([caso.id], { solo_diligenciar: true })}
+                                style={{
+                                  background: '#0284c7',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  padding: '5px 8px',
+                                  borderRadius: '6px',
+                                  fontSize: '10px',
+                                  fontWeight: '700',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  width: '100%',
+                                  justifyContent: 'center'
+                                }}
+                                title="Llenar todo el formulario en OnBase Web y detenerse en pantalla para inspeccionar sin dar clic en Enviar"
+                              >
+                                <Eye size={11} /> Diligenciar (Sin Enviar)
+                              </button>
+
+                              <button 
+                                onClick={() => {
+                                  setDetailCaso(caso);
+                                  setShowDetailModal(true);
+                                }}
+                                style={{
+                                  background: '#f1f5f9',
+                                  color: '#475569',
+                                  border: '1px solid #cbd5e1',
+                                  padding: '4px 8px',
+                                  borderRadius: '6px',
+                                  fontSize: '10px',
+                                  fontWeight: '600',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  width: '100%',
+                                  justifyContent: 'center'
+                                }}
+                                title="Ver todos los campos del formulario OnBase Web mapeados para este registro"
+                              >
+                                <FileText size={11} /> Detalle Formulario
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -2037,7 +2151,26 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
               {previewText}
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              {previewItem && previewItem.comunicacion_pdf_path ? (
+                <a
+                  href={`/${previewItem.comunicacion_pdf_path.replace(/\\/g, '/')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    background: '#39a900',
+                    color: '#ffffff',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontWeight: '700',
+                    textDecoration: 'none',
+                    fontSize: '13px'
+                  }}
+                >
+                  📄 Abrir / Descargar Carta PDF
+                </a>
+              ) : <div></div>}
+
               <button 
                 onClick={() => setShowPreviewModal(false)}
                 style={{
@@ -2051,6 +2184,160 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                 }}
               >
                 Cerrar Vista Previa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Detalle Mapeo Formulario OnBase Web */}
+      {showDetailModal && detailCaso && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: '16px',
+            maxWidth: '850px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            padding: '28px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '2px solid #39a900', paddingBottom: '12px' }}>
+              <h3 style={{ margin: 0, color: '#00324d', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FileText size={20} color="#39a900" />
+                Mapeo de Campos para Formulario OnBase Web (Caso #{detailCaso.id})
+              </h3>
+              <button 
+                onClick={() => setShowDetailModal(false)}
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '13px' }}>
+              {/* Bloque Destinatario Externo */}
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '16px' }}>
+                <h4 style={{ margin: '0 0 10px 0', color: '#166534', fontSize: '14px' }}>🟢 Destinatario Externo</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <strong>Nombre Destinatario *:</strong>
+                    <div style={{ background: '#fff', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', marginTop: '4px' }}>
+                      {detailCaso.aprendiz_nombre}
+                    </div>
+                  </div>
+                  <div>
+                    <strong>Email Destinatario *:</strong>
+                    <div style={{ background: '#fff', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', marginTop: '4px', color: '#0284c7', fontWeight: '600' }}>
+                      {detailCaso.aprendiz_correo || detailCaso.raw_row?.['CORREO REGISTRADO EN SOFÍA'] || 'correo@sena.edu.co'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bloque Asunto */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px' }}>
+                <h4 style={{ margin: '0 0 10px 0', color: '#0f172a', fontSize: '14px' }}>🟢 Asunto y Descripción</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <strong>Asunto *:</strong>
+                    <div style={{ background: '#fff', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', marginTop: '4px' }}>
+                      {detailCaso.asunto || 'NOVEDADES DE ALUMNOS'}
+                    </div>
+                  </div>
+                  <div>
+                    <strong>Descripción del Asunto *:</strong>
+                    <div style={{ background: '#fff', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', marginTop: '4px' }}>
+                      {detailCaso.descripcion_asunto || 'Notificación'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bloque Anexo y Copias Externas */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px' }}>
+                  <h4 style={{ margin: '0 0 10px 0', color: '#0f172a', fontSize: '14px' }}>📎 Anexo Adjunto</h4>
+                  <div>{detailCaso.anexo_path ? detailCaso.anexo_path : 'Sin anexo'}</div>
+                </div>
+
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px' }}>
+                  <h4 style={{ margin: '0 0 10px 0', color: '#0f172a', fontSize: '14px' }}>📧 Copias Externas (CC)</h4>
+                  {(() => {
+                    let parsedCc = [];
+                    if (detailCaso.copy_emails) {
+                      try {
+                        parsedCc = typeof detailCaso.copy_emails === 'string' ? JSON.parse(detailCaso.copy_emails) : detailCaso.copy_emails;
+                      } catch (e) {}
+                    }
+                    if (!Array.isArray(parsedCc) || parsedCc.length === 0) return <div style={{ color: '#94a3b8' }}>Sin copias</div>;
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {parsedCc.map((cc, i) => (
+                          <div key={i} style={{ fontSize: '11px', background: '#fff', padding: '4px 8px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+                            <strong>{cc.name}</strong> ({cc.email})
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Bloque Texto Combinado */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px' }}>
+                <h4 style={{ margin: '0 0 8px 0', color: '#0f172a', fontSize: '14px' }}>📄 Cuerpo del Formulario (Texto Combinado)</h4>
+                <div style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '12px', whiteSpace: 'pre-wrap', maxHeight: '200px', overflowY: 'auto' }}>
+                  {detailCaso.texto_combinado || detailCaso.texto_inicial}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
+              <button 
+                onClick={() => {
+                  setShowDetailModal(false);
+                  handleStartOnBaseLiveSession([detailCaso.id], { solo_diligenciar: true });
+                }}
+                style={{
+                  background: '#0284c7',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Eye size={16} /> Previsualizar en OnBase Web (Sin Enviar)
+              </button>
+
+              <button 
+                onClick={() => setShowDetailModal(false)}
+                style={{
+                  background: '#00324d',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Cerrar Detalle
               </button>
             </div>
           </div>

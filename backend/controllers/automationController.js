@@ -2549,7 +2549,8 @@ exports.executeAutomation = async (req, res) => {
                             await paso3_uformComunicacionElectronica(page, browser, currentJob.logs);
                         }
 
-                        await paso4_diligenciarComunicacionElectronica(page, browser, casoItem, currentJob.logs, { solo_diligenciar: false });
+                        const isSoloDiligenciar = !!req.body.solo_diligenciar;
+                        await paso4_diligenciarComunicacionElectronica(page, browser, casoItem, currentJob.logs, { solo_diligenciar: isSoloDiligenciar });
 
                         await pool.query(`UPDATE deserciones_casos SET status = 'Cargado', updated_at = CURRENT_TIMESTAMP WHERE id = $1`, [casoItem.id]).catch(() => {});
                         currentJob.logs.push(`[DESERCIONES Caso ${cIdx + 1}/${casosToLoad.length}] ✅ Caso #${casoItem.id} radicado y actualizado a 'Cargado' en BD.`);

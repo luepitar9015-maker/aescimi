@@ -227,6 +227,9 @@ app.use((req, res, next) => {
 // Setup multer for file upload
 const upload = multer({ dest: 'uploads/' });
 
+// Servir archivos subidos (PDFs generados y anexos de deserciones)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Register API Routes
 app.use('/api/auth/login', authLimiter); // Apply rate limiter to login
 app.use('/api/auth', authRoutes);
