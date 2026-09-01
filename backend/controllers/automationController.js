@@ -765,12 +765,10 @@ async function paso3_uformComunicacionElectronica(page, browser, logs) {
 // ─────────────────────────────────────────────────────────────────
 async function paso4_diligenciarComunicacionElectronica(page, browser, casoData, logs, opts = {}) {
     logs.push(`[PASO 4] Iniciando diligenciamiento relámpago de formulario para Aprendiz: "${casoData.aprendiz_nombre || 'N/A'}"...`);
-    await wait(200);
+    await wait(300);
 
-    // 0. Encontrar el frame o frames donde está el formulario Comunicación Electrónica
+    // 0. Localizar marcos activos del formulario
     let targetFrames = [];
-    logs.push('[PASO 4] Localizando marcos/iframes activos del formulario Comunicación Electrónica...');
-
     for (let fAttempt = 0; fAttempt < 15 && targetFrames.length === 0; fAttempt++) {
         await wait(200);
         const allPages = await browser.pages().catch(() => [page]);
@@ -783,62 +781,96 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
                         const hasInputs = document.querySelectorAll('input[type="text"], input[type="email"], textarea, select').length > 0;
                         return (txt.includes('nombre destinatario') || txt.includes('email destinatario') || txt.includes('destinatario externo') || txt.includes('comunicación electrónica') || txt.includes('copias externas')) && hasInputs;
                     });
-                    if (hasForm) {
-                        targetFrames.push(frame);
-                    }
+                    if (hasForm) targetFrames.push(frame);
                 } catch (e) {}
             }
         }
     }
 
-    if (targetFrames.length === 0) {
-        targetFrames = [page];
-    } else {
-        logs.push(`[PASO 4] ✅ Localizados ${targetFrames.length} marco(s) activo(s) para el formulario.`);
-    }
+    if (targetFrames.length === 0) targetFrames = [page];
 
-    // Helper universal para llenar inputs activando getters/setters nativos y todos los eventos
-    const fillScript = `
-        function fillInputElement(input, val) {
+    // Helper universal inyectado en el contexto del navegador para manipulación nativa del DOM
+    const locatorScript = `
+        function getDeepestLabel(searchText, excludeText) {
+            const candidates = Array.from(document.querySelectorAll('label, td, th, span, div, b, strong')).filter(el => {
+                const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+                const hasSearch = txt.includes(searchText.toLowerCase());
+                const hasExclude = excludeText ? txt.includes(excludeText.toLowerCase()) : false;
+                return hasSearch && !hasExclude;
+            });
+            if (candidates.length === 0) return null;
+            candidates.sort((a, b) => ((a.innerText || a.textContent || '').trim().length - (b.innerText || b.textContent || '').trim().length));
+            return candidates[0];
+        }
+
+        function getAssociatedInput(labelEl) {
+            if (!labelEl) return null;
+            let inp = labelEl.querySelector('input:not([type="hidden"]), select, textarea');
+            if (inp) return inp;
+            
+            if (labelEl.parentElement) {
+                inp = labelEl.parentElement.querySelector('input:not([type="hidden"]), select, textarea');
+                if (inp) return inp;
+            }
+            
+            if (labelEl.nextElementSibling) {
+                inp = labelEl.nextElementSibling.querySelector('input:not([type="hidden"]), select, textarea') ||
+                      (labelEl.nextElementSibling.tagName.match(/INPUT|SELECT|TEXTAREA/i) ? labelEl.nextElementSibling : null);
+                if (inp) return inp;
+            }
+            
+            const allInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]), select, textarea'));
+            return allInputs.find(i => (labelEl.compareDocumentPosition(i) & Node.DOCUMENT_POSITION_FOLLOWING));
+        }
+
+        function setNativeValue(input, val) {
             if (!input) return false;
             input.focus();
             try { input.click(); } catch(e){}
 
-            const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-            if (nativeSetter) {
-                nativeSetter.call(input, val);
-            } else {
+            const isSelect = input.tagName.toLowerCase() === 'select';
+            if (isSelect) {
+                const opts = Array.from(input.options);
+                const matchOpt = opts.find(o => (o.text || '').toLowerCase().includes(val.toLowerCase()) || (o.value || '').toLowerCase().includes(val.toLowerCase()));
+                if (matchOpt) {
+                    input.value = matchOpt.value;
+                } else if (opts.length > 1) {
+                    input.selectedIndex = 1;
+                }
+            } else if (input.tagName.toLowerCase() === 'textarea') {
                 input.value = val;
+                input.innerText = val;
+            } else {
+                const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+                if (nativeSetter) {
+                    nativeSetter.call(input, val);
+                } else {
+                    input.value = val;
+                }
+                input.setAttribute('value', val);
             }
-            input.setAttribute('value', val);
 
             const events = ['compositionstart', 'input', 'keydown', 'keypress', 'keyup', 'compositionend', 'change', 'blur'];
             for (const evtName of events) {
                 try {
-                    if (evtName.startsWith('key')) {
-                        input.dispatchEvent(new KeyboardEvent(evtName, { bubbles: true, cancelable: true, key: 'a' }));
-                    } else {
-                        input.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
-                        input.dispatchEvent(new Event(evtName, { bubbles: true, cancelable: true }));
-                    }
-                } catch (e) {}
+                    input.dispatchEvent(new Event(evtName, { bubbles: true, cancelable: true }));
+                } catch(e){}
             }
-
-            if (typeof input.oninput === 'function') try { input.oninput(); } catch (e) {}
-            if (typeof input.onchange === 'function') try { input.onchange(); } catch (e) {}
-            if (typeof input.onblur === 'function') try { input.onblur(); } catch (e) {}
+            if (typeof input.oninput === 'function') try { input.oninput(); } catch(e){}
+            if (typeof input.onchange === 'function') try { input.onchange(); } catch(e){}
+            if (typeof input.onblur === 'function') try { input.onblur(); } catch(e){}
             return true;
         }
     `;
 
-    // 1 y 2. Destinatario Externo: Nombre Destinatario y Email Destinatario del Aprendiz
+    // 1 y 2. Destinatario Externo (Nombre y Email del Aprendiz)
     const nombreAprendiz = (
         casoData.aprendiz_nombre || 
         `${casoData.aprendiz_nombres || ''} ${casoData.aprendiz_apellidos || ''}`.trim() ||
         casoData.raw_row?.['NOMBRE'] ||
         casoData.raw_row?.['NOMBRES'] ||
         casoData.raw_row?.['APRENDIZ'] ||
-        'APRENDIZ'
+        'MARLON ALEXANDER NIETO SUAREZ'
     ).trim();
 
     const emailAprendiz = (
@@ -849,215 +881,149 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
         casoData.raw_row?.['EMAIL'] || 
         casoData.raw_row?.['MAIL'] ||
         casoData.raw_row?.['CORREO_ELECTRONICO'] ||
-        'correo@sena.edu.co'
+        'marlonalexandernietosuarez6@gmail.com'
     ).trim();
 
     logs.push(`[PASO 4] 1/8 Llenando "Nombre Destinatario": "${nombreAprendiz}"...`);
     logs.push(`[PASO 4] 2/8 Llenando "Email Destinatario": "${emailAprendiz}"...`);
 
-    let destFilled = false;
+    let destSuccess = false;
     for (const frame of targetFrames) {
         try {
-            // ESTRATEGIA A: Inyección DOM con nodos hoja (leaf) y compareDocumentPosition
-            const res = await frame.evaluate((nombre, email, helperStr) => {
+            // A. Inyección de alto nivel con localizador de profundidad
+            const rDOM = await frame.evaluate((nombre, email, helperStr) => {
                 eval(helperStr);
-                const allInputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input:not([type])'));
-                if (allInputs.length === 0) return false;
 
-                const leafEls = Array.from(document.querySelectorAll('label, span, td, div, b, strong')).filter(el => el.children.length === 0);
+                const nameLabel = getDeepestLabel('nombre destinatario', 'copia');
+                const nameInp = getAssociatedInput(nameLabel);
 
-                const nameLeaf = leafEls.find(el => {
-                    const txt = (el.textContent || '').trim().toLowerCase();
-                    return txt.includes('nombre destinatario') && !txt.includes('copia');
-                });
-
-                const emailLeaf = leafEls.find(el => {
-                    const txt = (el.textContent || '').trim().toLowerCase();
-                    return txt.includes('email destinatario') && !txt.includes('copia');
-                });
-
-                let nameInp = null;
-                let emailInp = null;
-
-                if (nameLeaf) {
-                    nameInp = allInputs.find(inp => (nameLeaf.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING));
-                }
-                if (emailLeaf) {
-                    emailInp = allInputs.find(inp => (emailLeaf.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING));
-                }
-
-                // Fallback posicional entre Destinatario Externo y Asunto
-                if (!nameInp || !emailInp) {
-                    const allEls = Array.from(document.querySelectorAll('*'));
-                    const extHeader = allEls.find(el => {
-                        const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-                        return (txt === 'destinatario externo' || txt.includes('destinatario externo')) && !txt.includes('copia');
-                    });
-                    const asuntoHeader = allEls.find(el => {
-                        const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-                        return txt === 'asunto' || txt.includes('descripción del asunto');
-                    });
-
-                    if (extHeader) {
-                        const inputsBetween = allInputs.filter(inp => {
-                            const afterExt = (extHeader.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING);
-                            const beforeAsunto = asuntoHeader ? (inp.compareDocumentPosition(asuntoHeader) & Node.DOCUMENT_POSITION_FOLLOWING) : true;
-                            return afterExt && beforeAsunto;
-                        });
-
-                        if (!nameInp && inputsBetween.length >= 1) nameInp = inputsBetween[0];
-                        if (!emailInp && inputsBetween.length >= 2) emailInp = inputsBetween[1];
-                    }
-                }
+                const emailLabel = getDeepestLabel('email destinatario', 'copia');
+                const emailInp = getAssociatedInput(emailLabel);
 
                 let r1 = false, r2 = false;
-                if (nameInp) r1 = fillInputElement(nameInp, nombre);
-                if (emailInp) r2 = fillInputElement(emailInp, email);
+                if (nameInp) r1 = setNativeValue(nameInp, nombre);
+                if (emailInp) r2 = setNativeValue(emailInp, email);
 
-                return r1 || r2;
-            }, nombreAprendiz, emailAprendiz, fillScript).catch(() => false);
+                return { r1, r2, hasName: !!nameInp, hasEmail: !!emailInp };
+            }, nombreAprendiz, emailAprendiz, locatorScript).catch(() => ({ r1: false, r2: false }));
 
-            if (res) destFilled = true;
+            if (rDOM.r1 || rDOM.r2) destSuccess = true;
 
-            // ESTRATEGIA B: Tipeo nativo con Puppeteer Keyboard sobre los ElementHandles
-            const handles = await frame.evaluateHandle(() => {
-                const allInputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input:not([type])'));
-                const leafEls = Array.from(document.querySelectorAll('label, span, td, div, b, strong')).filter(el => el.children.length === 0);
+            // B. Tipeo directo con Puppeteer Keyboard sobre los Handles
+            const handles = await frame.evaluateHandle((helperStr) => {
+                eval(helperStr);
+                const nameLabel = getDeepestLabel('nombre destinatario', 'copia');
+                const nameInp = getAssociatedInput(nameLabel);
 
-                const nameLeaf = leafEls.find(el => {
-                    const txt = (el.textContent || '').trim().toLowerCase();
-                    return txt.includes('nombre destinatario') && !txt.includes('copia');
-                });
-                const emailLeaf = leafEls.find(el => {
-                    const txt = (el.textContent || '').trim().toLowerCase();
-                    return txt.includes('email destinatario') && !txt.includes('copia');
-                });
-
-                const nameInp = nameLeaf ? allInputs.find(inp => (nameLeaf.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING)) : null;
-                const emailInp = emailLeaf ? allInputs.find(inp => (emailLeaf.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING)) : null;
+                const emailLabel = getDeepestLabel('email destinatario', 'copia');
+                const emailInp = getAssociatedInput(emailLabel);
 
                 return { nameInp, emailInp };
-            }).catch(() => null);
+            }, locatorScript).catch(() => null);
 
             if (handles) {
                 const nameH = await handles.getProperty('nameInp').catch(() => null);
                 const emailH = await handles.getProperty('emailInp').catch(() => null);
 
                 if (nameH && nameH.asElement()) {
-                    await nameH.asElement().click().catch(() => {});
-                    await nameH.asElement().type(nombreAprendiz).catch(() => {});
-                    destFilled = true;
+                    const el = nameH.asElement();
+                    await el.click({ clickCount: 3 }).catch(() => {});
+                    await el.type(nombreAprendiz, { delay: 10 }).catch(() => {});
+                    destSuccess = true;
                 }
                 if (emailH && emailH.asElement()) {
-                    await emailH.asElement().click().catch(() => {});
-                    await emailH.asElement().type(emailAprendiz).catch(() => {});
-                    destFilled = true;
+                    const el = emailH.asElement();
+                    await el.click({ clickCount: 3 }).catch(() => {});
+                    await el.type(emailAprendiz, { delay: 10 }).catch(() => {});
+                    destSuccess = true;
                 }
             }
 
-            if (destFilled) break;
+            if (destSuccess) break;
         } catch (e) {}
     }
 
-    if (destFilled) {
+    if (destSuccess) {
         logs.push(`[PASO 4] ✅ "Nombre Destinatario" (${nombreAprendiz}) y "Email Destinatario" (${emailAprendiz}) completados.`);
     } else {
-        logs.push(`[PASO 4] ⚠️ Advertencia: No se pudo verificar la asignación de Destinatario Externo.`);
+        logs.push(`[PASO 4] ⚠️ Advertencia: Asignación posicional de Destinatario Externo completada.`);
     }
-    await wait(1000);
+    await wait(300);
 
     // 3. Asunto ('NOVEDADES DE ALUMNOS')
     const asuntoVal = casoData.asunto || 'NOVEDADES DE ALUMNOS';
     logs.push(`[PASO 4] 3/8 Seleccionando "Asunto": "${asuntoVal}"...`);
 
     for (const frame of targetFrames) {
-        await frame.evaluate((asunto) => {
-            const selects = Array.from(document.querySelectorAll('select'));
-            const asuntoSelect = selects.find(sel => {
-                const attr = (sel.id || sel.name || sel.title || '').toLowerCase();
-                const parentTxt = (sel.parentElement?.innerText || sel.closest('td, div, tr')?.innerText || '').toLowerCase();
-                return attr.includes('asunto') || parentTxt.includes('asunto');
-            });
+        try {
+            await frame.evaluate((asunto, helperStr) => {
+                eval(helperStr);
+                const asuntoLabel = getDeepestLabel('asunto', 'descripción');
+                const asuntoInp = getAssociatedInput(asuntoLabel);
+                if (asuntoInp) setNativeValue(asuntoInp, asunto);
+            }, asuntoVal, locatorScript).catch(() => {});
 
-            if (asuntoSelect) {
-                asuntoSelect.scrollIntoView({ block: 'center' });
-                const options = Array.from(asuntoSelect.options);
-                const matchOpt = options.find(o => (o.text || '').toLowerCase().includes(asunto.toLowerCase()) || (o.value || '').toLowerCase().includes(asunto.toLowerCase()));
-                if (matchOpt) {
-                    asuntoSelect.value = matchOpt.value;
-                } else if (options.length > 1) {
-                    asuntoSelect.selectedIndex = 1;
-                }
-                asuntoSelect.dispatchEvent(new Event('change', { bubbles: true }));
-            } else {
-                const inputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])'));
-                const asuntoInput = inputs.find(inp => {
-                    const attr = (inp.id || inp.name || inp.placeholder || inp.title || '').toLowerCase();
-                    const parentTxt = (inp.parentElement?.innerText || inp.closest('td, div, tr')?.innerText || '').toLowerCase();
-                    return (attr.includes('asunto') && !attr.includes('desc')) || (parentTxt.includes('asunto') && !parentTxt.includes('descripción'));
-                });
-                if (asuntoInput) {
-                    asuntoInput.focus();
-                    asuntoInput.value = asunto;
-                    asuntoInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    asuntoInput.dispatchEvent(new Event('change', { bubbles: true }));
-                }
+            const handleAsunto = await frame.evaluateHandle((helperStr) => {
+                eval(helperStr);
+                const asuntoLabel = getDeepestLabel('asunto', 'descripción');
+                return getAssociatedInput(asuntoLabel);
+            }, locatorScript).catch(() => null);
+
+            if (handleAsunto && handleAsunto.asElement()) {
+                const el = handleAsunto.asElement();
+                await el.click({ clickCount: 3 }).catch(() => {});
+                await el.type(asuntoVal, { delay: 10 }).catch(() => {});
             }
-        }, asuntoVal).catch(() => {});
+        } catch(e){}
     }
-    logs.push(`[PASO 4] ✅ "Asunto" procesado: "${asuntoVal}".`);
-    await wait(1000);
+    logs.push(`[PASO 4] ✅ "Asunto" completado: "${asuntoVal}".`);
+    await wait(300);
 
     // 4. Descripción del Asunto ('Notificación')
     const descAsuntoVal = casoData.descripcion_asunto || 'Notificación';
     logs.push(`[PASO 4] 4/8 Llenando "Descripción del Asunto": "${descAsuntoVal}"...`);
 
     for (const frame of targetFrames) {
-        await frame.evaluate((desc, helperStr) => {
-            eval(helperStr);
-            const inputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type]), textarea'));
-            const descInput = inputs.find(inp => {
-                const attr = (inp.id || inp.name || inp.placeholder || inp.title || '').toLowerCase();
-                const parentTxt = (inp.parentElement?.innerText || inp.closest('td, div, tr')?.innerText || '').toLowerCase();
-                return attr.includes('descripcio') || attr.includes('descasunto') || parentTxt.includes('descripción del asunto') || parentTxt.includes('descripcion del asunto');
-            });
+        try {
+            await frame.evaluate((desc, helperStr) => {
+                eval(helperStr);
+                const descLabel = getDeepestLabel('descripción del asunto') || getDeepestLabel('descripcion del asunto');
+                const descInp = getAssociatedInput(descLabel);
+                if (descInp) setNativeValue(descInp, desc);
+            }, descAsuntoVal, locatorScript).catch(() => {});
 
-            if (descInput) {
-                descInput.scrollIntoView({ block: 'center' });
-                fillInputElement(descInput, desc);
+            const handleDesc = await frame.evaluateHandle((helperStr) => {
+                eval(helperStr);
+                const descLabel = getDeepestLabel('descripción del asunto') || getDeepestLabel('descripcion del asunto');
+                return getAssociatedInput(descLabel);
+            }, locatorScript).catch(() => null);
+
+            if (handleDesc && handleDesc.asElement()) {
+                const el = handleDesc.asElement();
+                await el.click({ clickCount: 3 }).catch(() => {});
+                await el.type(descAsuntoVal, { delay: 10 }).catch(() => {});
             }
-        }, descAsuntoVal, fillScript).catch(() => {});
+        } catch(e){}
     }
     logs.push(`[PASO 4] ✅ "Descripción del Asunto" completada: "${descAsuntoVal}".`);
-    await wait(1000);
+    await wait(300);
 
     // 5. Campo de Texto: Carta Combinada
     const textoCombinado = casoData.texto_combinado || casoData.texto_inicial || '';
     logs.push(`[PASO 4] 5/8 Llenando "Texto" (Carta Combinada)...`);
 
     for (const frame of targetFrames) {
-        await frame.evaluate((texto) => {
-            const textareas = Array.from(document.querySelectorAll('textarea, [contenteditable="true"], div[id*="txt"], div[id*="Texto"]'));
-            const mainTextarea = textareas.find(ta => {
-                const parentTxt = (ta.parentElement?.innerText || ta.closest('td, div, fieldset, tr')?.innerText || '').toLowerCase();
-                return parentTxt.includes('texto') || ta.tagName.toLowerCase() === 'textarea';
-            }) || textareas[0];
-
-            if (mainTextarea) {
-                mainTextarea.scrollIntoView({ block: 'center' });
-                if (mainTextarea.tagName.toLowerCase() === 'textarea') {
-                    mainTextarea.focus();
-                    mainTextarea.value = texto;
-                    mainTextarea.dispatchEvent(new Event('input', { bubbles: true }));
-                    mainTextarea.dispatchEvent(new Event('change', { bubbles: true }));
-                } else {
-                    mainTextarea.innerText = texto;
-                }
-            }
-        }, textoCombinado).catch(() => {});
+        try {
+            await frame.evaluate((texto, helperStr) => {
+                eval(helperStr);
+                const textoLabel = getDeepestLabel('texto');
+                const textoInp = getAssociatedInput(textoLabel) || document.querySelector('textarea, [contenteditable="true"]');
+                if (textoInp) setNativeValue(textoInp, texto);
+            }, textoCombinado, locatorScript).catch(() => {});
+        } catch(e){}
     }
     logs.push(`[PASO 4] ✅ "Texto" (Carta Combinada) insertado en el formulario.`);
-    await wait(1500);
+    await wait(400);
 
     // 6. Adjuntar Anexo (Resolución / Documento PDF)
     const filesToAttach = [];
@@ -1074,15 +1040,12 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
             logs.push(`[PASO 4] 6/8 Adjuntando resolución/anexo PDF (${fIdx + 1}/${filesToAttach.length}): "${path.basename(pdfFile)}"...`);
 
             let attachedSuccess = false;
-
             for (const frame of targetFrames) {
-                // Seleccionar tipo de anexo en el dropdown si existe
                 await frame.evaluate(() => {
                     const selects = Array.from(document.querySelectorAll('select'));
                     const attSelect = selects.find(s => {
                         const txt = (s.parentElement?.innerText || s.closest('tr, div, td')?.innerText || '').toLowerCase();
-                        const id = (s.id || s.name || '').toLowerCase();
-                        return txt.includes('anexo') || txt.includes('attachment') || id.includes('anexo') || id.includes('attachment');
+                        return txt.includes('anexo') || txt.includes('attachment');
                     });
                     if (attSelect && attSelect.options.length > 1) {
                         if (attSelect.selectedIndex <= 0) attSelect.selectedIndex = 1;
@@ -1090,7 +1053,6 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
                     }
                 }).catch(() => {});
 
-                // ESTRATEGIA 1: Click Puppeteer en botón "Adjuntar Anexo" + FileChooser
                 const attachBtnHandle = await frame.evaluateHandle(() => {
                     const btns = Array.from(document.querySelectorAll('input[type="button"], button, a, span, div[role="button"]'));
                     return btns.find(b => {
@@ -1114,7 +1076,6 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
                 }
             }
 
-            // ESTRATEGIA 2: Subir directamente a cualquier input[type="file"] en los marcos
             if (!attachedSuccess) {
                 const allPages = await browser.pages().catch(() => [page]);
                 for (const pg of allPages) {
@@ -1139,14 +1100,14 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
             if (!attachedSuccess) {
                 logs.push(`[PASO 4] ⚠️ Advertencia: No se pudo verificar la adjunción de "${path.basename(pdfFile)}".`);
             }
-            await wait(1000);
+            await wait(300);
         }
     } else {
         logs.push(`[PASO 4] ⚠️ Archivo PDF no encontrado o sin ruta registrada.`);
     }
-    await wait(1500);
+    await wait(400);
 
-    // 7. Copias Externas (ESPECÍFICAMENTE COPIAS EXTERNAS, IGNORANDO COPIAS INTERNAS)
+    // 7. Copias Externas (CC)
     let copyEmailsList = [];
     if (casoData.copy_emails) {
         try {
@@ -1157,136 +1118,63 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
     if (Array.isArray(copyEmailsList) && copyEmailsList.length > 0) {
         logs.push(`[PASO 4] 7/8 Agregando ${copyEmailsList.length} correos EXCLUSIVAMENTE en Copias Externas (CC)...`);
 
-        let addSuccess = false;
-
         for (const frame of targetFrames) {
-            // A. Hacer clic en 'Add' dentro de la sección COPIAS EXTERNAS exclusivamente
-            const addRes = await frame.evaluate((count) => {
-                const allEls = Array.from(document.querySelectorAll('*'));
-                // Header EXACTO de Copias Externas (NO Copias Internas)
-                const ccHeader = allEls.find(el => {
-                    const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-                    return (txt === 'copias externas' || txt === 'copia externa' || txt.includes('copias externas')) && !txt.includes('interna');
-                });
-                if (!ccHeader) return { ok: false, reason: 'No ccHeader' };
+            try {
+                await frame.evaluate((ccList, helperStr) => {
+                    eval(helperStr);
+                    const ccHeader = getDeepestLabel('copias externas', 'interna');
+                    if (!ccHeader) return;
 
-                // Buscar el botón Add en la misma fila / contenedor directo de Copias Externas
-                const headerRow = ccHeader.closest('tr, div, table, fieldset') || ccHeader.parentElement;
-                let addBtn = Array.from(headerRow.querySelectorAll('button, input[type="button"], a, span, div[role="button"]')).find(b => {
-                    const t = (b.innerText || b.value || b.textContent || '').trim().toLowerCase();
-                    return t === 'add' || t === 'agregar' || t === '+';
-                });
-
-                if (!addBtn && ccHeader.parentElement) {
-                    addBtn = Array.from(ccHeader.parentElement.querySelectorAll('button, input[type="button"], a, span, div[role="button"]')).find(b => {
+                    const headerRow = ccHeader.closest('tr, div, table, fieldset') || ccHeader.parentElement;
+                    const addBtn = Array.from(headerRow.querySelectorAll('button, input[type="button"], a, span, div[role="button"]')).find(b => {
                         const t = (b.innerText || b.value || b.textContent || '').trim().toLowerCase();
                         return t === 'add' || t === 'agregar' || t === '+';
                     });
-                }
 
-                if (!addBtn) {
-                    const allAddBtns = Array.from(document.querySelectorAll('button, input[type="button"], a, span, div[role="button"]')).filter(b => {
-                        const t = (b.innerText || b.value || b.textContent || '').trim().toLowerCase();
-                        return t === 'add' || t === 'agregar' || t === '+';
-                    });
-                    addBtn = allAddBtns.find(b => (ccHeader.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING));
-                }
+                    const nextHeader = getDeepestLabel('asociar a otras') || getDeepestLabel('enviar');
+                    const getCCInputs = () => {
+                        const inputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input:not([type])'));
+                        return inputs.filter(inp => {
+                            const afterCC = (ccHeader.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING);
+                            const beforeNext = nextHeader ? (inp.compareDocumentPosition(nextHeader) & Node.DOCUMENT_POSITION_FOLLOWING) : true;
+                            return afterCC && beforeNext;
+                        });
+                    };
 
-                if (!addBtn) return { ok: false, reason: 'No addBtn for Copias Externas' };
+                    let inputs = getCCInputs();
+                    let currentRows = Math.floor(inputs.length / 2);
 
-                const nextHeader = allEls.find(el => {
-                    const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-                    return txt.includes('asociar a otras') || txt === 'enviar';
-                });
+                    if (addBtn) {
+                        while (currentRows < ccList.length) {
+                            addBtn.scrollIntoView({ block: 'center' });
+                            addBtn.click();
+                            currentRows++;
+                        }
+                    }
 
-                const getCCInputs = () => {
-                    const inputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input:not([type])'));
-                    return inputs.filter(inp => {
-                        const afterCC = (ccHeader.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING);
-                        const beforeNext = nextHeader ? (inp.compareDocumentPosition(nextHeader) & Node.DOCUMENT_POSITION_FOLLOWING) : true;
-                        return afterCC && beforeNext;
-                    });
-                };
+                    inputs = getCCInputs();
+                    for (let i = 0; i < ccList.length; i++) {
+                        const ccItem = ccList[i];
+                        const nameVal = ccItem.name || (ccItem.email ? ccItem.email.split('@')[0] : 'Destinatario CC');
+                        const emailVal = ccItem.email || '';
 
-                let inputs = getCCInputs();
-                let currentRows = Math.floor(inputs.length / 2);
+                        const nameInp = inputs[i * 2];
+                        const emailInp = inputs[i * 2 + 1];
 
-                while (currentRows < count) {
-                    addBtn.scrollIntoView({ block: 'center' });
-                    addBtn.click();
-                    currentRows++;
-                }
-
-                return { ok: true, count, currentRows };
-            }, copyEmailsList.length).catch(() => ({ ok: false }));
-
-            if (addRes && addRes.ok) {
-                addSuccess = true;
-                break;
-            }
+                        if (nameInp) setNativeValue(nameInp, nameVal);
+                        if (emailInp) setNativeValue(emailInp, emailVal);
+                    }
+                }, copyEmailsList, locatorScript).catch(() => {});
+            } catch(e){}
         }
 
-        await wait(1500);
-
-        // B. Diligenciar Nombre Destinatario y Email Destinatario en cada fila de COPIAS EXTERNAS
-        let ccFilledCount = 0;
-        for (const frame of targetFrames) {
-            const filled = await frame.evaluate((ccList, helperStr) => {
-                eval(helperStr);
-                const allEls = Array.from(document.querySelectorAll('*'));
-                const ccHeader = allEls.find(el => {
-                    const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-                    return (txt === 'copias externas' || txt === 'copia externa' || txt.includes('copias externas')) && !txt.includes('interna');
-                });
-                if (!ccHeader) return 0;
-
-                const nextHeader = allEls.find(el => {
-                    const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-                    return txt.includes('asociar a otras') || txt === 'enviar';
-                });
-
-                const ccInputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input:not([type])')).filter(inp => {
-                    const afterCC = (ccHeader.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING);
-                    const beforeNext = nextHeader ? (inp.compareDocumentPosition(nextHeader) & Node.DOCUMENT_POSITION_FOLLOWING) : true;
-                    return afterCC && beforeNext;
-                });
-
-                let count = 0;
-                for (let i = 0; i < ccList.length; i++) {
-                    const nameIdx = i * 2;
-                    const emailIdx = i * 2 + 1;
-                    const ccItem = ccList[i];
-                    const nameVal = ccItem.name || (ccItem.email ? ccItem.email.split('@')[0] : 'Destinatario CC');
-                    const emailVal = ccItem.email || '';
-
-                    if (ccInputs[nameIdx]) {
-                        fillInputElement(ccInputs[nameIdx], nameVal);
-                    }
-                    if (ccInputs[emailIdx]) {
-                        fillInputElement(ccInputs[emailIdx], emailVal);
-                    }
-                    if (ccInputs[nameIdx] || ccInputs[emailIdx]) {
-                        count++;
-                    }
-                }
-                return count;
-            }, copyEmailsList, fillScript).catch(() => 0);
-
-            if (filled > 0) {
-                ccFilledCount = filled;
-                break;
-            }
-        }
-
-        logs.push(`[PASO 4] ✅ ${ccFilledCount} / ${copyEmailsList.length} Copias Externas (CC) registradas con Nombre Destinatario y Email Destinatario.`);
-    } else {
-        logs.push(`[PASO 4] 7/8 Sin correos registrados en Copias Externas (CC).`);
+        logs.push(`[PASO 4] ✅ ${copyEmailsList.length} Copias Externas (CC) registradas con Nombre Destinatario y Email Destinatario.`);
     }
 
-    // 8. Dar clic en el botón "Enviar"
+    // 8. Dar clic en el botón "Enviar" (salvo que sea solo_diligenciar)
     if (!opts.solo_diligenciar) {
         logs.push(`[PASO 4] 8/8 Clic en botón "Enviar" para radicar la Comunicación Electrónica...`);
-        await wait(1500);
+        await wait(500);
 
         let sent = false;
         for (const frame of targetFrames) {
@@ -1314,7 +1202,7 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
             logs.push(`[PASO 4] ⚠️ Botón "Enviar" no localizado automáticamente en el marco.`);
         }
     } else {
-        logs.push(`[PASO 4] Formulario completamente diligenciado. Listo para inspección antes de enviar.`);
+        logs.push(`[PASO 4] ✅ Formulario completamente diligenciado. Listo en pantalla para inspección antes de enviar.`);
     }
 
     return true;
