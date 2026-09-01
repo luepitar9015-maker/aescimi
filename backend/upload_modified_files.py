@@ -11,7 +11,7 @@ def deploy_files():
     password = "Automatizador2026*"
     
     # Lista de archivos locales y sus destinos remotos correspondientes
-    local_backend_dir = r"d:\SENA V2\INSTALADOR_SENA\backend"
+    local_backend_dir = os.path.dirname(os.path.abspath(__file__))
     remote_backend_dir = "/home/cimi/aescimi/backend"
     
     files_to_copy = [
