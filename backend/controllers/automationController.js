@@ -775,146 +775,162 @@ async function paso3_uformComunicacionElectronica(page, browser, logs) {
 // 4. Descripción del Asunto: 'Notificación' (o valor configurado)
 // 5. Campo de Texto: Texto completo de la carta combinada
 // 6. Adjuntar anexo: Resolución / Documento PDF / Anexo explícito
-// 7. Copias Externas: Para cada correo en copia guardado, clic en 'Add' e ingresar Nombre y Correo
+// 7. Copias Externas: Para cada correo en copia guardado, clic en 'Add' de COPIAS EXTERNAS e ingresar Nombre y Correo
 // 8. Enviar: Clic en el botón "Enviar"
 // ─────────────────────────────────────────────────────────────────
 async function paso4_diligenciarComunicacionElectronica(page, browser, casoData, logs, opts = {}) {
     logs.push(`[PASO 4] Iniciando diligenciamiento de formulario para Aprendiz: "${casoData.aprendiz_nombre || 'N/A'}"...`);
     await wait(2000);
 
-    // 0. Encontrar el frame donde está el formulario Comunicación Electrónica
-    let targetFrame = null;
-    logs.push('[PASO 4] Localizando marco / iframe activo del formulario Comunicación Electrónica...');
+    // 0. Encontrar el frame o frames donde está el formulario Comunicación Electrónica
+    let targetFrames = [];
+    logs.push('[PASO 4] Localizando marcos/iframes activos del formulario Comunicación Electrónica...');
 
-    for (let fAttempt = 0; fAttempt < 15 && !targetFrame; fAttempt++) {
+    for (let fAttempt = 0; fAttempt < 15 && targetFrames.length === 0; fAttempt++) {
         await wait(1000);
         const allPages = await browser.pages().catch(() => [page]);
 
         for (const pg of allPages) {
             for (const frame of pg.frames()) {
                 try {
-                    const found = await frame.evaluate(() => {
+                    const hasForm = await frame.evaluate(() => {
                         const txt = document.body ? document.body.innerText.toLowerCase() : '';
-                        const hasInputs = document.querySelectorAll('input[type="text"], input[type="email"], textarea').length > 0;
-                        return (txt.includes('nombre destinatario') || txt.includes('email destinatario') || txt.includes('destinatario externo') || txt.includes('comunicación electrónica')) && hasInputs;
+                        const hasInputs = document.querySelectorAll('input[type="text"], input[type="email"], textarea, select').length > 0;
+                        return (txt.includes('nombre destinatario') || txt.includes('email destinatario') || txt.includes('destinatario externo') || txt.includes('comunicación electrónica') || txt.includes('copias externas')) && hasInputs;
                     });
-                    if (found) {
-                        targetFrame = frame;
-                        break;
+                    if (hasForm) {
+                        targetFrames.push(frame);
                     }
                 } catch (e) {}
             }
-            if (targetFrame) break;
         }
     }
 
-    if (!targetFrame) {
-        targetFrame = page;
+    if (targetFrames.length === 0) {
+        targetFrames = [page];
     } else {
-        logs.push('[PASO 4] ✅ Marco/Iframe de formulario localizado.');
+        logs.push(`[PASO 4] ✅ Localizados ${targetFrames.length} marco(s) activo(s) para el formulario.`);
     }
+
+    const targetFrame = targetFrames[0];
+
+    // Helper universal para llenar inputs activando getters/setters nativos y todos los eventos
+    const fillScript = `
+        function fillInputElement(input, val) {
+            if (!input) return false;
+            input.focus();
+            try { input.click(); } catch(e){}
+
+            const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+            if (nativeSetter) {
+                nativeSetter.call(input, val);
+            } else {
+                input.value = val;
+            }
+            input.setAttribute('value', val);
+
+            const events = ['compositionstart', 'input', 'keydown', 'keypress', 'keyup', 'compositionend', 'change', 'blur'];
+            for (const evtName of events) {
+                try {
+                    if (evtName.startsWith('key')) {
+                        input.dispatchEvent(new KeyboardEvent(evtName, { bubbles: true, cancelable: true, key: 'a' }));
+                    } else {
+                        input.dispatchEvent(new Event(evtName, { bubbles: true, cancelable: true }));
+                    }
+                } catch (e) {}
+            }
+
+            if (typeof input.oninput === 'function') try { input.oninput(); } catch (e) {}
+            if (typeof input.onchange === 'function') try { input.onchange(); } catch (e) {}
+            if (typeof input.onblur === 'function') try { input.onblur(); } catch (e) {}
+            return true;
+        }
+    `;
 
     // 1 y 2. Destinatario Externo: Nombre Destinatario y Email Destinatario del Aprendiz
     const nombreAprendiz = casoData.aprendiz_nombre || `${casoData.aprendiz_nombres || ''} ${casoData.aprendiz_apellidos || ''}`.trim() || 'APRENDIZ';
     const emailAprendiz = casoData.aprendiz_correo || casoData.raw_row?.['CORREO REGISTRADO EN SOFÍA'] || casoData.raw_row?.['CORREO REGISTRADO EN SOFIA'] || casoData.raw_row?.['CORREO'] || casoData.raw_row?.['EMAIL'] || 'correo@sena.edu.co';
-    
+
     logs.push(`[PASO 4] 1/8 Llenando "Nombre Destinatario": "${nombreAprendiz}"...`);
     logs.push(`[PASO 4] 2/8 Llenando "Email Destinatario": "${emailAprendiz}"...`);
 
-    const destFilled = await targetFrame.evaluate((nombre, email) => {
-        function setInputValue(input, val) {
-            if (!input || !val) return false;
-            input.focus();
-            input.value = val;
-            input.setAttribute('value', val);
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-            input.dispatchEvent(new Event('blur', { bubbles: true }));
-            input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
-            input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
-            return true;
-        }
+    let destFilled = false;
+    for (const frame of targetFrames) {
+        try {
+            const res = await frame.evaluate((nombre, email, helperStr) => {
+                eval(helperStr);
+                const allEls = Array.from(document.querySelectorAll('*'));
 
-        const allEls = Array.from(document.querySelectorAll('*'));
-        
-        // Header de Asunto para acotar búsqueda
-        const asuntoHeader = allEls.find(el => {
-            const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-            return txt === 'asunto' || txt.includes('descripción del asunto');
-        });
-
-        // ESTRATEGIA 1: Buscar por labels de "Nombre Destinatario" y "Email Destinatario"
-        const labels = Array.from(document.querySelectorAll('label, td, div, span, b, strong')).filter(el => {
-            if (!asuntoHeader) return true;
-            const pos = el.compareDocumentPosition(asuntoHeader);
-            return (pos & Node.DOCUMENT_POSITION_FOLLOWING);
-        });
-
-        const nameLabel = labels.find(el => {
-            const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-            return txt.includes('nombre destinatario') && !txt.includes('copia');
-        });
-
-        const emailLabel = labels.find(el => {
-            const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-            return txt.includes('email destinatario') && !txt.includes('copia');
-        });
-
-        let nameInp = null;
-        let emailInp = null;
-
-        if (nameLabel) {
-            const container = nameLabel.closest('td, tr, div, fieldset') || nameLabel.parentElement;
-            nameInp = container.querySelector('input[type="text"], input:not([type])') || 
-                      (nameLabel.nextElementSibling && nameLabel.nextElementSibling.querySelector('input')) ||
-                      (nameLabel.parentElement && nameLabel.parentElement.querySelector('input'));
-        }
-
-        if (emailLabel) {
-            const container = emailLabel.closest('td, tr, div, fieldset') || emailLabel.parentElement;
-            emailInp = container.querySelector('input[type="text"], input[type="email"], input:not([type])') ||
-                       (emailLabel.nextElementSibling && emailLabel.nextElementSibling.querySelector('input')) ||
-                       (emailLabel.parentElement && emailLabel.parentElement.querySelector('input'));
-        }
-
-        // ESTRATEGIA 2: Posicional entre "Destinatario Externo" header y "Asunto" header
-        if (!nameInp || !emailInp) {
-            const extHeader = allEls.find(el => {
-                const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-                return txt.includes('destinatario externo');
-            });
-
-            if (extHeader) {
-                const inputsBetween = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input:not([type])')).filter(inp => {
-                    const afterExt = (extHeader.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING);
-                    const beforeAsunto = asuntoHeader ? (inp.compareDocumentPosition(asuntoHeader) & Node.DOCUMENT_POSITION_FOLLOWING) : true;
-                    return afterExt && beforeAsunto;
+                const extHeader = allEls.find(el => {
+                    const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+                    return (txt === 'destinatario externo' || txt.includes('destinatario externo')) && !txt.includes('copia');
                 });
 
-                if (!nameInp && inputsBetween.length >= 1) nameInp = inputsBetween[0];
-                if (!emailInp && inputsBetween.length >= 2) emailInp = inputsBetween[1];
+                const asuntoHeader = allEls.find(el => {
+                    const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+                    return txt === 'asunto' || txt.includes('descripción del asunto');
+                });
+
+                let nameInp = null;
+                let emailInp = null;
+
+                // Búsqueda por labels explícitos
+                const labels = Array.from(document.querySelectorAll('label, td, div, span, b, strong'));
+                const nameLabel = labels.find(el => {
+                    const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+                    return txt.includes('nombre destinatario') && !txt.includes('copia');
+                });
+                if (nameLabel) {
+                    const parent = nameLabel.closest('tr, td, div, fieldset') || nameLabel.parentElement;
+                    nameInp = parent.querySelector('input[type="text"], input:not([type])') ||
+                              (nameLabel.nextElementSibling && nameLabel.nextElementSibling.querySelector('input')) ||
+                              (nameLabel.parentElement && nameLabel.parentElement.querySelector('input'));
+                }
+
+                const emailLabel = labels.find(el => {
+                    const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+                    return txt.includes('email destinatario') && !txt.includes('copia');
+                });
+                if (emailLabel) {
+                    const parent = emailLabel.closest('tr, td, div, fieldset') || emailLabel.parentElement;
+                    emailInp = parent.querySelector('input[type="text"], input[type="email"], input:not([type])') ||
+                               (emailLabel.nextElementSibling && emailLabel.nextElementSibling.querySelector('input')) ||
+                               (emailLabel.parentElement && emailLabel.parentElement.querySelector('input'));
+                }
+
+                // Búsqueda por posición entre "Destinatario Externo" y "Asunto"
+                if (extHeader && (!nameInp || !emailInp)) {
+                    const inputsBetween = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input:not([type])')).filter(inp => {
+                        const afterExt = (extHeader.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING);
+                        const beforeAsunto = asuntoHeader ? (inp.compareDocumentPosition(asuntoHeader) & Node.DOCUMENT_POSITION_FOLLOWING) : true;
+                        return afterExt && beforeAsunto;
+                    });
+
+                    if (!nameInp && inputsBetween.length >= 1) nameInp = inputsBetween[0];
+                    if (!emailInp && inputsBetween.length >= 2) emailInp = inputsBetween[1];
+                }
+
+                // Fallbacks directos por atributos
+                if (!nameInp) nameInp = document.querySelector('input[title*="Nombre Destinatario" i], input[name*="NombreDestinatario" i], input[id*="NombreDestinatario" i]');
+                if (!emailInp) emailInp = document.querySelector('input[title*="Email Destinatario" i], input[name*="EmailDestinatario" i], input[id*="EmailDestinatario" i]');
+
+                let r1 = false, r2 = false;
+                if (nameInp) r1 = fillInputElement(nameInp, nombre);
+                if (emailInp) r2 = fillInputElement(emailInp, email);
+                return r1 && r2;
+            }, nombreAprendiz, emailAprendiz, fillScript).catch(() => false);
+
+            if (res) {
+                destFilled = true;
+                break;
             }
-        }
-
-        // ESTRATEGIA 3: Buscar inputs por atributos de id / name / title
-        if (!nameInp) {
-            nameInp = document.querySelector('input[title*="Nombre Destinatario" i], input[name*="NombreDestinatario" i], input[id*="NombreDestinatario" i]');
-        }
-        if (!emailInp) {
-            emailInp = document.querySelector('input[title*="Email Destinatario" i], input[name*="EmailDestinatario" i], input[id*="EmailDestinatario" i]');
-        }
-
-        let r1 = false, r2 = false;
-        if (nameInp) r1 = setInputValue(nameInp, nombre);
-        if (emailInp) r2 = setInputValue(emailInp, email);
-
-        return r1 && r2;
-    }, nombreAprendiz, emailAprendiz).catch(() => false);
+        } catch (e) {}
+    }
 
     if (destFilled) {
-        logs.push(`[PASO 4] ✅ "Nombre Destinatario" y "Email Destinatario" completados exitosamente.`);
+        logs.push(`[PASO 4] ✅ "Nombre Destinatario" (${nombreAprendiz}) y "Email Destinatario" (${emailAprendiz}) completados.`);
     } else {
-        logs.push(`[PASO 4] ⚠️ Advertencia: No se pudo verificar la asignación de Destinatario Externo por selectores.`);
+        logs.push(`[PASO 4] ⚠️ Advertencia: No se pudo verificar la asignación de Destinatario Externo.`);
     }
     await wait(1000);
 
@@ -922,39 +938,41 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
     const asuntoVal = casoData.asunto || 'NOVEDADES DE ALUMNOS';
     logs.push(`[PASO 4] 3/8 Seleccionando "Asunto": "${asuntoVal}"...`);
 
-    await targetFrame.evaluate((asunto) => {
-        const selects = Array.from(document.querySelectorAll('select'));
-        const asuntoSelect = selects.find(sel => {
-            const attr = (sel.id || sel.name || sel.title || '').toLowerCase();
-            const parentTxt = (sel.parentElement?.innerText || sel.closest('td, div, tr')?.innerText || '').toLowerCase();
-            return attr.includes('asunto') || parentTxt.includes('asunto');
-        });
-
-        if (asuntoSelect) {
-            asuntoSelect.scrollIntoView({ block: 'center' });
-            const options = Array.from(asuntoSelect.options);
-            const matchOpt = options.find(o => (o.text || '').toLowerCase().includes(asunto.toLowerCase()) || (o.value || '').toLowerCase().includes(asunto.toLowerCase()));
-            if (matchOpt) {
-                asuntoSelect.value = matchOpt.value;
-            } else if (options.length > 1) {
-                asuntoSelect.selectedIndex = 1;
-            }
-            asuntoSelect.dispatchEvent(new Event('change', { bubbles: true }));
-        } else {
-            const inputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])'));
-            const asuntoInput = inputs.find(inp => {
-                const attr = (inp.id || inp.name || inp.placeholder || inp.title || '').toLowerCase();
-                const parentTxt = (inp.parentElement?.innerText || inp.closest('td, div, tr')?.innerText || '').toLowerCase();
-                return (attr.includes('asunto') && !attr.includes('desc')) || (parentTxt.includes('asunto') && !parentTxt.includes('descripción'));
+    for (const frame of targetFrames) {
+        await frame.evaluate((asunto) => {
+            const selects = Array.from(document.querySelectorAll('select'));
+            const asuntoSelect = selects.find(sel => {
+                const attr = (sel.id || sel.name || sel.title || '').toLowerCase();
+                const parentTxt = (sel.parentElement?.innerText || sel.closest('td, div, tr')?.innerText || '').toLowerCase();
+                return attr.includes('asunto') || parentTxt.includes('asunto');
             });
-            if (asuntoInput) {
-                asuntoInput.focus();
-                asuntoInput.value = asunto;
-                asuntoInput.dispatchEvent(new Event('input', { bubbles: true }));
-                asuntoInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+            if (asuntoSelect) {
+                asuntoSelect.scrollIntoView({ block: 'center' });
+                const options = Array.from(asuntoSelect.options);
+                const matchOpt = options.find(o => (o.text || '').toLowerCase().includes(asunto.toLowerCase()) || (o.value || '').toLowerCase().includes(asunto.toLowerCase()));
+                if (matchOpt) {
+                    asuntoSelect.value = matchOpt.value;
+                } else if (options.length > 1) {
+                    asuntoSelect.selectedIndex = 1;
+                }
+                asuntoSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            } else {
+                const inputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])'));
+                const asuntoInput = inputs.find(inp => {
+                    const attr = (inp.id || inp.name || inp.placeholder || inp.title || '').toLowerCase();
+                    const parentTxt = (inp.parentElement?.innerText || inp.closest('td, div, tr')?.innerText || '').toLowerCase();
+                    return (attr.includes('asunto') && !attr.includes('desc')) || (parentTxt.includes('asunto') && !parentTxt.includes('descripción'));
+                });
+                if (asuntoInput) {
+                    asuntoInput.focus();
+                    asuntoInput.value = asunto;
+                    asuntoInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    asuntoInput.dispatchEvent(new Event('change', { bubbles: true }));
+                }
             }
-        }
-    }, asuntoVal).catch(() => {});
+        }, asuntoVal).catch(() => {});
+    }
     logs.push(`[PASO 4] ✅ "Asunto" procesado: "${asuntoVal}".`);
     await wait(1000);
 
@@ -962,23 +980,22 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
     const descAsuntoVal = casoData.descripcion_asunto || 'Notificación';
     logs.push(`[PASO 4] 4/8 Llenando "Descripción del Asunto": "${descAsuntoVal}"...`);
 
-    await targetFrame.evaluate((desc) => {
-        const inputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type]), textarea'));
-        const descInput = inputs.find(inp => {
-            const attr = (inp.id || inp.name || inp.placeholder || inp.title || '').toLowerCase();
-            const parentTxt = (inp.parentElement?.innerText || inp.closest('td, div, tr')?.innerText || '').toLowerCase();
-            return attr.includes('descripcio') || attr.includes('descasunto') || parentTxt.includes('descripción del asunto') || parentTxt.includes('descripcion del asunto');
-        });
+    for (const frame of targetFrames) {
+        await frame.evaluate((desc, helperStr) => {
+            eval(helperStr);
+            const inputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type]), textarea'));
+            const descInput = inputs.find(inp => {
+                const attr = (inp.id || inp.name || inp.placeholder || inp.title || '').toLowerCase();
+                const parentTxt = (inp.parentElement?.innerText || inp.closest('td, div, tr')?.innerText || '').toLowerCase();
+                return attr.includes('descripcio') || attr.includes('descasunto') || parentTxt.includes('descripción del asunto') || parentTxt.includes('descripcion del asunto');
+            });
 
-        if (descInput) {
-            descInput.scrollIntoView({ block: 'center' });
-            descInput.focus();
-            descInput.value = desc;
-            descInput.dispatchEvent(new Event('input', { bubbles: true }));
-            descInput.dispatchEvent(new Event('change', { bubbles: true }));
-            descInput.dispatchEvent(new Event('blur', { bubbles: true }));
-        }
-    }, descAsuntoVal).catch(() => {});
+            if (descInput) {
+                descInput.scrollIntoView({ block: 'center' });
+                fillInputElement(descInput, desc);
+            }
+        }, descAsuntoVal, fillScript).catch(() => {});
+    }
     logs.push(`[PASO 4] ✅ "Descripción del Asunto" completada: "${descAsuntoVal}".`);
     await wait(1000);
 
@@ -986,25 +1003,27 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
     const textoCombinado = casoData.texto_combinado || casoData.texto_inicial || '';
     logs.push(`[PASO 4] 5/8 Llenando "Texto" (Carta Combinada)...`);
 
-    await targetFrame.evaluate((texto) => {
-        const textareas = Array.from(document.querySelectorAll('textarea, [contenteditable="true"], div[id*="txt"], div[id*="Texto"]'));
-        const mainTextarea = textareas.find(ta => {
-            const parentTxt = (ta.parentElement?.innerText || ta.closest('td, div, fieldset, tr')?.innerText || '').toLowerCase();
-            return parentTxt.includes('texto') || ta.tagName.toLowerCase() === 'textarea';
-        }) || textareas[0];
+    for (const frame of targetFrames) {
+        await frame.evaluate((texto) => {
+            const textareas = Array.from(document.querySelectorAll('textarea, [contenteditable="true"], div[id*="txt"], div[id*="Texto"]'));
+            const mainTextarea = textareas.find(ta => {
+                const parentTxt = (ta.parentElement?.innerText || ta.closest('td, div, fieldset, tr')?.innerText || '').toLowerCase();
+                return parentTxt.includes('texto') || ta.tagName.toLowerCase() === 'textarea';
+            }) || textareas[0];
 
-        if (mainTextarea) {
-            mainTextarea.scrollIntoView({ block: 'center' });
-            if (mainTextarea.tagName.toLowerCase() === 'textarea') {
-                mainTextarea.focus();
-                mainTextarea.value = texto;
-                mainTextarea.dispatchEvent(new Event('input', { bubbles: true }));
-                mainTextarea.dispatchEvent(new Event('change', { bubbles: true }));
-            } else {
-                mainTextarea.innerText = texto;
+            if (mainTextarea) {
+                mainTextarea.scrollIntoView({ block: 'center' });
+                if (mainTextarea.tagName.toLowerCase() === 'textarea') {
+                    mainTextarea.focus();
+                    mainTextarea.value = texto;
+                    mainTextarea.dispatchEvent(new Event('input', { bubbles: true }));
+                    mainTextarea.dispatchEvent(new Event('change', { bubbles: true }));
+                } else {
+                    mainTextarea.innerText = texto;
+                }
             }
-        }
-    }, textoCombinado).catch(() => {});
+        }, textoCombinado).catch(() => {});
+    }
     logs.push(`[PASO 4] ✅ "Texto" (Carta Combinada) insertado en el formulario.`);
     await wait(1500);
 
@@ -1020,60 +1039,73 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
     if (filesToAttach.length > 0) {
         for (let fIdx = 0; fIdx < filesToAttach.length; fIdx++) {
             const pdfFile = filesToAttach[fIdx];
-            logs.push(`[PASO 4] 6/8 Adjuntando archivo PDF (${fIdx + 1}/${filesToAttach.length}): "${path.basename(pdfFile)}"...`);
+            logs.push(`[PASO 4] 6/8 Adjuntando resolución/anexo PDF (${fIdx + 1}/${filesToAttach.length}): "${path.basename(pdfFile)}"...`);
 
-            try {
-                // ESTRATEGIA 1: ElementHandle click + waitForFileChooser
-                const attachBtnHandle = await targetFrame.evaluateHandle(() => {
+            let attachedSuccess = false;
+
+            for (const frame of targetFrames) {
+                // Seleccionar tipo de anexo en el dropdown si existe
+                await frame.evaluate(() => {
+                    const selects = Array.from(document.querySelectorAll('select'));
+                    const attSelect = selects.find(s => {
+                        const txt = (s.parentElement?.innerText || s.closest('tr, div, td')?.innerText || '').toLowerCase();
+                        const id = (s.id || s.name || '').toLowerCase();
+                        return txt.includes('anexo') || txt.includes('attachment') || id.includes('anexo') || id.includes('attachment');
+                    });
+                    if (attSelect && attSelect.options.length > 1) {
+                        if (attSelect.selectedIndex <= 0) attSelect.selectedIndex = 1;
+                        attSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }).catch(() => {});
+
+                // ESTRATEGIA 1: Click Puppeteer en botón "Adjuntar Anexo" + FileChooser
+                const attachBtnHandle = await frame.evaluateHandle(() => {
                     const btns = Array.from(document.querySelectorAll('input[type="button"], button, a, span, div[role="button"]'));
                     return btns.find(b => {
                         const txt = (b.value || b.innerText || b.textContent || '').trim().toLowerCase();
-                        return txt.includes('adjuntar anexo') || txt.includes('adjuntar');
+                        return txt === 'adjuntar anexo' || txt === 'adjuntar' || txt.includes('adjuntar');
                     }) || null;
                 }).catch(() => null);
 
-                let attachedSuccess = false;
-
                 if (attachBtnHandle && attachBtnHandle.asElement()) {
-                    const [fileChooser] = await Promise.all([
-                        page.waitForFileChooser({ timeout: 4000 }).catch(() => null),
-                        attachBtnHandle.asElement().click().catch(() => {})
-                    ]);
-
-                    if (fileChooser) {
-                        await fileChooser.accept([pdfFile]);
-                        attachedSuccess = true;
-                        logs.push(`[PASO 4] ✅ Archivo PDF (${path.basename(pdfFile)}) adjuntado exitosamente mediante selector de archivos.`);
-                    }
-                }
-
-                // ESTRATEGIA 2: Subir directamente a cualquier input[type="file"] en los marcos
-                if (!attachedSuccess) {
-                    const allPages = await browser.pages().catch(() => [page]);
-                    for (const pg of allPages) {
-                        for (const frame of pg.frames()) {
-                            try {
-                                const fileInputs = await frame.$$('input[type="file"]');
-                                if (fileInputs && fileInputs.length > 0) {
-                                    for (const fInput of fileInputs) {
-                                        await fInput.uploadFile(pdfFile);
-                                        attachedSuccess = true;
-                                        logs.push(`[PASO 4] ✅ Archivo PDF (${path.basename(pdfFile)}) cargado en input file del formulario.`);
-                                        break;
-                                    }
-                                }
-                            } catch (e) {}
-                            if (attachedSuccess) break;
+                    try {
+                        const fcPromise = page.waitForFileChooser({ timeout: 4000 }).catch(() => null);
+                        await attachBtnHandle.asElement().click().catch(() => {});
+                        const fileChooser = await fcPromise;
+                        if (fileChooser) {
+                            await fileChooser.accept([pdfFile]);
+                            attachedSuccess = true;
+                            logs.push(`[PASO 4] ✅ Archivo PDF (${path.basename(pdfFile)}) adjuntado mediante selector de archivos.`);
+                            break;
                         }
+                    } catch (e) {}
+                }
+            }
+
+            // ESTRATEGIA 2: Subir directamente a cualquier input[type="file"] en los marcos
+            if (!attachedSuccess) {
+                const allPages = await browser.pages().catch(() => [page]);
+                for (const pg of allPages) {
+                    for (const frame of pg.frames()) {
+                        try {
+                            const fileInputs = await frame.$$('input[type="file"]');
+                            if (fileInputs && fileInputs.length > 0) {
+                                for (const fInput of fileInputs) {
+                                    await fInput.uploadFile(pdfFile);
+                                    attachedSuccess = true;
+                                    logs.push(`[PASO 4] ✅ Archivo PDF (${path.basename(pdfFile)}) cargado en input file del formulario.`);
+                                    break;
+                                }
+                            }
+                        } catch (e) {}
                         if (attachedSuccess) break;
                     }
+                    if (attachedSuccess) break;
                 }
+            }
 
-                if (!attachedSuccess) {
-                    logs.push(`[PASO 4] ⚠️ Advertencia: No se pudo abrir el selector de archivos para "${path.basename(pdfFile)}".`);
-                }
-            } catch (attachErr) {
-                logs.push(`[WARN] Error adjuntando el archivo PDF "${path.basename(pdfFile)}": ${attachErr.message}`);
+            if (!attachedSuccess) {
+                logs.push(`[PASO 4] ⚠️ Advertencia: No se pudo verificar la adjunción de "${path.basename(pdfFile)}".`);
             }
             await wait(1000);
         }
@@ -1082,7 +1114,7 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
     }
     await wait(1500);
 
-    // 7. Copias Externas (Agregar correos en copia CC: Nombre Destinatario + Email Destinatario)
+    // 7. Copias Externas (ESPECÍFICAMENTE COPIAS EXTERNAS, IGNORANDO COPIAS INTERNAS)
     let copyEmailsList = [];
     if (casoData.copy_emails) {
         try {
@@ -1091,115 +1123,130 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
     }
 
     if (Array.isArray(copyEmailsList) && copyEmailsList.length > 0) {
-        logs.push(`[PASO 4] 7/8 Agregando ${copyEmailsList.length} correos en Copias Externas (CC)...`);
+        logs.push(`[PASO 4] 7/8 Agregando ${copyEmailsList.length} correos EXCLUSIVAMENTE en Copias Externas (CC)...`);
 
-        // A. Asegurar filas en la sección Copias Externas haciendo clic en 'Add'
-        await targetFrame.evaluate((count) => {
-            const allEls = Array.from(document.querySelectorAll('*'));
-            const ccHeader = allEls.find(el => {
-                const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-                return txt === 'copias externas' || txt === 'copia externa';
-            });
-            if (!ccHeader) return;
+        let addSuccess = false;
 
-            // Encontrar contenedor de Copias Externas
-            let container = ccHeader.parentElement;
-            while (container && container !== document.body) {
-                const text = (container.innerText || container.textContent || '').toLowerCase();
-                const hasAdd = Array.from(container.querySelectorAll('button, input[type="button"], a, span, div[role="button"]')).some(b => {
-                    const t = (b.innerText || b.value || '').trim().toLowerCase();
+        for (const frame of targetFrames) {
+            // A. Hacer clic en 'Add' dentro de la sección COPIAS EXTERNAS exclusivamente
+            const addRes = await frame.evaluate((count) => {
+                const allEls = Array.from(document.querySelectorAll('*'));
+                // Header EXACTO de Copias Externas (NO Copias Internas)
+                const ccHeader = allEls.find(el => {
+                    const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+                    return (txt === 'copias externas' || txt === 'copia externa' || txt.includes('copias externas')) && !txt.includes('interna');
+                });
+                if (!ccHeader) return { ok: false, reason: 'No ccHeader' };
+
+                // Buscar el botón Add en la misma fila / contenedor directo de Copias Externas
+                const headerRow = ccHeader.closest('tr, div, table, fieldset') || ccHeader.parentElement;
+                let addBtn = Array.from(headerRow.querySelectorAll('button, input[type="button"], a, span, div[role="button"]')).find(b => {
+                    const t = (b.innerText || b.value || b.textContent || '').trim().toLowerCase();
                     return t === 'add' || t === 'agregar' || t === '+';
                 });
-                if (hasAdd && (container.querySelectorAll('input').length >= 2 || container.children.length > 2)) {
-                    break;
+
+                if (!addBtn && ccHeader.parentElement) {
+                    addBtn = Array.from(ccHeader.parentElement.querySelectorAll('button, input[type="button"], a, span, div[role="button"]')).find(b => {
+                        const t = (b.innerText || b.value || b.textContent || '').trim().toLowerCase();
+                        return t === 'add' || t === 'agregar' || t === '+';
+                    });
                 }
-                container = container.parentElement;
-            }
-            if (!container) container = ccHeader.closest('form, table, div, fieldset') || document.body;
 
-            const getCCInputs = () => {
-                const inputs = Array.from(container.querySelectorAll('input[type="text"], input[type="email"], input:not([type])'));
-                return inputs.filter(inp => (ccHeader.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING));
-            };
+                if (!addBtn) {
+                    const allAddBtns = Array.from(document.querySelectorAll('button, input[type="button"], a, span, div[role="button"]')).filter(b => {
+                        const t = (b.innerText || b.value || b.textContent || '').trim().toLowerCase();
+                        return t === 'add' || t === 'agregar' || t === '+';
+                    });
+                    addBtn = allAddBtns.find(b => (ccHeader.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING));
+                }
 
-            const findAddBtn = () => {
-                const btns = Array.from(container.querySelectorAll('button, input[type="button"], a, span, div[role="button"]'));
-                return btns.find(b => {
-                    const txt = (b.innerText || b.value || b.textContent || '').trim().toLowerCase();
-                    return txt === 'add' || txt === 'agregar' || txt === '+';
+                if (!addBtn) return { ok: false, reason: 'No addBtn for Copias Externas' };
+
+                const nextHeader = allEls.find(el => {
+                    const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+                    return txt.includes('asociar a otras') || txt === 'enviar';
                 });
-            };
 
-            let inputs = getCCInputs();
-            let currentRows = Math.floor(inputs.length / 2);
-            const addBtn = findAddBtn();
+                const getCCInputs = () => {
+                    const inputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input:not([type])'));
+                    return inputs.filter(inp => {
+                        const afterCC = (ccHeader.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING);
+                        const beforeNext = nextHeader ? (inp.compareDocumentPosition(nextHeader) & Node.DOCUMENT_POSITION_FOLLOWING) : true;
+                        return afterCC && beforeNext;
+                    });
+                };
 
-            if (addBtn) {
+                let inputs = getCCInputs();
+                let currentRows = Math.floor(inputs.length / 2);
+
                 while (currentRows < count) {
                     addBtn.scrollIntoView({ block: 'center' });
                     addBtn.click();
                     currentRows++;
                 }
+
+                return { ok: true, count, currentRows };
+            }, copyEmailsList.length).catch(() => ({ ok: false }));
+
+            if (addRes && addRes.ok) {
+                addSuccess = true;
+                break;
             }
-        }, copyEmailsList.length).catch(() => {});
+        }
 
         await wait(1500);
 
-        // B. Diligenciar Nombre Destinatario y Email Destinatario en cada fila de Copias Externas
-        const ccFilled = await targetFrame.evaluate((ccList) => {
-            function setInputValue(input, val) {
-                if (!input || !val) return false;
-                input.focus();
-                input.value = val;
-                input.setAttribute('value', val);
-                input.dispatchEvent(new Event('input', { bubbles: true }));
-                input.dispatchEvent(new Event('change', { bubbles: true }));
-                input.dispatchEvent(new Event('blur', { bubbles: true }));
-                input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
-                input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
-                return true;
+        // B. Diligenciar Nombre Destinatario y Email Destinatario en cada fila de COPIAS EXTERNAS
+        let ccFilledCount = 0;
+        for (const frame of targetFrames) {
+            const filled = await frame.evaluate((ccList, helperStr) => {
+                eval(helperStr);
+                const allEls = Array.from(document.querySelectorAll('*'));
+                const ccHeader = allEls.find(el => {
+                    const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+                    return (txt === 'copias externas' || txt === 'copia externa' || txt.includes('copias externas')) && !txt.includes('interna');
+                });
+                if (!ccHeader) return 0;
+
+                const nextHeader = allEls.find(el => {
+                    const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+                    return txt.includes('asociar a otras') || txt === 'enviar';
+                });
+
+                const ccInputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input:not([type])')).filter(inp => {
+                    const afterCC = (ccHeader.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING);
+                    const beforeNext = nextHeader ? (inp.compareDocumentPosition(nextHeader) & Node.DOCUMENT_POSITION_FOLLOWING) : true;
+                    return afterCC && beforeNext;
+                });
+
+                let count = 0;
+                for (let i = 0; i < ccList.length; i++) {
+                    const nameIdx = i * 2;
+                    const emailIdx = i * 2 + 1;
+                    const ccItem = ccList[i];
+                    const nameVal = ccItem.name || (ccItem.email ? ccItem.email.split('@')[0] : 'Destinatario CC');
+                    const emailVal = ccItem.email || '';
+
+                    if (ccInputs[nameIdx]) {
+                        fillInputElement(ccInputs[nameIdx], nameVal);
+                    }
+                    if (ccInputs[emailIdx]) {
+                        fillInputElement(ccInputs[emailIdx], emailVal);
+                    }
+                    if (ccInputs[nameIdx] || ccInputs[emailIdx]) {
+                        count++;
+                    }
+                }
+                return count;
+            }, copyEmailsList, fillScript).catch(() => 0);
+
+            if (filled > 0) {
+                ccFilledCount = filled;
+                break;
             }
+        }
 
-            const allEls = Array.from(document.querySelectorAll('*'));
-            const ccHeader = allEls.find(el => {
-                const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-                return txt === 'copias externas' || txt === 'copia externa';
-            });
-            if (!ccHeader) return 0;
-
-            const nextHeader = allEls.find(el => {
-                const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-                return txt.includes('asociar a otras') || txt === 'enviar';
-            });
-
-            const allInputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input:not([type])')).filter(inp => {
-                const afterCC = (ccHeader.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING);
-                const beforeNext = nextHeader ? (inp.compareDocumentPosition(nextHeader) & Node.DOCUMENT_POSITION_FOLLOWING) : true;
-                return afterCC && beforeNext;
-            });
-
-            let filledCount = 0;
-            for (let i = 0; i < ccList.length; i++) {
-                const nameIdx = i * 2;
-                const emailIdx = i * 2 + 1;
-                const ccItem = ccList[i];
-                const nameVal = ccItem.name || (ccItem.email ? ccItem.email.split('@')[0] : 'Destinatario CC');
-                const emailVal = ccItem.email || '';
-
-                if (allInputs[nameIdx]) {
-                    setInputValue(allInputs[nameIdx], nameVal);
-                }
-                if (allInputs[emailIdx]) {
-                    setInputValue(allInputs[emailIdx], emailVal);
-                }
-                if (allInputs[nameIdx] || allInputs[emailIdx]) {
-                    filledCount++;
-                }
-            }
-            return filledCount;
-        }, copyEmailsList).catch(() => 0);
-
-        logs.push(`[PASO 4] ✅ ${ccFilled} / ${copyEmailsList.length} Copias Externas (CC) registradas con Nombre Destinatario y Email Destinatario.`);
+        logs.push(`[PASO 4] ✅ ${ccFilledCount} / ${copyEmailsList.length} Copias Externas (CC) registradas con Nombre Destinatario y Email Destinatario.`);
     } else {
         logs.push(`[PASO 4] 7/8 Sin correos registrados en Copias Externas (CC).`);
     }
@@ -1209,20 +1256,25 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
         logs.push(`[PASO 4] 8/8 Clic en botón "Enviar" para radicar la Comunicación Electrónica...`);
         await wait(1500);
 
-        const sent = await targetFrame.evaluate(() => {
-            const btns = Array.from(document.querySelectorAll('input[type="button"], input[type="submit"], button, a, div[role="button"]'));
-            const sendBtn = btns.find(b => {
-                const txt = (b.value || b.innerText || b.textContent || '').trim().toLowerCase();
-                return txt === 'enviar' || txt === 'enviar comunicación' || txt.includes('enviar');
-            });
+        let sent = false;
+        for (const frame of targetFrames) {
+            sent = await frame.evaluate(() => {
+                const btns = Array.from(document.querySelectorAll('input[type="button"], input[type="submit"], button, a, div[role="button"]'));
+                const sendBtn = btns.find(b => {
+                    const txt = (b.value || b.innerText || b.textContent || '').trim().toLowerCase();
+                    return txt === 'enviar' || txt === 'enviar comunicación' || txt.includes('enviar');
+                });
 
-            if (sendBtn) {
-                sendBtn.scrollIntoView({ block: 'center' });
-                sendBtn.click();
-                return true;
-            }
-            return false;
-        }).catch(() => false);
+                if (sendBtn) {
+                    sendBtn.scrollIntoView({ block: 'center' });
+                    sendBtn.click();
+                    return true;
+                }
+                return false;
+            }).catch(() => false);
+
+            if (sent) break;
+        }
 
         if (sent) {
             logs.push(`[PASO 4] ✅ Clic en el botón "Enviar" completado exitosamente.`);
