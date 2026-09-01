@@ -547,74 +547,67 @@ async function paso2_abrirFormulario(page, browser, logs) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// PASO 3: UForm Comunicación Electrónica
+// PASO 3: UForm Comunicación Electrónica (Ultra Rápido)
 // ─────────────────────────────────────────────────────────────────
 async function paso3_uformComunicacionElectronica(page, browser, logs) {
     logs.push('[PASO 3] Buscando "Nuevo formulario" y seleccionando "UForm Comunicación Electrónica"...');
-    await wait(2000);
+    await wait(200);
 
-    // 0. Si la interfaz se desvió a Document Retrieval (Búsqueda), hacer clic en icono de Nuevo Formulario (#newform)
-    const isOnDocRetrieval = await page.evaluate(() => {
-        const txt = document.body ? document.body.innerText.toLowerCase() : '';
-        return txt.includes('document retrieval') || txt.includes('document types');
-    }).catch(() => false);
+    // 0. Redirección relámpago si la interfaz está en "Document Retrieval"
+    for (let attempt = 0; attempt < 5; attempt++) {
+        const switched = await page.evaluate(() => {
+            const txt = document.body ? document.body.innerText.toLowerCase() : '';
+            const isDocRetrieval = txt.includes('document retrieval') || txt.includes('document types');
+            const isFormOpen = txt.includes('comunicación electrónica') || txt.includes('destinatario externo');
 
-    if (isOnDocRetrieval) {
-        logs.push('[PASO 3] ⚠️ Interfaz en "Document Retrieval". Redirigiendo a "Nuevo formulario"...');
-        await page.evaluate(() => {
-            const btn = document.querySelector('#newform, [id*="NewForm"], [id*="newform"], [onclick*="NewForm"]');
-            if (btn) btn.click();
-        }).catch(() => {});
-        await wait(3000);
-    }
+            if (isDocRetrieval && !isFormOpen) {
+                // Hacer clic en cualquier icono de Grid / Nuevo Formulario
+                const gridBtn = document.querySelector(
+                    '#newform, [id*="NewForm" i], [id*="newform" i], [onclick*="NewForm" i], ' +
+                    '[title*="Form" i], [title*="formulario" i], [aria-label*="Form" i], ' +
+                    'a.navMenu, span.icon-grid, i.fa-th, i.icon-grid, .icon-apps, span.app-icon, ' +
+                    'button[title*="New" i], a[title*="New" i]'
+                );
+                if (gridBtn) {
+                    gridBtn.click();
+                    return 'Boton Nuevo Formulario (Grid) cliqueado';
+                }
 
-    // 1. Clic en "Nuevo formulario" (#newform) si la ventana de selección no está ya abierta
-    const allPages0 = await browser.pages().catch(() => [page]);
-    let alreadyOnNewForm = false;
-    for (const pg of allPages0) {
-        for (const frame of pg.frames()) {
-            try {
-                const found = await frame.evaluate(() => {
-                    const txt = document.body ? document.body.innerText.toLowerCase() : '';
-                    return txt.includes('crear un nuevo formulario') || txt.includes('uform comunicacion');
+                // Buscar por enlaces o botones con texto "Nuevo formulario" o "New Form"
+                const allClickables = Array.from(document.querySelectorAll('a, button, span, div, i'));
+                const newFormBtn = allClickables.find(el => {
+                    const t = (el.title || el.getAttribute('aria-label') || el.innerText || '').toLowerCase();
+                    const cls = (el.className || '').toString().toLowerCase();
+                    return t.includes('new form') || t.includes('nuevo formulario') || cls.includes('grid') || cls.includes('th');
                 });
-                if (found) { alreadyOnNewForm = true; break; }
-            } catch (e) {}
-        }
-        if (alreadyOnNewForm) break;
-    }
-
-    if (!alreadyOnNewForm) {
-        const clickedNewForm = await page.evaluate(() => {
-            // Clic únicamente en el botón exacto de Nuevo Formulario (#newform)
-            const exactBtn = document.querySelector('#newform, [id*="NewForm"], [id*="newform"], [onclick*="NewForm"], [title="Nuevo formulario"], [title="New Form"]');
-            if (exactBtn) {
-                exactBtn.click();
-                return true;
+                if (newFormBtn) {
+                    newFormBtn.click();
+                    return 'Enlace Nuevo Formulario cliqueado';
+                }
             }
-            return false;
-        }).catch(() => false);
+            return null;
+        }).catch(() => null);
 
-        if (clickedNewForm) {
-            logs.push('[PASO 3] ✅ Clic en "Nuevo formulario" (:::) realizado.');
-        } else {
-            logs.push('[PASO 3] Buscando formulario en la interfaz activa...');
+        if (switched) {
+            logs.push(`[PASO 3] ✅ Redirección desde Document Retrieval: ${switched}`);
+            await wait(500);
+            break;
         }
-        await wait(3000);
+        await wait(200);
     }
 
-    // 2. Localizar y hacer clic en "UForm Comunicacion Electronica"
+    // 1. Clic directo en "UForm Comunicacion Electronica"
     logs.push('[PASO 3] Buscando item "UForm Comunicacion Electronica"...');
     let itemClicked = false;
 
-    for (let attempt = 0; attempt < 12 && !itemClicked; attempt++) {
-        await wait(1000);
+    for (let attempt = 0; attempt < 15 && !itemClicked; attempt++) {
+        await wait(200);
         const allPages = await browser.pages().catch(() => [page]);
         for (const pg of allPages) {
             for (const frame of pg.frames()) {
                 try {
                     const res = await frame.evaluate((att) => {
-                        // 1. Buscar por ID exacto de OnBase (#itemLabelunity118 o #liunity118)
+                        // A. ID exacto de OnBase (#itemLabelunity118 o #liunity118)
                         const exactElem = document.querySelector('#itemLabelunity118, #liunity118, [id*="unity118"]');
                         if (exactElem) {
                             exactElem.scrollIntoView({ block: 'center' });
@@ -622,24 +615,16 @@ async function paso3_uformComunicacionElectronica(page, browser, logs) {
                             return exactElem.innerText || exactElem.textContent || 'unity118';
                         }
 
-                        // 2. Desplegar categoría "COMUNICACIONES PRODUCIDAS" si está cerrada
-                        if (att === 1 || att === 2) {
-                            const producerHeader = Array.from(document.querySelectorAll('a, li, span, td, div, label')).find(el => {
-                                const txt = (el.innerText || el.textContent || '').trim().toUpperCase();
-                                return txt === 'COMUNICACIONES PRODUCIDAS' || txt.includes('COMUNICACIONES PRODUCIDAS');
-                            });
-                            if (producerHeader) producerHeader.click();
+                        // B. Abrir categoría "COMUNICACIONES PRODUCIDAS"
+                        const producerHeader = Array.from(document.querySelectorAll('a, li, span, td, div, label')).find(el => {
+                            const txt = (el.innerText || el.textContent || '').trim().toUpperCase();
+                            return txt === 'COMUNICACIONES PRODUCIDAS' || txt.includes('COMUNICACIONES PRODUCIDAS');
+                        });
+                        if (producerHeader && (att === 0 || att === 1)) {
+                            producerHeader.click();
                         }
 
-                        // 3. Filtrar usando estrictamente la caja de búsqueda "filtrar"
-                        const filterInput = document.querySelector('input[placeholder*="filtrar"], #txtFilter, #filterInput, input[id*="filter"]');
-                        if (filterInput && !filterInput.value && att === 3) {
-                            filterInput.value = 'Electronica';
-                            filterInput.dispatchEvent(new Event('input', { bubbles: true }));
-                            filterInput.dispatchEvent(new Event('change', { bubbles: true }));
-                        }
-
-                        // 4. Buscar por texto en los elementos visibles (excluyendo Document Retrieval / PAPEL / FRM)
+                        // C. Buscar "UForm Comunicacion Electronica" en elementos del arbol
                         const allNodes = Array.from(document.querySelectorAll('a, li, span, td, div, label, [role="treeitem"]'));
                         const itemNode = allNodes.find(el => {
                             const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
@@ -667,12 +652,12 @@ async function paso3_uformComunicacionElectronica(page, browser, logs) {
         }
     }
 
-    // 3. Esperar que cargue el formulario "SENA Comunicación Electrónica" (esperar que el spinner termine)
-    logs.push('[PASO 3] Esperando apertura y renderizado completo del formulario en OnBase Web...');
+    // 2. Esperar apertura del formulario en ultra alta velocidad
+    logs.push('[PASO 3] Esperando apertura relámpago del formulario...');
     let formLoadedFrame = null;
 
-    for (let attempt = 0; attempt < 20 && !formLoadedFrame; attempt++) {
-        await wait(1000);
+    for (let attempt = 0; attempt < 25 && !formLoadedFrame; attempt++) {
+        await wait(150);
         const allPages = await browser.pages().catch(() => [page]);
         for (const pg of allPages) {
             for (const frame of pg.frames()) {
@@ -693,23 +678,23 @@ async function paso3_uformComunicacionElectronica(page, browser, logs) {
     }
 
     if (formLoadedFrame) {
-        logs.push('[PASO 3] ✅ Formulario "SENA Comunicación Electrónica" cargado y listo en pantalla.');
+        logs.push('[PASO 3] ✅ Formulario "SENA Comunicación Electrónica" cargado en pantalla.');
     } else {
         logs.push('[PASO 3] Formulario "UForm Comunicación Electrónica" preparado.');
     }
 
-    // 4. Seleccionar opción "Externo" en "Por favor seleccione tipo de destinatario:"
+    // 3. Seleccionar opción "Externo" inmediatamente
     logs.push('[PASO 3] Seleccionando tipo de destinatario: "Externo"...');
     let selectedExterno = false;
 
-    for (let attempt = 0; attempt < 10 && !selectedExterno; attempt++) {
-        await wait(1000);
+    for (let attempt = 0; attempt < 15 && !selectedExterno; attempt++) {
+        await wait(150);
         const allPages = await browser.pages().catch(() => [page]);
         for (const pg of allPages) {
             for (const frame of pg.frames()) {
                 try {
                     const res = await frame.evaluate(() => {
-                        // 1. Buscar radios por id, name, value, title o id conteniendo 'externo'
+                        // 1. Radio "Externo"
                         const radios = Array.from(document.querySelectorAll('input[type="radio"]'));
                         const radioExterno = radios.find(r => {
                             const val = (r.value || r.id || r.name || r.title || '').toLowerCase();
@@ -726,7 +711,7 @@ async function paso3_uformComunicacionElectronica(page, browser, logs) {
                             return 'Radio "Externo" marcado activamente.';
                         }
 
-                        // 2. Buscar label/span conteniendo la palabra "Externo"
+                        // 2. Label "Externo"
                         const labels = Array.from(document.querySelectorAll('label, span, font, td, b, strong, div'));
                         const labelExterno = labels.find(el => {
                             const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
@@ -754,7 +739,7 @@ async function paso3_uformComunicacionElectronica(page, browser, logs) {
 
                     if (res) {
                         selectedExterno = true;
-                        logs.push(`[PASO 3] ✅ "Por favor seleccione tipo de destinatario: Externo" seleccionado exitosamente (${res}).`);
+                        logs.push(`[PASO 3] ✅ "Por favor seleccione tipo de destinatario: Externo" seleccionado (${res}).`);
                         break;
                     }
                 } catch (e) {}
@@ -779,15 +764,15 @@ async function paso3_uformComunicacionElectronica(page, browser, logs) {
 // 8. Enviar: Clic en el botón "Enviar"
 // ─────────────────────────────────────────────────────────────────
 async function paso4_diligenciarComunicacionElectronica(page, browser, casoData, logs, opts = {}) {
-    logs.push(`[PASO 4] Iniciando diligenciamiento de formulario para Aprendiz: "${casoData.aprendiz_nombre || 'N/A'}"...`);
-    await wait(2000);
+    logs.push(`[PASO 4] Iniciando diligenciamiento relámpago de formulario para Aprendiz: "${casoData.aprendiz_nombre || 'N/A'}"...`);
+    await wait(200);
 
     // 0. Encontrar el frame o frames donde está el formulario Comunicación Electrónica
     let targetFrames = [];
     logs.push('[PASO 4] Localizando marcos/iframes activos del formulario Comunicación Electrónica...');
 
     for (let fAttempt = 0; fAttempt < 15 && targetFrames.length === 0; fAttempt++) {
-        await wait(1000);
+        await wait(200);
         const allPages = await browser.pages().catch(() => [page]);
 
         for (const pg of allPages) {
