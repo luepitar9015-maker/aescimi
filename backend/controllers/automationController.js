@@ -812,8 +812,6 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
         logs.push(`[PASO 4] ✅ Localizados ${targetFrames.length} marco(s) activo(s) para el formulario.`);
     }
 
-    const targetFrame = targetFrames[0];
-
     // Helper universal para llenar inputs activando getters/setters nativos y todos los eventos
     const fillScript = `
         function fillInputElement(input, val) {
@@ -835,6 +833,7 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
                     if (evtName.startsWith('key')) {
                         input.dispatchEvent(new KeyboardEvent(evtName, { bubbles: true, cancelable: true, key: 'a' }));
                     } else {
+                        input.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
                         input.dispatchEvent(new Event(evtName, { bubbles: true, cancelable: true }));
                     }
                 } catch (e) {}
@@ -848,8 +847,25 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
     `;
 
     // 1 y 2. Destinatario Externo: Nombre Destinatario y Email Destinatario del Aprendiz
-    const nombreAprendiz = casoData.aprendiz_nombre || `${casoData.aprendiz_nombres || ''} ${casoData.aprendiz_apellidos || ''}`.trim() || 'APRENDIZ';
-    const emailAprendiz = casoData.aprendiz_correo || casoData.raw_row?.['CORREO REGISTRADO EN SOFÍA'] || casoData.raw_row?.['CORREO REGISTRADO EN SOFIA'] || casoData.raw_row?.['CORREO'] || casoData.raw_row?.['EMAIL'] || 'correo@sena.edu.co';
+    const nombreAprendiz = (
+        casoData.aprendiz_nombre || 
+        `${casoData.aprendiz_nombres || ''} ${casoData.aprendiz_apellidos || ''}`.trim() ||
+        casoData.raw_row?.['NOMBRE'] ||
+        casoData.raw_row?.['NOMBRES'] ||
+        casoData.raw_row?.['APRENDIZ'] ||
+        'APRENDIZ'
+    ).trim();
+
+    const emailAprendiz = (
+        casoData.aprendiz_correo || 
+        casoData.raw_row?.['CORREO REGISTRADO EN SOFÍA'] || 
+        casoData.raw_row?.['CORREO REGISTRADO EN SOFIA'] || 
+        casoData.raw_row?.['CORREO'] || 
+        casoData.raw_row?.['EMAIL'] || 
+        casoData.raw_row?.['MAIL'] ||
+        casoData.raw_row?.['CORREO_ELECTRONICO'] ||
+        'correo@sena.edu.co'
+    ).trim();
 
     logs.push(`[PASO 4] 1/8 Llenando "Nombre Destinatario": "${nombreAprendiz}"...`);
     logs.push(`[PASO 4] 2/8 Llenando "Email Destinatario": "${emailAprendiz}"...`);
@@ -857,73 +873,104 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
     let destFilled = false;
     for (const frame of targetFrames) {
         try {
+            // ESTRATEGIA A: Inyección DOM con nodos hoja (leaf) y compareDocumentPosition
             const res = await frame.evaluate((nombre, email, helperStr) => {
                 eval(helperStr);
-                const allEls = Array.from(document.querySelectorAll('*'));
+                const allInputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input:not([type])'));
+                if (allInputs.length === 0) return false;
 
-                const extHeader = allEls.find(el => {
-                    const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-                    return (txt === 'destinatario externo' || txt.includes('destinatario externo')) && !txt.includes('copia');
+                const leafEls = Array.from(document.querySelectorAll('label, span, td, div, b, strong')).filter(el => el.children.length === 0);
+
+                const nameLeaf = leafEls.find(el => {
+                    const txt = (el.textContent || '').trim().toLowerCase();
+                    return txt.includes('nombre destinatario') && !txt.includes('copia');
                 });
 
-                const asuntoHeader = allEls.find(el => {
-                    const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-                    return txt === 'asunto' || txt.includes('descripción del asunto');
+                const emailLeaf = leafEls.find(el => {
+                    const txt = (el.textContent || '').trim().toLowerCase();
+                    return txt.includes('email destinatario') && !txt.includes('copia');
                 });
 
                 let nameInp = null;
                 let emailInp = null;
 
-                // Búsqueda por labels explícitos
-                const labels = Array.from(document.querySelectorAll('label, td, div, span, b, strong'));
-                const nameLabel = labels.find(el => {
-                    const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-                    return txt.includes('nombre destinatario') && !txt.includes('copia');
-                });
-                if (nameLabel) {
-                    const parent = nameLabel.closest('tr, td, div, fieldset') || nameLabel.parentElement;
-                    nameInp = parent.querySelector('input[type="text"], input:not([type])') ||
-                              (nameLabel.nextElementSibling && nameLabel.nextElementSibling.querySelector('input')) ||
-                              (nameLabel.parentElement && nameLabel.parentElement.querySelector('input'));
+                if (nameLeaf) {
+                    nameInp = allInputs.find(inp => (nameLeaf.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING));
+                }
+                if (emailLeaf) {
+                    emailInp = allInputs.find(inp => (emailLeaf.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING));
                 }
 
-                const emailLabel = labels.find(el => {
-                    const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-                    return txt.includes('email destinatario') && !txt.includes('copia');
-                });
-                if (emailLabel) {
-                    const parent = emailLabel.closest('tr, td, div, fieldset') || emailLabel.parentElement;
-                    emailInp = parent.querySelector('input[type="text"], input[type="email"], input:not([type])') ||
-                               (emailLabel.nextElementSibling && emailLabel.nextElementSibling.querySelector('input')) ||
-                               (emailLabel.parentElement && emailLabel.parentElement.querySelector('input'));
-                }
-
-                // Búsqueda por posición entre "Destinatario Externo" y "Asunto"
-                if (extHeader && (!nameInp || !emailInp)) {
-                    const inputsBetween = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input:not([type])')).filter(inp => {
-                        const afterExt = (extHeader.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING);
-                        const beforeAsunto = asuntoHeader ? (inp.compareDocumentPosition(asuntoHeader) & Node.DOCUMENT_POSITION_FOLLOWING) : true;
-                        return afterExt && beforeAsunto;
+                // Fallback posicional entre Destinatario Externo y Asunto
+                if (!nameInp || !emailInp) {
+                    const allEls = Array.from(document.querySelectorAll('*'));
+                    const extHeader = allEls.find(el => {
+                        const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+                        return (txt === 'destinatario externo' || txt.includes('destinatario externo')) && !txt.includes('copia');
+                    });
+                    const asuntoHeader = allEls.find(el => {
+                        const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+                        return txt === 'asunto' || txt.includes('descripción del asunto');
                     });
 
-                    if (!nameInp && inputsBetween.length >= 1) nameInp = inputsBetween[0];
-                    if (!emailInp && inputsBetween.length >= 2) emailInp = inputsBetween[1];
-                }
+                    if (extHeader) {
+                        const inputsBetween = allInputs.filter(inp => {
+                            const afterExt = (extHeader.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING);
+                            const beforeAsunto = asuntoHeader ? (inp.compareDocumentPosition(asuntoHeader) & Node.DOCUMENT_POSITION_FOLLOWING) : true;
+                            return afterExt && beforeAsunto;
+                        });
 
-                // Fallbacks directos por atributos
-                if (!nameInp) nameInp = document.querySelector('input[title*="Nombre Destinatario" i], input[name*="NombreDestinatario" i], input[id*="NombreDestinatario" i]');
-                if (!emailInp) emailInp = document.querySelector('input[title*="Email Destinatario" i], input[name*="EmailDestinatario" i], input[id*="EmailDestinatario" i]');
+                        if (!nameInp && inputsBetween.length >= 1) nameInp = inputsBetween[0];
+                        if (!emailInp && inputsBetween.length >= 2) emailInp = inputsBetween[1];
+                    }
+                }
 
                 let r1 = false, r2 = false;
                 if (nameInp) r1 = fillInputElement(nameInp, nombre);
                 if (emailInp) r2 = fillInputElement(emailInp, email);
-                return r1 && r2;
+
+                return r1 || r2;
             }, nombreAprendiz, emailAprendiz, fillScript).catch(() => false);
 
-            if (res) {
-                destFilled = true;
-                break;
+            if (res) destFilled = true;
+
+            // ESTRATEGIA B: Tipeo nativo con Puppeteer Keyboard sobre los ElementHandles
+            const handles = await frame.evaluateHandle(() => {
+                const allInputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input:not([type])'));
+                const leafEls = Array.from(document.querySelectorAll('label, span, td, div, b, strong')).filter(el => el.children.length === 0);
+
+                const nameLeaf = leafEls.find(el => {
+                    const txt = (el.textContent || '').trim().toLowerCase();
+                    return txt.includes('nombre destinatario') && !txt.includes('copia');
+                });
+                const emailLeaf = leafEls.find(el => {
+                    const txt = (el.textContent || '').trim().toLowerCase();
+                    return txt.includes('email destinatario') && !txt.includes('copia');
+                });
+
+                const nameInp = nameLeaf ? allInputs.find(inp => (nameLeaf.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING)) : null;
+                const emailInp = emailLeaf ? allInputs.find(inp => (emailLeaf.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING)) : null;
+
+                return { nameInp, emailInp };
+            }).catch(() => null);
+
+            if (handles) {
+                const nameH = await handles.getProperty('nameInp').catch(() => null);
+                const emailH = await handles.getProperty('emailInp').catch(() => null);
+
+                if (nameH && nameH.asElement()) {
+                    await nameH.asElement().click().catch(() => {});
+                    await nameH.asElement().type(nombreAprendiz).catch(() => {});
+                    destFilled = true;
+                }
+                if (emailH && emailH.asElement()) {
+                    await emailH.asElement().click().catch(() => {});
+                    await emailH.asElement().type(emailAprendiz).catch(() => {});
+                    destFilled = true;
+                }
             }
+
+            if (destFilled) break;
         } catch (e) {}
     }
 
