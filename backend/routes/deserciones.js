@@ -486,7 +486,7 @@ router.get('/casos', requireAuth, async (req, res) => {
 
 // 6. Cargar casos seleccionados hacia OnBase Web
 router.post('/cargue-onbase', requireAuth, async (req, res) => {
-    const { caso_ids } = req.body;
+    const { caso_ids, solo_diligenciar } = req.body;
     if (!caso_ids || !Array.isArray(caso_ids) || caso_ids.length === 0) {
         return res.status(400).json({ error: 'Debe seleccionar al menos un caso para realizar el cargue a OnBase.' });
     }
@@ -501,11 +501,27 @@ router.post('/cargue-onbase', requireAuth, async (req, res) => {
 
         const casosToLoad = queryRes.rows;
 
-        // Actualizamos estado a 'Cargado' y fecha de actualización
-        await pool.query(
-            `UPDATE deserciones_casos SET status = 'Cargado', updated_at = CURRENT_TIMESTAMP WHERE id IN (${idsPlaceholder})`,
-            caso_ids
-        );
+        // Disparar la automatización directamente para procesar los caso_ids seleccionados
+        const automationController = require('../controllers/automationController');
+        
+        // Simular req/res para lanzar executeAutomation
+        const fakeReq = {
+            body: {
+                action: 'deserciones_onbase_cargue',
+                caso_ids: caso_ids,
+                solo_diligenciar: !!solo_diligenciar
+            },
+            setTimeout: () => {}
+        };
+        const fakeRes = {
+            setTimeout: () => {},
+            json: () => {},
+            status: () => ({ json: () => {} })
+        };
+
+        automationController.executeAutomation(fakeReq, fakeRes).catch(err => {
+            console.error('[DESERCIONES] Error en ejecución de automatización:', err);
+        });
 
         res.json({
             message: `Proceso de cargue iniciado exitosamente a OnBase Web para ${casosToLoad.length} comunicaciones.`,

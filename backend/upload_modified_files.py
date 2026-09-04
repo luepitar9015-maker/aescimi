@@ -13,21 +13,6 @@ def deploy_files():
     # Lista de archivos locales y sus destinos remotos correspondientes
     local_backend_dir = os.path.dirname(os.path.abspath(__file__))
     remote_backend_dir = "/home/cimi/aescimi/backend"
-    
-    files_to_copy = [
-        ("server.js", "server.js"),
-        ("routes/auth.js", "routes/auth.js"),
-        ("routes/audit.js", "routes/audit.js"),
-        ("middleware/auditMiddleware.js", "middleware/auditMiddleware.js"),
-        ("setup_db.js", "setup_db.js"),
-        ("reset_sequences.js", "reset_sequences.js"),
-        ("quitar_tilde.js", "quitar_tilde.js"),
-        ("sync_storage_to_db.js", "sync_storage_to_db.js"),
-        ("routes/ades.js", "routes/ades.js"),
-        ("routes/deserciones.js", "routes/deserciones.js"),
-        ("controllers/automationController.js", "controllers/automationController.js")
-    ]
-    
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     
@@ -39,30 +24,47 @@ def deploy_files():
         return
 
     sftp = ssh.open_sftp()
-    
-    # Asegurar que existan directorios remotos (ej: middleware/ o routes/)
-    remote_dirs = ["middleware", "routes"]
-    for d in remote_dirs:
+
+    # Copiar carpetas enteras de backend: routes, middleware, controllers y archivos JS raíz
+    subdirs_to_copy = ["routes", "middleware", "controllers"]
+    for d in subdirs_to_copy:
         try:
             sftp.mkdir(f"{remote_backend_dir}/{d}")
-            print(f"Directorio remoto creado: {remote_backend_dir}/{d}")
         except IOError:
-            # Ya existe
             pass
-            
-    # Copiar archivos
-    for local_rel, remote_rel in files_to_copy:
-        local_path = os.path.join(local_backend_dir, local_rel.replace('/', os.sep))
-        remote_path = f"{remote_backend_dir}/{remote_rel}"
-        
-        if os.path.exists(local_path):
+
+    def put_dir_flat(sftp_client, source, target):
+        if not os.path.exists(source):
+            return
+        for item in os.listdir(source):
+            s_path = os.path.join(source, item)
+            t_path = f"{target}/{item}"
+            if os.path.isdir(s_path):
+                try:
+                    sftp_client.mkdir(t_path)
+                except IOError:
+                    pass
+                put_dir_flat(sftp_client, s_path, t_path)
+            elif item.endswith('.js') or item.endswith('.json'):
+                try:
+                    sftp_client.put(s_path, t_path)
+                    print(f"Copiado: {s_path} -> {t_path}")
+                except Exception as e:
+                    print(f"Error copiando {s_path}: {e}")
+
+    for d in subdirs_to_copy:
+        put_dir_flat(sftp, os.path.join(local_backend_dir, d), f"{remote_backend_dir}/{d}")
+
+    # Copiar archivos .js raíz del backend (server.js, database_pg.js, etc.)
+    for item in os.listdir(local_backend_dir):
+        s_path = os.path.join(local_backend_dir, item)
+        if os.path.isfile(s_path) and (item.endswith('.js') or item == 'package.json'):
+            t_path = f"{remote_backend_dir}/{item}"
             try:
-                sftp.put(local_path, remote_path)
-                print(f"Copiado: {local_rel} -> {remote_rel}")
+                sftp.put(s_path, t_path)
+                print(f"Copiado raíz: {item} -> {t_path}")
             except Exception as e:
-                print(f"Error copiando {local_rel}: {e}")
-        else:
-            print(f"Archivo local no encontrado: {local_path}")
+                print(f"Error copiando {item}: {e}")
             
     sftp.close()
 

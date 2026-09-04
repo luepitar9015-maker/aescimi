@@ -752,6 +752,29 @@ async function paso3_uformComunicacionElectronica(page, browser, logs) {
 }
 
 
+// Helper para resolver rutas locales de anexos PDF sin importar si vienen de Linux o Windows
+function resolverRutaLocalPDF(ruta) {
+    if (!ruta || typeof ruta !== 'string') return null;
+    if (fs.existsSync(ruta)) return ruta;
+    
+    const filename = path.basename(ruta);
+    if (!filename) return null;
+
+    const candidates = [
+        path.join(__dirname, '..', 'uploads', 'deserciones', filename),
+        path.join(__dirname, '..', 'uploads', 'deserciones_pdf', filename),
+        path.join(__dirname, '..', 'uploads', filename),
+        path.join(process.cwd(), 'uploads', 'deserciones', filename),
+        path.join(process.cwd(), 'uploads', 'deserciones_pdf', filename),
+        path.join(process.cwd(), 'uploads', filename)
+    ];
+
+    for (const cand of candidates) {
+        if (fs.existsSync(cand)) return cand;
+    }
+    return null;
+}
+
 // ─────────────────────────────────────────────────────────────────
 // PASO 4 (DESERCIONES): Diligenciamiento de Formulario "Comunicación Electrónica" en OnBase Web
 // 1. Nombre Destinatario: Aprendiz (Nombres y Apellidos)
@@ -796,6 +819,8 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
                 const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
                 const hasSearch = txt.includes(searchText.toLowerCase());
                 const hasExclude = excludeText ? txt.includes(excludeText.toLowerCase()) : false;
+                const isTipoHeader = txt.includes('tipo de destinatario') || txt.includes('seleccione tipo');
+                if (searchText.toLowerCase().includes('nombre') && isTipoHeader) return false;
                 return hasSearch && !hasExclude;
             });
             if (candidates.length === 0) return null;
@@ -863,6 +888,49 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
         }
     `;
 
+    // 0. Enforzar selección de "Externo" al inicio del Paso 4
+    logs.push('[PASO 4] Garantizando selección de tipo de destinatario: "Externo"...');
+    for (const frame of targetFrames) {
+        try {
+            await frame.evaluate(() => {
+                // A. Buscar radio buttons
+                const radios = Array.from(document.querySelectorAll('input[type="radio"], input[type="checkbox"]'));
+                const rExterno = radios.find(r => {
+                    const txt = (r.value || r.id || r.name || r.title || r.parentElement?.innerText || r.closest('td, tr, div, label')?.innerText || '').toLowerCase();
+                    return (txt.includes('externo') || txt.includes('destinatario externo')) && !txt.includes('copia');
+                });
+                if (rExterno) {
+                    rExterno.scrollIntoView({ block: 'center' });
+                    rExterno.click();
+                    rExterno.checked = true;
+                    rExterno.dispatchEvent(new Event('change', { bubbles: true }));
+                    rExterno.dispatchEvent(new Event('click', { bubbles: true }));
+                }
+
+                // B. Buscar labels o spans "Externo" / "Destinatario Externo"
+                const labels = Array.from(document.querySelectorAll('label, span, font, td, b, strong, div'));
+                const lExterno = labels.find(el => {
+                    const t = (el.innerText || el.textContent || '').trim().toLowerCase();
+                    return (t === 'externo' || t === 'externo:' || t === 'destinatario externo' || t.startsWith('destinatario externo')) && !t.includes('copia');
+                });
+                if (lExterno) {
+                    lExterno.scrollIntoView({ block: 'center' });
+                    lExterno.click();
+                    const parent = lExterno.closest('td, tr, div, p, fieldset') || lExterno.parentElement;
+                    if (parent) {
+                        const inp = parent.querySelector('input[type="radio"]');
+                        if (inp) {
+                            inp.click();
+                            inp.checked = true;
+                            inp.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    }
+                }
+            }).catch(() => {});
+        } catch (e) {}
+    }
+    await wait(400);
+
     // 1 y 2. Destinatario Externo (Nombre y Email del Aprendiz)
     const nombreAprendiz = (
         casoData.aprendiz_nombre || 
@@ -894,11 +962,35 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
             const rDOM = await frame.evaluate((nombre, email, helperStr) => {
                 eval(helperStr);
 
-                const nameLabel = getDeepestLabel('nombre destinatario', 'copia');
-                const nameInp = getAssociatedInput(nameLabel);
+                // Buscar inputs específicos del Destinatario Externo (evitando la sección de Copias)
+                function findMainDestInput(labelText) {
+                    const allInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="button"]):not([type="submit"])'));
 
-                const emailLabel = getDeepestLabel('email destinatario', 'copia');
-                const emailInp = getAssociatedInput(emailLabel);
+                    const allLabels = Array.from(document.querySelectorAll('label, td, th, span, div, b, strong')).filter(el => {
+                        const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+                        const isCopiaSection = txt.includes('copia') || txt.includes('copias');
+                        const isTipoHeader = txt.includes('tipo de destinatario') || txt.includes('seleccione tipo');
+                        return txt.includes(labelText.toLowerCase()) && !isCopiaSection && !isTipoHeader;
+                    });
+                    
+                    if (allLabels.length > 0) {
+                        allLabels.sort((a, b) => ((a.innerText || a.textContent || '').trim().length - (b.innerText || b.textContent || '').trim().length));
+                        const bestLabel = allLabels[0];
+                        const foundInp = getAssociatedInput(bestLabel);
+                        if (foundInp) return foundInp;
+                    }
+
+                    // Fallback directo posicional si la etiqueta no responde:
+                    // 1er input de texto = Nombre Destinatario
+                    // 2do input de texto = Email Destinatario
+                    if (labelText.includes('nombre') && allInputs.length >= 1) return allInputs[0];
+                    if (labelText.includes('email') && allInputs.length >= 2) return allInputs[1];
+
+                    return null;
+                }
+
+                const nameInp = findMainDestInput('nombre destinatario');
+                const emailInp = findMainDestInput('email destinatario');
 
                 let r1 = false, r2 = false;
                 if (nameInp) r1 = setNativeValue(nameInp, nombre);
@@ -912,11 +1004,32 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
             // B. Tipeo directo con Puppeteer Keyboard sobre los Handles
             const handles = await frame.evaluateHandle((helperStr) => {
                 eval(helperStr);
-                const nameLabel = getDeepestLabel('nombre destinatario', 'copia');
-                const nameInp = getAssociatedInput(nameLabel);
 
-                const emailLabel = getDeepestLabel('email destinatario', 'copia');
-                const emailInp = getAssociatedInput(emailLabel);
+                function findMainDestInput(labelText) {
+                    const allInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="button"]):not([type="submit"])'));
+
+                    const allLabels = Array.from(document.querySelectorAll('label, td, th, span, div, b, strong')).filter(el => {
+                        const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+                        const isCopiaSection = txt.includes('copia') || txt.includes('copias');
+                        const isTipoHeader = txt.includes('tipo de destinatario') || txt.includes('seleccione tipo');
+                        return txt.includes(labelText.toLowerCase()) && !isCopiaSection && !isTipoHeader;
+                    });
+                    
+                    if (allLabels.length > 0) {
+                        allLabels.sort((a, b) => ((a.innerText || a.textContent || '').trim().length - (b.innerText || b.textContent || '').trim().length));
+                        const bestLabel = allLabels[0];
+                        const foundInp = getAssociatedInput(bestLabel);
+                        if (foundInp) return foundInp;
+                    }
+
+                    if (labelText.includes('nombre') && allInputs.length >= 1) return allInputs[0];
+                    if (labelText.includes('email') && allInputs.length >= 2) return allInputs[1];
+
+                    return null;
+                }
+
+                const nameInp = findMainDestInput('nombre destinatario');
+                const emailInp = findMainDestInput('email destinatario');
 
                 return { nameInp, emailInp };
             }, locatorScript).catch(() => null);
@@ -960,7 +1073,9 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
                 eval(helperStr);
                 const asuntoLabel = getDeepestLabel('asunto', 'descripción');
                 const asuntoInp = getAssociatedInput(asuntoLabel);
-                if (asuntoInp) setNativeValue(asuntoInp, asunto);
+                if (asuntoInp) {
+                    setNativeValue(asuntoInp, asunto);
+                }
             }, asuntoVal, locatorScript).catch(() => {});
 
             const handleAsunto = await frame.evaluateHandle((helperStr) => {
@@ -1027,11 +1142,13 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
 
     // 6. Adjuntar Anexo (Resolución / Documento PDF)
     const filesToAttach = [];
-    if (casoData.anexo_path && fs.existsSync(casoData.anexo_path)) {
-        filesToAttach.push(casoData.anexo_path);
+    const localAnexo = resolverRutaLocalPDF(casoData.anexo_path);
+    if (localAnexo) {
+        filesToAttach.push(localAnexo);
     }
-    if (casoData.comunicacion_pdf_path && fs.existsSync(casoData.comunicacion_pdf_path) && casoData.comunicacion_pdf_path !== casoData.anexo_path) {
-        filesToAttach.push(casoData.comunicacion_pdf_path);
+    const localPdfCom = resolverRutaLocalPDF(casoData.comunicacion_pdf_path);
+    if (localPdfCom && !filesToAttach.includes(localPdfCom)) {
+        filesToAttach.push(localPdfCom);
     }
 
     if (filesToAttach.length > 0) {
