@@ -545,6 +545,205 @@ router.get('/reports/no-code-documents', async (req, res) => {
     }
 });
 
+// ──────────────────────────────────────────────────────────────────────────────
+// MONITOREO DE SERVIDOR Y SISTEMA (SOLO SUPERADMIN)
+// ──────────────────────────────────────────────────────────────────────────────
+const os = require('os');
+const { exec } = require('child_process');
+
+const execPromise = (cmd) => new Promise((resolve) => {
+    exec(cmd, { timeout: 6000 }, (error, stdout, stderr) => {
+        resolve({ error, stdout: stdout || '', stderr: stderr || '' });
+    });
+});
+
+// GET /api/superuser/server-status
+router.get('/server-status', async (req, res) => {
+    try {
+        // 1. Métricas de Sistema Operativo
+        const cpus = os.cpus();
+        const cpuCount = cpus.length;
+        const cpuModel = cpus[0]?.model || 'N/A';
+        const loadAvg = os.loadavg(); // [1m, 5m, 15m]
+        const totalMem = os.totalmem();
+        const freeMem = os.freemem();
+        const usedMem = totalMem - freeMem;
+        const uptimeSeconds = os.uptime();
+        const hostname = os.hostname();
+        const platform = os.platform();
+        const release = os.release();
+
+        // 2. Espacio en Disco (df -h en Linux o wmic en Windows)
+        let diskInfo = [];
+        if (platform === 'linux') {
+            const { stdout: dfOut } = await execPromise("df -h --output=source,size,used,avail,pcent,target -x tmpfs -x devtmpfs -x squashfs 2>/dev/null || df -h");
+            const lines = dfOut.trim().split('\n');
+            if (lines.length > 1) {
+                diskInfo = lines.slice(1).map(l => {
+                    const parts = l.trim().split(/\s+/);
+                    return {
+                        filesystem: parts[0] || '',
+                        size: parts[1] || '',
+                        used: parts[2] || '',
+                        avail: parts[3] || '',
+                        usePercent: parts[4] || '',
+                        mount: parts[5] || parts[parts.length - 1] || ''
+                    };
+                }).filter(d => d.size);
+            }
+        }
+
+        // 3. Procesos PM2
+        let pm2Processes = [];
+        try {
+            const { stdout: pm2Out } = await execPromise('pm2 jlist 2>/dev/null');
+            if (pm2Out && pm2Out.trim().startsWith('[')) {
+                const list = JSON.parse(pm2Out.trim());
+                pm2Processes = list.map(p => ({
+                    id: p.pm_id,
+                    name: p.name,
+                    status: p.pm2_env?.status || 'unknown',
+                    cpu: p.monit?.cpu || 0,
+                    memory: p.monit?.memory ? (p.monit.memory / (1024 * 1024)).toFixed(1) + ' MB' : '0 MB',
+                    uptime: p.pm2_env?.pm_uptime ? Math.floor((Date.now() - p.pm2_env.pm_uptime) / 1000) : 0,
+                    restarts: p.pm2_env?.restart_time || 0
+                }));
+            }
+        } catch { }
+
+        // 4. Diagnóstico de Servicios Esenciales
+        const services = [];
+
+        // Base de Datos PostgreSQL
+        let dbOk = false;
+        let dbVersion = 'N/A';
+        let dbConnections = 0;
+        let dbSize = 'N/A';
+        try {
+            const dbCheck = await pool.query(`
+                SELECT version(), 
+                       (SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()) as active_conns,
+                       pg_size_pretty(pg_database_size(current_database())) as dbsize
+            `);
+            if (dbCheck.rows.length > 0) {
+                dbOk = true;
+                dbVersion = dbCheck.rows[0].version?.split(' ')?.[1] || 'PostgreSQL';
+                dbConnections = parseInt(dbCheck.rows[0].active_conns, 10);
+                dbSize = dbCheck.rows[0].dbsize;
+            }
+        } catch (dbErr) {
+            console.error('[SERVER STATUS] DB check error:', dbErr.message);
+        }
+        services.push({
+            name: 'PostgreSQL Database',
+            status: dbOk ? 'healthy' : 'down',
+            details: dbOk ? `Activa (${dbConnections} conexiones, tamaño: ${dbSize})` : 'Sin conexión'
+        });
+
+        // Nginx / Reverse Proxy
+        if (platform === 'linux') {
+            const { stdout: nginxCheck } = await execPromise('systemctl is-active nginx 2>/dev/null || systemctl is-active openresty 2>/dev/null');
+            const isNginxActive = nginxCheck.trim() === 'active';
+            services.push({
+                name: 'Nginx / OpenResty Web Server',
+                status: isNginxActive ? 'healthy' : 'down',
+                details: isNginxActive ? 'Servicio HTTP/HTTPS activo' : 'Inactivo o no accesible'
+            });
+        }
+
+        // 5. Estadísticas Generales del Sistema Documental
+        let totalExpedientes = 0;
+        let totalDocumentos = 0;
+        let docsCargados = 0;
+        let docsPendientes = 0;
+        let totalUsuarios = 0;
+        try {
+            const expCount = await pool.query('SELECT COUNT(*) FROM expedientes');
+            totalExpedientes = parseInt(expCount.rows[0]?.count || 0, 10);
+
+            const docCount = await pool.query(`
+                SELECT 
+                    COUNT(*) as total,
+                    COUNT(CASE WHEN status = 'Cargado' THEN 1 END) as cargados,
+                    COUNT(CASE WHEN status != 'Cargado' OR status IS NULL THEN 1 END) as pendientes
+                FROM documents
+            `);
+            totalDocumentos = parseInt(docCount.rows[0]?.total || 0, 10);
+            docsCargados = parseInt(docCount.rows[0]?.cargados || 0, 10);
+            docsPendientes = parseInt(docCount.rows[0]?.pendientes || 0, 10);
+
+            const userCount = await pool.query('SELECT COUNT(*) FROM users');
+            totalUsuarios = parseInt(userCount.rows[0]?.count || 0, 10);
+        } catch { }
+
+        res.json({
+            success: true,
+            timestamp: new Date().toISOString(),
+            os: {
+                hostname,
+                platform,
+                release,
+                cpuCount,
+                cpuModel,
+                loadAvg,
+                totalMemMB: Math.round(totalMem / (1024 * 1024)),
+                usedMemMB: Math.round(usedMem / (1024 * 1024)),
+                freeMemMB: Math.round(freeMem / (1024 * 1024)),
+                memPercent: Math.round((usedMem / totalMem) * 100),
+                uptimeSeconds
+            },
+            disks: diskInfo,
+            pm2: pm2Processes,
+            services,
+            stats: {
+                totalExpedientes,
+                totalDocumentos,
+                docsCargados,
+                docsPendientes,
+                totalUsuarios
+            }
+        });
+
+    } catch (err) {
+        console.error('[SUPERUSER] Error obteniendo server-status:', err);
+        res.status(500).json({ error: 'Error al consultar estado del servidor: ' + err.message });
+    }
+});
+
+// POST /api/superuser/server-action
+// Ejecuta acciones de mantenimiento controladas (reiniciar proceso backend, liberar memoria, etc.)
+router.post('/server-action', async (req, res) => {
+    const { action, target } = req.body;
+    console.log(`[SUPERUSER] Acción de servidor solicitada por ${req.user?.id}: ${action} (target: ${target})`);
+
+    try {
+        if (action === 'restart_process') {
+            const procName = target === 'sena-presentacion' ? 'sena-presentacion' : 'sena-backend';
+            // Responder antes del restart si es el mismo proceso
+            res.json({ success: true, message: `Reinicio de ${procName} ejecutado.` });
+            setTimeout(() => {
+                exec(`pm2 restart ${procName}`);
+            }, 500);
+            return;
+        }
+
+        if (action === 'flush_pm2_logs') {
+            await execPromise('pm2 flush');
+            return res.json({ success: true, message: 'Logs de PM2 vaciados correctamente.' });
+        }
+
+        if (action === 'vacuum_db') {
+            await pool.query('VACUUM ANALYZE;');
+            return res.json({ success: true, message: 'Optimización de Base de Datos (VACUUM ANALYZE) ejecutada con éxito.' });
+        }
+
+        return res.status(400).json({ error: 'Acción no reconocida.' });
+    } catch (err) {
+        console.error('[SUPERUSER] Error ejecutando acción de servidor:', err);
+        res.status(500).json({ error: 'Fallo al ejecutar acción: ' + err.message });
+    }
+});
+
 module.exports = router;
 
 
