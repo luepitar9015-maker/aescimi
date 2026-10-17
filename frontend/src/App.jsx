@@ -1,7 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { LogOut, FileText, User, Settings as SettingsIcon, FolderKanban, Database, Play, Network, Folder, Cloud, Globe, Shield, FileSpreadsheet, Upload, BarChart2 } from 'lucide-react';
+import { LogOut, FileText, User, Settings as SettingsIcon, FolderKanban, Database, Play, Network, Folder, Cloud, Globe, Shield, FileSpreadsheet, Upload, BarChart2, Server } from 'lucide-react';
 import AIChatBot from './components/AIChatBot'; // IA Assistant
 import './App.css';
 
@@ -520,6 +520,9 @@ function Layout({ children }) {
           {currentUser.role === 'superadmin' && (
             <div style={{ marginTop: '20px' }}>
               <div style={{ fontSize: '11px', color: '#f472b6', padding: '0 12px', fontWeight: 'bold' }}>SUPERUSUARIO</div>
+              <Link to="/superuser" className="nav-item" style={{ color: '#db2777', fontWeight: '600' }}>
+                <Server size={18} /> Monitoreo Servidor
+              </Link>
               <Link to="/deserciones" className="nav-item" style={{ color: '#db2777' }}>
                 <FileSpreadsheet size={18} /> Módulo Deserciones
               </Link>

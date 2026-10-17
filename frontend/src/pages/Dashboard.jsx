@@ -6,12 +6,13 @@ import {
     Network, FolderKanban, Folder, Globe, Play,
     Upload, FileSpreadsheet, Database, Cloud,
     Settings, Shield, User, ChevronRight,
-    Lock, Zap, FolderOpen, FolderX, Files
+    Lock, Zap, FolderOpen, FolderX, Files, Server
 } from 'lucide-react';
 
 // ── Catálogo completo de módulos ──────────────────────────────────────────────
 const MODULOS = [
     { id: 'dashboard',                label: 'Dashboard',              desc: 'Panel principal del sistema',                          ruta: '/dashboard',                icon: LayoutDashboard,  color: 'from-purple-500 to-indigo-600',  border: 'border-purple-200', text: 'text-purple-700' },
+    { id: 'superuser',                label: 'Monitoreo Servidor',     desc: 'Estado del servidor en vivo, CPU, RAM y procesos PM2', ruta: '/superuser',                icon: Server,           color: 'from-pink-500 to-rose-600',      border: 'border-pink-200',   text: 'text-pink-700' },
     { id: 'trd',                      label: 'Estructura y TRD',       desc: 'Gestión de series, subseries y estructura documental',  ruta: '/creation',                 icon: Network,          color: 'from-blue-500 to-cyan-600',      border: 'border-blue-200',   text: 'text-blue-700' },
     { id: 'expedientes',              label: 'Crear Expedientes',      desc: 'Creación y gestión de expedientes',                    ruta: '/expedientes',              icon: FolderKanban,     color: 'from-orange-500 to-amber-600',   border: 'border-orange-200', text: 'text-orange-700' },
     { id: 'documents',                label: 'Gestión Documental',     desc: 'Subir y gestionar documentos en carpetas',             ruta: '/documents',                icon: Folder,           color: 'from-teal-500 to-green-600',     border: 'border-teal-200',   text: 'text-teal-700' },
