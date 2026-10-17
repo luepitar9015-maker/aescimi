@@ -1809,8 +1809,46 @@ async function paso4_llenarCampos(formPage, formFrame, docInfo, logs) {
             await comboInput.focus();
             await wait(200);
 
-            logs.push(`[PASO 4] Escribiendo en ${fieldName}: "${valueToType.substring(0,40)}"`);
-            for (const char of valueToType) {
+            // Si es Tipo Documental o campo con dropdown, aplicar mecanografía inteligente y búsqueda semántica
+            let searchKey = valueToType;
+            let typingText = valueToType;
+
+            if (fieldName.toLowerCase().includes('tipo documental')) {
+                // Si la tipología tiene un alias guardado previamente en BD, usarlo directamente
+                let savedAlias = null;
+                try {
+                    const aliasRes = await pool.query(
+                        'SELECT onbase_name FROM trd_typologies WHERE (typology_name ILIKE $1 OR onbase_name ILIKE $1) AND onbase_name IS NOT NULL LIMIT 1',
+                        [valueToType.trim()]
+                    );
+                    if (aliasRes && aliasRes.rows && aliasRes.rows[0]?.onbase_name) {
+                        savedAlias = aliasRes.rows[0].onbase_name;
+                        logs.push(`[PASO 4] 💡 Equivalencia previa encontrada en BD para "${valueToType.substring(0,35)}..." ➔ "${savedAlias}"`);
+                    }
+                } catch (dbErr) { }
+
+                if (savedAlias) {
+                    typingText = savedAlias;
+                    searchKey = savedAlias;
+                } else {
+                    // Extraer palabras clave principales (sin preposiciones) para filtrar el dropdown sin bloquearlo
+                    const stopWords = new Set(['DE', 'DEL', 'LA', 'EL', 'LOS', 'LAS', 'EN', 'Y', 'O', 'A', 'AL', 'PARA', 'POR', 'CON', 'SIN', 'SOBRE']);
+                    const tokens = valueToType
+                        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                        .toUpperCase()
+                        .split(/[^A-Z0-9]+/)
+                        .filter(w => w.length > 1 && !stopWords.has(w));
+                    
+                    if (tokens.length > 0) {
+                        // Tipear la primera o primeras dos palabras clave para abrir opciones
+                        typingText = tokens.slice(0, Math.min(2, tokens.length)).join(' ');
+                        logs.push(`[PASO 4] 🔍 Filtrando dropdown OnBase con palabras clave: "${typingText}" (TRD completa: "${valueToType.substring(0,40)}...")`);
+                    }
+                }
+            }
+
+            logs.push(`[PASO 4] Escribiendo en ${fieldName}: "${typingText.substring(0,40)}"`);
+            for (const char of typingText) {
                 await formPage.keyboard.type(char, { delay: 0 });
                 await wait(20); // ms por letra para simular mecanografía rápida
             }
@@ -1847,37 +1885,94 @@ async function paso4_llenarCampos(formPage, formFrame, docInfo, logs) {
                                     if (box) { offX = box.x; offY = box.y; }
                                 }
 
-                                const suggestion = await frame.evaluate((sels, sc) => {
+                                const suggestion = await frame.evaluate((sels, originalText, typedVal) => {
+                                    const cleanText = (t) => (t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+                                    const targetClean = cleanText(originalText);
+                                    const typedClean = cleanText(typedVal);
+                                    const targetWords = targetClean.split(' ').filter(w => w.length > 2);
+
+                                    // Generar acrónimo/siglas del texto original (ej. "CERTIFICADO DE DISPONIBILIDAD PRESUPUESTAL" -> "CDP")
+                                    const acronym = targetClean.split(' ').filter(w => !['DE','DEL','LA','EL','EN','Y','PARA','POR','CON'].includes(w)).map(w => w[0]).join('');
+
                                     for (const sel of sels) {
                                         const items = Array.from(document.querySelectorAll(sel)).filter(el => {
                                             const r = el.getBoundingClientRect();
                                             return r.width > 0 && r.height > 0;
                                         });
+
                                         if (items.length > 0) {
-                                            const cleanText = (t) => (t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-                                            const searchText = cleanText(sc);
-                                            // 1. Intentar coincidencia exacta tras limpiar acentos y espacios
-                                            let exact = items.find(i => cleanText(i.innerText || i.textContent) === searchText);
-                                            // 2. Reintento con includes tras limpiar si no hay coincidencia exacta
-                                            if (!exact) {
-                                                exact = items.find(i => cleanText(i.innerText || i.textContent).includes(searchText));
+                                            let bestItem = null;
+                                            let bestScore = -1;
+
+                                            for (const item of items) {
+                                                const itemText = cleanText(item.innerText || item.textContent);
+                                                if (!itemText) continue;
+
+                                                let score = 0;
+                                                // 1. Coincidencia exacta
+                                                if (itemText === targetClean || itemText === typedClean) {
+                                                    score = 1000;
+                                                }
+                                                // 2. Coincidencia por acrónimo / sigla exacta (ej. "CDP", "RP", "RUT")
+                                                else if (acronym.length >= 2 && (itemText === acronym || itemText.startsWith(acronym + ' '))) {
+                                                    score = 800;
+                                                }
+                                                // 3. Contención bidireccional
+                                                else if (targetClean.includes(itemText)) {
+                                                    // La opción de OnBase está contenida completa en la TRD (muy común)
+                                                    score = 500 + itemText.length;
+                                                } else if (itemText.includes(targetClean)) {
+                                                    score = 400 + targetClean.length;
+                                                } else if (itemText.includes(typedClean) || typedClean.includes(itemText)) {
+                                                    score = 300;
+                                                } else {
+                                                    // 4. Conteo de palabras clave coincidentes
+                                                    const itemWords = itemText.split(' ').filter(w => w.length > 2);
+                                                    let commonWords = 0;
+                                                    for (const tw of targetWords) {
+                                                        if (itemWords.includes(tw)) commonWords++;
+                                                    }
+                                                    if (commonWords > 0) {
+                                                        score = 100 + (commonWords * 20);
+                                                    }
+                                                }
+
+                                                if (score > bestScore) {
+                                                    bestScore = score;
+                                                    bestItem = item;
+                                                }
                                             }
-                                            const target = exact || items[0];
+
+                                            const target = bestItem || items[0];
                                             const r = target.getBoundingClientRect();
                                             return {
                                                 lx: r.left + r.width / 2,
                                                 ly: r.top + r.height / 2,
-                                                text: (target.innerText || target.textContent || '').trim().substring(0, 80)
+                                                text: (target.innerText || target.textContent || '').trim().substring(0, 80),
+                                                score: bestScore
                                             };
                                         }
                                     }
                                     return null;
-                                }, DROPDOWN_SELS, valueToType);
+                                }, DROPDOWN_SELS, valueToType, typingText);
 
                                 if (suggestion) {
-                                    logs.push(`[PASO 4] ✅ Dropdown detectado para ${fieldName} → "${suggestion.text}"`);
+                                    logs.push(`[PASO 4] ✅ Dropdown detectado para ${fieldName} → "${suggestion.text}" (Score: ${suggestion.score})`);
                                     await pg.mouse.click(offX + suggestion.lx, offY + suggestion.ly);
                                     await wait(1500); // Tiempo para autorrelleno
+
+                                    // Si es Tipo Documental, auto-aprender y guardar la equivalencia en la BD
+                                    if (fieldName.toLowerCase().includes('tipo documental') && suggestion.text) {
+                                        try {
+                                            const recognized = suggestion.text.trim().toUpperCase();
+                                            await pool.query(
+                                                'UPDATE trd_typologies SET onbase_name = $1 WHERE (typology_name ILIKE $2 OR id = $3) AND (onbase_name IS NULL OR onbase_name = \'\')',
+                                                [recognized, `%${valueToType.trim()}%`, docInfo?.typology_id || 0]
+                                            );
+                                            logs.push(`[PASO 4] 💾 Equivalencia guardada en BD: "${valueToType.substring(0,35)}..." ➔ "${recognized}"`);
+                                        } catch (dbSaveErr) { }
+                                    }
+
                                     dropdownHandled = true;
                                     break;
                                 }

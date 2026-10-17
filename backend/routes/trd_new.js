@@ -443,7 +443,7 @@ router.get('/typologies-for-expediente', (req, res) => {
         const endsWithDot = `%.${subserie}`;
 
         db.all(`
-            SELECT t.id, t.typology_name as name, t.series_id, t.subseries_id
+            SELECT t.id, t.typology_name as name, t.onbase_name, t.series_id, t.subseries_id
             FROM trd_typologies t
             LEFT JOIN trd_subseries sub ON t.subseries_id = sub.id
             LEFT JOIN trd_series sr ON (sub.series_id = sr.id OR t.series_id = sr.id)
@@ -457,7 +457,7 @@ router.get('/typologies-for-expediente', (req, res) => {
         const exact = series;
         const like = `%${series}%`;
         db.all(`
-            SELECT t.id, t.typology_name as name, t.series_id, t.subseries_id
+            SELECT t.id, t.typology_name as name, t.onbase_name, t.series_id, t.subseries_id
             FROM trd_typologies t
             LEFT JOIN trd_series sr ON t.series_id = sr.id
             WHERE sr.series_code = ? OR sr.series_name ILIKE ?
@@ -474,7 +474,7 @@ router.get('/typologies-for-expediente', (req, res) => {
 // GET all typologies (fallback for unmatched expedientes)
 router.get('/all-typologies', (req, res) => {
     db.all(`
-        SELECT t.id, t.typology_name as name, t.series_id, t.subseries_id,
+        SELECT t.id, t.typology_name as name, t.onbase_name, t.series_id, t.subseries_id,
                sr.series_code, sr.series_name, sub.subseries_code, sub.subseries_name
         FROM trd_typologies t
         LEFT JOIN trd_series sr ON (t.series_id = sr.id)
@@ -682,13 +682,15 @@ router.delete('/subseries/:id', (req, res) => {
 
 // PUT Edit Typology
 router.put('/typology/:id', (req, res) => {
-    const { name } = req.body;
-    db.run("UPDATE trd_typologies SET typology_name = ? WHERE id = ?",
-        [name, req.params.id],
+    const { name, onbase_name } = req.body;
+    db.run(
+        "UPDATE trd_typologies SET typology_name = COALESCE(?, typology_name), onbase_name = COALESCE(?, onbase_name) WHERE id = ?",
+        [name !== undefined ? name : null, onbase_name !== undefined ? onbase_name : null, req.params.id],
         function (err) {
             if (err) return res.status(500).json({ error: err.message });
             res.json({ message: 'Tipología actualizada' });
-        });
+        }
+    );
 });
 
 // POST Update Hierarchy for Series or Subseries
