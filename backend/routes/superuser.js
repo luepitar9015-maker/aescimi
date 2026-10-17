@@ -549,6 +549,7 @@ router.get('/reports/no-code-documents', async (req, res) => {
 // MONITOREO DE SERVIDOR Y SISTEMA (SOLO SUPERADMIN)
 // ──────────────────────────────────────────────────────────────────────────────
 const os = require('os');
+const net = require('net');
 const { exec } = require('child_process');
 
 const execPromise = (cmd) => new Promise((resolve) => {
@@ -640,14 +641,70 @@ router.get('/server-status', async (req, res) => {
             details: dbOk ? `Activa (${dbConnections} conexiones, tamaño: ${dbSize})` : 'Sin conexión'
         });
 
-        // Nginx / Reverse Proxy
+        // 4b. Servidor Web HTTP (Puerto 80 / Reverse Proxy)
+        let isHttpActive = false;
+        let httpTech = 'Express / Node.js';
+
+        // Probar conectividad socket TCP en puerto 80 local (timeout 1.5s)
+        try {
+            await new Promise((resolve, reject) => {
+                const client = net.createConnection({ port: 80, host: '127.0.0.1' }, () => {
+                    isHttpActive = true;
+                    client.end();
+                    resolve();
+                });
+                client.setTimeout(1500);
+                client.on('timeout', () => { client.destroy(); reject(new Error('Timeout')); });
+                client.on('error', (err) => { reject(err); });
+            });
+        } catch {
+            isHttpActive = false;
+        }
+
+        // Si no respondió puerto 80, probar puerto 3000 o 3005
+        if (!isHttpActive) {
+            try {
+                await new Promise((resolve, reject) => {
+                    const client = net.createConnection({ port: 3000, host: '127.0.0.1' }, () => {
+                        isHttpActive = true;
+                        client.end();
+                        resolve();
+                    });
+                    client.setTimeout(1000);
+                    client.on('timeout', () => { client.destroy(); reject(new Error('Timeout')); });
+                    client.on('error', (err) => { reject(err); });
+                });
+            } catch {}
+        }
+
+        // En Linux, verificar si Nginx o Apache están activos como proxy inverso
         if (platform === 'linux') {
-            const { stdout: nginxCheck } = await execPromise('systemctl is-active nginx 2>/dev/null || systemctl is-active openresty 2>/dev/null');
-            const isNginxActive = nginxCheck.trim() === 'active';
+            try {
+                const { stdout: srvCheck } = await execPromise('systemctl is-active nginx 2>/dev/null || systemctl is-active openresty 2>/dev/null || systemctl is-active httpd 2>/dev/null');
+                if (srvCheck.trim() === 'active') {
+                    httpTech = 'Nginx';
+                    isHttpActive = true;
+                }
+            } catch {}
+        }
+
+        services.push({
+            name: 'Servidor Web HTTP (Puerto 80)',
+            status: isHttpActive ? 'healthy' : 'down',
+            details: isHttpActive 
+                ? `Operativo y respondiendo peticiones HTTP (${httpTech})` 
+                : 'Inactivo o puerto 80 no responde'
+        });
+
+        // 4c. Motor de Aplicación (PM2 Cluster)
+        const onlineProcesses = pm2Processes.filter(p => p.status === 'online');
+        if (pm2Processes.length > 0) {
             services.push({
-                name: 'Nginx / OpenResty Web Server',
-                status: isNginxActive ? 'healthy' : 'down',
-                details: isNginxActive ? 'Servicio HTTP/HTTPS activo' : 'Inactivo o no accesible'
+                name: 'Motor de Aplicación (PM2)',
+                status: onlineProcesses.length > 0 ? 'healthy' : 'down',
+                details: onlineProcesses.length > 0 
+                    ? `Activo (${onlineProcesses.length} servicios en línea: ${onlineProcesses.map(p => p.name).join(', ')})`
+                    : 'Procesos detenidos'
             });
         }
 
