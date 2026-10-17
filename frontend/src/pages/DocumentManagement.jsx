@@ -101,11 +101,11 @@ function CustomPdfViewer({ fileUrl, onTextExtracted, activeTargetName }) {
     }, [pdf, pageNumber, scale]);
 
     const handleMouseDown = (e) => {
-        if (isOcrLoading) return;
+        if (isOcrLoading || !containerRef.current) return;
         e.preventDefault(); // Previene la selección/arrastre nativo del navegador para dibujar el área
         const rect = containerRef.current.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+        const y = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
         
         isSelectingRef.current = true;
         startCoordsRef.current = { x, y };
@@ -113,10 +113,10 @@ function CustomPdfViewer({ fileUrl, onTextExtracted, activeTargetName }) {
     };
 
     const handleMouseMove = (e) => {
-        if (!isSelectingRef.current) return;
+        if (!isSelectingRef.current || !containerRef.current) return;
         const rect = containerRef.current.getBoundingClientRect();
-        const currentX = e.clientX - rect.left;
-        const currentY = e.clientY - rect.top;
+        const currentX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+        const currentY = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
         
         const startX = startCoordsRef.current.x;
         const startY = startCoordsRef.current.y;
@@ -814,7 +814,7 @@ function DocumentManagement() {
             documentText: '',
             isSplit: false,
             selectedForMerge: true,
-            ranges: [{ start: 1, end: 1, typologyId: '', typologyName: '', addTextOption: 'no', documentText: '' }],
+            ranges: [{ start: 1, end: 1, typologyId: '', typologyName: '', creationDate: defaultDate, origen: 'ELECTRONICO', addTextOption: 'no', documentText: '' }],
             url: URL.createObjectURL(f),  // create preview URL
             aiAnalysisStatus: 'idle', // 'idle' | 'loading' | 'success' | 'error'
             aiSuggestedTypology: '',
@@ -857,21 +857,68 @@ function DocumentManagement() {
     };
 
     const updateFileDate = (index, creationDate) => {
-        setFiles(prev => prev.map((entry, i) =>
-            i === index ? { ...entry, creationDate } : entry
-        ));
+        setFiles(prev => prev.map((entry, i) => {
+            if (i !== index) return entry;
+            const oldDate = entry.creationDate;
+            const updatedRanges = (entry.ranges || []).map(r => ({
+                ...r,
+                creationDate: (!r.creationDate || r.creationDate === oldDate) ? creationDate : r.creationDate
+            }));
+            return { ...entry, creationDate, ranges: updatedRanges };
+        }));
     };
 
     const toggleSplit = (index) => {
-        setFiles(prev => prev.map((entry, i) =>
-            i === index ? { ...entry, isSplit: !entry.isSplit } : entry
-        ));
+        setFiles(prev => prev.map((entry, i) => {
+            if (i !== index) return entry;
+            const newIsSplit = !entry.isSplit;
+            let ranges = entry.ranges;
+            if (newIsSplit) {
+                if (!ranges || ranges.length === 0) {
+                    ranges = [{
+                        start: 1,
+                        end: 1,
+                        typologyId: entry.typologyId || '',
+                        typologyName: entry.typologyName || '',
+                        creationDate: entry.creationDate || defaultDate,
+                        origen: entry.origen || 'ELECTRONICO',
+                        addTextOption: 'no',
+                        documentText: ''
+                    }];
+                } else {
+                    ranges = ranges.map(r => ({
+                        ...r,
+                        creationDate: r.creationDate || entry.creationDate || defaultDate,
+                        origen: r.origen || entry.origen || 'ELECTRONICO'
+                    }));
+                }
+            }
+            return { ...entry, isSplit: newIsSplit, ranges };
+        }));
     };
 
     const addRange = (fileIdx) => {
-        setFiles(prev => prev.map((entry, i) =>
-            i === fileIdx ? { ...entry, ranges: [...entry.ranges, { start: 1, end: 1, typologyId: '', typologyName: '', addTextOption: 'no', documentText: '' }] } : entry
-        ));
+        setFiles(prev => prev.map((entry, i) => {
+            if (i !== fileIdx) return entry;
+            const lastRange = entry.ranges[entry.ranges.length - 1];
+            const nextStart = lastRange ? (Number(lastRange.end) + 1 || 1) : 1;
+            return {
+                ...entry,
+                ranges: [
+                    ...entry.ranges,
+                    {
+                        start: nextStart,
+                        end: nextStart,
+                        typologyId: '',
+                        typologyName: '',
+                        creationDate: entry.creationDate || defaultDate,
+                        origen: entry.origen || 'ELECTRONICO',
+                        addTextOption: 'no',
+                        documentText: ''
+                    }
+                ]
+            };
+        }));
     };
 
     const removeRange = (fileIdx, rangeIdx) => {
@@ -1023,7 +1070,9 @@ function DocumentManagement() {
                 const typs = entry.ranges.map(r => ({
                     name: r.typologyName,
                     range: `${r.start}-${r.end}`,
-                    description: r.addTextOption === 'si' ? r.documentText : ''
+                    description: r.addTextOption === 'si' ? r.documentText : '',
+                    document_date: r.creationDate || entry.creationDate,
+                    origen: hybridStatus === 'no' ? 'ELECTRONICO' : (r.origen || entry.origen || 'ELECTRONICO')
                 }));
                 formData.append('typology', JSON.stringify(typs));
             } else {
@@ -1549,14 +1598,16 @@ function DocumentManagement() {
 
                                                         {!mergeMode && (
                                                             <div className="mt-2 text-xs">
-                                                                <label className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Fecha de Creación Documento</label>
+                                                                <label className="text-[10px] text-gray-400 font-bold uppercase block mb-1">
+                                                                    {entry.isSplit ? "Fecha de Creación Base (para los rangos)" : "Fecha de Creación Documento"}
+                                                                </label>
                                                                 <input 
                                                                     type="datetime-local" 
                                                                     className="w-full p-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-green-500 outline-none mb-2"
                                                                     value={entry.creationDate}
                                                                     onChange={(e) => updateFileDate(idx, e.target.value)}
                                                                 />
-                                                                {hybridStatus === 'yes' && (
+                                                                {hybridStatus === 'yes' && !entry.isSplit && (
                                                                     <>
                                                                         <label className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Soporte Documento</label>
                                                                         <select 
@@ -1691,22 +1742,24 @@ function DocumentManagement() {
                                                         {!mergeMode && entry.isSplit && (
                                                             <div className="mt-3 space-y-2 border-l-2 border-green-200 pl-2">
                                                                 {entry.ranges.map((range, ridx) => (
-                                                                    <div key={ridx} className="bg-white border rounded p-2 text-[10px] space-y-2 relative group">
+                                                                    <div key={ridx} className="bg-white border rounded p-2 text-[10px] space-y-2 relative group shadow-sm">
                                                                         <div className="flex items-center gap-1">
                                                                             <input 
                                                                                 type="number" 
-                                                                                className="w-10 border rounded px-1" 
+                                                                                className="w-10 border rounded px-1 text-center font-bold" 
                                                                                 value={range.start} 
                                                                                 onChange={e => updateRange(idx, ridx, 'start', e.target.value)}
                                                                                 placeholder="D"
+                                                                                title="Página inicial"
                                                                             />
-                                                                            <span>a</span>
+                                                                            <span className="text-gray-500 font-medium">a</span>
                                                                             <input 
                                                                                 type="number" 
-                                                                                className="w-10 border rounded px-1" 
+                                                                                className="w-10 border rounded px-1 text-center font-bold" 
                                                                                 value={range.end} 
                                                                                 onChange={e => updateRange(idx, ridx, 'end', e.target.value)}
                                                                                 placeholder="H"
+                                                                                title="Página final"
                                                                             />
                                                                             <select
                                                                                 className="flex-1 border rounded px-1 min-w-0"
@@ -1727,6 +1780,35 @@ function DocumentManagement() {
                                                                                 </button>
                                                                             )}
                                                                         </div>
+
+                                                                        <div>
+                                                                            <label className="text-[9px] text-gray-500 font-bold uppercase block mb-0.5">
+                                                                                📅 Fecha Creación Documento
+                                                                            </label>
+                                                                            <input 
+                                                                                type="datetime-local" 
+                                                                                className="w-full p-1 border border-gray-300 rounded text-[10px] outline-none bg-white focus:ring-1 focus:ring-green-500"
+                                                                                value={range.creationDate || entry.creationDate || defaultDate}
+                                                                                onChange={e => updateRange(idx, ridx, 'creationDate', e.target.value)}
+                                                                            />
+                                                                        </div>
+
+                                                                        {hybridStatus === 'yes' && (
+                                                                            <div>
+                                                                                <label className="text-[9px] text-gray-500 font-bold uppercase block mb-0.5">
+                                                                                    Soporte
+                                                                                </label>
+                                                                                <select 
+                                                                                    className="w-full p-1 border border-gray-300 rounded text-[9px] outline-none bg-gray-50 font-medium"
+                                                                                    value={range.origen || entry.origen || 'ELECTRONICO'}
+                                                                                    onChange={e => updateRange(idx, ridx, 'origen', e.target.value)}
+                                                                                >
+                                                                                    <option value="ELECTRONICO">ELECTRÓNICO</option>
+                                                                                    <option value="FISICO">FÍSICO</option>
+                                                                                </select>
+                                                                            </div>
+                                                                        )}
+
                                                                         <div>
                                                                             <label className="text-[9px] text-gray-400 font-bold uppercase block mb-1">¿Agregar texto?</label>
                                                                             <select
@@ -1761,9 +1843,10 @@ function DocumentManagement() {
                                                                         </div>
                                                                     </div>
                                                                 ))}
-                                                                <button 
+                                                                <button
+                                                                    type="button"
                                                                     onClick={() => addRange(idx)}
-                                                                    className="w-full py-1 text-[10px] bg-green-50 text-green-700 border border-green-200 border-dashed rounded hover:bg-green-100 font-bold"
+                                                                    className="w-full py-1 text-[10px] bg-green-50 text-green-700 border border-green-200 border-dashed rounded hover:bg-green-100 font-bold transition-colors"
                                                                 >
                                                                     + Agregar rango
                                                                 </button>

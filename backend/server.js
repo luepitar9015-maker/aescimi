@@ -255,11 +255,24 @@ app.get('/video-player', (req, res) => {
     res.sendFile(path.join(__dirname, 'video_player.html'));
 });
 app.get('/api/video/fecha', (req, res) => {
-    const videoPath = 'C:\\Users\\Usuario\\Downloads\\GRABACION DE FECHA CREACION DOCUMENTO.mp4';
-    if (!require('fs').existsSync(videoPath)) {
-        return res.status(404).send('Video no encontrado');
+    const candidatePaths = [
+        process.env.VIDEO_TUTORIAL_PATH,
+        path.join(__dirname, 'uploads', 'tutoriales', 'video_fecha.mp4'),
+        'C:\\Users\\Usuario\\Downloads\\GRABACION DE FECHA CREACION DOCUMENTO.mp4'
+    ].filter(Boolean);
+
+    let videoPath = null;
+    for (const cp of candidatePaths) {
+        if (fs.existsSync(cp)) {
+            videoPath = cp;
+            break;
+        }
     }
-    const stat = require('fs').statSync(videoPath);
+
+    if (!videoPath) {
+        return res.status(404).json({ error: 'Video tutorial no disponible en este entorno' });
+    }
+    const stat = fs.statSync(videoPath);
     const fileSize = stat.size;
     const range = req.headers.range;
     if (range) {
@@ -267,7 +280,7 @@ app.get('/api/video/fecha', (req, res) => {
         const start = parseInt(parts[0], 10);
         const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
         const chunksize = (end - start) + 1;
-        const file = require('fs').createReadStream(videoPath, { start, end });
+        const file = fs.createReadStream(videoPath, { start, end });
         res.writeHead(206, {
             'Content-Range': `bytes ${start}-${end}/${fileSize}`,
             'Accept-Ranges': 'bytes',
@@ -277,7 +290,7 @@ app.get('/api/video/fecha', (req, res) => {
         file.pipe(res);
     } else {
         res.writeHead(200, { 'Content-Length': fileSize, 'Content-Type': 'video/mp4' });
-        require('fs').createReadStream(videoPath).pipe(res);
+        fs.createReadStream(videoPath).pipe(res);
     }
 });
 

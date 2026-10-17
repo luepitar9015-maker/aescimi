@@ -103,13 +103,16 @@ router.post('/classify-document', requireAuth, upload.single('file'), async (req
         }
 
         // Extraer texto del PDF usando pdf-parse (máximo 3 páginas para ahorrar tokens y tiempo)
-        const parser = new PDFParse({ data: req.file.buffer });
-        const pdfData = await parser.getText({ first: 1, last: 3 });
-        const extractedText = (pdfData.text || '').substring(0, 15000); // Limitar a aprox 15k caracteres
-
-        if (!extractedText || extractedText.trim().length === 0) {
-            return res.status(400).json({ error: 'El PDF parece estar escaneado como imagen o no tiene texto extraíble.' });
+        let extractedText = '';
+        try {
+            const parser = new PDFParse({ data: req.file.buffer });
+            const pdfData = await parser.getText({ first: 1, last: 3 });
+            extractedText = (pdfData.text || '').substring(0, 15000); // Limitar a aprox 15k caracteres
+        } catch (pdfErr) {
+            console.warn('[AI CLASSIFY] pdf-parse no pudo extraer texto (procesando como documento escaneado/imagen):', pdfErr.message);
         }
+
+        const isScannedOrImage = !extractedText || extractedText.trim().length < 20;
 
         // Obtener tipologías válidas de la base de datos para darle opciones a la IA
         // Permitir filtrar por subserie si viene en query o body para mejorar la precisión
@@ -166,13 +169,43 @@ router.post('/classify-document', requireAuth, upload.single('file'), async (req
             generationConfig: { responseMimeType: 'application/json' }
         });
 
-        const prompt = `
-Eres un experto clasificador de documentos de archivo.
+        let prompt;
+        let contents;
+
+        if (isScannedOrImage) {
+            // Documento escaneado sin capa de texto: procesar visualmente con Gemini Vision multimodal
+            prompt = `
+Eres un experto clasificador de documentos de archivo institucional (SENA).
+A continuación se adjunta un documento PDF escaneado/digitalizado como imagen.
+Analiza visualmente la primera página y su contenido gráfico/textual para determinar a cuál de las siguientes "Tipologías Documentales" pertenece.
+
+Tipologías permitidas en el sistema:
+[${tipologias || 'Acta, Resolución, Contrato, Cédula, RUT, Informe, Memorando, Circular, Formato, Comunicación Oficial'}]
+
+Reglas:
+1. Responde ÚNICAMENTE con un objeto JSON válido con este formato: 
+{"tipologia_sugerida": "Nombre de la Tipologia", "confianza": 95, "razon": "Breve justificación de 1 línea basada en el reconocimiento visual del documento."}
+2. Si ninguna tipología parece encajar, pon "tipologia_sugerida": "Desconocida".
+3. No incluyas markdown como \`\`\`json o \`\`\`, solo el JSON raw.
+`;
+            contents = [
+                {
+                    inlineData: {
+                        data: req.file.buffer.toString('base64'),
+                        mimeType: 'application/pdf'
+                    }
+                },
+                prompt
+            ];
+        } else {
+            // Documento con texto nativo extraído
+            prompt = `
+Eres un experto clasificador de documentos de archivo institucional (SENA).
 A continuación, te proporciono el texto extraído de las primeras páginas de un documento PDF.
 Tu tarea es analizar el contenido y sugerir a cuál de las siguientes "Tipologías Documentales" pertenece este documento.
 
 Tipologías permitidas en el sistema:
-[${tipologias || 'Acta, Resolución, Contrato, Cédula, RUT, Informe, Memorando, Circular'}]
+[${tipologias || 'Acta, Resolución, Contrato, Cédula, RUT, Informe, Memorando, Circular, Formato, Comunicación Oficial'}]
 
 Texto extraído del documento:
 ---
@@ -185,8 +218,10 @@ Reglas:
 2. Si ninguna tipología parece encajar, pon "tipologia_sugerida": "Desconocida".
 3. No incluyas markdown como \`\`\`json o \`\`\`, solo el JSON raw.
 `;
+            contents = prompt;
+        }
 
-        const result = await model.generateContent(prompt);
+        const result = await model.generateContent(contents);
         let textResponse = result.response.text().trim();
         
         // Limpieza robusta de la respuesta en caso de que contenga markdown JSON u otros caracteres

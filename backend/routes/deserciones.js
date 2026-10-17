@@ -438,10 +438,6 @@ router.post('/guardar-casos', requireAuth, async (req, res) => {
             }
         }
 
-        if (browser) {
-            await browser.close();
-        }
-
         res.json({
             message: `Se han procesado y guardado ${createdRecords.length} comunicaciones de deserción correctamente.`,
             casos: createdRecords
@@ -450,6 +446,10 @@ router.post('/guardar-casos', requireAuth, async (req, res) => {
     } catch (err) {
         console.error('[DESERCIONES] Error al guardar casos:', err);
         res.status(500).json({ error: `Error al procesar los casos de deserción: ${err.message}` });
+    } finally {
+        if (browser) {
+            await browser.close().catch(() => {});
+        }
     }
 });
 
@@ -543,6 +543,47 @@ router.post('/limpiar-casos', requireAuth, async (req, res) => {
     } catch (err) {
         console.error('[DESERCIONES] Error limpiando casos:', err);
         res.status(500).json({ error: 'Error al vaciar el histórico de casos.' });
+    }
+});
+
+// 8. Marcar casos seleccionados o todos como 'Cargado'
+router.post('/marcar-cargado', requireAuth, async (req, res) => {
+    const { caso_ids } = req.body;
+    try {
+        await ensureDesercionesTable();
+        if (caso_ids && Array.isArray(caso_ids) && caso_ids.length > 0) {
+            const placeholders = caso_ids.map((_, i) => `$${i + 1}`).join(',');
+            await pool.query(
+                `UPDATE deserciones_casos SET status = 'Cargado', updated_at = NOW() WHERE id IN (${placeholders})`,
+                caso_ids
+            );
+            res.json({ success: true, message: `${caso_ids.length} caso(s) marcados como Cargados exitosamente.` });
+        } else {
+            const result = await pool.query(
+                "UPDATE deserciones_casos SET status = 'Cargado', updated_at = NOW() WHERE status = 'Pendiente' RETURNING id"
+            );
+            res.json({ success: true, message: `Todos los casos pendientes (${result.rowCount}) fueron marcados como Cargados exitosamente.` });
+        }
+    } catch (err) {
+        console.error('[DESERCIONES] Error marcando casos como cargados:', err);
+        res.status(500).json({ error: `Error al actualizar estado de los casos: ${err.message}` });
+    }
+});
+
+// 9. Eliminar casos seleccionados
+router.post('/eliminar-casos', requireAuth, async (req, res) => {
+    const { caso_ids } = req.body;
+    if (!caso_ids || !Array.isArray(caso_ids) || caso_ids.length === 0) {
+        return res.status(400).json({ error: 'Debe especificar al menos un ID de caso para eliminar.' });
+    }
+    try {
+        await ensureDesercionesTable();
+        const placeholders = caso_ids.map((_, i) => `$${i + 1}`).join(',');
+        await pool.query(`DELETE FROM deserciones_casos WHERE id IN (${placeholders})`, caso_ids);
+        res.json({ success: true, message: `${caso_ids.length} caso(s) eliminados exitosamente.` });
+    } catch (err) {
+        console.error('[DESERCIONES] Error eliminando casos:', err);
+        res.status(500).json({ error: `Error al eliminar los casos seleccionados: ${err.message}` });
     }
 });
 

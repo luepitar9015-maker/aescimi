@@ -233,7 +233,12 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
           }
 
           if (st.hasFrame) {
-            setLiveFrame(`/api/automation/frame?t=${Date.now()}&token=${token}`);
+            const nextSrc = `/api/automation/frame?t=${Date.now()}&token=${token}`;
+            const preloadImg = new Image();
+            preloadImg.onload = () => {
+              setLiveFrame(nextSrc);
+            };
+            preloadImg.src = nextSrc;
           }
 
           if (st.completed || st.running === false) {
@@ -247,7 +252,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
         } catch (e) {
           console.error('Error en sondeo de consola en vivo:', e);
         }
-      }, 1000);
+      }, 800);
     }
     return () => {
       if (interval) clearInterval(interval);
@@ -269,6 +274,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
 
   // Historico & Actions State
   const [historico, setHistorico] = useState([]);
+  const [statusFilter, setStatusFilter] = useState('Pendiente'); // 'Pendiente' | 'Cargado' | 'Todos'
   const [selectedHistoricoRows, setSelectedHistoricoRows] = useState({}); // { [casoId]: boolean }
   const [loadingHistorico, setLoadingHistorico] = useState(false);
   const [processingSave, setProcessingSave] = useState(false);
@@ -434,9 +440,10 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
   const handleStartOnBaseLiveSession = async (casoIds = null, opts = null) => {
     setAutomationLoading(true);
     setAutomationError(false);
+    setLiveFrame(null);
     setCurrentStepIndex(0);
     setLogs([
-      `[ONBASE WEB LIVE] Conectando a la consola en directo...`,
+      `[ONBASE WEB LIVE] Reiniciando consola y conectando en directo...`,
       `[CONFIG] Usuario seleccionado por defecto: ${selectedOnbaseUser}`,
       `[PASO 1] Iniciando navegador y autenticación en OnBase Web...`
     ]);
@@ -447,13 +454,19 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
       const activeUser = onbaseUserCredential.trim() || selectedOnbaseUser || 'EDHERNANDEZM';
       const activePass = onbasePasswordCredential.trim() || 'Automatizador2026*';
 
+      const selectedCasosData = (Array.isArray(casoIds) && casoIds.length > 0)
+        ? casoIds.map(id => excelData.find(r => r.id_temp === id || r.id === id)).filter(Boolean)
+        : (excelData && excelData.length > 0 ? excelData : []);
+
       const payload = {
         url: 'https://onbase.sena.edu.co/AppNet/NavPanel.aspx',
         username: activeUser,
         password: activePass,
         action: 'deserciones_onbase_cargue',
         target_user: activeUser,
-        caso_ids: casoIds
+        caso_ids: casoIds,
+        casos_data: selectedCasosData,
+        force_restart: true
       };
 
       if (typeof opts === 'number') {
@@ -897,6 +910,46 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
     }
   };
 
+  // 9. Marcar casos seleccionados o individuales como Cargados (para sacarlos de pendientes)
+  const handleMarcarCargados = async (casoIds = null) => {
+    const ids = casoIds || Object.keys(selectedHistoricoRows).filter(id => selectedHistoricoRows[id]).map(id => parseInt(id, 10));
+    if (ids.length === 0) {
+      alert('Por favor seleccione al menos un caso para marcar como Cargado.');
+      return;
+    }
+    if (!window.confirm(`¿Desea marcar ${ids.length} caso(s) como 'Cargado'? Saldrán de la lista de Pendientes.`)) {
+      return;
+    }
+    try {
+      const res = await axios.post('/api/deserciones/marcar-cargado', { caso_ids: ids }, { headers: getAuthHeaders() });
+      setStatusMessage({ type: 'success', text: res.data.message || 'Casos marcados como cargados exitosamente.' });
+      fetchHistorico();
+    } catch (err) {
+      console.error('Error al marcar casos:', err);
+      alert('Error al actualizar el estado de los casos.');
+    }
+  };
+
+  // 10. Eliminar casos seleccionados
+  const handleEliminarCasos = async () => {
+    const ids = Object.keys(selectedHistoricoRows).filter(id => selectedHistoricoRows[id]).map(id => parseInt(id, 10));
+    if (ids.length === 0) {
+      alert('Por favor seleccione al menos un caso para eliminar.');
+      return;
+    }
+    if (!window.confirm(`¿Está seguro de que desea eliminar permanentemente ${ids.length} caso(s) seleccionado(s)?`)) {
+      return;
+    }
+    try {
+      const res = await axios.post('/api/deserciones/eliminar-casos', { caso_ids: ids }, { headers: getAuthHeaders() });
+      setStatusMessage({ type: 'success', text: res.data.message || 'Casos eliminados exitosamente.' });
+      fetchHistorico();
+    } catch (err) {
+      console.error('Error al eliminar casos:', err);
+      alert('Error al eliminar los casos seleccionados.');
+    }
+  };
+
   return (
     <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto', fontFamily: 'system-ui, sans-serif' }}>
       
@@ -1205,6 +1258,63 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                 </div>
               ) : (
                 <div style={{ overflowX: 'auto' }}>
+                  {(() => {
+                    const incompleteCount = excelData.filter(r => {
+                      const fn = (r.aprendiz_nombre || '').trim();
+                      const doc = (r.aprendiz_doc_numero || '').trim();
+                      const mail = (r.aprendiz_correo || '').trim();
+                      return !fn || fn === 'N/A' || !doc || !mail || mail === 'Sin correo';
+                    }).length;
+
+                    return incompleteCount > 0 ? (
+                      <div style={{
+                        background: '#fffbeb',
+                        border: '1px solid #fde68a',
+                        borderRadius: '8px',
+                        padding: '10px 16px',
+                        marginBottom: '14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '10px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#92400e', fontSize: '13px', fontWeight: '600' }}>
+                          <span style={{ fontSize: '16px' }}>⚠️</span>
+                          <span>Atención: Se identificaron <strong>{incompleteCount}</strong> registro(s) con datos indispensables vacíos (Documento, Nombre o Correo).</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedRows(prev => {
+                              const next = { ...prev };
+                              excelData.forEach(r => {
+                                const fn = (r.aprendiz_nombre || '').trim();
+                                const doc = (r.aprendiz_doc_numero || '').trim();
+                                const mail = (r.aprendiz_correo || '').trim();
+                                if (!fn || fn === 'N/A' || !doc || !mail || mail === 'Sin correo') {
+                                  delete next[r.id_temp];
+                                }
+                              });
+                              return next;
+                            });
+                          }}
+                          style={{
+                            background: '#fef3c7',
+                            color: '#78350f',
+                            border: '1px solid #fcd34d',
+                            padding: '5px 12px',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Deseleccionar registros incompletos
+                        </button>
+                      </div>
+                    ) : null;
+                  })()}
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                     <thead>
                       <tr style={{ background: '#f1f5f9', textTransform: 'uppercase', fontSize: '11px', color: '#475569' }}>
@@ -1229,8 +1339,17 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                         const numDoc = row.aprendiz_doc_numero || row.raw_row?.['DOCUMENTO'] || row.raw_row?.['NUM_DOCUMENTO'] || '';
                         const correoSofia = row.aprendiz_correo || row.raw_row?.['CORREO REGISTRADO EN SOFÍA'] || row.raw_row?.['CORREO REGISTRADO EN SOFIA'] || row.raw_row?.['CORREO'] || row.raw_row?.['EMAIL'] || 'Sin correo';
 
+                        const hasMissingDoc = !numDoc || String(numDoc).trim() === '';
+                        const hasMissingName = !fullName || fullName === 'N/A' || String(fullName).trim() === '';
+                        const hasMissingEmail = !correoSofia || correoSofia === 'Sin correo' || String(correoSofia).trim() === '';
+                        const isRowIncomplete = hasMissingDoc || hasMissingName || hasMissingEmail;
+
                         return (
-                          <tr key={row.id_temp || idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <tr key={row.id_temp || idx} style={{
+                            borderBottom: '1px solid #e2e8f0',
+                            background: isRowIncomplete ? '#fffdf5' : (selectedRows[row.id_temp] ? '#f8fafc' : 'transparent'),
+                            borderLeft: isRowIncomplete ? '4px solid #f59e0b' : '4px solid transparent'
+                          }}>
                             <td style={{ padding: '10px', textAlign: 'center' }}>
                               <input 
                                 type="checkbox"
@@ -1239,7 +1358,9 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                               />
                             </td>
                             <td style={{ padding: '10px', color: '#0f172a' }}>
-                              <strong style={{ display: 'block', fontSize: '13px', color: '#00324d' }}>{fullName}</strong>
+                              <strong style={{ display: 'block', fontSize: '13px', color: hasMissingName ? '#dc2626' : '#00324d' }}>
+                                {hasMissingName ? '⚠️ Nombre faltante' : fullName}
+                              </strong>
                               {(nombres && apellidos && fullName !== `${nombres} ${apellidos}`) && (
                                 <span style={{ fontSize: '11px', color: '#64748b' }}>Nombres: {nombres} | Apellidos: {apellidos}</span>
                               )}
@@ -1249,13 +1370,25 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                                 {tipoDoc}
                               </span>
                             </td>
-                            <td style={{ padding: '10px', fontWeight: '600' }}>{numDoc}</td>
+                            <td style={{ padding: '10px', fontWeight: '600' }}>
+                              {hasMissingDoc ? (
+                                <span style={{ color: '#dc2626', fontSize: '11px', background: '#fee2e2', padding: '2px 6px', borderRadius: '4px' }}>
+                                  ⚠️ Falta Doc
+                                </span>
+                              ) : numDoc}
+                            </td>
                             <td style={{ padding: '10px' }}>{row.ficha}</td>
                             <td style={{ padding: '10px', maxWidth: '200px', whiteSpace: 'normal', wordBreak: 'break-word' }}>{row.programa}</td>
                             <td style={{ padding: '10px' }}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f8fafc', padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', color: '#0369a1', fontWeight: '600' }}>
-                                📧 {correoSofia}
-                              </span>
+                              {hasMissingEmail ? (
+                                <span style={{ color: '#b45309', fontSize: '11px', background: '#fef3c7', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
+                                  ⚠️ Sin correo Sofía
+                                </span>
+                              ) : (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f8fafc', padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', color: '#0369a1', fontWeight: '600' }}>
+                                  📧 {correoSofia}
+                                </span>
+                              )}
                             </td>
                             <td style={{ padding: '10px' }}>{row.causal_desercion || 'DESERCIÓN'}</td>
                             
@@ -1752,67 +1885,182 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
           </div>
 
           {/* Tabla de Histórico de Comunicaciones */}
+          {(() => {
+            const countPendientes = historico.filter(c => c.status === 'Pendiente').length;
+            const countCargados = historico.filter(c => c.status === 'Cargado').length;
+            const countTodos = historico.length;
+
+            const filteredHistorico = historico.filter(caso => {
+              if (statusFilter === 'Pendiente') return caso.status === 'Pendiente';
+              if (statusFilter === 'Cargado') return caso.status === 'Cargado';
+              return true;
+            });
+
+            const selectedCount = Object.keys(selectedHistoricoRows).filter(id => selectedHistoricoRows[id]).length;
+
+            return (
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
               <div>
                 <h3 style={{ margin: 0, color: '#0f172a', fontSize: '18px' }}>Histórico de Comunicaciones Registradas</h3>
                 <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '13px' }}>
-                  Seleccione uno o varios casos preparados para iniciar el cargue automatizado a OnBase Web.
+                  Gestione y cargue las comunicaciones procesadas. Por defecto se muestran los casos pendientes.
                 </p>
               </div>
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                {historico.length > 0 && (
+
+              {/* Selector de Pestañas / Filtro por Estado */}
+              <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '10px', gap: '4px' }}>
+                <button
+                  onClick={() => setStatusFilter('Pendiente')}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontWeight: '700',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    background: statusFilter === 'Pendiente' ? '#00324d' : 'transparent',
+                    color: statusFilter === 'Pendiente' ? '#ffffff' : '#475569',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <Clock size={14} /> Pendientes ({countPendientes})
+                </button>
+
+                <button
+                  onClick={() => setStatusFilter('Cargado')}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontWeight: '700',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    background: statusFilter === 'Cargado' ? '#15803d' : 'transparent',
+                    color: statusFilter === 'Cargado' ? '#ffffff' : '#475569',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <CheckCircle2 size={14} /> Ya Cargados ({countCargados})
+                </button>
+
+                <button
+                  onClick={() => setStatusFilter('Todos')}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontWeight: '700',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    background: statusFilter === 'Todos' ? '#475569' : 'transparent',
+                    color: statusFilter === 'Todos' ? '#ffffff' : '#475569',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <FileText size={14} /> Todos ({countTodos})
+                </button>
+              </div>
+
+              {/* Botones de Acción Global */}
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {selectedCount > 0 && (
                   <>
-                    {/* Botón para Cargar Seleccionados a OnBase */}
                     <button 
                       onClick={() => {
                         const selectedIds = Object.keys(selectedHistoricoRows).filter(id => selectedHistoricoRows[id]).map(id => parseInt(id, 10));
-                        if (selectedIds.length === 0) {
-                          alert('Por favor seleccione al menos un caso de la lista para realizar el cargue a OnBase Web.');
-                          return;
-                        }
                         handleStartOnBaseLiveSession(selectedIds, null);
                       }}
                       style={{
                         background: 'linear-gradient(135deg, #00324d 0%, #39a900 100%)',
                         color: '#ffffff',
                         border: 'none',
-                        padding: '10px 18px',
+                        padding: '9px 14px',
                         borderRadius: '8px',
                         fontWeight: '700',
-                        fontSize: '13px',
+                        fontSize: '12px',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px',
-                        boxShadow: '0 2px 6px rgba(0,50,77,0.25)'
+                        gap: '6px',
+                        boxShadow: '0 2px 6px rgba(0,50,77,0.2)'
                       }}
                       title="Cargar los casos seleccionados automáticamente en OnBase Web"
                     >
-                      <Play size={16} /> 
-                      Cargar {Object.keys(selectedHistoricoRows).filter(id => selectedHistoricoRows[id]).length > 0 ? `(${Object.keys(selectedHistoricoRows).filter(id => selectedHistoricoRows[id]).length}) ` : ''}Seleccionados a OnBase
+                      <Play size={14} /> Cargar ({selectedCount}) a OnBase
                     </button>
 
                     <button 
-                      onClick={handleLimpiarCasos}
+                      onClick={() => handleMarcarCargados()}
                       style={{
-                        background: '#fef2f2',
-                        color: '#dc2626',
-                        border: '1px solid #fca5a5',
-                        padding: '10px 16px',
+                        background: '#dcfce7',
+                        color: '#15803d',
+                        border: '1px solid #86efac',
+                        padding: '9px 14px',
                         borderRadius: '8px',
-                        fontWeight: '600',
-                        fontSize: '13px',
+                        fontWeight: '700',
+                        fontSize: '12px',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px'
+                        gap: '6px'
                       }}
-                      title="Eliminar todos los registros del histórico"
+                      title="Marcar los casos seleccionados como Ya Cargados (sacándolos de Pendientes)"
                     >
-                      <Trash2 size={16} /> Limpiar Histórico
+                      <CheckCircle2 size={14} /> Marcar ({selectedCount}) como Cargados
+                    </button>
+
+                    <button 
+                      onClick={handleEliminarCasos}
+                      style={{
+                        background: '#fee2e2',
+                        color: '#b91c1c',
+                        border: '1px solid #fca5a5',
+                        padding: '9px 14px',
+                        borderRadius: '8px',
+                        fontWeight: '700',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                      title="Eliminar casos seleccionados de la base de datos"
+                    >
+                      <Trash2 size={14} /> Eliminar ({selectedCount})
                     </button>
                   </>
+                )}
+
+                {historico.length > 0 && (
+                  <button 
+                    onClick={handleLimpiarCasos}
+                    style={{
+                      background: '#f8fafc',
+                      color: '#64748b',
+                      border: '1px solid #cbd5e1',
+                      padding: '9px 14px',
+                      borderRadius: '8px',
+                      fontWeight: '600',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                    title="Vaciar todo el histórico de casos"
+                  >
+                    <Trash2 size={14} /> Limpiar Histórico
+                  </button>
                 )}
               </div>
             </div>
@@ -1821,9 +2069,39 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
               <div style={{ padding: '40px', textIndent: 'center', textAlign: 'center', color: '#64748b' }}>
                 Cargando historial de correspondencia...
               </div>
-            ) : historico.length === 0 ? (
-              <div style={{ padding: '40px', textIndent: 'center', textAlign: 'center', color: '#94a3b8', background: '#f8fafc', borderRadius: '8px' }}>
-                Aún no se han generado comunicaciones de deserciones.
+            ) : filteredHistorico.length === 0 ? (
+              <div style={{ padding: '50px 20px', textAlign: 'center', color: '#64748b', background: '#f8fafc', borderRadius: '10px', border: '1px dashed #cbd5e1' }}>
+                <CheckCircle2 size={36} color="#22c55e" style={{ margin: '0 auto 10px', display: 'block' }} />
+                <p style={{ margin: 0, fontWeight: '700', fontSize: '15px', color: '#0f172a' }}>
+                  {statusFilter === 'Pendiente' 
+                    ? '¡No hay casos pendientes en este momento!' 
+                    : statusFilter === 'Cargado' 
+                    ? 'No hay casos marcados como cargados.' 
+                    : 'No hay casos registrados en el módulo.'}
+                </p>
+                <p style={{ margin: '6px 0 0 0', fontSize: '13px', color: '#64748b' }}>
+                  {statusFilter === 'Pendiente' 
+                    ? 'Todas las comunicaciones preparadas ya fueron cargadas y procesadas.' 
+                    : 'Puede generar nuevas comunicaciones o cambiar de filtro arriba.'}
+                </p>
+                {statusFilter === 'Pendiente' && countCargados > 0 && (
+                  <button
+                    onClick={() => setStatusFilter('Cargado')}
+                    style={{
+                      marginTop: '14px',
+                      background: '#e0f2fe',
+                      color: '#0369a1',
+                      border: '1px solid #bae6fd',
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      fontWeight: '700',
+                      fontSize: '12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Ver los {countCargados} casos ya cargados
+                  </button>
+                )}
               </div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
@@ -1833,15 +2111,15 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                       <th style={{ padding: '12px', textAlign: 'center', width: '40px' }}>
                         <input 
                           type="checkbox"
-                          checked={historico.length > 0 && historico.every(c => selectedHistoricoRows[c.id])}
+                          checked={filteredHistorico.length > 0 && filteredHistorico.every(c => selectedHistoricoRows[c.id])}
                           onChange={(e) => {
                             const isChecked = e.target.checked;
-                            const newSel = {};
-                            historico.forEach(c => { newSel[c.id] = isChecked; });
+                            const newSel = { ...selectedHistoricoRows };
+                            filteredHistorico.forEach(c => { newSel[c.id] = isChecked; });
                             setSelectedHistoricoRows(newSel);
                           }}
                           style={{ cursor: 'pointer', transform: 'scale(1.2)' }}
-                          title="Seleccionar / deseleccionar todos los casos"
+                          title="Seleccionar / deseleccionar todos los casos visibles"
                         />
                       </th>
                       <th style={{ padding: '12px', textAlign: 'left' }}>ID / Fecha</th>
@@ -1857,7 +2135,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                     </tr>
                   </thead>
                   <tbody>
-                    {historico.map(caso => {
+                    {filteredHistorico.map(caso => {
                       const emailSofia = caso.aprendiz_correo || caso.raw_row?.['CORREO REGISTRADO EN SOFÍA'] || caso.raw_row?.['CORREO REGISTRADO EN SOFIA'] || caso.raw_row?.['CORREO'] || 'correo@sena.edu.co';
                       
                       let parsedCc = [];
@@ -2070,6 +2348,34 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                               >
                                 <FileText size={11} /> Detalle Formulario
                               </button>
+
+                              {caso.status === 'Pendiente' ? (
+                                <button
+                                  onClick={() => handleMarcarCargados([caso.id])}
+                                  style={{
+                                    background: '#f0fdf4',
+                                    color: '#15803d',
+                                    border: '1px solid #bbf7d0',
+                                    padding: '4px 8px',
+                                    borderRadius: '6px',
+                                    fontSize: '10px',
+                                    fontWeight: '700',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    width: '100%',
+                                    justifyContent: 'center'
+                                  }}
+                                  title="Marcar este caso como Ya Cargado para sacarlo de la bandeja de pendientes"
+                                >
+                                  <CheckCircle2 size={11} /> Marcar Cargado
+                                </button>
+                              ) : (
+                                <span style={{ fontSize: '10px', color: '#15803d', fontWeight: '600' }}>
+                                  ✓ Procesado
+                                </span>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -2080,6 +2386,8 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
               </div>
             )}
           </div>
+          );
+        })()}
 
         </div>
       )}

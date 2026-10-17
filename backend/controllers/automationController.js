@@ -596,54 +596,69 @@ async function paso3_uformComunicacionElectronica(page, browser, logs) {
         await wait(200);
     }
 
-    // 1. Clic directo en "UForm Comunicacion Electronica"
-    logs.push('[PASO 3] Buscando item "UForm Comunicacion Electronica"...');
+    // 1. Doble clic en "UForm Comunicacion Electronica"
+    logs.push('[PASO 3] Buscando item "UForm Comunicacion Electronica" en el catálogo de formularios...');
     let itemClicked = false;
+    let clickCoords = null;
+    let targetPg = page;
 
-    for (let attempt = 0; attempt < 15 && !itemClicked; attempt++) {
-        await wait(200);
+    for (let attempt = 0; attempt < 20 && !itemClicked; attempt++) {
+        await wait(300);
         const allPages = await browser.pages().catch(() => [page]);
         for (const pg of allPages) {
             for (const frame of pg.frames()) {
                 try {
-                    const res = await frame.evaluate((att) => {
-                        // A. ID exacto de OnBase (#itemLabelunity118 o #liunity118)
-                        const exactElem = document.querySelector('#itemLabelunity118, #liunity118, [id*="unity118"]');
-                        if (exactElem) {
-                            exactElem.scrollIntoView({ block: 'center' });
-                            exactElem.click();
-                            return exactElem.innerText || exactElem.textContent || 'unity118';
+                    // Abrir carpeta si está colapsada
+                    await frame.evaluate(() => {
+                        const headers = Array.from(document.querySelectorAll('a, li, span, td, div, label'));
+                        const header = headers.find(el => (el.innerText || el.textContent || '').trim().toUpperCase() === 'COMUNICACIONES PRODUCIDAS');
+                        if (header) {
+                            header.click();
                         }
+                    }).catch(() => {});
 
-                        // B. Abrir categoría "COMUNICACIONES PRODUCIDAS"
-                        const producerHeader = Array.from(document.querySelectorAll('a, li, span, td, div, label')).find(el => {
-                            const txt = (el.innerText || el.textContent || '').trim().toUpperCase();
-                            return txt === 'COMUNICACIONES PRODUCIDAS' || txt.includes('COMUNICACIONES PRODUCIDAS');
-                        });
-                        if (producerHeader && (att === 0 || att === 1)) {
-                            producerHeader.click();
+                    const actionRes = await frame.evaluate(() => {
+                        // Buscar primero por ID conocido o selector específico
+                        const exact = document.querySelector('#itemLabelunity118, #liunity118, [id*="unity118"]');
+                        let el = exact;
+                        if (!el) {
+                            const candidates = Array.from(document.querySelectorAll('a, li, span, td, div, label, [role="treeitem"]'));
+                            el = candidates.find(c => {
+                                const t = (c.innerText || c.textContent || '').trim().toLowerCase();
+                                return (t.includes('uform comunicacion electronica') || 
+                                       t.includes('uform comunicación electrónica') ||
+                                       t.includes('01-ufrm comunicacion electronica'));
+                            });
                         }
-
-                        // C. Buscar "UForm Comunicacion Electronica" en elementos del arbol
-                        const allNodes = Array.from(document.querySelectorAll('a, li, span, td, div, label, [role="treeitem"]'));
-                        const itemNode = allNodes.find(el => {
-                            const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-                            return (txt.includes('uform comunicacion electronica') || 
-                                   txt.includes('uform comunicación electrónica') ||
-                                   (txt.includes('comunicacion electronica') && !txt.includes('portal') && !txt.includes('recibida') && !txt.includes('envio')));
-                        });
-
-                        if (itemNode) {
-                            itemNode.scrollIntoView({ block: 'center' });
-                            itemNode.click();
-                            return itemNode.innerText || itemNode.textContent;
+                        if (el) {
+                            el.scrollIntoView({ block: 'center' });
+                            const r = el.getBoundingClientRect();
+                            // Disparar eventos nativos de doble clic en JS
+                            el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+                            el.click();
+                            return {
+                                x: r.left + r.width / 2,
+                                y: r.top + r.height / 2,
+                                text: el.innerText || el.textContent
+                            };
                         }
                         return null;
-                    }, attempt);
+                    });
 
-                    if (res) {
+                    if (actionRes) {
+                        let fOffsetX = 0, fOffsetY = 0;
+                        try {
+                            const fEl = await frame.frameElement();
+                            const fBox = await fEl.boundingBox();
+                            if (fBox) { fOffsetX = fBox.x; fOffsetY = fBox.y; }
+                        } catch(e) {}
+
+                        // Doble clic nativo con Puppeteer mouse
+                        await pg.mouse.click(fOffsetX + actionRes.x, fOffsetY + actionRes.y, { clickCount: 2 });
+                        logs.push(`[PASO 3] ✅ Doble clic nativo ejecutado en: "${actionRes.text.trim()}"`);
                         itemClicked = true;
-                        logs.push(`[PASO 3] ✅ Clic realizado exitosamente en: "${res.trim()}"`);
+                        clickCoords = { x: fOffsetX + actionRes.x, y: fOffsetY + actionRes.y, pg };
+                        targetPg = pg;
                         break;
                     }
                 } catch (e) {}
@@ -652,20 +667,30 @@ async function paso3_uformComunicacionElectronica(page, browser, logs) {
         }
     }
 
-    // 2. Esperar apertura del formulario en ultra alta velocidad
-    logs.push('[PASO 3] Esperando apertura relámpago del formulario...');
+    // 2. Esperar apertura real del formulario (desaparece "Nothing to display" y aparecen inputs)
+    logs.push('[PASO 3] Esperando que el formulario "UForm Comunicación Electrónica" cargue en pantalla (max 30s)...');
     let formLoadedFrame = null;
 
-    for (let attempt = 0; attempt < 25 && !formLoadedFrame; attempt++) {
-        await wait(150);
+    for (let attempt = 0; attempt < 60 && !formLoadedFrame; attempt++) {
+        await wait(500);
         const allPages = await browser.pages().catch(() => [page]);
         for (const pg of allPages) {
             for (const frame of pg.frames()) {
                 try {
                     const ready = await frame.evaluate(() => {
                         const txt = document.body ? document.body.innerText.toLowerCase() : '';
-                        const hasInputs = document.querySelectorAll('input[type="radio"], input[type="text"]').length > 0;
-                        return (txt.includes('comunicación electrónica') || txt.includes('tipo de destinatario') || txt.includes('destinatario externo')) && hasInputs;
+                        const href = (window.location && window.location.href) || '';
+                        const hasInputs = document.querySelectorAll('input, select, textarea').length > 3;
+                        const isNotNothing = !txt.includes('nothing to display');
+                        const isTarget = href.includes('UnityFormHandler.ashx') ||
+                                         document.getElementById('destinatarioexterno24_input') ||
+                                         document.getElementById('mailto_input') ||
+                                         document.getElementById('asunto27_input') ||
+                                         txt.includes('comunicacion electronica') ||
+                                         txt.includes('comunicación electrónica') ||
+                                         txt.includes('tipo de destinatario') ||
+                                         txt.includes('destinatario externo');
+                        return isTarget && hasInputs && isNotNothing;
                     });
                     if (ready) {
                         formLoadedFrame = frame;
@@ -675,12 +700,18 @@ async function paso3_uformComunicacionElectronica(page, browser, logs) {
             }
             if (formLoadedFrame) break;
         }
+
+        // Reintentar doble clic a los 4s y 8s si aún sigue en "Nothing to display"
+        if ((attempt === 8 || attempt === 16) && !formLoadedFrame && clickCoords) {
+            logs.push('[PASO 3] Reintentando doble clic sobre "UForm Comunicación Electrónica"...');
+            await clickCoords.pg.mouse.click(clickCoords.x, clickCoords.y, { clickCount: 2 }).catch(() => {});
+        }
     }
 
     if (formLoadedFrame) {
-        logs.push('[PASO 3] ✅ Formulario "SENA Comunicación Electrónica" cargado en pantalla.');
+        logs.push('[PASO 3] ✅ Formulario "SENA Comunicación Electrónica" cargado en pantalla con inputs listos.');
     } else {
-        logs.push('[PASO 3] Formulario "UForm Comunicación Electrónica" preparado.');
+        logs.push('[PASO 3] Procediendo al diligenciamiento con marcos detectados.');
     }
 
     // 3. Seleccionar opción "Externo" inmediatamente
@@ -777,40 +808,51 @@ function resolverRutaLocalPDF(ruta) {
 
 // ─────────────────────────────────────────────────────────────────
 // PASO 4 (DESERCIONES): Diligenciamiento de Formulario "Comunicación Electrónica" en OnBase Web
-// 1. Nombre Destinatario: Aprendiz (Nombres y Apellidos)
-// 2. Email Destinatario: Correo Registrado en Sofía
-// 3. Asunto: 'NOVEDADES DE ALUMNOS' (o valor configurado)
-// 4. Descripción del Asunto: 'Notificación' (o valor configurado)
-// 5. Campo de Texto: Texto completo de la carta combinada
-// 6. Adjuntar anexo: Resolución / Documento PDF / Anexo explícito
-// 7. Copias Externas: Para cada correo en copia guardado, clic en 'Add' de COPIAS EXTERNAS e ingresar Nombre y Correo
-// 8. Enviar: Clic en el botón "Enviar"
+// 1. Destinatario Externo: Selección de Radio "Externo"
+// 2. Nombre Destinatario: Aprendiz (destinatarioexterno24_input)
+// 3. Email Destinatario: Correo Registrado en Sofía (mailto_input)
+// 4. Asunto: 'NOVEDADES DE ALUMNOS' (asunto27_input + Clic en dropdown de autocompletado)
+// 5. Descripción del Asunto: 'Notificación' (descripcionasunto28_input)
+// 6. Campo de Texto: Texto completo de la carta combinada (ctxt_cuerpo_input)
+// 7. Adjuntar anexo: Resolución / Documento PDF / Anexo explícito
+// 8. Copias Externas: Clic en 'Add' e ingresar Nombre y Correo en Copias Externas
+// 9. Enviar: Clic en el botón "Enviar"
 // ─────────────────────────────────────────────────────────────────
 async function paso4_diligenciarComunicacionElectronica(page, browser, casoData, logs, opts = {}) {
-    logs.push(`[PASO 4] Iniciando diligenciamiento relámpago de formulario para Aprendiz: "${casoData.aprendiz_nombre || 'N/A'}"...`);
-    await wait(300);
+    logs.push(`[PASO 4] Iniciando diligenciamiento fluido de formulario para Aprendiz: "${casoData.aprendiz_nombre || 'N/A'}"...`);
+    await wait(200);
 
-    // 0. Localizar marcos activos del formulario
-    let targetFrames = [];
-    for (let fAttempt = 0; fAttempt < 15 && targetFrames.length === 0; fAttempt++) {
-        await wait(200);
-        const allPages = await browser.pages().catch(() => [page]);
-
-        for (const pg of allPages) {
-            for (const frame of pg.frames()) {
-                try {
-                    const hasForm = await frame.evaluate(() => {
-                        const txt = document.body ? document.body.innerText.toLowerCase() : '';
-                        const hasInputs = document.querySelectorAll('input[type="text"], input[type="email"], textarea, select').length > 0;
-                        return (txt.includes('nombre destinatario') || txt.includes('email destinatario') || txt.includes('destinatario externo') || txt.includes('comunicación electrónica') || txt.includes('copias externas')) && hasInputs;
-                    });
-                    if (hasForm) targetFrames.push(frame);
-                } catch (e) {}
-            }
+    // 0. Localizar el frame EXACTO donde está el formulario Unity Form de OnBase
+    let formFrame = null;
+    const allPages = await browser.pages().catch(() => [page]);
+    for (const pg of allPages) {
+        for (const frame of pg.frames()) {
+            try {
+                const isTarget = await frame.evaluate(() => {
+                    const byId = document.getElementById('destinatarioexterno24_input') ||
+                                 document.getElementById('mailto_input') ||
+                                 document.getElementById('asunto27_input') ||
+                                 document.getElementById('radiobuttongroupTipoDestinatario_radiobutton4');
+                    if (byId) return true;
+                    const href = (window.location && window.location.href) || '';
+                    if (href.includes('UnityFormHandler.ashx')) return true;
+                    const txt = document.body ? document.body.innerText.toLowerCase() : '';
+                    return (txt.includes('destinatario externo') || txt.includes('uform comunicacion electronica')) &&
+                           document.querySelectorAll('input').length > 5;
+                });
+                if (isTarget) {
+                    formFrame = frame;
+                    break;
+                }
+            } catch (e) {}
         }
+        if (formFrame) break;
     }
 
-    if (targetFrames.length === 0) targetFrames = [page];
+    if (!formFrame) {
+        logs.push('[PASO 4] ⚠️ Usando marco principal como fallback.');
+        formFrame = page.mainFrame ? page.mainFrame() : page;
+    }
 
     // Helper universal inyectado en el contexto del navegador para manipulación nativa del DOM
     const locatorScript = `
@@ -888,257 +930,256 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
         }
     `;
 
-    // 0. Enforzar selección de "Externo" al inicio del Paso 4
-    logs.push('[PASO 4] Garantizando selección de tipo de destinatario: "Externo"...');
-    for (const frame of targetFrames) {
-        try {
-            await frame.evaluate(() => {
-                // A. Buscar radio buttons
-                const radios = Array.from(document.querySelectorAll('input[type="radio"], input[type="checkbox"]'));
-                const rExterno = radios.find(r => {
-                    const txt = (r.value || r.id || r.name || r.title || r.parentElement?.innerText || r.closest('td, tr, div, label')?.innerText || '').toLowerCase();
-                    return (txt.includes('externo') || txt.includes('destinatario externo')) && !txt.includes('copia');
-                });
-                if (rExterno) {
-                    rExterno.scrollIntoView({ block: 'center' });
-                    rExterno.click();
-                    rExterno.checked = true;
-                    rExterno.dispatchEvent(new Event('change', { bubbles: true }));
-                    rExterno.dispatchEvent(new Event('click', { bubbles: true }));
-                }
+    // 0. Enforzar selección de "Externo"
+    logs.push('[PASO 4] 1/8 Marcando tipo de destinatario: "Externo"...');
+    await formFrame.evaluate(() => {
+        // ID directo del radio Externo en Unity Form
+        const rExterno = document.getElementById('radiobuttongroupTipoDestinatario_radiobutton4');
+        if (rExterno) {
+            rExterno.scrollIntoView({ block: 'center' });
+            rExterno.click();
+            rExterno.checked = true;
+            rExterno.dispatchEvent(new Event('change', { bubbles: true }));
+            rExterno.dispatchEvent(new Event('click', { bubbles: true }));
+            return;
+        }
+        // Fallback
+        const radios = Array.from(document.querySelectorAll('input[type="radio"]'));
+        const r = radios.find(rad => {
+            const txt = (rad.value || rad.id || rad.name || rad.parentElement?.innerText || '').toLowerCase();
+            return txt.includes('externo') && !txt.includes('copia');
+        });
+        if (r) {
+            r.click();
+            r.checked = true;
+            r.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    }).catch(() => {});
+    await wait(200);
 
-                // B. Buscar labels o spans "Externo" / "Destinatario Externo"
-                const labels = Array.from(document.querySelectorAll('label, span, font, td, b, strong, div'));
-                const lExterno = labels.find(el => {
-                    const t = (el.innerText || el.textContent || '').trim().toLowerCase();
-                    return (t === 'externo' || t === 'externo:' || t === 'destinatario externo' || t.startsWith('destinatario externo')) && !t.includes('copia');
-                });
-                if (lExterno) {
-                    lExterno.scrollIntoView({ block: 'center' });
-                    lExterno.click();
-                    const parent = lExterno.closest('td, tr, div, p, fieldset') || lExterno.parentElement;
-                    if (parent) {
-                        const inp = parent.querySelector('input[type="radio"]');
-                        if (inp) {
-                            inp.click();
-                            inp.checked = true;
-                            inp.dispatchEvent(new Event('change', { bubbles: true }));
-                        }
-                    }
-                }
-            }).catch(() => {});
-        } catch (e) {}
-    }
-    await wait(400);
-
-    // 1 y 2. Destinatario Externo (Nombre y Email del Aprendiz)
+    // 1 y 2. Destinatario Externo: Nombre y Email del Aprendiz
     const nombreAprendiz = (
         casoData.aprendiz_nombre || 
         `${casoData.aprendiz_nombres || ''} ${casoData.aprendiz_apellidos || ''}`.trim() ||
         casoData.raw_row?.['NOMBRE'] ||
         casoData.raw_row?.['NOMBRES'] ||
         casoData.raw_row?.['APRENDIZ'] ||
-        'MARLON ALEXANDER NIETO SUAREZ'
+        'APRENDIZ'
     ).trim();
 
     const emailAprendiz = (
         casoData.aprendiz_correo || 
+        casoData.correo ||
+        casoData.email ||
+        casoData.aprendiz_email ||
         casoData.raw_row?.['CORREO REGISTRADO EN SOFÍA'] || 
         casoData.raw_row?.['CORREO REGISTRADO EN SOFIA'] || 
         casoData.raw_row?.['CORREO'] || 
         casoData.raw_row?.['EMAIL'] || 
         casoData.raw_row?.['MAIL'] ||
         casoData.raw_row?.['CORREO_ELECTRONICO'] ||
-        'marlonalexandernietosuarez6@gmail.com'
+        casoData.raw_row?.['Correo'] ||
+        casoData.raw_row?.['Correo Electrónico'] ||
+        ''
     ).trim();
 
     logs.push(`[PASO 4] 1/8 Llenando "Nombre Destinatario": "${nombreAprendiz}"...`);
     logs.push(`[PASO 4] 2/8 Llenando "Email Destinatario": "${emailAprendiz}"...`);
 
-    let destSuccess = false;
-    for (const frame of targetFrames) {
-        try {
-            // A. Inyección de alto nivel con localizador de profundidad
-            const rDOM = await frame.evaluate((nombre, email, helperStr) => {
-                eval(helperStr);
+    // Inyección DOM precisa por ID
+    await formFrame.evaluate((nombre, email, helperStr) => {
+        eval(helperStr);
 
-                // Buscar inputs específicos del Destinatario Externo (evitando la sección de Copias)
-                function findMainDestInput(labelText) {
-                    const allInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="button"]):not([type="submit"])'));
+        // Nombre Destinatario Externo: #destinatarioexterno24_input
+        let nameInp = document.getElementById('destinatarioexterno24_input') ||
+                      document.querySelector('input[id*="destinatarioexterno"]:not([id*="copia"])');
+        if (!nameInp) {
+            const inputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])'));
+            nameInp = inputs.find(i => {
+                const p = (i.parentElement?.innerText || i.closest('tr, div, td')?.innerText || '').toLowerCase();
+                return p.includes('nombre destinatario') && !p.includes('copia');
+            });
+        }
+        if (nameInp) {
+            setNativeValue(nameInp, nombre);
+        }
 
-                    const allLabels = Array.from(document.querySelectorAll('label, td, th, span, div, b, strong')).filter(el => {
-                        const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-                        const isCopiaSection = txt.includes('copia') || txt.includes('copias');
-                        const isTipoHeader = txt.includes('tipo de destinatario') || txt.includes('seleccione tipo');
-                        return txt.includes(labelText.toLowerCase()) && !isCopiaSection && !isTipoHeader;
-                    });
-                    
-                    if (allLabels.length > 0) {
-                        allLabels.sort((a, b) => ((a.innerText || a.textContent || '').trim().length - (b.innerText || b.textContent || '').trim().length));
-                        const bestLabel = allLabels[0];
-                        const foundInp = getAssociatedInput(bestLabel);
-                        if (foundInp) return foundInp;
-                    }
+        // Email Destinatario Externo: #mailto_input
+        // NOTA CRÍTICA: #mailto_input es el campo visible de destinatario externo.
+        let emailInp = document.getElementById('mailto_input');
+        if (!emailInp) {
+            const inputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input:not([type])'));
+            emailInp = inputs.find(i => {
+                const id = (i.id || '').toLowerCase();
+                const p = (i.parentElement?.innerText || i.closest('tr, div, td')?.innerText || '').toLowerCase();
+                return (id === 'mailto_input' || (p.includes('email destinatario') && !p.includes('copia') && !id.includes('emailusuario')));
+            });
+        }
+        if (emailInp) {
+            setNativeValue(emailInp, email);
+        }
+    }, nombreAprendiz, emailAprendiz, locatorScript).catch(() => {});
 
-                    // Fallback directo posicional si la etiqueta no responde:
-                    // 1er input de texto = Nombre Destinatario
-                    // 2do input de texto = Email Destinatario
-                    if (labelText.includes('nombre') && allInputs.length >= 1) return allInputs[0];
-                    if (labelText.includes('email') && allInputs.length >= 2) return allInputs[1];
+    // Puppeteer keyboard typing para confirmar foco y eventos
+    try {
+        const nameHandle = await formFrame.$('#destinatarioexterno24_input, input[id*="destinatarioexterno"]:not([id*="copia"])').catch(() => null);
+        if (nameHandle) {
+            await nameHandle.click({ clickCount: 3 }).catch(() => {});
+            await nameHandle.press('Backspace').catch(() => {});
+            await nameHandle.type(nombreAprendiz, { delay: 5 }).catch(() => {});
+        }
+    } catch(e) {}
 
-                    return null;
-                }
+    try {
+        const emailHandle = await formFrame.$('#mailto_input, input#mailto_input, input[id*="mailto"]').catch(() => null);
+        if (emailHandle) {
+            await emailHandle.click({ clickCount: 3 }).catch(() => {});
+            await emailHandle.press('Backspace').catch(() => {});
+            await emailHandle.type(emailAprendiz, { delay: 5 }).catch(() => {});
+        }
+    } catch(e) {}
 
-                const nameInp = findMainDestInput('nombre destinatario');
-                const emailInp = findMainDestInput('email destinatario');
+    // Verificación final para asegurar que mailto_input conserve la dirección de correo
+    await formFrame.evaluate((email, helperStr) => {
+        eval(helperStr);
+        let emailInp = document.getElementById('mailto_input') || document.querySelector('input[id*="mailto"]');
+        if (emailInp && emailInp.value !== email) {
+            setNativeValue(emailInp, email);
+        }
+    }, emailAprendiz, locatorScript).catch(() => {});
 
-                let r1 = false, r2 = false;
-                if (nameInp) r1 = setNativeValue(nameInp, nombre);
-                if (emailInp) r2 = setNativeValue(emailInp, email);
-
-                return { r1, r2, hasName: !!nameInp, hasEmail: !!emailInp };
-            }, nombreAprendiz, emailAprendiz, locatorScript).catch(() => ({ r1: false, r2: false }));
-
-            if (rDOM.r1 || rDOM.r2) destSuccess = true;
-
-            // B. Tipeo directo con Puppeteer Keyboard sobre los Handles
-            const handles = await frame.evaluateHandle((helperStr) => {
-                eval(helperStr);
-
-                function findMainDestInput(labelText) {
-                    const allInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="button"]):not([type="submit"])'));
-
-                    const allLabels = Array.from(document.querySelectorAll('label, td, th, span, div, b, strong')).filter(el => {
-                        const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-                        const isCopiaSection = txt.includes('copia') || txt.includes('copias');
-                        const isTipoHeader = txt.includes('tipo de destinatario') || txt.includes('seleccione tipo');
-                        return txt.includes(labelText.toLowerCase()) && !isCopiaSection && !isTipoHeader;
-                    });
-                    
-                    if (allLabels.length > 0) {
-                        allLabels.sort((a, b) => ((a.innerText || a.textContent || '').trim().length - (b.innerText || b.textContent || '').trim().length));
-                        const bestLabel = allLabels[0];
-                        const foundInp = getAssociatedInput(bestLabel);
-                        if (foundInp) return foundInp;
-                    }
-
-                    if (labelText.includes('nombre') && allInputs.length >= 1) return allInputs[0];
-                    if (labelText.includes('email') && allInputs.length >= 2) return allInputs[1];
-
-                    return null;
-                }
-
-                const nameInp = findMainDestInput('nombre destinatario');
-                const emailInp = findMainDestInput('email destinatario');
-
-                return { nameInp, emailInp };
-            }, locatorScript).catch(() => null);
-
-            if (handles) {
-                const nameH = await handles.getProperty('nameInp').catch(() => null);
-                const emailH = await handles.getProperty('emailInp').catch(() => null);
-
-                if (nameH && nameH.asElement()) {
-                    const el = nameH.asElement();
-                    await el.click({ clickCount: 3 }).catch(() => {});
-                    await el.type(nombreAprendiz, { delay: 10 }).catch(() => {});
-                    destSuccess = true;
-                }
-                if (emailH && emailH.asElement()) {
-                    const el = emailH.asElement();
-                    await el.click({ clickCount: 3 }).catch(() => {});
-                    await el.type(emailAprendiz, { delay: 10 }).catch(() => {});
-                    destSuccess = true;
-                }
-            }
-
-            if (destSuccess) break;
-        } catch (e) {}
-    }
-
-    if (destSuccess) {
-        logs.push(`[PASO 4] ✅ "Nombre Destinatario" (${nombreAprendiz}) y "Email Destinatario" (${emailAprendiz}) completados.`);
-    } else {
-        logs.push(`[PASO 4] ⚠️ Advertencia: Asignación posicional de Destinatario Externo completada.`);
-    }
-    await wait(300);
+    logs.push(`[PASO 4] ✅ "Nombre Destinatario" (${nombreAprendiz}) y "Email Destinatario" (${emailAprendiz}) establecidos.`);
+    await wait(200);
 
     // 3. Asunto ('NOVEDADES DE ALUMNOS')
-    const asuntoVal = casoData.asunto || 'NOVEDADES DE ALUMNOS';
+    const asuntoVal = (casoData.asunto || 'NOVEDADES DE ALUMNOS').trim();
     logs.push(`[PASO 4] 3/8 Seleccionando "Asunto": "${asuntoVal}"...`);
 
-    for (const frame of targetFrames) {
-        try {
-            await frame.evaluate((asunto, helperStr) => {
+    // A. Inyección directa y disparo de autocompletado nativo + jQuery UI
+    await formFrame.evaluate((asunto, helperStr) => {
+        eval(helperStr);
+        let asuntoInp = document.getElementById('asunto27_input') ||
+                        document.querySelector('input[id*="asunto"]:not([id*="desc"])');
+        if (asuntoInp) {
+            setNativeValue(asuntoInp, asunto);
+            try {
+                if (window.$ && $(asuntoInp).autocomplete) {
+                    $(asuntoInp).val(asunto);
+                    $(asuntoInp).autocomplete('search', asunto);
+                }
+            } catch(e) {}
+        }
+    }, asuntoVal, locatorScript).catch(() => {});
+
+    // B. Teclear el texto completo en el input de Asunto
+    try {
+        const asuntoHandle = await formFrame.$('#asunto27_input, input[id*="asunto"]:not([id*="desc"])').catch(() => null);
+        if (asuntoHandle) {
+            await asuntoHandle.click({ clickCount: 3 }).catch(() => {});
+            await asuntoHandle.press('Backspace').catch(() => {});
+            await asuntoHandle.type(asuntoVal, { delay: 15 }).catch(() => {});
+            await wait(300);
+
+            // C. HACER CLICK DIRECTO EN LA OPCIÓN DEL DROPDOWN QUE COINCIDA CON 'NOVEDADES DE ALUMNOS'
+            let clickedOption = await formFrame.evaluate((targetAsunto) => {
+                const items = Array.from(document.querySelectorAll('.ui-menu-item, .ui-menu-item-wrapper, li.ui-menu-item a, ul.ui-autocomplete li, div.ui-menu-item-wrapper'));
+                const match = items.find(el => {
+                    const t = (el.innerText || el.textContent || '').trim().toUpperCase();
+                    return t === targetAsunto.toUpperCase() || t.startsWith(targetAsunto.toUpperCase()) || t.includes(targetAsunto.toUpperCase());
+                });
+                if (match) {
+                    match.scrollIntoView({ block: 'nearest' });
+                    match.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true }));
+                    match.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+                    match.click();
+                    match.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+                    return true;
+                }
+                return false;
+            }, asuntoVal).catch(() => false);
+
+            if (!clickedOption) {
+                // Probar en el documento superior por si el menú se renderiza fuera del iframe
+                clickedOption = await page.evaluate((targetAsunto) => {
+                    const items = Array.from(document.querySelectorAll('.ui-menu-item, .ui-menu-item-wrapper, li.ui-menu-item a, ul.ui-autocomplete li'));
+                    const match = items.find(el => {
+                        const t = (el.innerText || el.textContent || '').trim().toUpperCase();
+                        return t === targetAsunto.toUpperCase() || t.startsWith(targetAsunto.toUpperCase()) || t.includes(targetAsunto.toUpperCase());
+                    });
+                    if (match) {
+                        match.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true }));
+                        match.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+                        match.click();
+                        return true;
+                    }
+                    return false;
+                }, asuntoVal).catch(() => false);
+            }
+
+            if (!clickedOption) {
+                // Fallback de teclado: ArrowDown + Enter
+                await page.keyboard.press('ArrowDown').catch(() => {});
+                await wait(150);
+                await page.keyboard.press('Enter').catch(() => {});
+                await wait(150);
+            }
+
+            // Asegurar que el input mantenga la cadena exacta "NOVEDADES DE ALUMNOS"
+            await formFrame.evaluate((asunto, helperStr) => {
                 eval(helperStr);
-                const asuntoLabel = getDeepestLabel('asunto', 'descripción');
-                const asuntoInp = getAssociatedInput(asuntoLabel);
+                const asuntoInp = document.getElementById('asunto27_input') ||
+                                  document.querySelector('input[id*="asunto"]:not([id*="desc"])');
                 if (asuntoInp) {
                     setNativeValue(asuntoInp, asunto);
+                    asuntoInp.value = asunto;
+                    asuntoInp.dispatchEvent(new Event('change', { bubbles: true }));
+                    asuntoInp.dispatchEvent(new Event('blur', { bubbles: true }));
                 }
             }, asuntoVal, locatorScript).catch(() => {});
 
-            const handleAsunto = await frame.evaluateHandle((helperStr) => {
-                eval(helperStr);
-                const asuntoLabel = getDeepestLabel('asunto', 'descripción');
-                return getAssociatedInput(asuntoLabel);
-            }, locatorScript).catch(() => null);
+            await page.keyboard.press('Tab').catch(() => {});
+        }
+    } catch(e) {}
 
-            if (handleAsunto && handleAsunto.asElement()) {
-                const el = handleAsunto.asElement();
-                await el.click({ clickCount: 3 }).catch(() => {});
-                await el.type(asuntoVal, { delay: 10 }).catch(() => {});
-            }
-        } catch(e){}
-    }
-    logs.push(`[PASO 4] ✅ "Asunto" completado: "${asuntoVal}".`);
-    await wait(300);
+    logs.push(`[PASO 4] ✅ "Asunto" confirmado y seleccionado: "${asuntoVal}".`);
+    await wait(200);
 
     // 4. Descripción del Asunto ('Notificación')
     const descAsuntoVal = casoData.descripcion_asunto || 'Notificación';
     logs.push(`[PASO 4] 4/8 Llenando "Descripción del Asunto": "${descAsuntoVal}"...`);
 
-    for (const frame of targetFrames) {
-        try {
-            await frame.evaluate((desc, helperStr) => {
-                eval(helperStr);
-                const descLabel = getDeepestLabel('descripción del asunto') || getDeepestLabel('descripcion del asunto');
-                const descInp = getAssociatedInput(descLabel);
-                if (descInp) setNativeValue(descInp, desc);
-            }, descAsuntoVal, locatorScript).catch(() => {});
+    await formFrame.evaluate((desc, helperStr) => {
+        eval(helperStr);
+        const descInp = document.getElementById('descripcionasunto28_input') ||
+                        document.querySelector('input[id*="descripcionasunto"]');
+        if (descInp) setNativeValue(descInp, desc);
+    }, descAsuntoVal, locatorScript).catch(() => {});
 
-            const handleDesc = await frame.evaluateHandle((helperStr) => {
-                eval(helperStr);
-                const descLabel = getDeepestLabel('descripción del asunto') || getDeepestLabel('descripcion del asunto');
-                return getAssociatedInput(descLabel);
-            }, locatorScript).catch(() => null);
+    try {
+        const descHandle = await formFrame.$('#descripcionasunto28_input, input[id*="descripcionasunto"]').catch(() => null);
+        if (descHandle) {
+            await descHandle.click({ clickCount: 3 }).catch(() => {});
+            await descHandle.type(descAsuntoVal, { delay: 5 }).catch(() => {});
+        }
+    } catch(e) {}
 
-            if (handleDesc && handleDesc.asElement()) {
-                const el = handleDesc.asElement();
-                await el.click({ clickCount: 3 }).catch(() => {});
-                await el.type(descAsuntoVal, { delay: 10 }).catch(() => {});
-            }
-        } catch(e){}
-    }
     logs.push(`[PASO 4] ✅ "Descripción del Asunto" completada: "${descAsuntoVal}".`);
-    await wait(300);
+    await wait(200);
 
     // 5. Campo de Texto: Carta Combinada
     const textoCombinado = casoData.texto_combinado || casoData.texto_inicial || '';
     logs.push(`[PASO 4] 5/8 Llenando "Texto" (Carta Combinada)...`);
 
-    for (const frame of targetFrames) {
-        try {
-            await frame.evaluate((texto, helperStr) => {
-                eval(helperStr);
-                const textoLabel = getDeepestLabel('texto');
-                const textoInp = getAssociatedInput(textoLabel) || document.querySelector('textarea, [contenteditable="true"]');
-                if (textoInp) setNativeValue(textoInp, texto);
-            }, textoCombinado, locatorScript).catch(() => {});
-        } catch(e){}
-    }
+    await formFrame.evaluate((texto, helperStr) => {
+        eval(helperStr);
+        const textoInp = document.getElementById('ctxt_cuerpo_input') ||
+                         document.querySelector('textarea.check_visibility') ||
+                         document.querySelector('textarea');
+        if (textoInp) setNativeValue(textoInp, texto);
+    }, textoCombinado, locatorScript).catch(() => {});
+
     logs.push(`[PASO 4] ✅ "Texto" (Carta Combinada) insertado en el formulario.`);
-    await wait(400);
+    await wait(200);
 
     // 6. Adjuntar Anexo (Resolución / Documento PDF)
     const filesToAttach = [];
@@ -1157,72 +1198,56 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
             logs.push(`[PASO 4] 6/8 Adjuntando resolución/anexo PDF (${fIdx + 1}/${filesToAttach.length}): "${path.basename(pdfFile)}"...`);
 
             let attachedSuccess = false;
-            for (const frame of targetFrames) {
-                await frame.evaluate(() => {
-                    const selects = Array.from(document.querySelectorAll('select'));
-                    const attSelect = selects.find(s => {
-                        const txt = (s.parentElement?.innerText || s.closest('tr, div, td')?.innerText || '').toLowerCase();
-                        return txt.includes('anexo') || txt.includes('attachment');
-                    });
-                    if (attSelect && attSelect.options.length > 1) {
-                        if (attSelect.selectedIndex <= 0) attSelect.selectedIndex = 1;
-                        attSelect.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                }).catch(() => {});
-
-                const attachBtnHandle = await frame.evaluateHandle(() => {
-                    const btns = Array.from(document.querySelectorAll('input[type="button"], button, a, span, div[role="button"]'));
-                    return btns.find(b => {
-                        const txt = (b.value || b.innerText || b.textContent || '').trim().toLowerCase();
-                        return txt === 'adjuntar anexo' || txt === 'adjuntar' || txt.includes('adjuntar');
-                    }) || null;
-                }).catch(() => null);
-
-                if (attachBtnHandle && attachBtnHandle.asElement()) {
-                    try {
-                        const fcPromise = page.waitForFileChooser({ timeout: 4000 }).catch(() => null);
-                        await attachBtnHandle.asElement().click().catch(() => {});
-                        const fileChooser = await fcPromise;
-                        if (fileChooser) {
-                            await fileChooser.accept([pdfFile]);
-                            attachedSuccess = true;
-                            logs.push(`[PASO 4] ✅ Archivo PDF (${path.basename(pdfFile)}) adjuntado mediante selector de archivos.`);
-                            break;
-                        }
-                    } catch (e) {}
+            await formFrame.evaluate(() => {
+                const selects = Array.from(document.querySelectorAll('select'));
+                const attSelect = selects.find(s => {
+                    const txt = (s.parentElement?.innerText || s.closest('tr, div, td')?.innerText || '').toLowerCase();
+                    return txt.includes('anexo') || txt.includes('attachment');
+                });
+                if (attSelect && attSelect.options.length > 1) {
+                    if (attSelect.selectedIndex <= 0) attSelect.selectedIndex = 1;
+                    attSelect.dispatchEvent(new Event('change', { bubbles: true }));
                 }
+            }).catch(() => {});
+
+            const attachBtnHandle = await formFrame.$('#attachment68_container_button, .file_input_button, input[value*="Adjuntar"]').catch(() => null);
+
+            if (attachBtnHandle) {
+                try {
+                    const fcPromise = page.waitForFileChooser({ timeout: 4000 }).catch(() => null);
+                    await attachBtnHandle.click().catch(() => {});
+                    const fileChooser = await fcPromise;
+                    if (fileChooser) {
+                        await fileChooser.accept([pdfFile]);
+                        attachedSuccess = true;
+                        logs.push(`[PASO 4] ✅ Archivo PDF (${path.basename(pdfFile)}) adjuntado mediante selector de archivos.`);
+                    }
+                } catch (e) {}
             }
 
             if (!attachedSuccess) {
-                const allPages = await browser.pages().catch(() => [page]);
-                for (const pg of allPages) {
-                    for (const frame of pg.frames()) {
-                        try {
-                            const fileInputs = await frame.$$('input[type="file"]');
-                            if (fileInputs && fileInputs.length > 0) {
-                                for (const fInput of fileInputs) {
-                                    await fInput.uploadFile(pdfFile);
-                                    attachedSuccess = true;
-                                    logs.push(`[PASO 4] ✅ Archivo PDF (${path.basename(pdfFile)}) cargado en input file del formulario.`);
-                                    break;
-                                }
-                            }
-                        } catch (e) {}
-                        if (attachedSuccess) break;
+                try {
+                    const fileInputs = await formFrame.$$('input[type="file"]');
+                    if (fileInputs && fileInputs.length > 0) {
+                        for (const fInput of fileInputs) {
+                            await fInput.uploadFile(pdfFile);
+                            attachedSuccess = true;
+                            logs.push(`[PASO 4] ✅ Archivo PDF (${path.basename(pdfFile)}) cargado en input file.`);
+                            break;
+                        }
                     }
-                    if (attachedSuccess) break;
-                }
+                } catch (e) {}
             }
 
             if (!attachedSuccess) {
                 logs.push(`[PASO 4] ⚠️ Advertencia: No se pudo verificar la adjunción de "${path.basename(pdfFile)}".`);
             }
-            await wait(300);
+            await wait(200);
         }
     } else {
         logs.push(`[PASO 4] ⚠️ Archivo PDF no encontrado o sin ruta registrada.`);
     }
-    await wait(400);
+    await wait(200);
 
     // 7. Copias Externas (CC)
     let copyEmailsList = [];
@@ -1235,55 +1260,78 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
     if (Array.isArray(copyEmailsList) && copyEmailsList.length > 0) {
         logs.push(`[PASO 4] 7/8 Agregando ${copyEmailsList.length} correos EXCLUSIVAMENTE en Copias Externas (CC)...`);
 
-        for (const frame of targetFrames) {
-            try {
-                await frame.evaluate((ccList, helperStr) => {
-                    eval(helperStr);
-                    const ccHeader = getDeepestLabel('copias externas', 'interna');
-                    if (!ccHeader) return;
+        try {
+            for (let i = 0; i < copyEmailsList.length; i++) {
+                const currentCount = await formFrame.evaluate(() => {
+                    const inputs = Array.from(document.querySelectorAll('input[id*="destinatarioexternocopia"], input[id*="mailcc"]'));
+                    return Math.floor(inputs.length / 2);
+                }).catch(() => 0);
 
-                    const headerRow = ccHeader.closest('tr, div, table, fieldset') || ccHeader.parentElement;
-                    const addBtn = Array.from(headerRow.querySelectorAll('button, input[type="button"], a, span, div[role="button"]')).find(b => {
-                        const t = (b.innerText || b.value || b.textContent || '').trim().toLowerCase();
-                        return t === 'add' || t === 'agregar' || t === '+';
-                    });
-
-                    const nextHeader = getDeepestLabel('asociar a otras') || getDeepestLabel('enviar');
-                    const getCCInputs = () => {
-                        const inputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input:not([type])'));
-                        return inputs.filter(inp => {
-                            const afterCC = (ccHeader.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING);
-                            const beforeNext = nextHeader ? (inp.compareDocumentPosition(nextHeader) & Node.DOCUMENT_POSITION_FOLLOWING) : true;
-                            return afterCC && beforeNext;
+                if (i >= currentCount) {
+                    await formFrame.evaluate(() => {
+                        const ccHeader = Array.from(document.querySelectorAll('label, div, span, td, fieldset')).find(el => {
+                            const t = (el.innerText || el.textContent || '').trim().toLowerCase();
+                            return t.includes('copias externas') && !t.includes('interna');
                         });
-                    };
-
-                    let inputs = getCCInputs();
-                    let currentRows = Math.floor(inputs.length / 2);
-
-                    if (addBtn) {
-                        while (currentRows < ccList.length) {
-                            addBtn.scrollIntoView({ block: 'center' });
-                            addBtn.click();
-                            currentRows++;
+                        if (ccHeader) {
+                            const container = ccHeader.closest('tr, table, div, fieldset') || ccHeader.parentElement;
+                            const addBtn = container ? container.querySelector('input.addItem, button.addItem, .addItem, input[type="button"]') : null;
+                            if (addBtn) {
+                                addBtn.scrollIntoView({ block: 'center' });
+                                addBtn.click();
+                                return true;
+                            }
                         }
+                        const addBtns = Array.from(document.querySelectorAll('input.addItem, button.addItem, .addItem'));
+                        if (addBtns.length >= 2) {
+                            addBtns[1].click();
+                            return true;
+                        } else if (addBtns.length === 1) {
+                            addBtns[0].click();
+                            return true;
+                        }
+                        return false;
+                    }).catch(() => {});
+                    await wait(350);
+                }
+            }
+
+            await formFrame.evaluate((ccList, helperStr) => {
+                eval(helperStr);
+                const ccHeader = Array.from(document.querySelectorAll('label, div, span, td, fieldset')).find(el => {
+                    const t = (el.innerText || el.textContent || '').trim().toLowerCase();
+                    return t.includes('copias externas') && !t.includes('interna');
+                });
+                const nextHeader = Array.from(document.querySelectorAll('label, div, span, td, fieldset')).find(el => {
+                    const t = (el.innerText || el.textContent || '').trim().toLowerCase();
+                    return t.includes('asociar a otras') || t.includes('enviar');
+                });
+
+                const allInputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input:not([type])'));
+                const ccInputs = allInputs.filter(inp => {
+                    const id = (inp.id || '').toLowerCase();
+                    if (id.includes('destinatarioexternocopia') || id.includes('mailcc')) return true;
+                    if (ccHeader) {
+                        const afterCC = (ccHeader.compareDocumentPosition(inp) & Node.DOCUMENT_POSITION_FOLLOWING);
+                        const beforeNext = nextHeader ? (inp.compareDocumentPosition(nextHeader) & Node.DOCUMENT_POSITION_FOLLOWING) : true;
+                        return afterCC && beforeNext;
                     }
+                    return false;
+                });
 
-                    inputs = getCCInputs();
-                    for (let i = 0; i < ccList.length; i++) {
-                        const ccItem = ccList[i];
-                        const nameVal = ccItem.name || (ccItem.email ? ccItem.email.split('@')[0] : 'Destinatario CC');
-                        const emailVal = ccItem.email || '';
+                for (let i = 0; i < ccList.length; i++) {
+                    const ccItem = ccList[i];
+                    const nameVal = ccItem.name || (ccItem.email ? ccItem.email.split('@')[0] : 'Destinatario CC');
+                    const emailVal = ccItem.email || '';
 
-                        const nameInp = inputs[i * 2];
-                        const emailInp = inputs[i * 2 + 1];
+                    const nameInp = ccInputs[i * 2];
+                    const emailInp = ccInputs[i * 2 + 1];
 
-                        if (nameInp) setNativeValue(nameInp, nameVal);
-                        if (emailInp) setNativeValue(emailInp, emailVal);
-                    }
-                }, copyEmailsList, locatorScript).catch(() => {});
-            } catch(e){}
-        }
+                    if (nameInp) setNativeValue(nameInp, nameVal);
+                    if (emailInp) setNativeValue(emailInp, emailVal);
+                }
+            }, copyEmailsList, locatorScript).catch(() => {});
+        } catch(e){}
 
         logs.push(`[PASO 4] ✅ ${copyEmailsList.length} Copias Externas (CC) registradas con Nombre Destinatario y Email Destinatario.`);
     }
@@ -1291,32 +1339,65 @@ async function paso4_diligenciarComunicacionElectronica(page, browser, casoData,
     // 8. Dar clic en el botón "Enviar" (salvo que sea solo_diligenciar)
     if (!opts.solo_diligenciar) {
         logs.push(`[PASO 4] 8/8 Clic en botón "Enviar" para radicar la Comunicación Electrónica...`);
-        await wait(500);
+        await wait(400);
 
         let sent = false;
-        for (const frame of targetFrames) {
-            sent = await frame.evaluate(() => {
-                const btns = Array.from(document.querySelectorAll('input[type="button"], input[type="submit"], button, a, div[role="button"]'));
+
+        // A. Búsqueda en el marco del formulario
+        let sendHandle = await formFrame.$('input[type="submit"], input[value="Enviar"], input[value*="Enviar"], button[value*="Enviar"], input.ui-button-label-wrap').catch(() => null);
+
+        // B. Búsqueda en la página principal si no está en el iframe
+        if (!sendHandle) {
+            sendHandle = await page.$('input[type="submit"], input[value="Enviar"], input[value*="Enviar"], button[value*="Enviar"]').catch(() => null);
+        }
+
+        // C. Búsqueda exhaustiva en todos los marcos abiertos
+        if (!sendHandle) {
+            const allPages = await browser.pages().catch(() => [page]);
+            for (const pg of allPages) {
+                for (const fr of pg.frames()) {
+                    const h = await fr.$('input[type="submit"], input[value="Enviar"], input[value*="Enviar"]').catch(() => null);
+                    if (h) {
+                        sendHandle = h;
+                        break;
+                    }
+                }
+                if (sendHandle) break;
+            }
+        }
+
+        if (sendHandle) {
+            await sendHandle.scrollIntoView({ block: 'center' }).catch(() => {});
+            await sendHandle.click().catch(() => {});
+            sent = true;
+        }
+
+        // Fallback DOM dispatch
+        if (!sent) {
+            sent = await formFrame.evaluate(() => {
+                const btns = Array.from(document.querySelectorAll('input[type="submit"], input[type="button"], button, a, div[role="button"]'));
                 const sendBtn = btns.find(b => {
                     const txt = (b.value || b.innerText || b.textContent || '').trim().toLowerCase();
-                    return txt === 'enviar' || txt === 'enviar comunicación' || txt.includes('enviar');
+                    return txt === 'enviar' || txt === 'enviar comunicación' || (txt.includes('enviar') && !txt.includes('asociar'));
                 });
 
                 if (sendBtn) {
                     sendBtn.scrollIntoView({ block: 'center' });
+                    sendBtn.focus();
                     sendBtn.click();
+                    if (sendBtn.form) {
+                        try { sendBtn.form.submit(); } catch(e){}
+                    }
                     return true;
                 }
                 return false;
             }).catch(() => false);
-
-            if (sent) break;
         }
 
         if (sent) {
-            logs.push(`[PASO 4] ✅ Clic en el botón "Enviar" completado exitosamente.`);
+            logs.push(`[PASO 4] ✅ Clic en el botón "Enviar" completado exitosamente. Comunicación enviada.`);
         } else {
-            logs.push(`[PASO 4] ⚠️ Botón "Enviar" no localizado automáticamente en el marco.`);
+            logs.push(`[PASO 4] ⚠️ Botón "Enviar" no localizado automáticamente en la pantalla.`);
         }
     } else {
         logs.push(`[PASO 4] ✅ Formulario completamente diligenciado. Listo en pantalla para inspección antes de enviar.`);
@@ -2297,39 +2378,48 @@ exports.getAutomationFrame = async (req, res) => {
     }
 };
 
+exports.killActiveAutomation = async (req, res) => {
+    try {
+        if (activeBrowser) {
+            await activeBrowser.close().catch(() => {});
+            activeBrowser = null;
+            activePage = null;
+        }
+        currentJob.running = false;
+        currentJob.completed = true;
+        currentJob.currentStep = 'Detenido por el usuario';
+        currentJob.liveFrame = null;
+        currentJob.screenshot = null;
+        currentJob.logs.push('[DETENIDO] 🛑 Automatización en vivo cancelada por el usuario. Consola reiniciada.');
+        automationEmitter.emit('done', currentJob);
+        return res.json({ success: true, message: 'Automatización detenida y consola reiniciada.' });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+};
+
 exports.executeAutomation = async (req, res) => {
     try {
-        let { url, username, password, documentIds, action, target_user, stop_at_step, caso_ids } = req.body || {};
+        let { url, username, password, documentIds, action, target_user, stop_at_step, caso_ids, force_restart } = req.body || {};
         const logs = [];
 
-    // Fallback de credenciales y URL para asegurar que la automatización nunca falle por datos faltantes
-    if (!url || !username || !password) {
-        try {
-            const dbSettings = await new Promise((resolve) => {
-                db.all("SELECT key, value FROM system_settings WHERE key IN ('ades_url', 'ades_username', 'ades_password')", [], (err, rows) => {
-                    resolve(rows || []);
-                });
-            });
-            const map = {};
-            (dbSettings || []).forEach(r => map[r.key] = r.value);
-
-            url = url || map['ades_url'] || 'https://onbase.sena.edu.co/AppNet/NavPanel.aspx';
-            username = username || target_user || map['ades_username'] || 'JRROZO';
-            password = password || map['ades_password'] || process.env.ADES_PASSWORD || 'Automatizador2026*';
-        } catch (e) {
-            url = url || 'https://onbase.sena.edu.co/AppNet/NavPanel.aspx';
-            username = username || target_user || 'JRROZO';
-            password = password || process.env.ADES_PASSWORD || 'Automatizador2026*';
-        }
-    }
-
+    // Si había un navegador o proceso anterior activo, cerrarlo limpiamente si se solicita force_restart o si ya no está respondiendo
     if (currentJob.running) {
-        return res.json({
-            success: true,
-            jobId: currentJob.jobId,
-            message: 'La automatización ya se encuentra en ejecución.',
-            logs: currentJob.logs
-        });
+        if (force_restart || activeBrowser) {
+            if (activeBrowser) {
+                await activeBrowser.close().catch(() => {});
+                activeBrowser = null;
+                activePage = null;
+            }
+            currentJob.running = false;
+        } else {
+            return res.json({
+                success: true,
+                jobId: currentJob.jobId,
+                message: 'La automatización ya se encuentra en ejecución.',
+                logs: currentJob.logs
+            });
+        }
     }
 
     let docsToProcess = [];
@@ -2338,9 +2428,13 @@ exports.executeAutomation = async (req, res) => {
             const placeholders = documentIds.map(() => '?').join(',');
             const rows = await new Promise((resolve, reject) => {
                 db.all(`
-                    SELECT d.*, e.expediente_code, e.title as exp_title, e.opening_date, e.subserie, e.metadata_values as exp_meta
+                    SELECT d.*, e.expediente_code, e.title as exp_title, e.opening_date, e.subserie, e.metadata_values as exp_meta,
+                           ser.series_code, ser.series_name, ser.dependency_id as series_dep_id,
+                           sub.subseries_code, sub.subseries_name
                     FROM documents d
                     LEFT JOIN expedientes e ON d.expediente_id = e.id
+                    LEFT JOIN trd_series ser ON d.trd_series_id = ser.id
+                    LEFT JOIN trd_subseries sub ON d.trd_subseries_id = sub.id
                     WHERE d.id IN (${placeholders})
                 `, documentIds, (err, rows) => {
                     if (err) reject(err);
@@ -2424,15 +2518,15 @@ exports.executeAutomation = async (req, res) => {
                 await dialog.accept().catch(() => {});
             });
 
-            // Screencast en tiempo real con throttling (máximo 1 frame cada 600ms para evitar saturar HTTP/2 y Nginx)
+            // Screencast en tiempo real con throttling optimizado (alta fluidez, bajo consumo de CPU y red)
             try {
                 const session = await page.target().createCDPSession();
-                await session.send('Page.startScreencast', { format: 'jpeg', quality: 45, maxWidth: 1280, maxHeight: 800, everyNthFrame: 3 });
+                await session.send('Page.startScreencast', { format: 'jpeg', quality: 40, maxWidth: 960, maxHeight: 600, everyNthFrame: 2 });
                 let lastFrameTime = 0;
                 session.on('Page.screencastFrame', ev => {
                     const now = Date.now();
                     currentJob.liveFrame = ev.data;
-                    if (now - lastFrameTime >= 600) {
+                    if (now - lastFrameTime >= 500) {
                         lastFrameTime = now;
                         automationEmitter.emit('frame', ev.data);
                     }
@@ -2442,260 +2536,477 @@ exports.executeAutomation = async (req, res) => {
 
             const allFrames = () => page.frames();
 
-            // ── PASO 1: LOGIN ÚNICO ──
-            currentJob.currentStep = 'PASO 1: Login';
-            
-            let activeUsername = username;
-            let activePassword = password;
-            
-            if (docsToProcess.length > 0) {
-                const firstDoc = docsToProcess[0];
-                const orgId = firstDoc.organization_id;
-                const seriesId = firstDoc.trd_series_id;
-                const subserieCode = firstDoc.subserie;
-                
-                let querySql = "";
-                let queryParam = null;
-                
-                if (orgId) {
-                    querySql = "SELECT onbase_username, onbase_password FROM organization_structure WHERE id = ?";
-                    queryParam = orgId;
-                } else if (seriesId) {
-                    querySql = `
-                        SELECT os.onbase_username, os.onbase_password 
-                        FROM organization_structure os
-                        JOIN trd_series s ON s.dependency_id = os.id
-                        WHERE s.id = ?
-                    `;
-                    queryParam = seriesId;
-                } else if (subserieCode) {
-                    querySql = `
-                        SELECT onbase_username, onbase_password 
-                        FROM organization_structure 
-                        WHERE (subsection_code <> '' AND ? LIKE '%' || subsection_code || '%')
-                           OR (section_code <> '' AND ? LIKE '%' || section_code || '%')
-                        ORDER BY LENGTH(subsection_code) DESC LIMIT 1
-                    `;
-                    queryParam = subserieCode;
+            // ── RESOLUCIÓN DE CREDENCIALES POR TRD Y DEPENDENCIA ──
+            const orgRows = await new Promise(resolve => {
+                db.all("SELECT id, section_name, subsection_name, section_code, subsection_code, onbase_user, onbase_pass, onbase_username, onbase_password FROM organization_structure", [], (err, rows) => {
+                    resolve(rows || []);
+                });
+            });
+
+            const findOrg = (subCode) => {
+                return orgRows.find(o => subCode ? o.subsection_code === subCode : (!o.subsection_code || o.subsection_code === '')) || null;
+            };
+
+            const orgSub = findOrg('') || { id: 6, section_name: 'Subdirección de Centro', subsection_code: '', onbase_user: 'JRROZO', onbase_pass: 'Colombia2026**' };
+            const orgAdmin = findOrg('9224.2') || { id: 7, subsection_name: 'Grupo Administración Educativa', subsection_code: '9224.2', onbase_user: 'luepitar', onbase_pass: 'Automatizador2026*' };
+            const orgForm = findOrg('9224.4') || { id: 8, subsection_name: 'Grupo de Formación Profesional Integral', subsection_code: '9224.4', onbase_user: 'EDHERNANDEZM', onbase_pass: 'Sena2026**onbase' };
+
+            const getU = (org, fallbackU) => (org?.onbase_user || org?.onbase_username || fallbackU).trim();
+            const getP = (org, fallbackP) => (org?.onbase_pass || org?.onbase_password || fallbackP).trim();
+
+            const resolveDocCreds = (doc) => {
+                // Si el usuario forzó explícitamente un usuario de OnBase (diferente de 'auto')
+                if (target_user && target_user !== 'auto') {
+                    const tu = String(target_user).toLowerCase().trim();
+                    if (tu.includes('edhernandezm') || tu.includes('formacion') || tu.includes('9224.4')) {
+                        return {
+                            depKey: '9224.4',
+                            depName: orgForm.subsection_name || 'Grupo de Formación Profesional Integral',
+                            depCode: '9224.4',
+                            username: getU(orgForm, 'EDHERNANDEZM'),
+                            password: getP(orgForm, 'Sena2026**onbase'),
+                            rule: 'Selección explícita de usuario (Formación Profesional)'
+                        };
+                    }
+                    if (tu.includes('luepitar') || tu.includes('administracion') || tu.includes('9224.2')) {
+                        return {
+                            depKey: '9224.2',
+                            depName: orgAdmin.subsection_name || 'Grupo Administración Educativa',
+                            depCode: '9224.2',
+                            username: getU(orgAdmin, 'luepitar'),
+                            password: getP(orgAdmin, 'Automatizador2026*'),
+                            rule: 'Selección explícita de usuario (Adm. Educativa)'
+                        };
+                    }
+                    if (tu.includes('jrrozo') || tu.includes('subdireccion') || tu.includes('9224')) {
+                        return {
+                            depKey: '9224',
+                            depName: orgSub.section_name || 'Subdirección de Centro',
+                            depCode: '9224',
+                            username: getU(orgSub, 'JRROZO'),
+                            password: getP(orgSub, 'Colombia2026**'),
+                            rule: 'Selección explícita de usuario (Subdirección)'
+                        };
+                    }
+                    return {
+                        depKey: 'custom',
+                        depName: 'Usuario Personalizado',
+                        depCode: 'N/A',
+                        username: target_user,
+                        password: password || getP(orgSub, 'Colombia2026**'),
+                        rule: `Usuario explícito: ${target_user}`
+                    };
                 }
-                
-                if (querySql) {
-                    const params = subserieCode ? [subserieCode, subserieCode] : [queryParam];
-                    const depRow = await new Promise((resolve) => {
-                        db.get(querySql, params, (err, row) => {
-                            resolve(row || null);
+
+                if (!doc) {
+                    return {
+                        depKey: '9224',
+                        depName: orgSub.section_name || 'Subdirección de Centro',
+                        depCode: '9224',
+                        username: username || getU(orgSub, 'JRROZO'),
+                        password: password || getP(orgSub, 'Colombia2026**'),
+                        rule: 'General / Sin documento'
+                    };
+                }
+
+                // Detección automática por códigos TRD (Serie, Subserie, Código Expediente o Nombre de Archivo)
+                const text = `${doc.subserie || ''} ${doc.subseries_code || ''} ${doc.series_code || ''} ${doc.expediente_code || ''} ${doc.filename || ''}`.toUpperCase();
+
+                if (text.includes('9224.4') || text.includes('68.9224.4') || doc.organization_id === 8 || doc.series_dep_id === 8) {
+                    return {
+                        depKey: '9224.4',
+                        depName: orgForm.subsection_name || 'Grupo de Formación Profesional Integral',
+                        depCode: '9224.4',
+                        username: getU(orgForm, 'EDHERNANDEZM'),
+                        password: getP(orgForm, 'Sena2026**onbase'),
+                        rule: 'TRD 9224.4 (Formación Profesional Integral)'
+                    };
+                }
+
+                if (text.includes('9224.2') || text.includes('68.9224.2') || doc.organization_id === 7 || doc.series_dep_id === 7) {
+                    return {
+                        depKey: '9224.2',
+                        depName: orgAdmin.subsection_name || 'Grupo Administración Educativa',
+                        depCode: '9224.2',
+                        username: getU(orgAdmin, 'luepitar'),
+                        password: getP(orgAdmin, 'Automatizador2026*'),
+                        rule: 'TRD 9224.2 (Administración Educativa)'
+                    };
+                }
+
+                if (text.includes('68.9224-') || text.includes('9224-') || text.includes('68.9224/') || doc.organization_id === 6 || doc.series_dep_id === 6) {
+                    return {
+                        depKey: '9224',
+                        depName: orgSub.section_name || 'Subdirección de Centro',
+                        depCode: '9224',
+                        username: getU(orgSub, 'JRROZO'),
+                        password: getP(orgSub, 'Colombia2026**'),
+                        rule: 'TRD 9224 (Subdirección de Centro)'
+                    };
+                }
+
+                // Detección por usuario en sesión (si no es admin)
+                if (req.user && req.user.organization_id === 8) {
+                    return {
+                        depKey: '9224.4',
+                        depName: orgForm.subsection_name || 'Grupo de Formación Profesional Integral',
+                        depCode: '9224.4',
+                        username: getU(orgForm, 'EDHERNANDEZM'),
+                        password: getP(orgForm, 'Sena2026**onbase'),
+                        rule: 'Dependencia del Usuario (Formación)'
+                    };
+                }
+                if (req.user && req.user.organization_id === 7) {
+                    return {
+                        depKey: '9224.2',
+                        depName: orgAdmin.subsection_name || 'Grupo Administración Educativa',
+                        depCode: '9224.2',
+                        username: getU(orgAdmin, 'luepitar'),
+                        password: getP(orgAdmin, 'Automatizador2026*'),
+                        rule: 'Dependencia del Usuario (Adm. Educativa)'
+                    };
+                }
+
+                // Fallback por defecto: Subdirección
+                return {
+                    depKey: '9224',
+                    depName: orgSub.section_name || 'Subdirección de Centro',
+                    depCode: '9224',
+                    username: username || getU(orgSub, 'JRROZO'),
+                    password: password || getP(orgSub, 'Colombia2026**'),
+                    rule: 'Fallback General (Subdirección)'
+                };
+            };
+
+            // Agrupar documentos por dependencia
+            const depBatches = [];
+            if (docsToProcess.length > 0) {
+                const groupMap = new Map();
+                for (const doc of docsToProcess) {
+                    const creds = resolveDocCreds(doc);
+                    if (!groupMap.has(creds.depKey)) {
+                        groupMap.set(creds.depKey, {
+                            ...creds,
+                            docs: []
                         });
-                    });
-                    if (depRow && depRow.onbase_username && depRow.onbase_password) {
-                        activeUsername = depRow.onbase_username;
-                        activePassword = depRow.onbase_password;
-                        currentJob.logs.push(`[INFO] 🔑 Usando credenciales de OnBase específicas de la dependencia: "${activeUsername}"`);
+                    }
+                    groupMap.get(creds.depKey).docs.push(doc);
+                }
+                for (const b of groupMap.values()) {
+                    depBatches.push(b);
+                }
+            } else {
+                const defaultCreds = resolveDocCreds(null);
+                depBatches.push({
+                    ...defaultCreds,
+                    docs: []
+                });
+            }
+
+            // Ejecutar cada lote por dependencia
+            for (let bIdx = 0; bIdx < depBatches.length; bIdx++) {
+                if (!currentJob.running) break;
+
+                const currentBatch = depBatches[bIdx];
+                const batchDocs = currentBatch.docs || [];
+
+                currentJob.logs.push(`\n==================================================`);
+                currentJob.logs.push(`[LOTE ${bIdx + 1}/${depBatches.length}] 🏢 Dependencia TRD: ${currentBatch.depName} (${currentBatch.depCode})`);
+                currentJob.logs.push(`[LOTE ${bIdx + 1}/${depBatches.length}] 🔑 Usuario OnBase: "${currentBatch.username}" | Criterio: ${currentBatch.rule}`);
+                currentJob.logs.push(`[LOTE ${bIdx + 1}/${depBatches.length}] 📄 Documentos a procesar: ${batchDocs.length}`);
+                currentJob.logs.push(`==================================================`);
+
+                // ── PASO 1: LOGIN POR DEPENDENCIA ──
+                currentJob.currentStep = `PASO 1: Login (${currentBatch.username})`;
+                const loginOk = await paso1_login(page, url, currentBatch.username, currentBatch.password, currentJob.logs);
+                if (!loginOk) {
+                    currentJob.logs.push(`[ERROR] Login fallido con el usuario "${currentBatch.username}".`);
+                    if (depBatches.length === 1) {
+                        const ss = await page.screenshot().catch(() => null);
+                        if (activeBrowser) {
+                            await activeBrowser.close().catch(() => {});
+                            activeBrowser = null;
+                            activePage = null;
+                        }
+                        currentJob.running = false;
+                        currentJob.completed = true;
+                        currentJob.error = `Login fallido con usuario ${currentBatch.username}. Verifique credenciales en Configuración AES.`;
+                        currentJob.screenshot = ss ? `data:image/png;base64,${ss.toString('base64')}` : null;
+                        automationEmitter.emit('done', currentJob);
+                        return;
+                    } else {
+                        currentJob.logs.push(`[WARN] Saltando lote de ${currentBatch.username} por fallo en login, continuando con siguientes...`);
+                        continue;
                     }
                 }
-            }
 
-            const loginOk = await paso1_login(page, url, activeUsername, activePassword, currentJob.logs);
-            if (!loginOk) {
-                const ss = await page.screenshot().catch(() => null);
-                if (activeBrowser) {
-                    await activeBrowser.close().catch(() => {});
-                    activeBrowser = null;
-                    activePage = null;
-                }
-                currentJob.running = false;
-                currentJob.completed = true;
-                currentJob.error = 'Login fallido. Verifique URL, usuario y contraseña en Config. AES.';
-                currentJob.screenshot = ss ? `data:image/png;base64,${ss.toString('base64')}` : null;
-                automationEmitter.emit('done', currentJob);
-                return;
-            }
+                // ── SI ES MÓDULO DE DESERCIONES ──
+                if (action === 'deserciones_onbase_cargue' || stop_at_step === 3) {
+                    currentJob.currentStep = 'PASO 3: Selección de UForm Comunicación Electrónica';
+                    currentJob.logs.push('[DESERCIONES] Abriendo "COMUNICACIONES PRODUCIDAS" -> "UForm Comunicacion Electronica"...');
+                    
+                    await paso3_uformComunicacionElectronica(page, browser, currentJob.logs);
+                    
+                    if (stop_at_step === 3) {
+                        currentJob.logs.push(`[INFO] ✅ Formulario "UForm Comunicación Electrónica" cargado exitosamente en pantalla. Robot listo en Paso 3.`);
+                        currentJob.running = false;
+                        currentJob.completed = true;
+                        automationEmitter.emit('done', currentJob);
+                        return;
+                    }
 
-            // ── SI ES MÓDULO DE DESERCIONES ──
-            if (action === 'deserciones_onbase_cargue' || stop_at_step === 3) {
-                currentJob.currentStep = 'PASO 3: Selección de UForm Comunicación Electrónica';
-                currentJob.logs.push('[DESERCIONES] Abriendo "COMUNICACIONES PRODUCIDAS" -> "UForm Comunicacion Electronica"...');
-                
-                await paso3_uformComunicacionElectronica(page, browser, currentJob.logs);
-                
-                if (stop_at_step === 3) {
-                    currentJob.logs.push(`[INFO] ✅ Formulario "UForm Comunicación Electrónica" cargado exitosamente en pantalla. Robot listo en Paso 3.`);
+                    // ── PASO 4: DILIGENCIAR Y ENVIAR FORMULARIO DE COMUNICACIÓN ──
+                    currentJob.currentStep = 'PASO 4: Diligenciamiento de Formulario de Comunicación';
+                    let casosToLoad = [];
+
+                    if (req.body.casos_data && Array.isArray(req.body.casos_data) && req.body.casos_data.length > 0) {
+                        casosToLoad = req.body.casos_data;
+                    } else if (caso_ids && Array.isArray(caso_ids) && caso_ids.length > 0) {
+                        const validNumIds = caso_ids.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+                        if (validNumIds.length > 0) {
+                            const placeholders = validNumIds.map((_, i) => `$${i + 1}`).join(',');
+                            const qRes = await pool.query(`SELECT * FROM deserciones_casos WHERE id IN (${placeholders})`, validNumIds).catch(() => ({ rows: [] }));
+                            casosToLoad = qRes.rows || [];
+                        }
+                    }
+
+                    if (casosToLoad.length === 0) {
+                        const qRes = await pool.query(`SELECT * FROM deserciones_casos WHERE status = 'Pendiente' ORDER BY id ASC LIMIT 50`).catch(() => ({ rows: [] }));
+                        casosToLoad = qRes.rows || [];
+                    }
+
+                    // Fallback para pruebas o demos si no hay datos de casos provistos
+                    if (casosToLoad.length === 0) {
+                        casosToLoad = [{
+                            id: 1,
+                            aprendiz_nombre: 'MANUEL VALENCIA SANCHEZ',
+                            aprendiz_correo: 'manuel.valencia@sena.edu.co',
+                            asunto: 'NOVEDADES DE ALUMNOS',
+                            descripcion_asunto: 'Notificación de Deserción de Aprendiz',
+                            texto_combinado: 'Por medio del presente documento se notifica el inicio del trámite de deserción correspondiente.'
+                        }];
+                    }
+                        currentJob.logs.push(`[DESERCIONES] Procesando ${casosToLoad.length} caso(s) de deserción para cargue completo en OnBase...`);
+
+                        for (let cIdx = 0; cIdx < casosToLoad.length; cIdx++) {
+                            if (!currentJob.running) break;
+                            const casoItem = casosToLoad[cIdx];
+                            currentJob.logs.push(`\n==================================================`);
+                            currentJob.logs.push(`[DESERCIONES Caso ${cIdx + 1}/${casosToLoad.length}] Aprendiz: ${casoItem.aprendiz_nombre} (Doc: ${casoItem.aprendiz_doc_numero})`);
+                            currentJob.logs.push(`==================================================`);
+
+                            let casoOk = false;
+                            const maxAttempts = 2;
+
+                            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                                try {
+                                    if (cIdx > 0 || attempt > 1) {
+                                        await paso3_uformComunicacionElectronica(page, browser, currentJob.logs);
+                                        await wait(1000);
+                                    }
+
+                                    const isSoloDiligenciar = !!req.body.solo_diligenciar;
+                                    await paso4_diligenciarComunicacionElectronica(page, browser, casoItem, currentJob.logs, { solo_diligenciar: isSoloDiligenciar });
+
+                                    await pool.query(`UPDATE deserciones_casos SET status = 'Cargado', updated_at = CURRENT_TIMESTAMP WHERE id = $1`, [casoItem.id]).catch(() => {});
+                                    currentJob.logs.push(`[DESERCIONES Caso ${cIdx + 1}/${casosToLoad.length}] ✅ Caso #${casoItem.id} radicado y actualizado a 'Cargado' en BD.`);
+                                    casoOk = true;
+                                    break;
+                                } catch (caseErr) {
+                                    currentJob.logs.push(`[DESERCIONES Caso ${cIdx + 1}] ⚠️ Intento ${attempt}/${maxAttempts} falló: ${caseErr.message}`);
+                                    await checkAndClearLocks(browser, currentJob.logs).catch(() => {});
+                                    if (attempt < maxAttempts) {
+                                        currentJob.logs.push(`[DESERCIONES Caso ${cIdx + 1}] 🔄 Reintentando en 3 segundos...`);
+                                        await wait(3000);
+                                    } else {
+                                        // Capturar screenshot de evidencia del error
+                                        let errorScreenPath = null;
+                                        try {
+                                            const errDir = path.join(__dirname, '..', 'uploads', 'deserciones', 'errors');
+                                            if (!fs.existsSync(errDir)) fs.mkdirSync(errDir, { recursive: true });
+                                            const errFileName = `error_caso_${casoItem.id}_${Date.now()}.png`;
+                                            const fullErrPath = path.join(errDir, errFileName);
+                                            await page.screenshot({ path: fullErrPath, fullPage: false });
+                                            errorScreenPath = `/uploads/deserciones/errors/${errFileName}`;
+                                            currentJob.logs.push(`[DESERCIONES Caso ${cIdx + 1}] 📸 Captura de evidencia guardada: ${errFileName}`);
+                                        } catch (screenErr) {
+                                            console.warn('[DESERCIONES] Error tomando screenshot de fallo:', screenErr.message);
+                                        }
+
+                                        const errNote = `Error: ${caseErr.message}${errorScreenPath ? ` | Captura: ${errorScreenPath}` : ''}`;
+                                        await pool.query(
+                                            `UPDATE deserciones_casos SET status = 'Error', descripcion_asunto = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+                                            [casoItem.id, errNote]
+                                        ).catch(() => {});
+                                    }
+                                }
+                            }
+                        }
+
                     currentJob.running = false;
                     currentJob.completed = true;
+                    currentJob.logs.push(`\n[DESERCIONES] ✅ Proceso de lote a OnBase Web finalizado para ${casosToLoad.length} caso(s).`);
                     automationEmitter.emit('done', currentJob);
                     return;
                 }
 
-                // ── PASO 4: DILIGENCIAR Y ENVIAR FORMULARIO DE COMUNICACIÓN ──
-                currentJob.currentStep = 'PASO 4: Diligenciamiento de Formulario de Comunicación';
-                let casosToLoad = [];
-
-                if (caso_ids && Array.isArray(caso_ids) && caso_ids.length > 0) {
-                    const placeholders = caso_ids.map((_, i) => `$${i + 1}`).join(',');
-                    const qRes = await pool.query(`SELECT * FROM deserciones_casos WHERE id IN (${placeholders})`, caso_ids);
-                    casosToLoad = qRes.rows || [];
-                } else {
-                    const qRes = await pool.query(`SELECT * FROM deserciones_casos WHERE status = 'Pendiente' ORDER BY id ASC LIMIT 50`);
-                    casosToLoad = qRes.rows || [];
-                }
-
-                if (casosToLoad.length === 0) {
-                    currentJob.logs.push('[DESERCIONES] ⚠️ No hay casos de deserción pendientes seleccionados para cargar.');
-                } else {
-                    currentJob.logs.push(`[DESERCIONES] Procesando ${casosToLoad.length} caso(s) de deserción para cargue completo en OnBase...`);
-
-                    for (let cIdx = 0; cIdx < casosToLoad.length; cIdx++) {
-                        if (!currentJob.running) break;
-                        const casoItem = casosToLoad[cIdx];
-                        currentJob.logs.push(`\n==================================================`);
-                        currentJob.logs.push(`[DESERCIONES Caso ${cIdx + 1}/${casosToLoad.length}] Aprendiz: ${casoItem.aprendiz_nombre} (Doc: ${casoItem.aprendiz_doc_numero})`);
-                        currentJob.logs.push(`==================================================`);
-
-                        if (cIdx > 0) {
-                            await paso3_uformComunicacionElectronica(page, browser, currentJob.logs);
-                        }
-
-                        const isSoloDiligenciar = !!req.body.solo_diligenciar;
-                        await paso4_diligenciarComunicacionElectronica(page, browser, casoItem, currentJob.logs, { solo_diligenciar: isSoloDiligenciar });
-
-                        await pool.query(`UPDATE deserciones_casos SET status = 'Cargado', updated_at = CURRENT_TIMESTAMP WHERE id = $1`, [casoItem.id]).catch(() => {});
-                        currentJob.logs.push(`[DESERCIONES Caso ${cIdx + 1}/${casosToLoad.length}] ✅ Caso #${casoItem.id} radicado y actualizado a 'Cargado' en BD.`);
+                // ── PROCESAR DOCUMENTOS DEL LOTE ──
+                const totalDocs = Math.max(1, batchDocs.length);
+                for (let docIdx = 0; docIdx < totalDocs; docIdx++) {
+                    if (!currentJob.running) {
+                        currentJob.logs.push('[INFO] Automatización cancelada por el usuario.');
+                        break;
                     }
-                }
 
-                currentJob.running = false;
-                currentJob.completed = true;
-                currentJob.logs.push(`\n[DESERCIONES] ✅ Proceso de cargue a OnBase Web finalizado con éxito para ${casosToLoad.length} caso(s).`);
-                automationEmitter.emit('done', currentJob);
-                return;
-            }
+                    const docInfo = batchDocs[docIdx] || null;
+                    const hasMoreDocs = docIdx < totalDocs - 1;
 
-            // ── PROCESAR LOTE EN LA MISMA SESIÓN ──
-            const totalDocs = Math.max(1, docsToProcess.length);
-            for (let docIdx = 0; docIdx < totalDocs; docIdx++) {
-                if (!currentJob.running) {
-                    currentJob.logs.push('[INFO] Automatización cancelada por el usuario.');
-                    break;
-                }
+                    if (docInfo) {
+                        currentJob.logs.push(`\n--------------------------------------------------`);
+                        currentJob.logs.push(`[LOTE ${bIdx + 1}] Documento ${docIdx + 1} de ${totalDocs}: "${docInfo.filename}"`);
+                        currentJob.logs.push(`--------------------------------------------------`);
+                    }
 
-                const docInfo = docsToProcess[docIdx] || null;
-                const hasMoreDocs = docIdx < totalDocs - 1;
+                    const maxDocAttempts = 2;
+                    let docSuccess = false;
 
-                if (docInfo) {
-                    currentJob.logs.push(`\n--------------------------------------------------`);
-                    currentJob.logs.push(`[LOTE] Documento ${docIdx + 1} de ${totalDocs}: "${docInfo.filename}"`);
-                    currentJob.logs.push(`--------------------------------------------------`);
-                }
+                    for (let attempt = 1; attempt <= maxDocAttempts; attempt++) {
+                        try {
+                            if (attempt > 1) {
+                                currentJob.logs.push(`[Doc ${docIdx + 1}/${totalDocs}] 🔄 Reintentando documento (intento ${attempt}/${maxDocAttempts})...`);
+                                await checkAndClearLocks(browser, currentJob.logs).catch(() => {});
+                                await wait(2000);
+                            }
 
-                try {
-                    // ── PASO 2: FORMULARIO SGDEA (Siempre abrir un nuevo formulario limpio para cada documento del lote) ──
-                    currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 2: Formulario SGDEA`;
-                    await paso2_abrirFormulario(page, browser, currentJob.logs);
-                    await wait(1500);
-
-                    // ── PASO 3: CÓDIGO DE EXPEDIENTE ──
-                    currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 3: Código de Expediente`;
-                    let formPage = page;
-                    let formFrame = page.mainFrame();
-
-                    if (docInfo?.expediente_code) {
-                        let result = await paso3_codigoExpediente(
-                            page, browser, docInfo.expediente_code, currentJob.logs
-                        );
-
-                        if ((!result || !result.success) && docIdx > 0) {
-                            currentJob.logs.push(`[Doc ${docIdx + 1}/${totalDocs}] [FALLBACK] Campo "Código Expediente" no detectado. Re-ejecutando PASO 2 para asegurar formulario...`);
+                            // ── PASO 2: FORMULARIO SGDEA (Siempre abrir un nuevo formulario limpio para cada documento del lote) ──
+                            currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 2: Formulario SGDEA`;
                             await paso2_abrirFormulario(page, browser, currentJob.logs);
                             await wait(1500);
-                            result = await paso3_codigoExpediente(
-                                page, browser, docInfo.expediente_code, currentJob.logs
-                            );
+
+                            // ── PASO 3: CÓDIGO DE EXPEDIENTE ──
+                            currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 3: Código de Expediente`;
+                            let formPage = page;
+                            let formFrame = page.mainFrame();
+
+                            if (docInfo?.expediente_code) {
+                                let result = await paso3_codigoExpediente(
+                                    page, browser, docInfo.expediente_code, currentJob.logs
+                                );
+
+                                if ((!result || !result.success) && docIdx > 0) {
+                                    currentJob.logs.push(`[Doc ${docIdx + 1}/${totalDocs}] [FALLBACK] Campo "Código Expediente" no detectado. Re-ejecutando PASO 2 para asegurar formulario...`);
+                                    await paso2_abrirFormulario(page, browser, currentJob.logs);
+                                    await wait(1500);
+                                    result = await paso3_codigoExpediente(
+                                        page, browser, docInfo.expediente_code, currentJob.logs
+                                    );
+                                }
+
+                                if (!result || !result.success) {
+                                    throw new Error("No se pudo escribir el Código de Expediente o no se encontró el campo.");
+                                }
+
+                                if (result?.formPage) formPage = result.formPage;
+                                if (result?.formFrame) formFrame = result.formFrame;
+                            }
+
+                            // ── PASO 4: LLENAR CAMPOS ──
+                            currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 4: Llenar Campos`;
+                            if (docInfo) {
+                                await paso4_llenarCampos(formPage, formFrame, docInfo, currentJob.logs);
+                            }
+                            await wait(500);
+
+                            // ── PASO 5: ADJUNTAR PDF ──
+                            currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 5: Adjuntar PDF`;
+                            if (docInfo?.path) {
+                                const attachOk = await paso5_adjuntarPDF(page, allFrames, docInfo, currentJob.logs);
+                                if (!attachOk) {
+                                    throw new Error("Fallo al adjuntar el archivo PDF (Importar falló o archivo no encontrado).");
+                                }
+                            }
+
+                            // ── PASO 6: GUARDAR ──
+                            currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 6: Guardar`;
+                            const saveOk = await paso6_guardar(page, allFrames, currentJob.logs, hasMoreDocs);
+                            if (!saveOk) {
+                                throw new Error("El guardado falló o el botón Guardar no estuvo disponible.");
+                            }
+
+                            // Marcar documento como Cargado en la BD
+                            if (docInfo?.id) {
+                                await new Promise(resolve => {
+                                    db.run(
+                                        'UPDATE documents SET status = ?, load_date = ? WHERE id = ?',
+                                        ['Cargado', new Date().toISOString(), docInfo.id],
+                                        () => resolve()
+                                    );
+                                });
+                                currentJob.logs.push(`[INFO] ✅ Documento "${docInfo.filename}" (ID ${docInfo.id}) actualizado a "Cargado" en BD`);
+                            }
+
+                            docSuccess = true;
+                            break;
+
+                        } catch (docErr) {
+                            currentJob.logs.push(`[ERROR DOC ${docIdx + 1}] (Intento ${attempt}/${maxDocAttempts}) "${docInfo?.filename || 'doc'}": ${docErr.message}`);
+                            await checkAndClearLocks(browser, currentJob.logs).catch(() => {});
+                            if (attempt === maxDocAttempts) {
+                                try {
+                                    const errDir = path.join(__dirname, '..', 'uploads', 'errors');
+                                    if (!fs.existsSync(errDir)) fs.mkdirSync(errDir, { recursive: true });
+                                    const errFile = `error_doc_${docInfo?.id || Date.now()}_${Date.now()}.png`;
+                                    await page.screenshot({ path: path.join(errDir, errFile), fullPage: false }).catch(() => {});
+                                    currentJob.logs.push(`[ERROR DOC ${docIdx + 1}] 📸 Captura de evidencia guardada: ${errFile}`);
+                                } catch (e) {}
+                            } else {
+                                await wait(2500);
+                            }
                         }
-
-                        if (!result || !result.success) {
-                            throw new Error("No se pudo escribir el Código de Expediente o no se encontró el campo.");
-                        }
-
-                        if (result?.formPage) formPage = result.formPage;
-                        if (result?.formFrame) formFrame = result.formFrame;
                     }
 
-                    // ── PASO 4: LLENAR CAMPOS ──
-                    currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 4: Llenar Campos`;
-                    if (docInfo) {
-                        await paso4_llenarCampos(formPage, formFrame, docInfo, currentJob.logs);
+                    if (hasMoreDocs) {
+                        await wait(2000);
                     }
-                    await wait(500);
-
-                    // ── PASO 5: ADJUNTAR PDF ──
-                    currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 5: Adjuntar PDF`;
-                    if (docInfo?.path) {
-                        const attachOk = await paso5_adjuntarPDF(page, allFrames, docInfo, currentJob.logs);
-                        if (!attachOk) {
-                            throw new Error("Fallo al adjuntar el archivo PDF (Importar falló o archivo no encontrado).");
-                        }
-                    }
-
-                    // ── PASO 6: GUARDAR ──
-                    currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 6: Guardar`;
-                    const saveOk = await paso6_guardar(page, allFrames, currentJob.logs, hasMoreDocs);
-                    if (!saveOk) {
-                        throw new Error("El guardado falló o el botón Guardar no estuvo disponible.");
-                    }
-
-                    // Marcar documento como Cargado en la BD
-                    if (docInfo?.id) {
-                        await new Promise(resolve => {
-                            db.run(
-                                'UPDATE documents SET status = ?, load_date = ? WHERE id = ?',
-                                ['Cargado', new Date().toISOString(), docInfo.id],
-                                () => resolve()
-                            );
-                        });
-                        currentJob.logs.push(`[INFO] ✅ Documento "${docInfo.filename}" (ID ${docInfo.id}) actualizado a "Cargado" en BD`);
-                    }
-
-                } catch (docErr) {
-                    currentJob.logs.push(`[ERROR DOC ${docIdx + 1}] Falló el procesamiento de "${docInfo?.filename || 'doc'}": ${docErr.message}`);
-                    await checkAndClearLocks(browser, currentJob.logs).catch(() => {});
                 }
 
-                if (hasMoreDocs) {
-                    await wait(2000);
+                // Si viene otro lote de otra dependencia diferente, cerrar sesión limpiamente
+                if (bIdx < depBatches.length - 1) {
+                    currentJob.logs.push(`[INFO] 🔄 Finalizado lote de "${currentBatch.username}". Cerrando sesión para cambiar a la siguiente dependencia...`);
+                    await paso7_logout(page, allFrames, currentJob.logs);
+                    await wait(3000);
                 }
             }
 
-            // ── PASO 7: CERRAR SESIÓN TRAS TERMINAR LOTE ──
+            // ── PASO 7: CERRAR SESIÓN FINAL ──
             currentJob.currentStep = 'PASO 7: Cerrar Sesión final';
             await paso7_logout(page, allFrames, currentJob.logs);
 
             const screenshotBuffer = await page.screenshot({ fullPage: false }).catch(() => null);
 
+            currentJob.screenshot = screenshotBuffer ? `data:image/png;base64,${screenshotBuffer.toString('base64')}` : null;
+            currentJob.logs.push('Proceso de cargue completado.');
+
+        } catch (err) {
+            currentJob.error = err.message;
+            currentJob.logs.push(`[ERROR CRÍTICO] ${err.message}`);
+        } finally {
             if (activeBrowser) {
                 await activeBrowser.close().catch(() => {});
                 activeBrowser = null;
                 activePage = null;
             }
-
             currentJob.running = false;
             currentJob.completed = true;
-            currentJob.screenshot = screenshotBuffer ? `data:image/png;base64,${screenshotBuffer.toString('base64')}` : null;
-            currentJob.logs.push('Proceso de cargue completado.');
-            automationEmitter.emit('done', currentJob);
-
-        } catch (err) {
-            if (activeBrowser) {
-                await activeBrowser.close().catch(() => { });
-                activeBrowser = null;
-                activePage = null;
-            }
-            currentJob.running = false;
-            currentJob.completed = true;
-            currentJob.error = err.message;
-            currentJob.logs.push(`[ERROR CRÍTICO] ${err.message}`);
             automationEmitter.emit('done', currentJob);
         }
     })().catch(unhandledErr => {
         console.error('[AUTOMATION UNHANDLED PROMISE ERROR]', unhandledErr);
+        if (activeBrowser) {
+            activeBrowser.close().catch(() => {});
+            activeBrowser = null;
+            activePage = null;
+        }
         currentJob.running = false;
         currentJob.completed = true;
         currentJob.error = unhandledErr.message;

@@ -154,7 +154,9 @@ export default function AIChatBot() {
                   fontSize: '13px',
                   boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
                   border: msg.role === 'user' ? 'none' : '1px solid #e5e7eb',
-                  lineHeight: '1.4'
+                  lineHeight: '1.5',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word'
                 }}>
                   {msg.content}
                 </div>
