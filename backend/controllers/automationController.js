@@ -1818,11 +1818,14 @@ async function paso4_llenarCampos(formPage, formFrame, docInfo, logs) {
                 let savedAlias = null;
                 try {
                     const aliasRes = await pool.query(
-                        'SELECT onbase_name FROM trd_typologies WHERE (typology_name ILIKE $1 OR onbase_name ILIKE $1) AND onbase_name IS NOT NULL LIMIT 1',
-                        [valueToType.trim()]
+                        `SELECT onbase_name FROM trd_typologies 
+                         WHERE (id = $1 OR typology_name ILIKE $2 OR onbase_name ILIKE $2) 
+                           AND onbase_name IS NOT NULL AND TRIM(onbase_name) != '' 
+                         LIMIT 1`,
+                        [docInfo?.trd_typology_id || docInfo?.typology_id || 0, valueToType.trim()]
                     );
                     if (aliasRes && aliasRes.rows && aliasRes.rows[0]?.onbase_name) {
-                        savedAlias = aliasRes.rows[0].onbase_name;
+                        savedAlias = aliasRes.rows[0].onbase_name.trim();
                         logs.push(`[PASO 4] 💡 Equivalencia previa encontrada en BD para "${valueToType.substring(0,35)}..." ➔ "${savedAlias}"`);
                     }
                 } catch (dbErr) { }
@@ -1831,18 +1834,19 @@ async function paso4_llenarCampos(formPage, formFrame, docInfo, logs) {
                     typingText = savedAlias;
                     searchKey = savedAlias;
                 } else {
-                    // Extraer palabras clave principales (sin preposiciones) para filtrar el dropdown sin bloquearlo
-                    const stopWords = new Set(['DE', 'DEL', 'LA', 'EL', 'LOS', 'LAS', 'EN', 'Y', 'O', 'A', 'AL', 'PARA', 'POR', 'CON', 'SIN', 'SOBRE']);
-                    const tokens = valueToType
+                    // Para buscar en el combobox de OnBase, usar la primera palabra o prefijo exacto
+                    const cleanWords = valueToType
                         .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
                         .toUpperCase()
-                        .split(/[^A-Z0-9]+/)
-                        .filter(w => w.length > 1 && !stopWords.has(w));
+                        .trim()
+                        .split(/\s+/);
                     
-                    if (tokens.length > 0) {
-                        // Tipear la primera o primeras dos palabras clave para abrir opciones
-                        typingText = tokens.slice(0, Math.min(2, tokens.length)).join(' ');
-                        logs.push(`[PASO 4] 🔍 Filtrando dropdown OnBase con palabras clave: "${typingText}" (TRD completa: "${valueToType.substring(0,40)}...")`);
+                    if (cleanWords.length > 0) {
+                        // Tipear la primera palabra (ej. "PUBLICACION", "ESTUDIO", "MINUTA", "CDP", "RP", "RUT")
+                        typingText = cleanWords[0].length <= 3 && cleanWords.length > 1 
+                            ? `${cleanWords[0]} ${cleanWords[1]}` 
+                            : cleanWords[0];
+                        logs.push(`[PASO 4] 🔍 Prefijo de búsqueda para dropdown OnBase: "${typingText}" (TRD completa: "${valueToType.substring(0,40)}...")`);
                     }
                 }
             }
@@ -1885,14 +1889,16 @@ async function paso4_llenarCampos(formPage, formFrame, docInfo, logs) {
                                     if (box) { offX = box.x; offY = box.y; }
                                 }
 
-                                const suggestion = await frame.evaluate((sels, originalText, typedVal) => {
+                                const suggestion = await frame.evaluate((sels, originalText, typedVal, targetAlias) => {
                                     const cleanText = (t) => (t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
                                     const targetClean = cleanText(originalText);
+                                    const aliasClean = cleanText(targetAlias || '');
                                     const typedClean = cleanText(typedVal);
-                                    const targetWords = targetClean.split(' ').filter(w => w.length > 2);
+                                    const stopW = new Set(['DE','DEL','LA','EL','LOS','LAS','EN','Y','O','A','AL','PARA','POR','CON','SIN','SOBRE']);
+                                    const targetTokens = targetClean.split(' ').filter(w => w.length > 1 && !stopW.has(w));
 
                                     // Generar acrónimo/siglas del texto original (ej. "CERTIFICADO DE DISPONIBILIDAD PRESUPUESTAL" -> "CDP")
-                                    const acronym = targetClean.split(' ').filter(w => !['DE','DEL','LA','EL','EN','Y','PARA','POR','CON'].includes(w)).map(w => w[0]).join('');
+                                    const acronym = targetClean.split(' ').filter(w => !stopW.has(w)).map(w => w[0]).join('');
 
                                     for (const sel of sels) {
                                         const items = Array.from(document.querySelectorAll(sel)).filter(el => {
@@ -1909,32 +1915,45 @@ async function paso4_llenarCampos(formPage, formFrame, docInfo, logs) {
                                                 if (!itemText) continue;
 
                                                 let score = 0;
-                                                // 1. Coincidencia exacta
-                                                if (itemText === targetClean || itemText === typedClean) {
-                                                    score = 1000;
+                                                // 1. Coincidencia exacta con el alias guardado
+                                                if (aliasClean && itemText === aliasClean) {
+                                                    score = 3000;
                                                 }
-                                                // 2. Coincidencia por acrónimo / sigla exacta (ej. "CDP", "RP", "RUT")
+                                                // 2. Coincidencia exacta con el texto TRD o lo escrito
+                                                else if (itemText === targetClean || itemText === typedClean) {
+                                                    score = 2500;
+                                                }
+                                                // 3. Coincidencia por acrónimo / sigla exacta (ej. "CDP", "RP", "RUT")
                                                 else if (acronym.length >= 2 && (itemText === acronym || itemText.startsWith(acronym + ' '))) {
-                                                    score = 800;
+                                                    score = 1500;
                                                 }
-                                                // 3. Contención bidireccional
-                                                else if (targetClean.includes(itemText)) {
-                                                    // La opción de OnBase está contenida completa en la TRD (muy común)
-                                                    score = 500 + itemText.length;
-                                                } else if (itemText.includes(targetClean)) {
-                                                    score = 400 + targetClean.length;
+                                                // 4. Contención directa de cadenas completas
+                                                else if (aliasClean && (targetClean.includes(aliasClean) || aliasClean.includes(itemText))) {
+                                                    score = 1400;
+                                                }
+                                                // 5. Token overlap inteligente (conteo de palabras clave coincidentes)
+                                                const itemTokens = itemText.split(' ').filter(w => w.length > 1 && !stopW.has(w));
+                                                let matchingTokens = 0;
+                                                for (const it of itemTokens) {
+                                                    if (targetTokens.includes(it)) matchingTokens++;
+                                                }
+                                                
+                                                if (itemTokens.length > 0) {
+                                                    const matchRatio = matchingTokens / itemTokens.length;
+                                                    if (matchRatio >= 0.5) {
+                                                        score = Math.max(score, 1000 + (matchingTokens * 50) + Math.round(matchRatio * 200));
+                                                    } else if (matchingTokens >= 2) {
+                                                        score = Math.max(score, 500 + (matchingTokens * 40));
+                                                    }
+                                                }
+
+                                                // 6. Contención de subcadenas parciales
+                                                if (targetClean.includes(itemText) && itemText.length > 5) {
+                                                    score = Math.max(score, 800 + itemText.length);
+                                                } else if (itemText.includes(targetClean) && targetClean.length > 5) {
+                                                    score = Math.max(score, 700 + targetClean.length);
                                                 } else if (itemText.includes(typedClean) || typedClean.includes(itemText)) {
-                                                    score = 300;
-                                                } else {
-                                                    // 4. Conteo de palabras clave coincidentes
-                                                    const itemWords = itemText.split(' ').filter(w => w.length > 2);
-                                                    let commonWords = 0;
-                                                    for (const tw of targetWords) {
-                                                        if (itemWords.includes(tw)) commonWords++;
-                                                    }
-                                                    if (commonWords > 0) {
-                                                        score = 100 + (commonWords * 20);
-                                                    }
+                                                    score = Math.max(score, 400);
                                                 }
 
                                                 if (score > bestScore) {
@@ -1943,18 +1962,20 @@ async function paso4_llenarCampos(formPage, formFrame, docInfo, logs) {
                                                 }
                                             }
 
-                                            const target = bestItem || items[0];
-                                            const r = target.getBoundingClientRect();
-                                            return {
-                                                lx: r.left + r.width / 2,
-                                                ly: r.top + r.height / 2,
-                                                text: (target.innerText || target.textContent || '').trim().substring(0, 80),
-                                                score: bestScore
-                                            };
+                                            // Exigir umbral mínimo de seguridad para no seleccionar opciones arbitrarias
+                                            if (bestItem && bestScore >= 400) {
+                                                const r = bestItem.getBoundingClientRect();
+                                                return {
+                                                    lx: r.left + r.width / 2,
+                                                    ly: r.top + r.height / 2,
+                                                    text: (bestItem.innerText || bestItem.textContent || '').trim().substring(0, 100),
+                                                    score: bestScore
+                                                };
+                                            }
                                         }
                                     }
                                     return null;
-                                }, DROPDOWN_SELS, valueToType, typingText);
+                                }, DROPDOWN_SELS, valueToType, typingText, savedAlias);
 
                                 if (suggestion) {
                                     logs.push(`[PASO 4] ✅ Dropdown detectado para ${fieldName} → "${suggestion.text}" (Score: ${suggestion.score})`);
@@ -1983,13 +2004,7 @@ async function paso4_llenarCampos(formPage, formFrame, docInfo, logs) {
                 }
 
                 if (!dropdownHandled) {
-                    logs.push(`[PASO 4][WARN] Dropdown no detectado para ${fieldName}. Fallback: ArrowDown + Enter`);
-                    await formPage.keyboard.press('ArrowDown');
-                    await wait(600);
-                    await formPage.keyboard.press('ArrowDown');
-                    await wait(300);
-                    await formPage.keyboard.press('Enter');
-                    await wait(1500);
+                    logs.push(`[PASO 4][WARN] Dropdown no detectado o sin coincidencia segura para ${fieldName} ("${valueToType.substring(0,35)}..."). Se omite selección arbitraria.`);
                 }
             } else {
                 await formPage.keyboard.press('Tab');
