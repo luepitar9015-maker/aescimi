@@ -301,12 +301,12 @@ router.post('/upload', requireAuth, upload.single('file'), async (req, res) => {
         };
 
         // Helper to save document to DB
-        const saveToDb = (filename, filePath, typologyName, descriptionText = null) => {
+        const saveToDb = (filename, filePath, typologyName, descriptionText = null, customDate = null, customOrigen = null) => {
             return new Promise((resolve, reject) => {
                 const query = `INSERT INTO documents (
                     organization_id, trd_series_id, trd_subseries_id, expediente_id,
-                    filename, path, typology_name, document_date, origen, metadata_values
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                    filename, path, typology_name, document_date, origen, metadata_values, user_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
                 
                 // Note: We use IDs from trdInfo if available, and expediente.id
                 db.run(query, [
@@ -317,9 +317,10 @@ router.post('/upload', requireAuth, upload.single('file'), async (req, res) => {
                     filename,
                     filePath,
                     typologyName,
-                    documentDate,
-                    origen,
-                    descriptionText ? JSON.stringify({ description: descriptionText }) : null
+                    customDate || documentDate,
+                    customOrigen || origen,
+                    descriptionText ? JSON.stringify({ description: descriptionText }) : null,
+                    req.user?.id || null
                 ], function(err) {
                     if (err) reject(err);
                     else resolve(this.lastID);
@@ -384,8 +385,10 @@ router.post('/upload', requireAuth, upload.single('file'), async (req, res) => {
                     }
                 }
                 
-                // Save record to DB
-                await saveToDb(filename, outputPath, typ.name, typ.description);
+                // Save record to DB with individual typology date and origen
+                const typDocDate = typ.document_date || documentDate;
+                const typOrigen = typ.origen || origen;
+                await saveToDb(filename, outputPath, typ.name, typ.description, typDocDate, typOrigen);
                 
                 results.push({ file: filename, path: outputPath });
             }
@@ -788,14 +791,15 @@ router.get('/stats/dashboard', requireAuth, (req, res) => {
                     COUNT(DISTINCT CASE WHEN d.id IS NOT NULL THEN e.id END) AS expedientes_con_docs,
                     COUNT(DISTINCT CASE WHEN d.id IS NULL THEN e.id END) AS expedientes_sin_docs,
                     COUNT(CASE WHEN d.status = 'Pendiente' THEN 1 END) AS docs_pendientes,
-                    COUNT(CASE WHEN d.status = 'Cargado' AND DATE(d.load_date) = CURRENT_DATE THEN 1 END) AS docs_cargados_hoy,
-                    COUNT(CASE WHEN d.status = 'Cargado' THEN 1 END) AS docs_cargados_total,
+                    COUNT(CASE WHEN (d.user_id = ? OR ea.user_id = ?) AND DATE(d.created_at) = CURRENT_DATE THEN 1 END) AS docs_cargados_hoy,
+                    COUNT(CASE WHEN d.user_id = ? THEN 1 WHEN d.user_id IS NULL AND d.id IS NOT NULL THEN 1 END) AS docs_cargados_total,
                     COUNT(d.id) AS total_docs
-                FROM expedientes e
+                FROM expediente_assignments ea
+                JOIN expedientes e ON e.id = ea.expediente_id
                 LEFT JOIN documents d ON d.expediente_id = e.id
-                WHERE e.id IN (SELECT expediente_id FROM expediente_assignments WHERE user_id = ?)
+                WHERE ea.user_id = ?
             `;
-            db.get(query, [userId], (err, row) => {
+            db.get(query, [userId, userId, userId, userId], (err, row) => {
                 if (err) reject(err);
                 else resolve(row || {
                     total_expedientes: 0, expedientes_con_docs: 0,
@@ -821,9 +825,7 @@ router.get('/stats/dashboard', requireAuth, (req, res) => {
                  WHERE d.id IS NULL
                 ) AS expedientes_sin_docs,
                 (SELECT COUNT(*) FROM documents WHERE status = 'Pendiente') AS docs_pendientes,
-                (SELECT COUNT(*) FROM documents WHERE status = 'Cargado' 
-                 AND DATE(load_date) = CURRENT_DATE
-                ) AS docs_cargados_hoy,
+                (SELECT COUNT(*) FROM documents WHERE DATE(created_at) = CURRENT_DATE) AS docs_cargados_hoy,
                 (SELECT COUNT(*) FROM documents WHERE status = 'Cargado') AS docs_cargados_total,
                 (SELECT COUNT(*) FROM documents) AS total_docs
         `;
@@ -1216,8 +1218,8 @@ router.post('/merge-upload', requireAuth, upload.array('files'), async (req, res
             return new Promise((resolve, reject) => {
                 const query = `INSERT INTO documents (
                     organization_id, trd_series_id, trd_subseries_id, expediente_id,
-                    filename, path, typology_name, document_date, origen, metadata_values
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                    filename, path, typology_name, document_date, origen, metadata_values, user_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
                 
                 db.run(query, [
                     trdInfo?.dependency_id || null,
@@ -1229,7 +1231,8 @@ router.post('/merge-upload', requireAuth, upload.array('files'), async (req, res
                     typologyName,
                     req.body.document_date || new Date().toISOString(),
                     origen,
-                    descriptionText ? JSON.stringify({ description: descriptionText }) : null
+                    descriptionText ? JSON.stringify({ description: descriptionText }) : null,
+                    req.user?.id || null
                 ], function(err) {
                     if (err) reject(err);
                     else resolve(this.lastID);

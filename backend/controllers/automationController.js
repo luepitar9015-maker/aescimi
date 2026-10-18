@@ -2642,7 +2642,7 @@ exports.executeAutomation = async (req, res) => {
                 return orgRows.find(o => subCode ? o.subsection_code === subCode : (!o.subsection_code || o.subsection_code === '')) || null;
             };
 
-            const orgSub = findOrg('') || { id: 6, section_name: 'Subdirección de Centro', subsection_code: '', onbase_user: 'JRROZO', onbase_pass: 'Colombia2026**' };
+            const orgSub = findOrg('') || { id: 6, section_name: 'Subdirección de Centro', subsection_code: '', onbase_user: 'TVILLAMIZARJ', onbase_pass: 'Sena2026**onbase' };
             const orgAdmin = findOrg('9224.2') || { id: 7, subsection_name: 'Grupo Administración Educativa', subsection_code: '9224.2', onbase_user: 'luepitar', onbase_pass: 'Automatizador2026*' };
             const orgForm = findOrg('9224.4') || { id: 8, subsection_name: 'Grupo de Formación Profesional Integral', subsection_code: '9224.4', onbase_user: 'EDHERNANDEZM', onbase_pass: 'Sena2026**onbase' };
 
@@ -2673,13 +2673,13 @@ exports.executeAutomation = async (req, res) => {
                             rule: 'Selección explícita de usuario (Adm. Educativa)'
                         };
                     }
-                    if (tu.includes('jrrozo') || tu.includes('subdireccion') || tu.includes('9224')) {
+                    if (tu.includes('tvillamizar') || tu.includes('jrrozo') || tu.includes('subdireccion') || tu.includes('9224')) {
                         return {
                             depKey: '9224',
                             depName: orgSub.section_name || 'Subdirección de Centro',
                             depCode: '9224',
-                            username: getU(orgSub, 'JRROZO'),
-                            password: getP(orgSub, 'Colombia2026**'),
+                            username: getU(orgSub, 'TVILLAMIZARJ'),
+                            password: getP(orgSub, 'Sena2026**onbase'),
                             rule: 'Selección explícita de usuario (Subdirección)'
                         };
                     }
@@ -2688,7 +2688,7 @@ exports.executeAutomation = async (req, res) => {
                         depName: 'Usuario Personalizado',
                         depCode: 'N/A',
                         username: target_user,
-                        password: password || getP(orgSub, 'Colombia2026**'),
+                        password: password || getP(orgSub, 'Sena2026**onbase'),
                         rule: `Usuario explícito: ${target_user}`
                     };
                 }
@@ -2698,8 +2698,8 @@ exports.executeAutomation = async (req, res) => {
                         depKey: '9224',
                         depName: orgSub.section_name || 'Subdirección de Centro',
                         depCode: '9224',
-                        username: username || getU(orgSub, 'JRROZO'),
-                        password: password || getP(orgSub, 'Colombia2026**'),
+                        username: username || getU(orgSub, 'TVILLAMIZARJ'),
+                        password: password || getP(orgSub, 'Sena2026**onbase'),
                         rule: 'General / Sin documento'
                     };
                 }
@@ -2734,8 +2734,8 @@ exports.executeAutomation = async (req, res) => {
                         depKey: '9224',
                         depName: orgSub.section_name || 'Subdirección de Centro',
                         depCode: '9224',
-                        username: getU(orgSub, 'JRROZO'),
-                        password: getP(orgSub, 'Colombia2026**'),
+                        username: getU(orgSub, 'TVILLAMIZARJ'),
+                        password: getP(orgSub, 'Sena2026**onbase'),
                         rule: 'TRD 9224 (Subdirección de Centro)'
                     };
                 }
@@ -2767,8 +2767,8 @@ exports.executeAutomation = async (req, res) => {
                     depKey: '9224',
                     depName: orgSub.section_name || 'Subdirección de Centro',
                     depCode: '9224',
-                    username: username || getU(orgSub, 'JRROZO'),
-                    password: password || getP(orgSub, 'Colombia2026**'),
+                    username: username || getU(orgSub, 'TVILLAMIZARJ'),
+                    password: password || getP(orgSub, 'Sena2026**onbase'),
                     rule: 'Fallback General (Subdirección)'
                 };
             };

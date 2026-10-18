@@ -16,6 +16,8 @@ function CargueAes() {
     const [modalEditFields, setModalEditFields] = useState({});
     const [editingCode, setEditingCode] = useState({});
     const [statusFilter, setStatusFilter] = useState('Pendiente'); // 'Todos', 'Pendiente', 'Cargado'
+    const [dependencyFilter, setDependencyFilter] = useState('all'); // 'all', '9224', '9224.4', '9224.2'
+    const [selectedOnBaseUser, setSelectedOnBaseUser] = useState('auto'); // 'auto', 'JRROZO', 'EDHERNANDEZM', 'luepitar'
     const [documents, setDocuments] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -25,6 +27,78 @@ function CargueAes() {
     const [isMonitorExpanded, setIsMonitorExpanded] = useState(false);
     const [manualText, setManualText] = useState('');
     const [isInteracting, setIsInteracting] = useState(false);
+
+    // Estado dinámico de usuarios OnBase asignados a dependencias
+    const [orgUsers, setOrgUsers] = useState({
+        '9224': 'TVILLAMIZARJ',
+        '9224.4': 'EDHERNANDEZM',
+        '9224.2': 'luepitar'
+    });
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+                const res = await axios.get('/api/organization', { headers: authHeaders });
+                const list = res.data?.data || [];
+                const mapping = {};
+                list.forEach(o => {
+                    const sub = (o.subsection_code || '').trim();
+                    const u = (o.onbase_user || o.onbase_username || '').trim();
+                    if (sub === '9224.4' && u) mapping['9224.4'] = u;
+                    else if (sub === '9224.2' && u) mapping['9224.2'] = u;
+                    else if ((!sub || sub === '9224') && u) mapping['9224'] = u;
+                });
+                setOrgUsers(prev => ({ ...prev, ...mapping }));
+            } catch (e) {
+                console.error('Error fetching org users:', e);
+            }
+        })();
+    }, []);
+
+    // Helper de Dependencia y Usuario OnBase
+    const getDepBadge = (code, user) => {
+        const u = (user || '').toUpperCase();
+        const c = String(code || '');
+        if (c.includes('9224.4') || u.includes('EDHERNANDEZ')) {
+            return {
+                label: 'Grupo de Formación Profesional Integral',
+                shortLabel: 'Formación (9224.4)',
+                code: '9224.4',
+                user: user || orgUsers['9224.4'] || 'EDHERNANDEZM',
+                icon: '🎓',
+                bg: '#e8f5e9',
+                color: '#1b5e20',
+                border: '#a5d6a7',
+                pillBg: '#c8e6c9'
+            };
+        }
+        if (c.includes('9224.2') || u.includes('LUEPITAR')) {
+            return {
+                label: 'Grupo Administración Educativa',
+                shortLabel: 'Adm. Educativa (9224.2)',
+                code: '9224.2',
+                user: user || orgUsers['9224.2'] || 'luepitar',
+                icon: '📚',
+                bg: '#f3e5f5',
+                color: '#4a148c',
+                border: '#ce93d8',
+                pillBg: '#e1bee7'
+            };
+        }
+        return {
+            label: 'Subdirección de Centro',
+            shortLabel: 'Subdirección (9224)',
+            code: '9224',
+            user: user || orgUsers['9224'] || 'TVILLAMIZARJ',
+            icon: '🏢',
+            bg: '#e3f2fd',
+            color: '#0d47a1',
+            border: '#90caf9',
+            pillBg: '#bbdefb'
+        };
+    };
 
     // Automation Flow Tracking
     const [currentStepIndex, setCurrentStepIndex] = useState(-1);
@@ -100,11 +174,16 @@ function CargueAes() {
     });
     const [allSubseries, setAllSubseries] = useState([]);
     const [currentLabels, setCurrentLabels] = useState({});
-    const fetchDocuments = async (filter) => {
+    const fetchDocuments = async (filter, dep) => {
         const activeFilter = filter !== undefined ? filter : statusFilter;
+        const activeDep = dep !== undefined ? dep : dependencyFilter;
         setLoading(true);
         try {
-            const res = await axios.get(`/api/ades/pending?status=${activeFilter}`);
+            let url = `/api/ades/pending?status=${activeFilter}`;
+            if (activeDep && activeDep !== 'all') {
+                url += `&dependency=${activeDep}`;
+            }
+            const res = await axios.get(url);
             const data = res.data || [];
             setDocuments(data);
             const codes = {};
@@ -118,12 +197,12 @@ function CargueAes() {
     };
 
     // alias for backward compat
-    const fetchPending = () => fetchDocuments(statusFilter);
+    const fetchPending = () => fetchDocuments(statusFilter, dependencyFilter);
 
     useEffect(() => {
-        fetchDocuments(statusFilter);
+        fetchDocuments(statusFilter, dependencyFilter);
         fetchSubseriesList();
-    }, [statusFilter]);
+    }, [statusFilter, dependencyFilter]);
 
     useEffect(() => {
         const fetchActiveUsers = async () => {
@@ -224,6 +303,7 @@ function CargueAes() {
                 url: settings.ades_url,
                 username: settings.ades_username,
                 password: settings.ades_password,
+                target_user: selectedOnBaseUser,
                 documentIds: docIdsToProcess
             }, { headers: authHeaders });
 
@@ -270,8 +350,12 @@ function CargueAes() {
         }
     };
     const filteredDocs = documents.filter(doc => {
-        // Status filter: Bypass client-side filtering as the backend handles the correct
-        // documents for each status tab ('Pendiente', 'Cargado', or 'Todos').
+        // Filtro de Dependencia
+        if (dependencyFilter !== 'all') {
+            const docDep = doc.dependency_code || (doc.subserie && doc.subserie.includes('9224.4') ? '9224.4' : (doc.subserie && doc.subserie.includes('9224.2') ? '9224.2' : '9224'));
+            if (docDep !== dependencyFilter) return false;
+        }
+
         if (!searchTerm) return true;
         const s = searchTerm.toLowerCase().trim();
 
@@ -293,6 +377,9 @@ function CargueAes() {
             doc.typology_name,
             doc.box_id,
             doc.subserie,
+            doc.dependency_name,
+            doc.dependency_code,
+            doc.target_onbase_user,
             mExp,
             mDoc
         ].map(getStr).join(' ');
@@ -988,6 +1075,9 @@ function CargueAes() {
                 opening_date: doc.opening_date || '',
                 expediente_metadata: doc.expediente_metadata || {},
                 has_first_three_typologies: doc.has_first_three_typologies ?? true,
+                dependency_name: doc.dependency_name || 'Subdirección de Centro',
+                dependency_code: doc.dependency_code || (doc.subserie && doc.subserie.includes('9224.4') ? '9224.4' : (doc.subserie && doc.subserie.includes('9224.2') ? '9224.2' : '9224')),
+                target_onbase_user: doc.target_onbase_user || (doc.subserie && doc.subserie.includes('9224.4') ? (orgUsers['9224.4'] || 'EDHERNANDEZM') : (doc.subserie && doc.subserie.includes('9224.2') ? (orgUsers['9224.2'] || 'luepitar') : (orgUsers['9224'] || 'TVILLAMIZARJ'))),
                 documents: []
             };
             groupedExpedientes.push(expGroupMap[expId]);
@@ -1066,6 +1156,54 @@ function CargueAes() {
                                 </button>
                             </div>
 
+                            {/* Barra de Filtro por Dependencia Institucional */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px', padding: '10px 14px', backgroundColor: '#f9fbf9', borderRadius: '10px', border: '1px solid #e0ede0', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#2e7d32', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    🏛️ Dependencia TRD:
+                                </span>
+                                {[
+                                    { id: 'all', label: 'Todas las Dependencias', count: documents.length, color: '#37474f', bg: '#eceff1' },
+                                    { id: '9224', label: `🏢 Subdirección (9224) • ${orgUsers['9224'] || 'TVILLAMIZARJ'}`, count: documents.filter(d => d.dependency_code === '9224' || (!d.dependency_code && (!d.subserie || !d.subserie.includes('9224.')))).length, color: '#0d47a1', bg: '#e3f2fd' },
+                                    { id: '9224.4', label: `🎓 Formación Profesional (9224.4) • ${orgUsers['9224.4'] || 'EDHERNANDEZM'}`, count: documents.filter(d => d.dependency_code === '9224.4' || (d.subserie && d.subserie.includes('9224.4'))).length, color: '#1b5e20', bg: '#e8f5e9' },
+                                    { id: '9224.2', label: `📚 Adm. Educativa (9224.2) • ${orgUsers['9224.2'] || 'luepitar'}`, count: documents.filter(d => d.dependency_code === '9224.2' || (d.subserie && d.subserie.includes('9224.2'))).length, color: '#4a148c', bg: '#f3e5f5' }
+                                ].map(dep => {
+                                    const isSelected = dependencyFilter === dep.id;
+                                    return (
+                                        <button
+                                            key={dep.id}
+                                            onClick={() => setDependencyFilter(dep.id)}
+                                            style={{
+                                                padding: '6px 12px',
+                                                borderRadius: '20px',
+                                                border: isSelected ? `2px solid ${dep.color}` : '1px solid #d0d7de',
+                                                backgroundColor: isSelected ? dep.bg : '#ffffff',
+                                                color: isSelected ? dep.color : '#555',
+                                                fontWeight: isSelected ? 'bold' : '500',
+                                                fontSize: '12px',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                boxShadow: isSelected ? '0 2px 4px rgba(0,0,0,0.08)' : 'none',
+                                                transition: 'all 0.15s ease-in-out'
+                                            }}
+                                        >
+                                            <span>{dep.label}</span>
+                                            <span style={{
+                                                padding: '1px 7px',
+                                                borderRadius: '10px',
+                                                fontSize: '10px',
+                                                fontWeight: 'bold',
+                                                backgroundColor: isSelected ? dep.color : '#e0e0e0',
+                                                color: isSelected ? '#fff' : '#555'
+                                            }}>
+                                                {dep.count}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
                             <div style={{ overflowX: 'auto' }}>
                                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                                     <thead>
@@ -1084,9 +1222,10 @@ function CargueAes() {
                                             </th>
                                             <th style={{ padding: '12px', width: '140px' }}>Código Expediente</th>
                                             <th style={{ padding: '12px' }}>Detalle de Expediente</th>
-                                            <th style={{ padding: '12px', width: '150px' }}>Cant. Documentos</th>
-                                            <th style={{ padding: '12px', width: '150px' }}>Subserie TRD</th>
-                                            <th style={{ padding: '12px', width: '220px', textAlign: 'center' }}>Seguimiento / Estado</th>
+                                            <th style={{ padding: '12px', width: '130px' }}>Cant. Documentos</th>
+                                            <th style={{ padding: '12px', width: '140px' }}>Subserie TRD</th>
+                                            <th style={{ padding: '12px', width: '220px' }}>Dependencia & Usuario OnBase</th>
+                                            <th style={{ padding: '12px', width: '200px', textAlign: 'center' }}>Seguimiento / Estado</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1178,6 +1317,34 @@ function CargueAes() {
                                                         <td style={{ padding: '12px', color: '#333', fontSize: '12px' }}>
                                                             {exp.subserie || '-'}
                                                         </td>
+                                                        <td style={{ padding: '12px' }}>
+                                                            {(() => {
+                                                                const b = getDepBadge(exp.dependency_code, exp.target_onbase_user);
+                                                                return (
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                                                        <span style={{
+                                                                            display: 'inline-flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '4px',
+                                                                            padding: '3px 8px',
+                                                                            borderRadius: '6px',
+                                                                            fontSize: '11px',
+                                                                            fontWeight: 'bold',
+                                                                            backgroundColor: b.bg,
+                                                                            color: b.color,
+                                                                            border: `1px solid ${b.border}`,
+                                                                            width: 'fit-content'
+                                                                        }}>
+                                                                            <span>{b.icon}</span>
+                                                                            <span>{b.shortLabel}</span>
+                                                                        </span>
+                                                                        <div style={{ fontSize: '11px', color: '#555', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                            OnBase: <strong style={{ color: '#111', backgroundColor: '#f0f0f0', padding: '1px 5px', borderRadius: '4px' }}>{exp.target_onbase_user || b.user}</strong>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </td>
                                                         <td style={{ padding: '12px', textAlign: 'center' }}>
                                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                                                                 <span style={{
@@ -1236,7 +1403,7 @@ function CargueAes() {
                                                     {/* Child Row (Expanded Documents List) */}
                                                     {isExpanded && (
                                                         <tr style={{ backgroundColor: '#fafafa' }}>
-                                                            <td colSpan="6" style={{ padding: '15px 15px 15px 50px', borderTop: '1px dashed #c8e6c9', borderBottom: '1px solid #e0e0e0' }}>
+                                                            <td colSpan="7" style={{ padding: '15px 15px 15px 50px', borderTop: '1px dashed #c8e6c9', borderBottom: '1px solid #e0e0e0' }}>
                                                                 <div style={{ 
                                                                     backgroundColor: '#fff', 
                                                                     borderRadius: '8px', 
@@ -1250,13 +1417,16 @@ function CargueAes() {
                                                                                 <th style={{ padding: '8px 12px', width: '40px', textAlign: 'center' }}></th>
                                                                                 <th style={{ padding: '8px 12px' }}>Archivo Original</th>
                                                                                 <th style={{ padding: '8px 12px' }}>Tipología</th>
+                                                                                <th style={{ padding: '8px 12px', width: '160px' }}>Usuario OnBase</th>
                                                                                 <th style={{ padding: '8px 12px', width: '110px' }}>Fecha</th>
                                                                                 <th style={{ padding: '8px 12px', width: '110px' }}>Estado</th>
                                                                                 <th style={{ padding: '8px 12px', width: '160px', textAlign: 'center' }}>Acciones</th>
                                                                             </tr>
                                                                         </thead>
                                                                         <tbody>
-                                                                            {exp.documents.map(doc => (
+                                                                            {exp.documents.map(doc => {
+                                                                                const docBadge = getDepBadge(doc.dependency_code || exp.dependency_code, doc.target_onbase_user || exp.target_onbase_user);
+                                                                                return (
                                                                                 <tr key={doc.id} style={{ borderBottom: '1px solid #f0f0f0', backgroundColor: selectedDocs.includes(doc.id) ? '#f1f8e9' : 'transparent' }}>
                                                                                     <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                                                                                         <input
@@ -1278,6 +1448,22 @@ function CargueAes() {
                                                                                     </td>
                                                                                     <td style={{ padding: '8px 12px', color: '#555' }}>
                                                                                         {doc.typology_name}
+                                                                                    </td>
+                                                                                    <td style={{ padding: '8px 12px' }}>
+                                                                                        <span style={{
+                                                                                            display: 'inline-flex',
+                                                                                            alignItems: 'center',
+                                                                                            gap: '4px',
+                                                                                            padding: '2px 7px',
+                                                                                            borderRadius: '4px',
+                                                                                            fontSize: '11px',
+                                                                                            fontWeight: 'bold',
+                                                                                            backgroundColor: docBadge.bg,
+                                                                                            color: docBadge.color,
+                                                                                            border: `1px solid ${docBadge.border}`
+                                                                                        }}>
+                                                                                            {docBadge.icon} {doc.target_onbase_user || docBadge.user}
+                                                                                        </span>
                                                                                     </td>
                                                                                     <td style={{ padding: '8px 12px', color: '#666' }}>
                                                                                         {new Date(doc.document_date).toLocaleDateString()}
@@ -1346,7 +1532,8 @@ function CargueAes() {
                                                                                         </div>
                                                                                     </td>
                                                                                 </tr>
-                                                                            ))}
+                                                                                );
+                                                                            })}
                                                                         </tbody>
                                                                     </table>
                                                                 </div>
@@ -1357,7 +1544,7 @@ function CargueAes() {
                                             );
                                         }) : (
                                             <tr>
-                                                <td colSpan="6" style={{ padding: '60px', textAlign: 'center' }}>
+                                                <td colSpan="7" style={{ padding: '60px', textAlign: 'center' }}>
                                                     <div style={{ color: '#999', fontSize: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                                                         {loading ? (
                                                             <p>Cargando expedientes...</p>
@@ -1386,41 +1573,100 @@ function CargueAes() {
                                 </table>
                             </div>
 
-                            {filteredDocs.length > 0 && (
-                                <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
-                                    <button
-                                        className="btn btn-primary"
-                                        onClick={() => handleRunAutomation()}
-                                        disabled={automationLoading}
-                                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px' }}
-                                    >
-                                        {automationLoading ? 'Ejecutando proceso en OnBase...' : <><Play size={18} /> Iniciar Cargue AES ({selectedDocs.length} de {filteredDocs.filter(d => d.status === 'Pendiente').length} Docs seleccionados)</>}
-                                    </button>
+                            {filteredDocs.length > 0 && (() => {
+                                const selectedDocsList = documents.filter(d => selectedDocs.includes(d.id));
+                                const subCount = selectedDocsList.filter(d => d.dependency_code === '9224' || (!d.dependency_code && (!d.subserie || !d.subserie.includes('9224.')))).length;
+                                const formCount = selectedDocsList.filter(d => d.dependency_code === '9224.4' || (d.subserie && d.subserie.includes('9224.4'))).length;
+                                const adminCount = selectedDocsList.filter(d => d.dependency_code === '9224.2' || (d.subserie && d.subserie.includes('9224.2'))).length;
 
-                                    <button
-                                        className="btn"
-                                        onClick={handleMarkSelectedAsCargado}
-                                        disabled={automationLoading || selectedDocs.length === 0}
-                                        style={{ 
-                                            display: 'flex', 
-                                            alignItems: 'center', 
-                                            justifyContent: 'center', 
-                                            gap: '8px', 
-                                            padding: '12px 20px', 
-                                            backgroundColor: selectedDocs.length > 0 ? '#2e7d32' : '#cccccc',
-                                            color: '#ffffff',
-                                            border: 'none',
-                                            borderRadius: '8px',
-                                            fontWeight: 'bold',
-                                            cursor: selectedDocs.length > 0 ? 'pointer' : 'not-allowed',
-                                            whiteSpace: 'nowrap'
-                                        }}
-                                        title="Marcar manualmente los documentos seleccionados como cargados en AES"
-                                    >
-                                        <CheckSquare size={18} /> Marcar Seleccionados como Cargados ({selectedDocs.length})
-                                    </button>
+                                return (
+                                <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    {/* Selector de Usuario OnBase y Plan de Ejecución */}
+                                    <div style={{ backgroundColor: '#f5faf5', border: '1px solid #c8e6c9', borderRadius: '10px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#2e7d32' }}>
+                                                👤 Usuario OnBase para este Cargue:
+                                            </span>
+                                            <select
+                                                value={selectedOnBaseUser}
+                                                onChange={(e) => setSelectedOnBaseUser(e.target.value)}
+                                                style={{
+                                                    padding: '6px 12px',
+                                                    borderRadius: '6px',
+                                                    border: '2px solid #39a900',
+                                                    backgroundColor: '#fff',
+                                                    color: '#1b5e20',
+                                                    fontWeight: 'bold',
+                                                    fontSize: '12px',
+                                                    outline: 'none',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                <option value="auto">🤖 Automático por TRD (Subdirección, Formación, Adm. Educativa)</option>
+                                                <option value={orgUsers['9224'] || 'TVILLAMIZARJ'}>🏢 Subdirección de Centro ({orgUsers['9224'] || 'TVILLAMIZARJ'})</option>
+                                                <option value={orgUsers['9224.4'] || 'EDHERNANDEZM'}>🎓 Formación Profesional Integral ({orgUsers['9224.4'] || 'EDHERNANDEZM'})</option>
+                                                <option value={orgUsers['9224.2'] || 'luepitar'}>📚 Administración Educativa ({orgUsers['9224.2'] || 'luepitar'})</option>
+                                            </select>
+                                        </div>
+
+                                        {selectedDocs.length > 0 && (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', fontSize: '11px' }}>
+                                                <span style={{ fontWeight: 'bold', color: '#555' }}>Plan de Lote ({selectedDocs.length}):</span>
+                                                {subCount > 0 && (
+                                                    <span style={{ backgroundColor: '#e3f2fd', color: '#0d47a1', border: '1px solid #90caf9', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>
+                                                        🏢 Subdirección ({orgUsers['9224'] || 'TVILLAMIZARJ'}): {subCount}
+                                                    </span>
+                                                )}
+                                                {formCount > 0 && (
+                                                    <span style={{ backgroundColor: '#e8f5e9', color: '#1b5e20', border: '1px solid #a5d6a7', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>
+                                                        🎓 Formación (EDHERNANDEZM): {formCount}
+                                                    </span>
+                                                )}
+                                                {adminCount > 0 && (
+                                                    <span style={{ backgroundColor: '#f3e5f5', color: '#4a148c', border: '1px solid #ce93d8', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>
+                                                        📚 Adm. Educativa (luepitar): {adminCount}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: '10px' }}>
+                                        <button
+                                            className="btn btn-primary"
+                                            onClick={() => handleRunAutomation()}
+                                            disabled={automationLoading}
+                                            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px' }}
+                                        >
+                                            {automationLoading ? 'Ejecutando proceso en OnBase...' : <><Play size={18} /> Iniciar Cargue AES ({selectedDocs.length} de {filteredDocs.filter(d => d.status === 'Pendiente').length} Docs seleccionados)</>}
+                                        </button>
+
+                                        <button
+                                            className="btn"
+                                            onClick={handleMarkSelectedAsCargado}
+                                            disabled={automationLoading || selectedDocs.length === 0}
+                                            style={{ 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                justifyContent: 'center', 
+                                                gap: '8px', 
+                                                padding: '12px 20px', 
+                                                backgroundColor: selectedDocs.length > 0 ? '#2e7d32' : '#cccccc',
+                                                color: '#ffffff',
+                                                border: 'none',
+                                                borderRadius: '8px',
+                                                fontWeight: 'bold',
+                                                cursor: selectedDocs.length > 0 ? 'pointer' : 'not-allowed',
+                                                whiteSpace: 'nowrap'
+                                            }}
+                                            title="Marcar manualmente los documentos seleccionados como cargados en AES"
+                                        >
+                                            <CheckSquare size={18} /> Marcar Seleccionados como Cargados ({selectedDocs.length})
+                                        </button>
+                                    </div>
                                 </div>
-                            )}
+                                );
+                            })()}
                         </div>
                     </div>
 
@@ -1809,6 +2055,27 @@ function CargueAes() {
                                     </button>
                                 </div>
                             </div>
+
+                            {/* Información Institucional TRD y OnBase */}
+                            {(() => {
+                                const mb = getDepBadge(configDoc.dependency_code, configDoc.target_onbase_user);
+                                return (
+                                    <div style={{ padding: '12px', borderRadius: '8px', background: mb.bg, border: `1px solid ${mb.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div>
+                                            <div style={{ fontSize: '11px', color: '#666', fontWeight: 'bold' }}>DEPENDENCIA TRD / SECCIÓN</div>
+                                            <div style={{ fontSize: '13px', fontWeight: 'bold', color: mb.color }}>
+                                                {mb.icon} {configDoc.dependency_name || mb.label} ({configDoc.dependency_code || mb.code})
+                                            </div>
+                                        </div>
+                                        <div style={{ textAlign: 'right' }}>
+                                            <div style={{ fontSize: '10px', color: '#666', fontWeight: 'bold' }}>USUARIO ONBASE</div>
+                                            <span style={{ display: 'inline-block', padding: '3px 8px', borderRadius: '6px', backgroundColor: mb.pillBg, color: mb.color, fontWeight: 'bold', fontSize: '12px' }}>
+                                                {configDoc.target_onbase_user || mb.user}
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
 
                             <div className="form-group">
                                 <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#666', marginBottom: '5px' }}>GRUPO DOCUMENTAL</label>

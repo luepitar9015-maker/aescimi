@@ -122,13 +122,24 @@ router.get('/estadisticas', requireAuth, async (req, res) => {
                 COUNT(DISTINCT ea.expediente_id)            AS expedientes_asignados,
                 COUNT(DISTINCT CASE WHEN ea_av.cargados > 0 THEN ea.expediente_id END) AS expedientes_con_docs,
                 ROUND(
-                    CASE WHEN SUM(CASE WHEN ea.expediente_id IS NOT NULL THEN total_requeridos ELSE 0 END) > 0
-                         THEN SUM(CASE WHEN ea.expediente_id IS NOT NULL THEN cargados ELSE 0 END)::NUMERIC 
-                               / SUM(CASE WHEN ea.expediente_id IS NOT NULL THEN total_requeridos ELSE 0 END) * 100
+                    CASE WHEN COUNT(DISTINCT ea.expediente_id) > 0
+                         THEN COUNT(DISTINCT CASE WHEN ea_av.cargados > 0 THEN ea.expediente_id END)::NUMERIC 
+                               / COUNT(DISTINCT ea.expediente_id) * 100
                          ELSE 0
-                    END, 2
+                    END, 1
                 ) AS porcentaje_cargue,
-                COALESCE((SELECT COUNT(*) FROM documents doc WHERE doc.expediente_id IN (SELECT expediente_id FROM expediente_assignments WHERE user_id = u.id)), 0) AS total_documentos
+                COALESCE((
+                    SELECT COUNT(*) 
+                    FROM documents doc 
+                    WHERE doc.user_id = u.id 
+                       OR (doc.user_id IS NULL AND doc.expediente_id IN (SELECT expediente_id FROM expediente_assignments WHERE user_id = u.id))
+                ), 0) AS total_documentos,
+                COALESCE((
+                    SELECT COUNT(*) 
+                    FROM documents doc 
+                    WHERE (doc.user_id = u.id OR doc.expediente_id IN (SELECT expediente_id FROM expediente_assignments WHERE user_id = u.id))
+                      AND DATE(doc.created_at) = CURRENT_DATE
+                ), 0) AS docs_hoy
             FROM users u
             LEFT JOIN expediente_assignments ea ON ea.user_id = u.id
             LEFT JOIN expediente_avance ea_av ON ea_av.id = ea.expediente_id

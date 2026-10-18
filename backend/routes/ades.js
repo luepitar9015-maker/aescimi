@@ -54,6 +54,80 @@ const resolveDocumentPath = (docPath, filename) => {
     return null;
 };
 
+// Helper inteligente para resolver Dependencia y Usuario OnBase según TRD y estructura organizativa
+const resolveDocDependency = (row, orgList = [], sessionUser = null) => {
+    const text = `${row.subserie || ''} ${row.filename || ''} ${row.expediente_code || ''} ${row.title || ''}`.toUpperCase();
+
+    const findOrg = (secCode, subCode) => {
+        return orgList.find(o => 
+            (subCode ? o.subsection_code === subCode : (!o.subsection_code || o.subsection_code === ''))
+        ) || null;
+    };
+
+    const orgSubdireccion = findOrg('9224', '') || { id: 6, section_name: 'SUBDIRECCION DE CENTRO', subsection_name: '', onbase_user: 'TVILLAMIZARJ' };
+    const orgAdminEducativa = findOrg('9224', '9224.2') || { id: 7, section_name: 'SUBDIRECCION DE CENTRO', subsection_name: 'GRUPO ADMINISTRACION EDUCATIVA', onbase_user: 'luepitar' };
+    const orgFormacion = findOrg('9224', '9224.4') || { id: 8, section_name: 'SUBDIRECCION DE CENTRO', subsection_name: 'GRUPO DE FORMACION PROFESIONAL INTEGRAL', onbase_user: 'EDHERNANDEZM' };
+
+    // 1. Detección por código de subserie o serie TRD
+    if (text.includes('9224.4') || text.includes('68.9224.4')) {
+        return {
+            dependency_id: 8,
+            dependency_name: orgFormacion.subsection_name || 'Formación Profesional Integral',
+            dependency_code: '9224.4',
+            onbase_user: orgFormacion.onbase_user || 'EDHERNANDEZM',
+            rule: 'TRD 9224.4'
+        };
+    }
+    if (text.includes('9224.2') || text.includes('68.9224.2')) {
+        return {
+            dependency_id: 7,
+            dependency_name: orgAdminEducativa.subsection_name || 'Administración Educativa',
+            dependency_code: '9224.2',
+            onbase_user: orgAdminEducativa.onbase_user || 'luepitar',
+            rule: 'TRD 9224.2'
+        };
+    }
+    if (text.includes('68.9224-') || text.includes('9224-') || text.includes('68.9224/')) {
+        return {
+            dependency_id: 6,
+            dependency_name: orgSubdireccion.section_name || 'Subdirección de Centro',
+            dependency_code: '9224',
+            onbase_user: orgSubdireccion.onbase_user || 'TVILLAMIZARJ',
+            rule: 'TRD 9224'
+        };
+    }
+
+    // 2. Por organization_id del documento
+    if (row.organization_id === 8) {
+        return { dependency_id: 8, dependency_name: orgFormacion.subsection_name || 'Formación Profesional Integral', dependency_code: '9224.4', onbase_user: orgFormacion.onbase_user || 'EDHERNANDEZM', rule: 'Org ID 8' };
+    }
+    if (row.organization_id === 7) {
+        return { dependency_id: 7, dependency_name: orgAdminEducativa.subsection_name || 'Administración Educativa', dependency_code: '9224.2', onbase_user: orgAdminEducativa.onbase_user || 'luepitar', rule: 'Org ID 7' };
+    }
+    if (row.organization_id === 6) {
+        return { dependency_id: 6, dependency_name: orgSubdireccion.section_name || 'Subdirección de Centro', dependency_code: '9224', onbase_user: orgSubdireccion.onbase_user || 'TVILLAMIZARJ', rule: 'Org ID 6' };
+    }
+
+    // 3. Por dependencia del usuario autenticado (si no es admin)
+    if (sessionUser && sessionUser.organization_id) {
+        if (sessionUser.organization_id === 8) {
+            return { dependency_id: 8, dependency_name: orgFormacion.subsection_name || 'Formación Profesional Integral', dependency_code: '9224.4', onbase_user: orgFormacion.onbase_user || 'EDHERNANDEZM', rule: 'Usuario Sesión (Formación)' };
+        }
+        if (sessionUser.organization_id === 7) {
+            return { dependency_id: 7, dependency_name: orgAdminEducativa.subsection_name || 'Administración Educativa', dependency_code: '9224.2', onbase_user: orgAdminEducativa.onbase_user || 'luepitar', rule: 'Usuario Sesión (Adm. Educativa)' };
+        }
+    }
+
+    // Fallback: Subdirección
+    return {
+        dependency_id: 6,
+        dependency_name: orgSubdireccion.section_name || 'Subdirección de Centro',
+        dependency_code: '9224',
+        onbase_user: orgSubdireccion.onbase_user || 'TVILLAMIZARJ',
+        rule: 'Por Defecto (Subdirección)'
+    };
+};
+
 // Helper to validate if an expediente has at least its first three typologies uploaded
 const validateExpedienteTypologies = (expedienteId, callback) => {
     const trdQ = `
@@ -191,35 +265,52 @@ router.get('/pending', requireAuth, (req, res) => {
             });
         });
 
-        await Promise.all(validatePromise);
+        // Obtener dependencias para asignación inteligente
+        db.all("SELECT id, section_name, subsection_name, section_code, subsection_code, onbase_user, onbase_pass FROM organization_structure", [], (orgErr, orgRows) => {
+            const orgList = orgRows || [];
+            const processed = [];
+            const reqDep = req.query.dependency ? String(req.query.dependency).trim() : null;
 
-        const processed = [];
-        rows.forEach(row => {
-            let docMeta = {};
-            let expMeta = {};
-            try { if (row.metadata_values) docMeta = JSON.parse(row.metadata_values); } catch (e) {}
-            try { if (row.expediente_metadata) expMeta = JSON.parse(row.expediente_metadata); } catch (e) {}
-            
-            const expId = row.expediente_id;
-            const hasFirstThree = expId ? (validationResults[expId] ?? true) : true;
+            rows.forEach(row => {
+                let docMeta = {};
+                let expMeta = {};
+                try { if (row.metadata_values) docMeta = JSON.parse(row.metadata_values); } catch (e) {}
+                try { if (row.expediente_metadata) expMeta = JSON.parse(row.expediente_metadata); } catch (e) {}
+                
+                const expId = row.expediente_id;
+                const hasFirstThree = expId ? (validationResults[expId] ?? true) : true;
 
-            // If not admin/superadmin, and it doesn't have the first three, we omit it.
-            if (!isUserAdmin && !hasFirstThree) {
-                return; // skip
-            }
+                // If not admin/superadmin, and it doesn't have the first three, we omit it.
+                if (!isUserAdmin && !hasFirstThree) {
+                    return; // skip
+                }
 
-            const resolvedPath = resolveDocumentPath(row.path, row.filename) || row.path;
+                const resolvedPath = resolveDocumentPath(row.path, row.filename) || row.path;
+                const depInfo = resolveDocDependency(row, orgList, req.user);
 
-            processed.push({
-                ...row,
-                path: resolvedPath,
-                document_metadata: docMeta && typeof docMeta === 'object' ? docMeta : {},
-                expediente_metadata: expMeta && typeof expMeta === 'object' ? expMeta : {},
-                has_first_three_typologies: hasFirstThree
+                // Si se filtró explícitamente por dependencia en la consulta
+                if (reqDep) {
+                    if (reqDep === '9224' && depInfo.dependency_code !== '9224') return;
+                    if (reqDep === '9224.2' && depInfo.dependency_code !== '9224.2') return;
+                    if (reqDep === '9224.4' && depInfo.dependency_code !== '9224.4') return;
+                }
+
+                processed.push({
+                    ...row,
+                    path: resolvedPath,
+                    document_metadata: docMeta && typeof docMeta === 'object' ? docMeta : {},
+                    expediente_metadata: expMeta && typeof expMeta === 'object' ? expMeta : {},
+                    has_first_three_typologies: hasFirstThree,
+                    dependency_id: depInfo.dependency_id,
+                    dependency_name: depInfo.dependency_name,
+                    dependency_code: depInfo.dependency_code,
+                    target_onbase_user: depInfo.onbase_user,
+                    trd_rule: depInfo.rule
+                });
             });
-        });
 
-        res.json(processed);
+            res.json(processed);
+        });
     });
 });
 
@@ -261,20 +352,29 @@ router.get('/all', requireAuth, (req, res) => {
     `;
     db.all(query, params, (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
-        const processed = rows.map(row => {
-            let docMeta = {};
-            let expMeta = {};
-            try { if (row.metadata_values) docMeta = JSON.parse(row.metadata_values); } catch (e) {}
-            try { if (row.expediente_metadata) expMeta = JSON.parse(row.expediente_metadata); } catch (e) {}
-            const resolvedPath = resolveDocumentPath(row.path, row.filename) || row.path;
-            return {
-                ...row,
-                path: resolvedPath,
-                document_metadata: docMeta && typeof docMeta === 'object' ? docMeta : {},
-                expediente_metadata: expMeta && typeof expMeta === 'object' ? expMeta : {}
-            };
+        db.all("SELECT id, section_name, subsection_name, section_code, subsection_code, onbase_user, onbase_pass FROM organization_structure", [], (orgErr, orgRows) => {
+            const orgList = orgRows || [];
+            const processed = rows.map(row => {
+                let docMeta = {};
+                let expMeta = {};
+                try { if (row.metadata_values) docMeta = JSON.parse(row.metadata_values); } catch (e) {}
+                try { if (row.expediente_metadata) expMeta = JSON.parse(row.expediente_metadata); } catch (e) {}
+                const resolvedPath = resolveDocumentPath(row.path, row.filename) || row.path;
+                const depInfo = resolveDocDependency(row, orgList, req.user);
+                return {
+                    ...row,
+                    path: resolvedPath,
+                    document_metadata: docMeta && typeof docMeta === 'object' ? docMeta : {},
+                    expediente_metadata: expMeta && typeof expMeta === 'object' ? expMeta : {},
+                    dependency_id: depInfo.dependency_id,
+                    dependency_name: depInfo.dependency_name,
+                    dependency_code: depInfo.dependency_code,
+                    target_onbase_user: depInfo.onbase_user,
+                    trd_rule: depInfo.rule
+                };
+            });
+            res.json(processed);
         });
-        res.json(processed);
     });
 });
 

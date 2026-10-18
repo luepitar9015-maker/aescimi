@@ -59,16 +59,33 @@ router.put('/:id', (req, res) => {
     const { id } = req.params;
     const { storage_path, onbase_user, onbase_pass } = req.body;
 
+    const u = onbase_user !== undefined ? onbase_user : null;
+    const p = onbase_pass !== undefined ? onbase_pass : null;
+
     db.run(
         `UPDATE organization_structure 
          SET storage_path = COALESCE(?, storage_path),
-             onbase_user = ?,
-             onbase_pass = ?
+             onbase_user = COALESCE(?, onbase_user),
+             onbase_pass = COALESCE(?, onbase_pass),
+             onbase_username = COALESCE(?, onbase_username),
+             onbase_password = COALESCE(?, onbase_password)
          WHERE id = ?`, 
-        [storage_path, onbase_user, onbase_pass, id], 
+        [storage_path !== undefined ? storage_path : null, u, p, u, p, id], 
         function(err) {
             if (err) {
-                return res.status(500).json({ error: err.message });
+                // Si las columnas onbase_username/password no existen en alguna BD alternativa, intentar con onbase_user/pass
+                return db.run(
+                    `UPDATE organization_structure 
+                     SET storage_path = COALESCE(?, storage_path),
+                         onbase_user = COALESCE(?, onbase_user),
+                         onbase_pass = COALESCE(?, onbase_pass)
+                     WHERE id = ?`,
+                    [storage_path !== undefined ? storage_path : null, u, p, id],
+                    function(err2) {
+                        if (err2) return res.status(500).json({ error: err2.message });
+                        res.json({ message: 'Updated successfully', changes: this.changes });
+                    }
+                );
             }
             res.json({ message: 'Updated successfully', changes: this.changes });
         }
