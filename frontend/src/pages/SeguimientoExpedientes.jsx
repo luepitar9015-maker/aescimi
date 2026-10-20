@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import {
   BarChart2, Users, FolderOpen, CheckCircle, Clock,
-  UserCheck, Search, X, RefreshCw, Trash2, Package, Eye
+  UserCheck, Search, X, RefreshCw, Trash2, Package, Eye,
+  FileSpreadsheet, Download, AlertCircle, Filter, Check
 } from 'lucide-react';
 
 /* ─── Barra de progreso ─────────────────────────────────── */
@@ -252,6 +253,53 @@ export default function SeguimientoExpedientes() {
   const [viewPaq, setViewPaq] = useState(null);
   const [paqItems, setPaqItems] = useState([]);
 
+  /* Modal y opciones de Exportación Excel */
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportUser, setExportUser] = useState('todos');
+  const [exportSoloPendientes, setExportSoloPendientes] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
+
+  /* ── Descargar Excel de Expedientes Pendientes por Responsable ── */
+  const descargarExcelPendientes = async (userId = exportUser, soloPendientes = exportSoloPendientes) => {
+    setIsExporting(true);
+    try {
+      const res = await axios.get('/api/seguimiento/exportar-pendientes-excel', {
+        params: {
+          user_id: userId,
+          solo_pendientes: soloPendientes ? 'true' : 'false'
+        },
+        responseType: 'blob'
+      });
+
+      let filename = 'Informe_Direccion_Expedientes_Pendientes.xlsx';
+      const disposition = res.headers['content-disposition'];
+      if (disposition && disposition.indexOf('filename=') !== -1) {
+        const matches = /filename="?([^"]+)"?/.exec(disposition);
+        if (matches != null && matches[1]) {
+          filename = matches[1];
+        }
+      }
+
+      const blob = new Blob([res.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      setShowExportModal(false);
+    } catch (err) {
+      console.error('Error al exportar a Excel:', err);
+      alert('Error al exportar expedientes a Excel: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   /* ── Carga de estadísticas ── */
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
@@ -458,13 +506,41 @@ export default function SeguimientoExpedientes() {
       {/* ═══ TAB: ESTADÍSTICAS ═══ */}
       {tab === 'estadisticas' && (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
-            <button onClick={fetchStats} style={{
-              display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px',
-              background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600
-            }}>
-              <RefreshCw size={14} /> Actualizar
-            </button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 13, color: '#4b5563', fontWeight: 600 }}>
+                Control de Gestión Documental & Auditoría para Dirección
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <button
+                onClick={() => {
+                  setExportUser(filtroUsuarioStats);
+                  setShowExportModal(true);
+                }}
+                disabled={isExporting}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px',
+                  background: 'linear-gradient(135deg, #0e7037 0%, #16a34a 100%)',
+                  color: '#fff', border: 'none', borderRadius: 8, cursor: isExporting ? 'not-allowed' : 'pointer',
+                  fontSize: 13, fontWeight: 700,
+                  boxShadow: '0 4px 12px rgba(16, 124, 65, 0.25)',
+                  transition: 'all 0.2s ease'
+                }}
+                title="Exportar a Excel los expedientes electrónicos pendientes por cargar para Dirección"
+              >
+                <FileSpreadsheet size={16} />
+                {isExporting ? 'Generando Excel...' : '📊 Exportar a Excel (Pendientes por Cargar)'}
+              </button>
+
+              <button onClick={fetchStats} style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px',
+                background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 8,
+                cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#374151'
+              }}>
+                <RefreshCw size={14} /> Actualizar
+              </button>
+            </div>
           </div>
 
           {stats && (
@@ -476,27 +552,44 @@ export default function SeguimientoExpedientes() {
             }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#111' }}>
-                  👤 Analizar por Usuario
+                  👤 Analizar por Responsable
                 </h3>
                 <p style={{ margin: '4px 0 0', fontSize: 12, color: '#6b7280' }}>
-                  Visualiza gráficos interactivos del avance, lotes y expedientes asignados.
+                  Visualice el estado de cargue individual o filtre el análisis para dirección.
                 </p>
               </div>
-              <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <select
                   value={filtroUsuarioStats}
                   onChange={e => setFiltroUsuarioStats(e.target.value)}
                   style={{
                     padding: '8px 16px', border: '1.5px solid #d1d5db', borderRadius: 8,
                     fontSize: 13, fontWeight: 600, background: '#fff', color: '#374151',
-                    outline: 'none', cursor: 'pointer', minWidth: 200
+                    outline: 'none', cursor: 'pointer', minWidth: 230
                   }}
                 >
                   <option value="todos">Todos los Usuarios (Global)</option>
                   {(stats.usuarios || []).map(u => (
-                    <option key={u.user_id} value={u.user_id}>{u.usuario}</option>
+                    <option key={u.user_id} value={u.user_id}>{u.usuario} ({u.expedientes_asignados} exp.)</option>
                   ))}
                 </select>
+
+                {filtroUsuarioStats !== 'todos' && (
+                  <button
+                    onClick={() => descargarExcelPendientes(filtroUsuarioStats, true)}
+                    disabled={isExporting}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
+                      background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0',
+                      borderRadius: 8, cursor: isExporting ? 'not-allowed' : 'pointer',
+                      fontSize: 12, fontWeight: 700
+                    }}
+                    title="Descargar Excel de expedientes pendientes de este responsable específico"
+                  >
+                    <Download size={14} />
+                    {isExporting ? 'Descargando...' : 'Descargar Excel de este Responsable'}
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -1203,6 +1296,192 @@ export default function SeguimientoExpedientes() {
                 border: 'none', borderRadius: 8, cursor: saving ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 13
               }}>
                 {saving ? 'Guardando...' : `Asignar (${selectedExps.length})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL: EXPORTAR A EXCEL PARA DIRECCIÓN ═══ */}
+      {showExportModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 1100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+          backdropFilter: 'blur(3px)'
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 16, padding: 30, width: '100%', maxWidth: 650,
+            maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 25px 60px rgba(0,0,0,.25)',
+            border: '1px solid #e5e7eb'
+          }}>
+            {/* Header del Modal */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{
+                  background: 'linear-gradient(135deg, #dcfce7, #bbf7d0)',
+                  color: '#15803d',
+                  padding: 12,
+                  borderRadius: 12,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 8px rgba(34, 197, 94, 0.2)'
+                }}>
+                  <FileSpreadsheet size={28} />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#111' }}>
+                      Exportador de Expedientes Pendientes
+                    </h2>
+                    <span style={{
+                      background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0',
+                      fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99, textTransform: 'uppercase'
+                    }}>
+                      Dirección & Auditoría
+                    </span>
+                  </div>
+                  <p style={{ margin: '4px 0 0', fontSize: 12, color: '#6b7280' }}>
+                    Genera el informe institucional en Excel (.xlsx) con los expedientes pendientes por cargar.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowExportModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 4 }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Selector de Responsable */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>
+                1. SELECCIONAR RESPONSABLE:
+              </label>
+              <select
+                value={exportUser}
+                onChange={e => setExportUser(e.target.value)}
+                style={{
+                  width: '100%', padding: '11px 14px', border: '1.5px solid #d1d5db',
+                  borderRadius: 10, fontSize: 13, fontWeight: 600, color: '#1f2937',
+                  background: '#f9fafb', outline: 'none'
+                }}
+              >
+                <option value="todos">📊 Todos los Responsables (Consolidado Institucional Completo)</option>
+                {(stats?.usuarios || []).map(u => (
+                  <option key={u.user_id} value={u.user_id}>
+                    👤 {u.usuario} {u.area ? `· ${u.area}` : ''} ({u.expedientes_asignados} exp. asignados)
+                  </option>
+                ))}
+              </select>
+              <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 5 }}>
+                {exportUser === 'todos' 
+                  ? 'Se incluirán todos los contratistas y funcionarios con expedientes en el sistema.'
+                  : 'Se generará el reporte enfocado exclusivamente en este funcionario.'}
+              </p>
+            </div>
+
+            {/* Criterio de Expedientes */}
+            <div style={{ marginBottom: 22 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>
+                2. CRITERIO DE EXPEDIENTES:
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <label style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 16px',
+                  borderRadius: 10, border: exportSoloPendientes ? '1.5px solid #39A900' : '1px solid #e5e7eb',
+                  background: exportSoloPendientes ? '#f0fdf4' : '#fff', cursor: 'pointer'
+                }}>
+                  <input
+                    type="radio"
+                    name="filtroPendientes"
+                    checked={exportSoloPendientes}
+                    onChange={() => setExportSoloPendientes(true)}
+                    style={{ marginTop: 2, accentColor: '#39A900' }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: '#111' }}>
+                      Solo expedientes pendientes por cargar <span style={{ color: '#16a34a', fontWeight: 800 }}>(Recomendado)</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                      Filtra únicamente los expedientes que aún no tienen documentos o cuyo avance de cargue es menor al 100%.
+                    </div>
+                  </div>
+                </label>
+
+                <label style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 16px',
+                  borderRadius: 10, border: !exportSoloPendientes ? '1.5px solid #39A900' : '1px solid #e5e7eb',
+                  background: !exportSoloPendientes ? '#f0fdf4' : '#fff', cursor: 'pointer'
+                }}>
+                  <input
+                    type="radio"
+                    name="filtroPendientes"
+                    checked={!exportSoloPendientes}
+                    onChange={() => setExportSoloPendientes(false)}
+                    style={{ marginTop: 2, accentColor: '#39A900' }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: '#111' }}>
+                      Todos los expedientes asignados
+                    </div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                      Incluye todos los expedientes (tanto pendientes de cargue como completados al 100%).
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Estructura del Documento a Generar */}
+            <div style={{
+              background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10,
+              padding: '14px 16px', marginBottom: 24
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>📋</span> Estructura del Libro Excel generado para Dirección:
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 11, color: '#64748b' }}>
+                <div style={{ background: '#fff', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 3 }}>📊 Hoja 1: Resumen_Dirección</div>
+                  <div>Totales consolidados por responsable, expedientes asignados, pendientes, tipologías faltantes y semáforo de cumplimiento.</div>
+                </div>
+                <div style={{ background: '#fff', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 3 }}>📁 Hoja 2: Detalle_Pendientes</div>
+                  <div>Detalle de cada expediente con código, título, subserie TRD, % avance y <strong>nombres de las tipologías faltantes</strong>.</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Botones de Acción */}
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={() => setShowExportModal(false)}
+                disabled={isExporting}
+                style={{
+                  padding: '10px 20px', background: '#f1f5f9', border: 'none',
+                  borderRadius: 10, cursor: 'pointer', fontWeight: 600, fontSize: 13, color: '#475569'
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => descargarExcelPendientes(exportUser, exportSoloPendientes)}
+                disabled={isExporting}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '11px 24px',
+                  background: isExporting ? '#94a3b8' : 'linear-gradient(135deg, #107c41, #0b5e31)',
+                  color: '#fff', border: 'none', borderRadius: 10,
+                  cursor: isExporting ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 13,
+                  boxShadow: '0 4px 14px rgba(16, 124, 65, 0.35)',
+                  transition: 'opacity 0.2s'
+                }}
+              >
+                <Download size={16} />
+                {isExporting ? 'Generando archivo Excel...' : 'Descargar Excel (.xlsx)'}
               </button>
             </div>
           </div>

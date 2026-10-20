@@ -501,6 +501,9 @@ function Layout({ children }) {
           <Link to="/deserciones" className="nav-item"><FileSpreadsheet size={18} /> Deserciones (OnBase)</Link>
           {canView('formatos') && <Link to="/formatos" className="nav-item"><FileSpreadsheet size={18} /> Formatos (FUID/Control)</Link>}
           {canView('trd_query') && <Link to="/trd-query" className="nav-item"><Database size={18} /> Consulta TRD</Link>}
+          {(currentUser.role === 'admin' || currentUser.role === 'superadmin' || canView('seguimiento')) && (
+            <Link to="/seguimiento" className="nav-item"><BarChart2 size={18} /> Estadísticas y Seguimiento</Link>
+          )}
 
           {(canView('onedrive') || canView('config-aes') || canView('automation') || canView('permissions')) && (
              <div style={{ marginTop: '10px', fontSize: '11px', color: '#999', padding: '0 12px' }}>CONFIGURACIÓN</div>

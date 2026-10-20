@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const xlsx = require('xlsx');
 const { pool } = require('../database_pg');
 const { requireAuth, requireAdmin } = require('../middleware/authMiddleware');
 
@@ -224,6 +225,221 @@ router.get('/estadisticas', requireAuth, async (req, res) => {
     } catch (err) {
         console.error('[SEGUIMIENTO] estadisticas error:', err);
         res.status(500).json({ error: 'Error al obtener estadísticas: ' + err.message });
+    }
+});
+
+// ──────────────────────────────────────────────────────────────
+// GET /api/seguimiento/exportar-pendientes-excel
+// Exporta reporte de expedientes pendientes por cargar por responsable (para Dirección)
+// ──────────────────────────────────────────────────────────────
+router.get('/exportar-pendientes-excel', requireAuth, async (req, res) => {
+    try {
+        let { user_id, solo_pendientes } = req.query;
+        const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
+
+        // Si no es admin/superadmin, solo puede exportar sus propios expedientes
+        if (!isAdmin) {
+            user_id = req.user.id;
+        }
+
+        const filtrarSoloPendientes = solo_pendientes !== 'false';
+
+        let whereClauses = [];
+        let params = [];
+        let pIdx = 1;
+
+        let filteredUserName = '';
+
+        if (user_id && user_id !== 'todos') {
+            whereClauses.push(`ea.user_id = $${pIdx++}`);
+            params.push(Number(user_id));
+
+            const uRes = await pool.query('SELECT full_name FROM users WHERE id = $1', [Number(user_id)]);
+            if (uRes.rowCount > 0) {
+                filteredUserName = uRes.rows[0].full_name;
+            }
+        }
+
+        const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+        const query = `
+            WITH exp_detalle AS (
+                SELECT 
+                    e.id AS expediente_id,
+                    COALESCE(NULLIF(e.expediente_code, ''), 'EXP-' || e.id) AS expediente_code,
+                    COALESCE(NULLIF(e.title, ''), 'Sin Título') AS expediente_titulo,
+                    COALESCE(e.dependencia, 'Sin Dependencia') AS dependencia,
+                    COALESCE(e.subserie, 'Sin Subserie') AS subserie,
+                    e.opening_date,
+                    u.id AS user_id,
+                    COALESCE(u.full_name, 'Sin Asignar') AS responsable,
+                    COALESCE(u.document_no, '—') AS responsable_doc,
+                    COALESCE(u.area, '—') AS responsable_area,
+                    COALESCE(ea.estado, 'Pendiente') AS estado_asignacion,
+                    COALESCE(ea.observaciones, '—') AS observaciones,
+                    COUNT(DISTINCT tt.id) AS total_requeridos,
+                    COUNT(DISTINCT CASE WHEN d.id IS NOT NULL THEN tt.id END) AS cargados,
+                    (COUNT(DISTINCT tt.id) - COUNT(DISTINCT CASE WHEN d.id IS NOT NULL THEN tt.id END)) AS faltantes,
+                    ROUND(
+                        CASE WHEN COUNT(DISTINCT tt.id) > 0
+                             THEN (COUNT(DISTINCT CASE WHEN d.id IS NOT NULL THEN tt.id END)::NUMERIC / COUNT(DISTINCT tt.id) * 100)
+                             ELSE 0
+                        END, 1
+                    ) AS avance_porcentaje,
+                    STRING_AGG(DISTINCT CASE WHEN d.id IS NULL THEN tt.typology_name END, ' | ') AS tipologias_faltantes_nombres,
+                    (SELECT COUNT(*) FROM documents doc WHERE doc.expediente_id = e.id) AS total_docs_cargados
+                FROM expedientes e
+                LEFT JOIN expediente_assignments ea ON e.id = ea.expediente_id
+                LEFT JOIN users u ON ea.user_id = u.id
+                LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie ILIKE '%-' || sub.subseries_code)
+                LEFT JOIN trd_series ser ON (sub.series_id = ser.id OR e.subserie = ser.series_code)
+                LEFT JOIN trd_typologies tt ON (tt.subseries_id = sub.id OR (tt.subseries_id IS NULL AND tt.series_id = ser.id))
+                LEFT JOIN documents d ON d.expediente_id = e.id AND UPPER(UNACCENT(d.typology_name)) = UPPER(UNACCENT(tt.typology_name))
+                ${whereSql}
+                GROUP BY e.id, e.expediente_code, e.title, e.dependencia, e.subserie, e.opening_date,
+                         u.id, u.full_name, u.document_no, u.area, ea.estado, ea.observaciones
+            )
+            SELECT * FROM exp_detalle
+            ${filtrarSoloPendientes ? 'WHERE (cargados < total_requeridos OR total_docs_cargados = 0 OR avance_porcentaje < 100)' : ''}
+            ORDER BY responsable ASC, avance_porcentaje ASC, expediente_code ASC
+        `;
+
+        const dbRes = await pool.query(query, params);
+
+        // Armar resumen ejecutivo por responsable
+        const resumenMap = new Map();
+        for (const row of dbRes.rows) {
+            const resp = row.responsable;
+            if (!resumenMap.has(resp)) {
+                resumenMap.set(resp, {
+                    responsable: resp,
+                    documento: row.responsable_doc,
+                    area: row.responsable_area,
+                    total_expedientes: 0,
+                    exp_pendientes: 0,
+                    exp_completados: 0,
+                    docs_faltantes: 0,
+                    sum_avance: 0
+                });
+            }
+            const r = resumenMap.get(resp);
+            r.total_expedientes++;
+            const pct = Number(row.avance_porcentaje) || 0;
+            r.sum_avance += pct;
+            if (pct >= 100) {
+                r.exp_completados++;
+            } else {
+                r.exp_pendientes++;
+                r.docs_faltantes += Math.max(0, Number(row.faltantes) || 0);
+            }
+        }
+
+        const resumenRows = Array.from(resumenMap.values()).map(r => {
+            const avgAvance = (r.sum_avance / (r.total_expedientes || 1));
+            return {
+                'Responsable': r.responsable,
+                'No. Documento': r.documento,
+                'Área / Coordinación': r.area,
+                'Total Exp. Asignados': r.total_expedientes,
+                'Exp. Pendientes por Cargar': r.exp_pendientes,
+                'Exp. 100% Completados': r.exp_completados,
+                'Total Tipologías Faltantes': r.docs_faltantes,
+                '% Avance Promedio': `${avgAvance.toFixed(1)}%`,
+                'Estado de Cumplimiento': avgAvance >= 80 ? 'Al Día (80-100%)' : avgAvance >= 40 ? 'En Proceso (40-79%)' : 'Pendiente Crítico (<40%)'
+            };
+        });
+
+        // Armar filas de detalle de cada expediente
+        const detalleRows = dbRes.rows.map((row, idx) => {
+            const pct = Number(row.avance_porcentaje) || 0;
+            const estadoCargue = pct >= 100 
+                ? 'Completado (100%)' 
+                : pct === 0 && Number(row.total_docs_cargados) === 0 
+                    ? 'Sin Iniciar (0% Docs)' 
+                    : `Incompleto (${pct}%)`;
+
+            const fechaApertura = row.opening_date 
+                ? new Date(row.opening_date).toISOString().split('T')[0] 
+                : '—';
+
+            return {
+                'N°': idx + 1,
+                'Responsable': row.responsable,
+                'Cédula / No. Documento': row.responsable_doc,
+                'Área / Coordinación': row.responsable_area,
+                'Código Expediente': row.expediente_code,
+                'Título del Expediente': row.expediente_titulo,
+                'Dependencia': row.dependencia,
+                'Serie / Subserie TRD': row.subserie,
+                'Fecha Apertura': fechaApertura,
+                'Estado Asignación': row.estado_asignacion,
+                'Tipologías Requeridas': Number(row.total_requeridos) || 0,
+                'Tipologías Cargadas': Number(row.cargados) || 0,
+                'Tipologías Faltantes (Cant.)': Math.max(0, Number(row.faltantes) || 0),
+                '% Avance': `${pct}%`,
+                'Estado de Cargue': estadoCargue,
+                'Documentos Pendientes por Cargar': row.tipologias_faltantes_nombres || 'Ninguno (Al Día)',
+                'Observaciones / Detalle': row.observaciones
+            };
+        });
+
+        const wb = xlsx.utils.book_new();
+
+        // 1. Hoja Resumen Dirección
+        const wsResumen = xlsx.utils.json_to_sheet(resumenRows);
+        wsResumen['!cols'] = [
+            { wch: 35 }, // Responsable
+            { wch: 18 }, // Doc
+            { wch: 42 }, // Área
+            { wch: 22 }, // Total Exp
+            { wch: 26 }, // Exp Pendientes
+            { wch: 22 }, // Exp Completados
+            { wch: 26 }, // Tipologías Faltantes
+            { wch: 20 }, // % Avance Promedio
+            { wch: 26 }  // Estado de Cumplimiento
+        ];
+        xlsx.utils.book_append_sheet(wb, wsResumen, 'Resumen_Dirección');
+
+        // 2. Hoja Detalle Expedientes Pendientes
+        const wsDetalle = xlsx.utils.json_to_sheet(detalleRows);
+        wsDetalle['!cols'] = [
+            { wch: 6 },  // N°
+            { wch: 32 }, // Responsable
+            { wch: 20 }, // Cédula
+            { wch: 36 }, // Área
+            { wch: 22 }, // Código
+            { wch: 45 }, // Título
+            { wch: 35 }, // Dependencia
+            { wch: 24 }, // Subserie
+            { wch: 16 }, // Fecha
+            { wch: 18 }, // Estado Asig
+            { wch: 20 }, // Req
+            { wch: 18 }, // Cargadas
+            { wch: 24 }, // Faltantes
+            { wch: 14 }, // % Avance
+            { wch: 24 }, // Estado Cargue
+            { wch: 75 }, // Tipologías Faltantes Detalladas
+            { wch: 35 }  // Observaciones
+        ];
+        xlsx.utils.book_append_sheet(wb, wsDetalle, 'Detalle_Pendientes');
+
+        const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+        const fechaStr = new Date().toISOString().split('T')[0];
+        const sanitizedUserName = filteredUserName 
+            ? filteredUserName.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 30) 
+            : null;
+
+        const filename = sanitizedUserName
+            ? `Expedientes_Pendientes_${sanitizedUserName}_${fechaStr}.xlsx`
+            : `Informe_Direccion_Expedientes_Pendientes_${fechaStr}.xlsx`;
+
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.send(buffer);
+    } catch (err) {
+        console.error('[SEGUIMIENTO] Error exportando expedientes pendientes a Excel:', err);
+        res.status(500).json({ error: 'Error al exportar expedientes pendientes a Excel: ' + err.message });
     }
 });
 
