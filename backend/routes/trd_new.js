@@ -693,6 +693,23 @@ router.put('/typology/:id', (req, res) => {
     );
 });
 
+// DELETE Typology (supports both singular and plural)
+router.delete('/typology/:id', (req, res) => {
+    const id = req.params.id;
+    db.run("DELETE FROM trd_typologies WHERE id = ?", [id], function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: 'Tipología eliminada' });
+    });
+});
+
+router.delete('/typologies/:id', (req, res) => {
+    const id = req.params.id;
+    db.run("DELETE FROM trd_typologies WHERE id = ?", [id], function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: 'Tipología eliminada' });
+    });
+});
+
 // POST Update Hierarchy for Series or Subseries
 router.post('/hierarchy', (req, res) => {
     const { type, id, hierarchy } = req.body; // type: 'series' | 'subseries'

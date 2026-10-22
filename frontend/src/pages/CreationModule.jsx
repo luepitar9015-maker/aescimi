@@ -190,6 +190,17 @@ function CreationModule() {
         }
     };
 
+    const showApiError = (err, defaultMsg = 'Ocurrió un error inesperado') => {
+        if (err.response?.status === 401) {
+            alert('Su sesión ha expirado. Por favor vuelva a iniciar sesión para continuar.');
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+            return;
+        }
+        alert(err.response?.data?.error || err.message || defaultMsg);
+    };
+
     const handleEditSeries = async (series) => {
         const code = prompt('Nuevo código de serie:', series.code);
         const name = prompt('Nuevo nombre de serie:', series.name);
@@ -197,7 +208,7 @@ function CreationModule() {
         try {
             await axios.put(`${API_URL}/trd/series/${series.id}`, { code, name });
             fetchTRD(selectedNode.id);
-        } catch (err) { alert(err.response?.data?.error || err.message); }
+        } catch (err) { showApiError(err); }
     };
 
     const handleDeleteSeries = async (seriesId) => {
@@ -205,7 +216,7 @@ function CreationModule() {
         try {
             await axios.delete(`${API_URL}/trd/series/${seriesId}`);
             fetchTRD(selectedNode.id);
-        } catch (err) { alert(err.response?.data?.error || err.message); }
+        } catch (err) { showApiError(err); }
     };
 
     const handleEditSubseries = async (sub) => {
@@ -215,7 +226,7 @@ function CreationModule() {
         try {
             await axios.put(`${API_URL}/trd/subseries/${sub.id}`, { code, name });
             fetchTRD(selectedNode.id);
-        } catch (err) { alert(err.response?.data?.error || err.message); }
+        } catch (err) { showApiError(err); }
     };
 
     const handleDeleteSubseries = async (subId) => {
@@ -223,7 +234,7 @@ function CreationModule() {
         try {
             await axios.delete(`${API_URL}/trd/subseries/${subId}`);
             fetchTRD(selectedNode.id);
-        } catch (err) { alert(err.response?.data?.error || err.message); }
+        } catch (err) { showApiError(err); }
     };
 
     const handleEditTypology = async (t) => {
@@ -232,7 +243,7 @@ function CreationModule() {
         try {
             await axios.put(`${API_URL}/trd/typology/${t.id}`, { name });
             fetchTRD(selectedNode.id);
-        } catch (err) { alert(err.response?.data?.error || err.message); }
+        } catch (err) { showApiError(err); }
     };
 
     const handleDeleteTypology = async (typId) => {
@@ -240,7 +251,7 @@ function CreationModule() {
         try {
             await axios.delete(`${API_URL}/trd/typology/${typId}`);
             fetchTRD(selectedNode.id);
-        } catch (err) { alert(err.response?.data?.error || err.message); }
+        } catch (err) { showApiError(err); }
     };
 
 
