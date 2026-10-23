@@ -485,17 +485,12 @@ async function paso2_abrirFormulario(page, browser, logs) {
         }
     }
 
-    // Esperar que OnBase cargue la lista de tipos de formulario
-    logs.push('[PASO 2] Esperando lista de formularios (hasta 12s)...');
-    await wait(4000);
-
-    // Buscar SGDEA en la lista que aparece
-    // En OnBase el formulario aparece como item en un panel izquierdo o centro
-    logs.push('[PASO 2] Buscando "SGDEA" en la lista de formularios...');
+    // Esperar que OnBase cargue la lista de tipos de formulario de forma reactiva
+    logs.push('[PASO 2] Buscando "SGDEA - Ingreso a Expediente" en la lista...');
     let sgdeaClicked = false;
 
-    for (let intento = 0; intento < 15 && !sgdeaClicked; intento++) {
-        await wait(1000);
+    for (let intento = 0; intento < 20 && !sgdeaClicked; intento++) {
+        await wait(intento === 0 ? 800 : 400);
         const allPages = await browser.pages();
 
         for (const pg of allPages) {
@@ -613,7 +608,7 @@ async function paso2_abrirFormulario(page, browser, logs) {
     
     if (formLoaded) {
         logs.push('[PASO 2] ✅ Formulario cargado (frame detectado)');
-        await wait(2000); // 2 segundos adicionales para que terminen de pintar los inputs
+        await wait(800); // Espera breve para terminar de pintar inputs
     } else {
         logs.push('[PASO 2][WARN] TIMEOUT esperando que el formulario aparezca en el DOM.');
     }
@@ -1570,7 +1565,17 @@ async function paso3_codigoExpediente(page, browser, code, logs) {
                 .slice(0, 6)
                 .map(el => ({ type: el.type, title: el.title, name: el.name, id: el.id, ro: el.readOnly }));
         }).catch(() => []);
-        logs.push(`[PASO 3] Inputs en frame: ${JSON.stringify(inputInfo)}`);
+        // Verificar si ya está cargado y vinculado de un documento anterior en el mismo lote
+        const alreadyBound = await formFrame.evaluate((c) => {
+            const inp = document.querySelector('#sgdeaexpediente8_input');
+            const serie = document.querySelector('#sgdeacodigoserie10_input, input[id*="serie" i]');
+            return inp && inp.value && inp.value.trim() === c && serie && serie.value && serie.value.trim().length > 0;
+        }, code).catch(() => false);
+
+        if (alreadyBound) {
+            logs.push(`[PASO 3] ⚡ Expediente "${code}" ya vinculado de documento anterior. Continuando sin reescribir.`);
+            return { formPage, formFrame, success: true };
+        }
 
         // Escribir el código asegurando limpieza absoluta previa (evita duplicación de texto)
         try {
@@ -1959,68 +1964,57 @@ async function paso4_llenarCampos(formPage, formFrame, docInfo, logs) {
                 ];
 
                 let dropdownHandled = false;
-                for (let t = 0; t < 15 && !dropdownHandled; t++) {
-                    await wait(400);
+                for (let t = 0; t < 10 && !dropdownHandled; t++) {
+                    await wait(350);
+                    const framesToCheck = [];
+                    if (formFrame) framesToCheck.push(formFrame);
                     const allPages = await formPage.browser().pages();
                     for (const pg of allPages) {
-                        for (const frame of pg.frames()) {
-                            try {
-                                const frameEl = await frame.frameElement().catch(() => null);
-                                let offX = 0, offY = 0;
-                                if (frameEl) {
-                                    const box = await frameEl.boundingBox().catch(() => null);
-                                    if (box) { offX = box.x; offY = box.y; }
-                                }
+                        for (const fr of pg.frames()) {
+                            if (fr !== formFrame) framesToCheck.push(fr);
+                        }
+                    }
 
-                                const suggestion = await frame.evaluate((sels, originalText, typedVal, targetAlias) => {
-                                    const cleanText = (t) => (t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-                                    const targetClean = cleanText(originalText);
-                                    const aliasClean = cleanText(targetAlias || '');
-                                    const typedClean = cleanText(typedVal);
-                                    const stopW = new Set(['DE','DEL','LA','EL','LOS','LAS','EN','Y','O','A','AL','PARA','POR','CON','SIN','SOBRE']);
-                                    const targetTokens = targetClean.split(' ').filter(w => w.length > 1 && !stopW.has(w));
+                    for (const frame of framesToCheck) {
+                        try {
+                            const result = await frame.evaluate((sels, originalText, typedVal, targetAlias) => {
+                                const cleanText = (t) => (t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+                                const targetClean = cleanText(originalText);
+                                const aliasClean = cleanText(targetAlias || '');
+                                const typedClean = cleanText(typedVal);
+                                const stopW = new Set(['DE','DEL','LA','EL','LOS','LAS','EN','Y','O','A','AL','PARA','POR','CON','SIN','SOBRE']);
+                                const targetTokens = targetClean.split(' ').filter(w => w.length > 1 && !stopW.has(w));
+                                const acronym = targetClean.split(' ').filter(w => !stopW.has(w)).map(w => w[0]).join('');
 
-                                    // Generar acrónimo/siglas del texto original (ej. "CERTIFICADO DE DISPONIBILIDAD PRESUPUESTAL" -> "CDP")
-                                    const acronym = targetClean.split(' ').filter(w => !stopW.has(w)).map(w => w[0]).join('');
+                                for (const sel of sels) {
+                                    const items = Array.from(document.querySelectorAll(sel)).filter(el => {
+                                        const r = el.getBoundingClientRect();
+                                        return r.width > 0 && r.height > 0;
+                                    });
 
-                                    for (const sel of sels) {
-                                        const items = Array.from(document.querySelectorAll(sel)).filter(el => {
-                                            const r = el.getBoundingClientRect();
-                                            return r.width > 0 && r.height > 0;
-                                        });
+                                    if (items.length > 0) {
+                                        let bestItem = null;
+                                        let bestScore = -1;
 
-                                        if (items.length > 0) {
-                                            let bestItem = null;
-                                            let bestScore = -1;
+                                        for (const item of items) {
+                                            const itemText = cleanText(item.innerText || item.textContent);
+                                            if (!itemText) continue;
 
-                                            for (const item of items) {
-                                                const itemText = cleanText(item.innerText || item.textContent);
-                                                if (!itemText) continue;
-
-                                                let score = 0;
-                                                // 1. Coincidencia exacta con el alias guardado
-                                                if (aliasClean && itemText === aliasClean) {
-                                                    score = 3000;
-                                                }
-                                                // 2. Coincidencia exacta con el texto TRD o lo escrito
-                                                else if (itemText === targetClean || itemText === typedClean) {
-                                                    score = 2500;
-                                                }
-                                                // 3. Coincidencia por acrónimo / sigla exacta (ej. "CDP", "RP", "RUT")
-                                                else if (acronym.length >= 2 && (itemText === acronym || itemText.startsWith(acronym + ' '))) {
-                                                    score = 1500;
-                                                }
-                                                // 4. Contención directa de cadenas completas
-                                                else if (aliasClean && (targetClean.includes(aliasClean) || aliasClean.includes(itemText))) {
-                                                    score = 1400;
-                                                }
-                                                // 5. Token overlap inteligente (conteo de palabras clave coincidentes)
+                                            let score = 0;
+                                            if (aliasClean && itemText === aliasClean) {
+                                                score = 3000;
+                                            } else if (itemText === targetClean || itemText === typedClean) {
+                                                score = 2500;
+                                            } else if (acronym.length >= 2 && (itemText === acronym || itemText.startsWith(acronym + ' '))) {
+                                                score = 1500;
+                                            } else if (aliasClean && (targetClean.includes(aliasClean) || aliasClean.includes(itemText))) {
+                                                score = 1400;
+                                            } else {
                                                 const itemTokens = itemText.split(' ').filter(w => w.length > 1 && !stopW.has(w));
                                                 let matchingTokens = 0;
                                                 for (const it of itemTokens) {
                                                     if (targetTokens.includes(it)) matchingTokens++;
                                                 }
-                                                
                                                 if (itemTokens.length > 0) {
                                                     const matchRatio = matchingTokens / itemTokens.length;
                                                     if (matchRatio >= 0.5) {
@@ -2029,8 +2023,6 @@ async function paso4_llenarCampos(formPage, formFrame, docInfo, logs) {
                                                         score = Math.max(score, 500 + (matchingTokens * 40));
                                                     }
                                                 }
-
-                                                // 6. Contención de subcadenas parciales
                                                 if (targetClean.includes(itemText) && itemText.length > 5) {
                                                     score = Math.max(score, 800 + itemText.length);
                                                 } else if (itemText.includes(targetClean) && targetClean.length > 5) {
@@ -2038,52 +2030,49 @@ async function paso4_llenarCampos(formPage, formFrame, docInfo, logs) {
                                                 } else if (itemText.includes(typedClean) || typedClean.includes(itemText)) {
                                                     score = Math.max(score, 400);
                                                 }
-
-                                                if (score > bestScore) {
-                                                    bestScore = score;
-                                                    bestItem = item;
-                                                }
                                             }
 
-                                            // Exigir umbral mínimo de seguridad para no seleccionar opciones arbitrarias
-                                            if (bestItem && bestScore >= 400) {
-                                                const r = bestItem.getBoundingClientRect();
-                                                return {
-                                                    lx: r.left + r.width / 2,
-                                                    ly: r.top + r.height / 2,
-                                                    text: (bestItem.innerText || bestItem.textContent || '').trim().substring(0, 100),
-                                                    score: bestScore
-                                                };
+                                            if (score > bestScore) {
+                                                bestScore = score;
+                                                bestItem = item;
                                             }
                                         }
+
+                                        if (bestItem && bestScore >= 400) {
+                                            const text = (bestItem.innerText || bestItem.textContent || '').trim().substring(0, 100);
+                                            bestItem.scrollIntoView({ block: 'nearest' });
+                                            bestItem.click();
+                                            bestItem.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                                            bestItem.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+                                            bestItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                                            return { text, score: bestScore };
+                                        }
                                     }
-                                    return null;
-                                }, DROPDOWN_SELS, valueToType, typingText, savedAlias);
-
-                                if (suggestion) {
-                                    logs.push(`[PASO 4] ✅ Dropdown detectado para ${fieldName} → "${suggestion.text}" (Score: ${suggestion.score})`);
-                                    await pg.mouse.click(offX + suggestion.lx, offY + suggestion.ly);
-                                    await wait(1500); // Tiempo para autorrelleno
-
-                                    // Si es Tipo Documental, auto-aprender y guardar la equivalencia en la BD
-                                    if (fieldName.toLowerCase().includes('tipo documental') && suggestion.text) {
-                                        try {
-                                            const recognized = suggestion.text.trim().toUpperCase();
-                                            await pool.query(
-                                                'UPDATE trd_typologies SET onbase_name = $1 WHERE (typology_name ILIKE $2 OR id = $3) AND (onbase_name IS NULL OR onbase_name = \'\')',
-                                                [recognized, `%${valueToType.trim()}%`, docInfo?.typology_id || 0]
-                                            );
-                                            logs.push(`[PASO 4] 💾 Equivalencia guardada en BD: "${valueToType.substring(0,35)}..." ➔ "${recognized}"`);
-                                        } catch (dbSaveErr) { }
-                                    }
-
-                                    dropdownHandled = true;
-                                    break;
                                 }
-                            } catch { }
-                        }
-                        if (dropdownHandled) break;
+                                return null;
+                            }, DROPDOWN_SELS, valueToType, typingText, savedAlias);
+
+                            if (result) {
+                                logs.push(`[PASO 4] ✅ Dropdown detectado para ${fieldName} → "${result.text}" (Score: ${result.score}, Clic directo)`);
+                                await wait(600);
+
+                                if (fieldName.toLowerCase().includes('tipo documental') && result.text) {
+                                    try {
+                                        const recognized = result.text.trim().toUpperCase();
+                                        await pool.query(
+                                            'UPDATE trd_typologies SET onbase_name = $1 WHERE (typology_name ILIKE $2 OR id = $3) AND (onbase_name IS NULL OR onbase_name = \'\')',
+                                            [recognized, `%${valueToType.trim()}%`, docInfo?.typology_id || 0]
+                                        );
+                                        logs.push(`[PASO 4] 💾 Equivalencia guardada en BD: "${valueToType.substring(0,35)}..." ➔ "${recognized}"`);
+                                    } catch (dbSaveErr) { }
+                                }
+
+                                dropdownHandled = true;
+                                break;
+                            }
+                        } catch { }
                     }
+                    if (dropdownHandled) break;
                 }
 
                 if (!dropdownHandled) {
@@ -2318,7 +2307,7 @@ async function paso5_adjuntarPDF(page, allFramesFn, docInfo, logs) {
         const chooser = await fileChooserPromise;
         await chooser.accept([docInfo.path]);
         logs.push(`[PASO 5] ✅ Archivo seleccionado: ${path.basename(docInfo.path)}`);
-        await wait(4000); // Esperar que OnBase procese el archivo
+        await wait(1800); // Espera optimizada para que OnBase procese el archivo
         return true;
     } catch (e) {
         logs.push(`[PASO 5][ERROR] ${e.message}`);
@@ -3095,6 +3084,8 @@ exports.executeAutomation = async (req, res) => {
 
                 // ── PROCESAR DOCUMENTOS DEL LOTE ──
                 const totalDocs = Math.max(1, batchDocs.length);
+                let formPage = page;
+                let formFrame = page.mainFrame();
                 for (let docIdx = 0; docIdx < totalDocs; docIdx++) {
                     if (!currentJob.running) {
                         currentJob.logs.push('[INFO] Automatización cancelada por el usuario.');
@@ -3121,15 +3112,31 @@ exports.executeAutomation = async (req, res) => {
                                 await wait(2000);
                             }
 
-                            // ── PASO 2: FORMULARIO SGDEA (Siempre abrir un nuevo formulario limpio para cada documento del lote) ──
-                            currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 2: Formulario SGDEA`;
-                            await paso2_abrirFormulario(page, browser, currentJob.logs);
-                            await wait(1500);
+                            // ── PASO 2: FORMULARIO SGDEA (Reutilización en lote si ya está abierto en pantalla) ──
+                            let needOpenForm = true;
+                            if (docIdx > 0 && formFrame) {
+                                try {
+                                    const formReady = await formFrame.evaluate(() => {
+                                        const inp = document.querySelector('#sgdeaexpediente8_input, input[id*="expediente" i], input[title*="expediente" i]');
+                                        return !!(inp && !inp.readOnly);
+                                    }).catch(() => false);
+                                    if (formReady) {
+                                        currentJob.logs.push(`[Doc ${docIdx + 1}/${totalDocs}] ⚡ Formulario SGDEA listo en pantalla (Aceleración de lote). Saltando navegación de menú.`);
+                                        needOpenForm = false;
+                                    }
+                                } catch (e) {
+                                    needOpenForm = true;
+                                }
+                            }
+
+                            if (needOpenForm) {
+                                currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 2: Formulario SGDEA`;
+                                await paso2_abrirFormulario(page, browser, currentJob.logs);
+                                await wait(800);
+                            }
 
                             // ── PASO 3: CÓDIGO DE EXPEDIENTE ──
                             currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 3: Código de Expediente`;
-                            let formPage = page;
-                            let formFrame = page.mainFrame();
 
                             if (docInfo?.expediente_code) {
                                 let result = await paso3_codigoExpediente(
