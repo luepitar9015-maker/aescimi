@@ -104,6 +104,7 @@ function ExpedienteCreation() {
     const [ignoreEmptyCells, setIgnoreEmptyCells] = useState(true);
     const [isApplyingUpdates, setIsApplyingUpdates] = useState(false);
     const [showUpdateMenu, setShowUpdateMenu] = useState(false);
+    const [selectedUpdateIds, setSelectedUpdateIds] = useState(new Set());
 
     const fetchTypologies = async (subserieCode) => {
         if (!subserieCode) { setTypologies([]); return; }
@@ -678,6 +679,11 @@ function ExpedienteCreation() {
                     headers: { Authorization: `Bearer ${token}` }
                 });
 
+                const validChangedIds = (res.data.previewRows || [])
+                    .filter(r => r.status === 'changed' && r.id)
+                    .map(r => r.id);
+                setSelectedUpdateIds(new Set(validChangedIds));
+
                 setUpdatePreviewData(res.data);
                 setShowUpdateModal(true);
                 setUpdateFilter(res.data.summary?.withChanges > 0 ? 'changed' : 'all');
@@ -697,17 +703,43 @@ function ExpedienteCreation() {
     // Alias para compatibilidad
     const handleFileUpdateMassive = handleFileUploadForUpdate;
 
+    // ── Funciones para Seleccionar / Deseleccionar Expedientes ──
+    const toggleSelectRow = (id) => {
+        if (!id) return;
+        setSelectedUpdateIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const selectAllChanges = () => {
+        const allIds = (updatePreviewData?.previewRows || [])
+            .filter(r => r.status === 'changed' && r.id)
+            .map(r => r.id);
+        setSelectedUpdateIds(new Set(allIds));
+    };
+
+    const deselectAllChanges = () => {
+        setSelectedUpdateIds(new Set());
+    };
+
     // ── Aplicar las Actualizaciones Verificadas a la Base de Datos ──
     const handleApplyMassiveUpdates = async () => {
         if (!updatePreviewData || !updatePreviewData.previewRows) return;
         
-        const changedRows = updatePreviewData.previewRows.filter(r => r.status === 'changed' && r.id);
-        if (changedRows.length === 0) {
-            alert("No hay expedientes con cambios detectados para actualizar.");
+        // Filtrar SOLO los que tienen cambios Y que el usuario haya seleccionado con el checkbox
+        const selectedRows = updatePreviewData.previewRows.filter(
+            r => r.status === 'changed' && r.id && selectedUpdateIds.has(r.id)
+        );
+
+        if (selectedRows.length === 0) {
+            alert("No ha seleccionado ningún expediente para actualizar. Marque las casillas de los expedientes que desea actualizar.");
             return;
         }
 
-        if (!confirm(`¿Confirmas aplicar la actualización masiva a ${changedRows.length} expediente(s)? Los datos anteriores serán actualizados con los nuevos valores del Excel.`)) {
+        if (!confirm(`¿Confirmas aplicar la actualización a los ${selectedRows.length} expediente(s) seleccionados? Los datos anteriores serán reemplazados con los nuevos valores del Excel.`)) {
             return;
         }
 
@@ -716,7 +748,7 @@ function ExpedienteCreation() {
 
         try {
             const token = localStorage.getItem('token');
-            const updatesPayload = changedRows.map(r => ({
+            const updatesPayload = selectedRows.map(r => ({
                 id: r.id,
                 changes: r.changes
             }));
@@ -733,6 +765,7 @@ function ExpedienteCreation() {
             setStatus(msg);
             setShowUpdateModal(false);
             setUpdatePreviewData(null);
+            setSelectedUpdateIds(new Set());
 
             if (activeTab === 'visualizador') {
                 fetchSavedExpedientes();
@@ -1709,9 +1742,9 @@ function ExpedienteCreation() {
                             </div>
                         </div>
 
-                        {/* ── Barra de Filtros ── */}
+                        {/* ── Barra de Filtros y Selección ── */}
                         <div className="px-5 py-2.5 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3 text-xs">
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex flex-wrap items-center gap-1.5">
                                 <span className="font-bold text-gray-500 uppercase tracking-wider mr-2">Filtrar:</span>
                                 <button
                                     onClick={() => setUpdateFilter('changed')}
@@ -1756,24 +1789,54 @@ function ExpedienteCreation() {
                                     </button>
                                 )}
                             </div>
-                            <span className="text-gray-500">
-                                Mostrando <strong>{
-                                    (updatePreviewData.previewRows || []).filter(r => {
-                                        if (updateFilter === 'changed') return r.status === 'changed';
-                                        if (updateFilter === 'unchanged') return r.status === 'unchanged';
-                                        if (updateFilter === 'not_found') return r.status === 'not_found' || r.status === 'ambiguous';
-                                        return true;
-                                    }).length
-                                }</strong> fila(s)
-                            </span>
+
+                            {/* Controles de Selección Rápida */}
+                            <div className="flex items-center gap-2">
+                                <span className="text-gray-500 font-medium">
+                                    <strong>{selectedUpdateIds.size}</strong> de {updatePreviewData.summary?.withChanges || 0} elegidos
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={selectAllChanges}
+                                    className="text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                                >
+                                    ✓ Seleccionar Todos
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={deselectAllChanges}
+                                    className="text-[11px] font-bold text-gray-600 bg-white hover:bg-gray-100 border border-gray-300 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                                >
+                                    ✕ Desmarcar Todos
+                                </button>
+                            </div>
                         </div>
 
-                        {/* ── Tabla de Diferencias (Antes vs Después) ── */}
+                        {/* ── Tabla de Diferencias (Antes vs Después con Checkboxes) ── */}
                         <div className="overflow-auto flex-1 p-4 bg-gray-50/50">
                             <table className="w-full text-sm text-left bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden" style={{borderCollapse: 'separate', borderSpacing: 0}}>
                                 <thead className="text-[10px] uppercase text-gray-500 tracking-wider bg-gray-100 sticky top-0 z-10">
                                     <tr className="border-b border-gray-200">
-                                        <th className="px-3 py-3 font-bold text-center w-12">#</th>
+                                        <th className="px-3 py-3 font-bold text-center w-16">
+                                            <div className="flex items-center justify-center gap-1">
+                                                <input
+                                                    type="checkbox"
+                                                    title="Marcar / Desmarcar todos los que tienen cambios"
+                                                    checked={
+                                                        (updatePreviewData.summary?.withChanges || 0) > 0 &&
+                                                        (updatePreviewData.previewRows || [])
+                                                            .filter(r => r.status === 'changed' && r.id)
+                                                            .every(r => selectedUpdateIds.has(r.id))
+                                                    }
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) selectAllChanges();
+                                                        else deselectAllChanges();
+                                                    }}
+                                                    className="accent-emerald-600 h-4 w-4 cursor-pointer"
+                                                />
+                                                <span className="text-[10px] text-gray-500">#</span>
+                                            </div>
+                                        </th>
                                         <th className="px-3 py-3 font-bold w-44">Coincidencia BD</th>
                                         <th className="px-3 py-3 font-bold w-60">Expediente / Título</th>
                                         <th className="px-3 py-3 font-bold w-36">Estado</th>
@@ -1789,9 +1852,29 @@ function ExpedienteCreation() {
                                             return true;
                                         })
                                         .map((row) => (
-                                            <tr key={row.rowIndex} className={`hover:bg-amber-50/40 transition-colors ${row.status === 'changed' ? 'bg-emerald-50/20' : ''}`}>
-                                                <td className="px-3 py-3 text-center text-xs font-mono text-gray-400">
-                                                    {row.rowIndex}
+                                            <tr 
+                                                key={row.rowIndex} 
+                                                className={`transition-colors ${
+                                                    row.status === 'changed' && row.id && selectedUpdateIds.has(row.id)
+                                                        ? 'bg-emerald-50/40 hover:bg-emerald-50/70' 
+                                                        : 'hover:bg-gray-50'
+                                                }`}
+                                            >
+                                                <td className="px-3 py-3 text-center text-xs font-mono text-gray-500">
+                                                    <div className="flex items-center justify-center gap-1.5">
+                                                        {row.status === 'changed' && row.id ? (
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedUpdateIds.has(row.id)}
+                                                                onChange={() => toggleSelectRow(row.id)}
+                                                                className="accent-emerald-600 h-4 w-4 cursor-pointer"
+                                                                title={`Seleccionar para actualizar #${row.id}`}
+                                                            />
+                                                        ) : (
+                                                            <span className="w-4 inline-block text-gray-300 text-center font-bold">—</span>
+                                                        )}
+                                                        <span>{row.rowIndex}</span>
+                                                    </div>
                                                 </td>
                                                 <td className="px-3 py-3 text-xs">
                                                     <span className="font-semibold text-gray-800 font-mono block">
@@ -1811,7 +1894,11 @@ function ExpedienteCreation() {
                                                 </td>
                                                 <td className="px-3 py-3 text-xs whitespace-nowrap">
                                                     {row.status === 'changed' && (
-                                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                                                            row.id && selectedUpdateIds.has(row.id)
+                                                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-xs'
+                                                                : 'bg-gray-100 text-gray-600 border border-gray-200'
+                                                        }`}>
                                                             <CheckCircle2 size={13} /> {row.statusText}
                                                         </span>
                                                     )}
@@ -1872,8 +1959,8 @@ function ExpedienteCreation() {
                         <div className="p-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 bg-white">
                             <div className="text-xs text-gray-600">
                                 <span className="font-bold text-gray-800">
-                                    {updatePreviewData.summary?.withChanges || 0} expediente(s) con cambios listos
-                                </span> para ser actualizados en PostgreSQL.
+                                    {selectedUpdateIds.size} de {updatePreviewData.summary?.withChanges || 0} expediente(s) seleccionados
+                                </span> para ser actualizados en la base de datos.
                             </div>
                             <div className="flex gap-2.5">
                                 <button
@@ -1887,7 +1974,7 @@ function ExpedienteCreation() {
                                 <button
                                     type="button"
                                     onClick={handleApplyMassiveUpdates}
-                                    disabled={isApplyingUpdates || (updatePreviewData.summary?.withChanges || 0) === 0}
+                                    disabled={isApplyingUpdates || selectedUpdateIds.size === 0}
                                     className="px-6 py-2.5 rounded-xl font-bold text-white shadow-lg transition-all flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                     style={{
                                         background: 'linear-gradient(135deg, #16a34a, #15803d)',
@@ -1902,7 +1989,7 @@ function ExpedienteCreation() {
                                     ) : (
                                         <>
                                             <Save size={16} />
-                                            <span>Aplicar Cambios ({updatePreviewData.summary?.withChanges || 0} Expedientes) →</span>
+                                            <span>Aplicar Cambios ({selectedUpdateIds.size} Seleccionado{selectedUpdateIds.size === 1 ? '' : 's'}) →</span>
                                         </>
                                     )}
                                 </button>
