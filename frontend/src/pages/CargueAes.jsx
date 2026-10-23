@@ -2083,7 +2083,14 @@ function CargueAes() {
                             </div>
 
                             <div className="form-group">
-                                <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#666', marginBottom: '5px' }}>TIPO DOCUMENTAL</label>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                                    <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#666' }}>TIPO DOCUMENTAL (TRD)</label>
+                                    {configDoc.onbase_name && (
+                                        <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#1565c0', background: '#e3f2fd', padding: '2px 6px', borderRadius: '4px' }}>
+                                            En OnBase/AES: {configDoc.onbase_name}
+                                        </span>
+                                    )}
+                                </div>
                                 <input
                                     type="text"
                                     value={editingModal ? (modalEditFields.typology_name ?? configDoc.typology_name ?? '') : (configDoc.typology_name || '')}

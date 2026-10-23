@@ -15,6 +15,74 @@ let activeBrowser = null;
 let activePage = null;
 
 // ─────────────────────────────────────────────────────────────────
+// CATÁLOGO OFICIAL TIPOLOGÍAS SEGÚN AES (HISTORIAS ACADÉMICAS)
+// ─────────────────────────────────────────────────────────────────
+const HISTORIAS_ACADEMICAS_MAP = {
+    'DOCUMENTO DE IDENTIDAD VIGENTE': 'DOCUMENTO DE IDENTIDAD VIGENTE',
+    'REGISTRO DEL SISTEMA DE MATRICULA ESTUDIANTIL DE EDUCACION BASICA Y MEDIA- SIMAT, ARTICULACION CON LA MEDIA': 'REGISTRO DEL SISTEMA DE MATRICULA ESTUDIANTIL DE EDUCACION BASICA',
+    'REGISTRO DEL SISTEMA DE MATRICULA ESTUDIANTIL DE EDUCACION BASICA': 'REGISTRO DEL SISTEMA DE MATRICULA ESTUDIANTIL DE EDUCACION BASICA',
+    'ACTA DE COMPROMISO DEL APRENDIZ': 'ACTA DE COMPROMISO DEL APRENDIZ',
+    'AUTORIZACION DE DATOS DE MENOR DE EDAD': 'AUTORIZACION DE DATOS DE MENOR DE EDAD',
+    'DOCUMENTO DE IDENTIFICACION DEL PADRE, TUTOR O ACUDIENTE': 'DOCUMENTO DE IDENTIFICACION DEL PADRE, TUTOR O ACUDIENTE',
+    'CERTIFICADOS ACADEMICOS PARA EL PROCESO DE MATRICULA SALVO REGULACION ESPECIAL': 'CERTIFICADOS ACADEMICOS PARA EL PROCESO DE MATRICULA (SALVO REGULA',
+    'CERTIFICADOS ACADEMICOS PARA EL PROCESO DE MATRICULA (SALVO REGULA': 'CERTIFICADOS ACADEMICOS PARA EL PROCESO DE MATRICULA (SALVO REGULA',
+    'DOCUMENTO DE CONVALIDACION DE CERTIFICADOS ACADEMICOS U OTROS': 'DOCUMENTO DE CONVALIDACION DE CERTIFICADOS ACADEMICOS U OTROS',
+    'CERTIFICADO DE AFILIACION EPS': 'CERTIFICADO DE AFILIACION EPS',
+    'RESULTADO PRUEBA ICFES, SABER 11': 'RESULTADO PRUEBA ICFES, SABER 11',
+    'REGISTRO DE ASISTENCIA PARA FORMALIZAR MATRICULA': 'REGISTRO DE ASISTENCIA PARA FORMALIZAR MATRICULA',
+    'CONSTANCIA DE RECONOCIMIENTO PARA PENSION DE SOBREVIVIENTES': 'CONSTANCIA DE RECONOCIMIENTO PARA PENSION DE SOBREVIVIENTES',
+    'LLAMADO DE ATENCION ESCRITO ACADEMICO O DISCIPLINARIO': 'LLAMADO DE ATENCION ESCRITO ACADEMICO O DISCIPLINARIO',
+    'SOLICITUD DE NOVEDADES REINGRESO, APLAZAMIENTO, RETIRO VOLUNTARIO, TRASLADO Y CONDICIONAMIENTO': 'SOLICITUD DE NOVEDADES (REINGRESO, APLAZAMIENTO, RETIRO VOLUNTARIO',
+    'SOLICITUD DE NOVEDADES (REINGRESO, APLAZAMIENTO, RETIRO VOLUNTARIO': 'SOLICITUD DE NOVEDADES (REINGRESO, APLAZAMIENTO, RETIRO VOLUNTARIO',
+    'RESPUESTA A SOLICITUD DE NOVEDAD': 'RESPUESTA A SOLICITUD DE NOVEDAD',
+    'ACTAS DE REUNION DEL COMITE DE SEGUIMIENTO Y EVALUACION DE ETAPA LECTIVA Y/O PRODUCTIVA': 'ACTAS DE REUNION DEL COMITE DE SEGUIMIENTO Y EVALUACION DE ETAPA L',
+    'ACTAS DE REUNION DEL COMITE DE SEGUIMIENTO Y EVALUACION DE ETAPA L': 'ACTAS DE REUNION DEL COMITE DE SEGUIMIENTO Y EVALUACION DE ETAPA L',
+    'RESOLUCION DE REINGRESO, SANCIONATORIA O CANCELACION MATRICULA, PLAN DE MEJORAMIENTO ACADEMICO O DISCIPLINARIO': 'RESOLUCION DE REINGRESO, SANCIONATORIA O CANCELACION MATRICULA, PL',
+    'RESOLUCION DE REINGRESO, SANCIONATORIA O CANCELACION MATRICULA, PL': 'RESOLUCION DE REINGRESO, SANCIONATORIA O CANCELACION MATRICULA, PL',
+    'SOLICITUD DE RECURSO DE REPOSICION': 'SOLICITUD DE RECURSO DE REPOSICION',
+    'ACTO ADMINISTRATIVO RECURSO REPOSICION': 'ACTO ADMINISTRATIVO RECURSO REPOSICION',
+    'COMUNICACION DE PRESENTACION ETAPA PRACTICA LECTIVA': 'COMUNICACION DE PRESENTACION ETAPA PRACTICA LECTIVA',
+    'ACTA DE CIERRE ETAPA LECTIVA': 'ACTA DE CIERRE ETAPA LECTIVA',
+    'COMUNICACION SELECCION DE ETAPA PRODUCTIVA': 'COMUNICACION SELECCION DE ETAPA PRODUCTIVA',
+    'AFILIACION AL SISTEMA GENERAL DE RIESGOS LABORALES DE APRENDICES - ARL': 'AFILIACION AL SISTEMA GENERAL DE RIESGOS LABORALES DE APRENDICES',
+    'AFILIACION AL SISTEMA GENERAL DE RIESGOS LABORALES DE APRENDICES': 'AFILIACION AL SISTEMA GENERAL DE RIESGOS LABORALES DE APRENDICES',
+    'REGISTRO PLANEACION, SEGUIMIENTO Y EVALUACION DE LA ETAPA PRODUCTIVA': 'REGISTRO PLANEACION, SEGUIMIENTO Y EVALUACION DE LA ETAPA PRODUCTI',
+    'REGISTRO PLANEACION, SEGUIMIENTO Y EVALUACION DE LA ETAPA PRODUCTI': 'REGISTRO PLANEACION, SEGUIMIENTO Y EVALUACION DE LA ETAPA PRODUCTI',
+    'BITACORA DE SEGUIMIENTO ETAPA PRODUCTIVA': 'BITACORA DE SEGUIMIENTO ETAPA PRODUCTIVA',
+    'SOLICITUD DE CAMBIO DE ETAPA PRODUCTIVA': 'SOLICITUD DE CAMBIO DE ETAPA PRODUCTIVA',
+    'QUEJA O RECLAMACION POR EL APRENDIZ DEL PROCESO DE FORMACION': 'QUEJA O RECLAMACION POR EL APRENDIZ DEL PROCESO DE FORMACION',
+    'CERTIFICADO DE APROBACION EMPRESA TERMINACION ETAPA PRODUCTIVA': 'CERTIFICADO DE APROBACION EMPRESA TERMINACION ETAPA PRODUCTIVA',
+    'INFORME DE BIENESTAR DEL APRENDIZ RUTA DE ATENCION PARA LA PREVENCION DE LA DESERCION': 'INFORME DE BIENESTAR DEL APRENDIZ RUTA DE ATENCION PARA LA PREVENC',
+    'INFORME DE BIENESTAR DEL APRENDIZ RUTA DE ATENCION PARA LA PREVENC': 'INFORME DE BIENESTAR DEL APRENDIZ RUTA DE ATENCION PARA LA PREVENC',
+    'DOCUMENTO DE IDENTIDAD EN CASO DE CAMBIO DEL MISMO': 'DOCUMENTO DE IDENTIDAD EN CASO DE CAMBIO DEL MISMO',
+    'PAZ Y SALVO ACADEMICO ADMINISTRATIVO O COMUNICACION DE INSTITUCION EDUCATIVA': 'PAZ Y SALVO ACADEMICO ADMINISTRATIVO O COMUNICACION INSTITUCION',
+    'PAZ Y SALVO ACADEMICO ADMINISTRATIVO O COMUNICACION INSTITUCION': 'PAZ Y SALVO ACADEMICO ADMINISTRATIVO O COMUNICACION INSTITUCION',
+    'CERTIFICADO DE INSCRIPCION EN EL APLICATIVO DE LA APE': 'CERTIFICADO DE INSCRIPCION EN EL APLICATIVO DE LA APE',
+    'RESULTADOS DE LA PRUEBA SABER TYT ANTE EL ICFES PARA APRENDICES DEL NIVEL TECNOLOGICO': 'RESULTADOS DE LA PRUEBA SABER TYT ANTE EL ICFES PARA APRENDICES DE',
+    'RESULTADOS DE LA PRUEBA SABER TYT ANTE EL ICFES PARA APRENDICES DE': 'RESULTADOS DE LA PRUEBA SABER TYT ANTE EL ICFES PARA APRENDICES DE',
+    'CONSTANCIA DE BUENA CONDUCTA': 'CONSTANCIA DE BUENA CONDUCTA',
+    'CONTROL Y EXPEDICION Y ENTREGA DE DUPLICADOS ANOS ANTERIORES AL ANO 2000': 'CONTROL Y EXPEDICION Y ENTREGA DE DUPLICADOS (AÑOS ANTERIORES AL A',
+    'CONTROL Y EXPEDICION Y ENTREGA DE DUPLICADOS (AÑOS ANTERIORES AL A': 'CONTROL Y EXPEDICION Y ENTREGA DE DUPLICADOS (AÑOS ANTERIORES AL A',
+    'SOLICITUD MODIFICACION DE DOCUMENTOS ACADEMICOS CON SU RESPECTIVO SOPORTE': 'SOLICITUD MODIFICACION DE DOCUMENTOS ACADEMICOS CON SU RESPECTIVO',
+    'SOLICITUD MODIFICACION DE DOCUMENTOS ACADEMICOS CON SU RESPECTIVO': 'SOLICITUD MODIFICACION DE DOCUMENTOS ACADEMICOS CON SU RESPECTIVO',
+    'CONSTANCIA DE VALIDACION ACADEMICA PARA APOSTILLAR': 'CONSTANCIA DE VALIDACION ACADEMICA PARA APOSTILLAR'
+};
+
+function resolveOnBaseTypologyName(rawName) {
+    if (!rawName) return '';
+    const norm = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    const cleanRaw = norm(rawName);
+    for (const [trdKey, aesVal] of Object.entries(HISTORIAS_ACADEMICAS_MAP)) {
+        if (norm(trdKey) === cleanRaw) return aesVal;
+    }
+    for (const [trdKey, aesVal] of Object.entries(HISTORIAS_ACADEMICAS_MAP)) {
+        const normKey = norm(trdKey);
+        if (cleanRaw.includes(normKey) || normKey.includes(cleanRaw)) return aesVal;
+    }
+    return rawName.trim();
+}
+
+// ─────────────────────────────────────────────────────────────────
 // UTILIDADES
 // ─────────────────────────────────────────────────────────────────
 
@@ -1814,25 +1882,27 @@ async function paso4_llenarCampos(formPage, formFrame, docInfo, logs) {
             let typingText = valueToType;
 
             if (fieldName.toLowerCase().includes('tipo documental')) {
-                // Si la tipología tiene un alias guardado previamente en BD, usarlo directamente
-                let savedAlias = null;
-                try {
-                    const aliasRes = await pool.query(
-                        `SELECT onbase_name FROM trd_typologies 
-                         WHERE (id = $1 OR typology_name ILIKE $2 OR onbase_name ILIKE $2) 
-                           AND onbase_name IS NOT NULL AND TRIM(onbase_name) != '' 
-                         LIMIT 1`,
-                        [docInfo?.trd_typology_id || docInfo?.typology_id || 0, valueToType.trim()]
-                    );
-                    if (aliasRes && aliasRes.rows && aliasRes.rows[0]?.onbase_name) {
-                        savedAlias = aliasRes.rows[0].onbase_name.trim();
-                        logs.push(`[PASO 4] 💡 Equivalencia previa encontrada en BD para "${valueToType.substring(0,35)}..." ➔ "${savedAlias}"`);
-                    }
-                } catch (dbErr) { }
+                // Si la tipología tiene un alias guardado previamente en BD o en el catálogo AES, usarlo directamente
+                let savedAlias = docInfo?.onbase_name || resolveOnBaseTypologyName(valueToType);
+                if (!savedAlias || savedAlias === valueToType.trim()) {
+                    try {
+                        const aliasRes = await pool.query(
+                            `SELECT onbase_name FROM trd_typologies 
+                             WHERE (id = $1 OR typology_name ILIKE $2 OR onbase_name ILIKE $2) 
+                               AND onbase_name IS NOT NULL AND TRIM(onbase_name) != '' 
+                             LIMIT 1`,
+                            [docInfo?.trd_typology_id || docInfo?.typology_id || 0, valueToType.trim()]
+                        );
+                        if (aliasRes && aliasRes.rows && aliasRes.rows[0]?.onbase_name) {
+                            savedAlias = aliasRes.rows[0].onbase_name.trim();
+                        }
+                    } catch (dbErr) { }
+                }
 
                 if (savedAlias) {
                     typingText = savedAlias;
                     searchKey = savedAlias;
+                    logs.push(`[PASO 4] 💡 Tipología según AES identificada: "${typingText}" (TRD original: "${valueToType.substring(0,35)}...")`);
                 } else {
                     // Para buscar en el combobox de OnBase, usar la primera palabra o prefijo exacto
                     const cleanWords = valueToType
@@ -2540,7 +2610,18 @@ exports.executeAutomation = async (req, res) => {
                 db.all(`
                     SELECT d.*, e.expediente_code, e.title as exp_title, e.opening_date, e.subserie, e.metadata_values as exp_meta,
                            ser.series_code, ser.series_name, ser.dependency_id as series_dep_id,
-                           sub.subseries_code, sub.subseries_name
+                           sub.subseries_code, sub.subseries_name,
+                           (
+                               SELECT t.onbase_name FROM trd_typologies t 
+                               WHERE (
+                                   LOWER(TRIM(t.typology_name)) = LOWER(TRIM(d.typology_name))
+                                   OR d.typology_name ILIKE '%' || TRIM(t.typology_name) || '%'
+                                   OR t.typology_name ILIKE '%' || TRIM(d.typology_name) || '%'
+                               )
+                               AND t.onbase_name IS NOT NULL AND TRIM(t.onbase_name) != ''
+                               ORDER BY CASE WHEN LOWER(TRIM(t.typology_name)) = LOWER(TRIM(d.typology_name)) THEN 1 ELSE 2 END
+                               LIMIT 1
+                           ) as typology_onbase_name
                     FROM documents d
                     LEFT JOIN expedientes e ON d.expediente_id = e.id
                     LEFT JOIN trd_series ser ON d.trd_series_id = ser.id
@@ -2557,10 +2638,28 @@ exports.executeAutomation = async (req, res) => {
                 try {
                     meta = typeof r.exp_meta === 'string' ? JSON.parse(r.exp_meta) : (r.exp_meta || {});
                 } catch { }
+                let docMeta = {};
+                try {
+                    docMeta = typeof r.metadata_values === 'string' ? JSON.parse(r.metadata_values) : (r.metadata_values || {});
+                } catch { }
+                const combinedMeta = { ...meta, ...docMeta };
+
+                // Construir nombre del documento concatenando Valores 1 al 8 exactamente como en la interfaz
+                const metaString = [1, 2, 3, 4, 5, 6, 7, 8]
+                    .map(i => combinedMeta[`valor${i}`] || combinedMeta[`Metadato ${i}`] || '')
+                    .map(v => String(v).trim())
+                    .filter(Boolean)
+                    .join(' ')
+                    .trim();
+
+                const joinedName = metaString || r.exp_title || r.filename;
+                const aesTypology = r.typology_onbase_name || resolveOnBaseTypologyName(r.typology_name);
+
                 return {
                     ...r,
-                    joinedName: r.exp_title || r.filename,
-                    parsedMeta: meta
+                    joinedName,
+                    parsedMeta: combinedMeta,
+                    onbase_name: aesTypology || null
                 };
             });
 

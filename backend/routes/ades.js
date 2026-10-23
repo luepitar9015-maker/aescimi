@@ -229,11 +229,12 @@ router.get('/pending', requireAuth, (req, res) => {
             e.opening_date,
             e.subserie,
             e.storage_type,
-            COALESCE(t_min.min_id, 9999) as typology_order
+            COALESCE(t_min.min_id, 9999) as typology_order,
+            t_min.onbase_name
         FROM documents d
         LEFT JOIN expedientes e ON d.expediente_id = e.id
         LEFT JOIN (
-            SELECT typology_name, MIN(id) as min_id
+            SELECT typology_name, MIN(id) as min_id, MAX(onbase_name) as onbase_name
             FROM trd_typologies
             GROUP BY typology_name
         ) t_min ON d.typology_name = t_min.typology_name
