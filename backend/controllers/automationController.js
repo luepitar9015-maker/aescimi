@@ -2274,7 +2274,40 @@ async function paso5_adjuntarPDF(page, allFramesFn, docInfo, logs) {
     docInfo = { ...docInfo, path: filePath };
 
     try {
-        // Preparar detector de FileChooser ANTES del clic
+        // 1. Desplegar sección "Documento Electrónico" si es un acordeón colapsado
+        logs.push('[PASO 5] Desplegando pestaña "Documento Electrónico"...');
+        for (const frame of allFramesFn()) {
+            try {
+                await frame.evaluate(() => {
+                    const elements = Array.from(document.querySelectorAll('button, a, div, span, [role="tab"], [role="button"], td, th, h3, h4'));
+                    const docElec = elements.find(el => {
+                        const t = (el.innerText || el.textContent || el.title || '').trim().toLowerCase();
+                        return t.includes('documento electronico') || t.includes('documento electrónico');
+                    });
+                    if (docElec) {
+                        docElec.scrollIntoView({ block: 'center' });
+                        docElec.click();
+                        docElec.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                    }
+                });
+            } catch (e) {}
+        }
+        await wait(800);
+
+        // 2. Verificar si existe directamente un input[type="file"] en el formulario
+        for (const frame of allFramesFn()) {
+            try {
+                const fileInp = await frame.$('input[type="file"]');
+                if (fileInp) {
+                    await fileInp.uploadFile(filePath);
+                    logs.push(`[PASO 5] ✅ Archivo adjuntado directamente por input[type="file"]: ${path.basename(filePath)}`);
+                    await wait(2000);
+                    return true;
+                }
+            } catch (e) {}
+        }
+
+        // 3. Preparar detector de FileChooser ANTES del clic en "Importar"
         const fileChooserPromise = page.waitForFileChooser({ timeout: 12000 });
 
         // Buscar y clic en botón "Importar"
@@ -2287,10 +2320,17 @@ async function paso5_adjuntarPDF(page, allFramesFn, docInfo, logs) {
                     ));
                     const btn = btns.find(b => {
                         const t = (b.innerText || b.value || b.title || b.name || b.id || b.textContent || '').trim().toLowerCase();
-                        const rect = b.getBoundingClientRect();
-                        return t.includes('importar') && rect.width > 0;
+                        return (t === 'importar' || t.includes('importar') || t.includes('examinar')) && !t.includes('expediente');
                     });
-                    if (btn) { btn.scrollIntoView({ block: 'center' }); btn.focus(); btn.click(); return true; }
+                    if (btn) {
+                        btn.scrollIntoView({ block: 'center' });
+                        btn.focus();
+                        btn.click();
+                        btn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                        btn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+                        btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                        return true;
+                    }
                     return false;
                 });
                 if (clicked) { importClicked = true; break; }
@@ -2298,16 +2338,16 @@ async function paso5_adjuntarPDF(page, allFramesFn, docInfo, logs) {
         }
 
         if (!importClicked) {
-            logs.push('[PASO 5][WARN] Botón "Importar" no encontrado');
-            fileChooserPromise.catch(() => { }); // cancela la espera
+            logs.push('[PASO 5][WARN] Botón "Importar" no encontrado tras desplegar Documento Electrónico');
+            fileChooserPromise.catch(() => { });
             return false;
         }
 
         logs.push('[PASO 5] Clic en "Importar". Esperando diálogo de archivo...');
         const chooser = await fileChooserPromise;
-        await chooser.accept([docInfo.path]);
-        logs.push(`[PASO 5] ✅ Archivo seleccionado: ${path.basename(docInfo.path)}`);
-        await wait(1800); // Espera optimizada para que OnBase procese el archivo
+        await chooser.accept([filePath]);
+        logs.push(`[PASO 5] ✅ Archivo seleccionado: ${path.basename(filePath)}`);
+        await wait(2000); // Esperar que OnBase procese el archivo y lo refleje como (1)
         return true;
     } catch (e) {
         logs.push(`[PASO 5][ERROR] ${e.message}`);
@@ -3169,7 +3209,7 @@ exports.executeAutomation = async (req, res) => {
 
                             // ── PASO 5: ADJUNTAR PDF ──
                             currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 5: Adjuntar PDF`;
-                            if (docInfo?.path) {
+                            if (docInfo?.path || docInfo?.storage_path) {
                                 const attachOk = await paso5_adjuntarPDF(page, allFrames, docInfo, currentJob.logs);
                                 if (!attachOk) {
                                     throw new Error("Fallo al adjuntar el archivo PDF (Importar falló o archivo no encontrado).");
