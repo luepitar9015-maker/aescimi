@@ -143,14 +143,20 @@ const safeClick = async (page, selector) => {
 };
 
 // Helper para detectar y quitar bloqueos de objetos (Locked Objects)
+let lastLockCheckTime = 0;
 async function checkAndClearLocks(browser, logs) {
+    const now = Date.now();
+    if (now - lastLockCheckTime < 3000) return;
+    lastLockCheckTime = now;
     try {
         const allPages = await browser.pages().catch(() => []);
         for (const pg of allPages) {
             for (const frame of pg.frames()) {
                 try {
                     const hasLocksPopup = await frame.evaluate(() => {
-                        const txt = document.body ? document.body.innerText.toLowerCase() : '';
+                        const modal = document.querySelector('.LockedObjects, [id*="Lock" i], [class*="Lock" i], .ui-dialog');
+                        if (!modal) return false;
+                        const txt = (modal.innerText || '').toLowerCase();
                         return (txt.includes('locked objects') || txt.includes('manage locks') || txt.includes('objetos bloqueados')) && txt.includes('lock type');
                     });
                     
@@ -185,7 +191,7 @@ async function checkAndClearLocks(browser, logs) {
                         
                         if (action) {
                             logs.push(`[LOCKS] Acción ejecutada: ${action}`);
-                            await wait(2000);
+                            await wait(1500);
                             
                             if (action === 'select_all') {
                                 // Clic en Remove Lock ahora
@@ -198,7 +204,7 @@ async function checkAndClearLocks(browser, logs) {
                                     if (removeBtn) removeBtn.click();
                                 });
                                 logs.push('[LOCKS] Clic en Remove Lock ejecutado');
-                                await wait(3000);
+                                await wait(2000);
                             }
                             
                             // Cerrar el popup haciendo clic en el botón de cerrar
@@ -211,7 +217,7 @@ async function checkAndClearLocks(browser, logs) {
                                 if (closeBtn) closeBtn.click();
                             });
                             logs.push('[LOCKS] Popup de bloqueo cerrado');
-                            await wait(2000);
+                            await wait(1000);
                         }
                     }
                 } catch (e) {}
@@ -594,6 +600,7 @@ async function paso2_abrirFormulario(page, browser, logs) {
             for (const frame of pg.frames()) {
                 try {
                     const found = await frame.evaluate(() => {
+                        if (document.querySelector('#sgdeaexpediente8_input, input[id*="expediente" i], input[title*="expediente" i]')) return true;
                         const html = document.body ? document.body.innerHTML.toLowerCase() : '';
                         return html.includes('código expediente') || html.includes('codigo expediente') || html.includes('nombre documento');
                     });
@@ -1500,14 +1507,13 @@ async function paso3_codigoExpediente(page, browser, code, logs) {
             for (const frame of pg.frames()) {
                 try {
                     const handle = await frame.evaluateHandle(() => {
-                        // Estrategia 1: por atributos específicos de OnBase
+                        // Estrategia 1: por ID exacto de OnBase (#sgdeaexpediente8_input) o atributos
                         const byAttr = document.querySelector(
-                            'input[title*="xpediente" i], input[name*="xpediente" i], input[id*="xpediente" i]'
+                            '#sgdeaexpediente8_input, input[title*="xpediente" i], input[name*="xpediente" i], input[id*="xpediente" i]'
                         );
                         if (byAttr && !byAttr.readOnly) return byAttr;
 
                         // Estrategia 2: buscar el label "Código Expediente" en la página
-                        // En OnBase el label está en la celda anterior del TR
                         const tds = Array.from(document.querySelectorAll('td, th, label, span, div'));
                         const labelEl = tds.find(el => {
                             const t = (el.innerText || el.textContent || '').trim().toLowerCase();
@@ -1515,19 +1521,16 @@ async function paso3_codigoExpediente(page, browser, code, logs) {
                                 || t.startsWith('código exp') || t.startsWith('codigo exp');
                         });
                         if (labelEl) {
-                            // Buscar el input en el mismo TR o el siguiente TR
                             const row = labelEl.closest('tr');
                             if (row) {
                                 const inp = row.querySelector('input:not([type="hidden"]):not([readonly])');
                                 if (inp) return inp;
-                                // Puede estar en el TR siguiente
                                 const nextRow = row.nextElementSibling;
                                 if (nextRow) {
                                     const inp2 = nextRow.querySelector('input:not([type="hidden"]):not([readonly])');
                                     if (inp2) return inp2;
                                 }
                             }
-                            // Buscar en el elemento padre
                             let parent = labelEl.parentElement;
                             for (let i = 0; i < 4 && parent; i++) {
                                 const inp = parent.querySelector('input:not([type="hidden"]):not([readonly])');
@@ -1559,7 +1562,7 @@ async function paso3_codigoExpediente(page, browser, code, logs) {
     } else {
         // Enfocar la página correcta
         await formPage.bringToFront();
-        await wait(500);
+        await wait(300);
 
         // Diagnóstico: qué inputs hay en el frame
         const inputInfo = await formFrame.evaluate(() => {
@@ -1569,25 +1572,35 @@ async function paso3_codigoExpediente(page, browser, code, logs) {
         }).catch(() => []);
         logs.push(`[PASO 3] Inputs en frame: ${JSON.stringify(inputInfo)}`);
 
-        // Escribir el código con keyboard.type nativo sobre el frame
-        // (triple clic para limpiar primero)
+        // Escribir el código asegurando limpieza absoluta previa (evita duplicación de texto)
         try {
-            await comboInput.click({ clickCount: 3 });
-            await wait(200);
-            await comboInput.press('Delete');
-            await wait(150);
+            await formFrame.evaluate(el => {
+                el.value = '';
+                el.focus();
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            }, comboInput);
 
-            // Usar keyboard.type del frame (NO de page ni formPage)
-            // Enfocamos el input y usamos page del frame para escribir
-            await comboInput.focus();
-            await wait(200);
+            await comboInput.click();
+            await wait(100);
+            await formPage.keyboard.down('Control');
+            await formPage.keyboard.press('KeyA');
+            await formPage.keyboard.up('Control');
+            await formPage.keyboard.press('Backspace');
+            await wait(100);
 
-            // Escribir carácter a carácter con delay
-            logs.push(`[PASO 3] Escribiendo "${code}" (${code.length} chars, delay 150ms)...`);
+            // Escribir ágil (delay 35ms)
+            logs.push(`[PASO 3] Escribiendo "${code}" (${code.length} chars, delay 35ms)...`);
             for (const char of code) {
-                await formPage.keyboard.type(char, { delay: 0 });
-                await wait(150);
+                await formPage.keyboard.type(char, { delay: 35 });
             }
+            await wait(200);
+
+            // Disparar eventos
+            await formFrame.evaluate(el => {
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            }, comboInput);
 
             // Verificar valor escrito
             const valEscrito = await formFrame.evaluate(el => el.value, comboInput).catch(() => '?');
@@ -1596,14 +1609,19 @@ async function paso3_codigoExpediente(page, browser, code, logs) {
             if (valEscrito === code) {
                 logs.push('[PASO 3] ✅ Código escrito correctamente');
             } else {
-                logs.push(`[PASO 3][WARN] Valor esperado "${code}", en campo "${valEscrito}"`);
+                logs.push(`[PASO 3][WARN] Valor esperado "${code}", en campo "${valEscrito}". Corrigiendo vía evaluate...`);
+                await formFrame.evaluate((el, c) => {
+                    el.value = c;
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                }, comboInput, code);
             }
         } catch (e) {
             logs.push(`[PASO 3][ERROR] Al escribir código: ${e.message}`);
         }
     }
 
-    // Esperar dropdown de sugerencias de OnBase (hasta 12s)
+    // Esperar dropdown de sugerencias de OnBase (hasta 8s)
     logs.push('[PASO 3] Esperando dropdown de OnBase...');
     const DROPDOWN_SELS = [
         'ul.CodeEntry_DropdownList_ItemRowList li',
@@ -1620,67 +1638,62 @@ async function paso3_codigoExpediente(page, browser, code, logs) {
 
     let dropdownHandled = false;
 
-    for (let t = 0; t < 8 && !dropdownHandled; t++) {
+    for (let t = 0; t < 10 && !dropdownHandled; t++) {
         await wait(500);
+        // Priorizar formFrame
+        const framesToCheck = [];
+        if (formFrame) framesToCheck.push(formFrame);
         const allPages = await browser.pages();
-
         for (const pg of allPages) {
-            for (const frame of pg.frames()) {
-                try {
-                    const frameEl = await frame.frameElement().catch(() => null);
-                    let offX = 0, offY = 0;
-                    if (frameEl) {
-                        const box = await frameEl.boundingBox().catch(() => null);
-                        if (box) { offX = box.x; offY = box.y; }
-                    }
-
-                    const suggestion = await frame.evaluate((sels, sc) => {
-                        for (const sel of sels) {
-                            const items = Array.from(document.querySelectorAll(sel)).filter(el => {
-                                const r = el.getBoundingClientRect();
-                                return r.width > 0 && r.height > 0;
-                            });
-                            if (items.length > 0) {
-                                // Preferir el que contiene el código
-                                const exact = items.find(i =>
-                                    (i.innerText || i.textContent || '').includes(sc)
-                                );
-                                const target = exact || items[0];
-                                const r = target.getBoundingClientRect();
-                                return {
-                                    lx: r.left + r.width / 2,
-                                    ly: r.top + r.height / 2,
-                                    text: (target.innerText || target.textContent || '').trim().substring(0, 80),
-                                    sel
-                                };
-                            }
-                        }
-                        return null;
-                    }, DROPDOWN_SELS, code);
-
-                    if (suggestion) {
-                        logs.push(`[PASO 3] ✅ Dropdown detectado t=${(t * 0.5).toFixed(1)}s → "${suggestion.text}"`);
-                        await pg.mouse.click(offX + suggestion.lx, offY + suggestion.ly);
-                        logs.push('[PASO 3] Clic en sugerencia. Esperando autorrelleno (3s)...');
-                        await wait(3000);
-                        dropdownHandled = true;
-                        break;
-                    }
-                } catch { }
+            for (const fr of pg.frames()) {
+                if (fr !== formFrame) framesToCheck.push(fr);
             }
-            if (dropdownHandled) break;
         }
+
+        for (const fr of framesToCheck) {
+            try {
+                const clickedText = await fr.evaluate((sels, sc) => {
+                    for (const sel of sels) {
+                        const items = Array.from(document.querySelectorAll(sel)).filter(el => {
+                            const r = el.getBoundingClientRect();
+                            return r.width > 0 && r.height > 0;
+                        });
+                        if (items.length > 0) {
+                            const exact = items.find(i => (i.innerText || i.textContent || '').includes(sc));
+                            const target = exact || items[0];
+                            const text = (target.innerText || target.textContent || '').trim().substring(0, 80);
+                            target.scrollIntoView({ block: 'nearest' });
+                            target.click();
+                            target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+                            target.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+                            target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+                            return text;
+                        }
+                    }
+                    return null;
+                }, DROPDOWN_SELS, code);
+
+                if (clickedText) {
+                    logs.push(`[PASO 3] ✅ Dropdown detectado t=${(t * 0.5).toFixed(1)}s → "${clickedText}" (clic directo aplicado)`);
+                    logs.push('[PASO 3] Esperando autorrelleno (2.5s)...');
+                    await wait(2500);
+                    dropdownHandled = true;
+                    break;
+                }
+            } catch { }
+        }
+        if (dropdownHandled) break;
     }
 
     if (!dropdownHandled) {
         logs.push('[PASO 3][WARN] Dropdown no detectado. Fallback: ArrowDown + Enter');
         if (formPage) {
             await formPage.keyboard.press('ArrowDown');
-            await wait(600);
+            await wait(400);
             await formPage.keyboard.press('ArrowDown');
-            await wait(300);
+            await wait(200);
             await formPage.keyboard.press('Enter');
-            await wait(3000);
+            await wait(2500);
         }
     }
 
@@ -2518,6 +2531,8 @@ let currentJob = {
     error: null,
     completed: false,
     screenshot: null,
+    liveFrame: null,
+    liveBuffer: null,
     startTime: null,
     documentIds: []
 };
@@ -2532,7 +2547,7 @@ exports.getAutomationStatus = async (req, res) => {
             logs: (currentJob.logs || []).slice(-100),
             error: currentJob.error,
             completed: currentJob.completed,
-            hasFrame: !!(currentJob.liveFrame || currentJob.screenshot)
+            hasFrame: !!(currentJob.liveBuffer || currentJob.liveFrame || currentJob.screenshot)
         });
     } catch (err) {
         return res.status(500).json({ error: err.message });
@@ -2541,6 +2556,14 @@ exports.getAutomationStatus = async (req, res) => {
 
 exports.getAutomationFrame = async (req, res) => {
     try {
+        if (currentJob.liveBuffer) {
+            res.writeHead(200, {
+                'Content-Type': 'image/jpeg',
+                'Content-Length': currentJob.liveBuffer.length,
+                'Cache-Control': 'no-cache, no-store, must-revalidate'
+            });
+            return res.end(currentJob.liveBuffer);
+        }
         const rawB64 = currentJob.liveFrame || currentJob.screenshot;
         if (!rawB64) {
             return res.status(404).send('No frame');
@@ -2569,6 +2592,7 @@ exports.killActiveAutomation = async (req, res) => {
         currentJob.completed = true;
         currentJob.currentStep = 'Detenido por el usuario';
         currentJob.liveFrame = null;
+        currentJob.liveBuffer = null;
         currentJob.screenshot = null;
         currentJob.logs.push('[DETENIDO] 🛑 Automatización en vivo cancelada por el usuario. Consola reiniciada.');
         automationEmitter.emit('done', currentJob);
@@ -2678,6 +2702,8 @@ exports.executeAutomation = async (req, res) => {
         error: null,
         completed: false,
         screenshot: null,
+        liveFrame: null,
+        liveBuffer: null,
         startTime: new Date().toISOString(),
         documentIds: documentIds || []
     };
@@ -2730,13 +2756,21 @@ exports.executeAutomation = async (req, res) => {
             // Screencast en tiempo real con throttling optimizado (alta fluidez, bajo consumo de CPU y red)
             try {
                 const session = await page.target().createCDPSession();
-                await session.send('Page.startScreencast', { format: 'jpeg', quality: 40, maxWidth: 960, maxHeight: 600, everyNthFrame: 2 });
+                await session.send('Page.startScreencast', {
+                    format: 'jpeg',
+                    quality: 30,
+                    maxWidth: 800,
+                    maxHeight: 500,
+                    everyNthFrame: 10
+                });
                 let lastFrameTime = 0;
                 session.on('Page.screencastFrame', ev => {
                     const now = Date.now();
-                    currentJob.liveFrame = ev.data;
-                    if (now - lastFrameTime >= 500) {
+                    // Limitar actualización de buffer a máximo 1 FPS para no recargar CPU ni event loop
+                    if (now - lastFrameTime >= 900) {
                         lastFrameTime = now;
+                        currentJob.liveBuffer = Buffer.from(ev.data, 'base64');
+                        currentJob.liveFrame = 'data:image/jpeg;base64,' + ev.data;
                         automationEmitter.emit('frame', ev.data);
                     }
                     session.send('Page.screencastFrameAck', { sessionId: ev.sessionId }).catch(() => { });
