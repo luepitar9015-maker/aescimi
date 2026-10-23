@@ -649,7 +649,7 @@ router.post('/mass', async (req, res) => {
     }
 });
 
-// POST mass update expedientes (By Title/Metadata)
+// POST mass update expedientes (By Title/Metadata - Legacy support)
 router.post('/mass-update', (req, res) => {
     const data = req.body; // Array of objects from Excel
     
@@ -691,14 +691,10 @@ router.post('/mass-update', (req, res) => {
             return;
         }
 
-        // Buscar el expediente existente basado en Titulo o Valores
-        // Prioridad: 1. Titulo exacto, 2. Valor 1 exacto
         let q = `SELECT id, expediente_code FROM expedientes WHERE title = $1`;
         let p = [titleQuery];
 
         if (!titleQuery && val1Query) {
-            // Usa el operador PostgreSQL ->> ya que la BD real es PostgreSQL.
-            // Extra: usa CAST por si la columna metadata_values se guarda como texto plano en lugar de jsonb
             q = `SELECT id, expediente_code FROM expedientes WHERE (metadata_values::jsonb)->>'valor1' = $1 OR (metadata_values::jsonb)->>'Metadato 1' = $2`;
             p = [val1Query, val1Query];
         }
@@ -727,7 +723,6 @@ router.post('/mass-update', (req, res) => {
 
             const expId = rows[0].id;
             
-            // Actualizar el código
             db.run(`UPDATE expedientes SET expediente_code = $1 WHERE id = $2`, [newCode, expId], function(updateErr) {
                 if (updateErr) {
                     errors.push({ item: titleQuery || val1Query, error: 'Error actualizando: ' + updateErr.message });
@@ -739,6 +734,448 @@ router.post('/mass-update', (req, res) => {
             });
         });
     });
+});
+
+// Helper de normalización para mapeo inteligente de columnas
+const normField = (str) => {
+    if (!str) return '';
+    return str.toString()
+        .toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[\s\-_]/g, '')
+        .trim();
+};
+
+const normalizeDateVal = (val) => {
+    if (!val || val === '') return null;
+    if (typeof val === 'number') {
+        const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+        return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
+    }
+    const str = String(val).trim();
+    const colMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (colMatch) return `${colMatch[3]}-${colMatch[2].padStart(2,'0')}-${colMatch[1].padStart(2,'0')}`;
+    const dashMatch = str.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+    if (dashMatch) return `${dashMatch[3]}-${dashMatch[2].padStart(2,'0')}-${dashMatch[1].padStart(2,'0')}`;
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? str : d.toISOString().split('T')[0];
+};
+
+// GET export editable template with existing expedientes data
+router.get('/export-editable', async (req, res) => {
+    try {
+        const client = await (db.pool || db).connect();
+        let expedientes = [];
+        try {
+            const expRes = await client.query(`
+                SELECT id, expediente_code, box_id, opening_date, subserie, storage_type, title, metadata_values 
+                FROM expedientes 
+                ORDER BY id ASC
+            `);
+            expedientes = expRes.rows || [];
+        } finally {
+            client.release();
+        }
+
+        const wb = xlsx.utils.book_new();
+
+        const rows = expedientes.map(exp => {
+            let meta = {};
+            try {
+                meta = typeof exp.metadata_values === 'string' ? JSON.parse(exp.metadata_values || '{}') : (exp.metadata_values || {});
+            } catch(e) {}
+
+            const dateStr = exp.opening_date ? new Date(exp.opening_date).toISOString().split('T')[0] : '';
+
+            return {
+                "ID": exp.id,
+                "Codigo Expediente": exp.expediente_code || '',
+                "Id Caja": exp.box_id || '',
+                "Fecha Apertura": dateStr,
+                "Subserie TRD": exp.subserie || '',
+                "Tipo Soporte": exp.storage_type || 'Fisico',
+                "Titulo": exp.title || '',
+                "Valor 1": meta.valor1 || '',
+                "Valor 2": meta.valor2 || '',
+                "Valor 3": meta.valor3 || '',
+                "Valor 4": meta.valor4 || '',
+                "Valor 5": meta.valor5 || '',
+                "Valor 6": meta.valor6 || '',
+                "Valor 7": meta.valor7 || '',
+                "Valor 8": meta.valor8 || ''
+            };
+        });
+
+        const ws = xlsx.utils.json_to_sheet(rows);
+        ws['!cols'] = [
+            { wch: 8 },  // ID
+            { wch: 22 }, // Codigo Expediente
+            { wch: 14 }, // Id Caja
+            { wch: 15 }, // Fecha Apertura
+            { wch: 16 }, // Subserie TRD
+            { wch: 15 }, // Tipo Soporte
+            { wch: 35 }, // Titulo
+            { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 },
+            { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }
+        ];
+
+        xlsx.utils.book_append_sheet(wb, ws, 'Expedientes_Para_Actualizar');
+
+        const instr = [
+            ['GUIA DE ACTUALIZACION MASIVA DE METADATOS Y EXPEDIENTES'],
+            [''],
+            ['1. NO MODIFIQUE LA COLUMNA "ID": El sistema usa este número para identificar exactamente el expediente.'],
+            ['2. Modifique las columnas que necesite corregir (Código, Caja, Fecha, Título, o Metadatos Valor 1 a 8).'],
+            ['3. Si deja una celda vacía, el sistema conservará el dato que ya tenía registrado (no lo borrará).'],
+            ['4. Guarde el archivo y cárguelo en el sistema mediante el botón "Actualizar Metadatos (Excel)".'],
+            ['5. El sistema le mostrará una pantalla de Vista Previa con el resumen exacto de los cambios antes de aplicarlos.']
+        ];
+        const wsInstr = xlsx.utils.aoa_to_sheet(instr);
+        xlsx.utils.book_append_sheet(wb, wsInstr, 'Instrucciones');
+
+        const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename="Expedientes_Para_Actualizacion_Masiva.xlsx"');
+        res.send(buffer);
+
+    } catch (err) {
+        console.error('[EXPEDIENTES] Error en export-editable:', err);
+        res.status(500).json({ error: 'Error al generar plantilla de actualización: ' + err.message });
+    }
+});
+
+// POST mass update preview (Analyzes Excel data against DB and returns exact diff)
+router.post('/mass-update-preview', async (req, res) => {
+    const rawRows = req.body;
+    if (!Array.isArray(rawRows) || rawRows.length === 0) {
+        return res.status(400).json({ error: 'No se enviaron datos para analizar.' });
+    }
+
+    const client = await (db.pool || db).connect();
+    try {
+        // Fetch all subseries labels for friendly metadata naming
+        const trdRes = await client.query('SELECT subseries_code, series_code, metadata_labels FROM trd_subseries');
+        const trdLabelsMap = {};
+        (trdRes.rows || []).forEach(r => {
+            let meta = null;
+            try {
+                meta = typeof r.metadata_labels === 'string' ? JSON.parse(r.metadata_labels) : r.metadata_labels;
+            } catch (e) {}
+            if (meta) {
+                if (r.subseries_code) trdLabelsMap[r.subseries_code] = meta;
+                if (r.series_code) trdLabelsMap[r.series_code] = meta;
+            }
+        });
+
+        const previewRows = [];
+        let matchedCount = 0;
+        let withChangesCount = 0;
+        let unchangedCount = 0;
+        let notFoundCount = 0;
+        let ambiguousCount = 0;
+
+        for (let idx = 0; idx < rawRows.length; idx++) {
+            const item = rawRows[idx];
+            const keys = Object.keys(item);
+
+            const findKey = (synonyms) => {
+                const normSyns = synonyms.map(normField);
+                const foundKey = keys.find(k => normSyns.includes(normField(k)));
+                return foundKey ? item[foundKey] : undefined;
+            };
+
+            const rowId = findKey(['id', 'idexpediente', 'identificador']);
+            const rowCode = findKey(['codigoexpediente', 'codexp', 'nroexpediente', 'expediente', 'codigo']);
+            const rowTitle = findKey(['titulo', 'nombreexpediente', 'asunto', 'descripcion', 'nombre', 'nombrecompleto']);
+            const rowBox = findKey(['idcaja', 'caja', 'cajano', 'nocaja', 'boxid']);
+            const rowDate = findKey(['fechaapertura', 'fechainicio', 'apertura', 'fecha']);
+            const rowSubserie = findKey(['subserie', 'codsubserie', 'codigosubserie', 'trd', 'codtrd']);
+            const rowStorage = findKey(['tipoalmacenamiento', 'tiposoporte', 'soporte']);
+
+            const rowMeta = {};
+            for (let m = 1; m <= 8; m++) {
+                const mVal = findKey([`valor${m}`, `valor ${m}`, `metadato${m}`, `metadato ${m}`, `meta${m}`]);
+                if (mVal !== undefined) {
+                    rowMeta[`valor${m}`] = String(mVal).trim();
+                }
+            }
+
+            // Find record in DB
+            let query = '';
+            let params = [];
+            let matchType = '';
+
+            const numId = parseInt(rowId, 10);
+            if (!isNaN(numId) && numId > 0) {
+                query = 'SELECT * FROM expedientes WHERE id = $1';
+                params = [numId];
+                matchType = `ID: ${numId}`;
+            } else if (rowCode && String(rowCode).trim() !== '') {
+                query = 'SELECT * FROM expedientes WHERE LOWER(TRIM(expediente_code)) = LOWER(TRIM($1))';
+                params = [String(rowCode).trim()];
+                matchType = `Código: ${rowCode}`;
+            } else if (rowTitle && String(rowTitle).trim() !== '') {
+                query = 'SELECT * FROM expedientes WHERE LOWER(TRIM(title)) = LOWER(TRIM($1))';
+                params = [String(rowTitle).trim()];
+                matchType = `Título: ${rowTitle}`;
+            } else if (rowMeta.valor1 && String(rowMeta.valor1).trim() !== '') {
+                query = `SELECT * FROM expedientes WHERE (metadata_values::jsonb)->>'valor1' = $1 OR (metadata_values::jsonb)->>'Metadato 1' = $1`;
+                params = [String(rowMeta.valor1).trim()];
+                matchType = `Valor 1: ${rowMeta.valor1}`;
+            }
+
+            if (!query) {
+                notFoundCount++;
+                previewRows.push({
+                    rowIndex: idx + 1,
+                    status: 'not_found',
+                    statusText: 'Sin datos clave para identificar el expediente (se requiere ID, Código o Título)',
+                    matchType: 'N/A',
+                    title: rowTitle || 'Sin Título',
+                    expediente_code: rowCode || '',
+                    changes: [],
+                    original: null,
+                    proposed: item
+                });
+                continue;
+            }
+
+            const dbRes = await client.query(query, params);
+            if (dbRes.rowCount === 0) {
+                notFoundCount++;
+                previewRows.push({
+                    rowIndex: idx + 1,
+                    status: 'not_found',
+                    statusText: `No encontrado en la base de datos (${matchType})`,
+                    matchType,
+                    title: rowTitle || 'Sin Título',
+                    expediente_code: rowCode || '',
+                    changes: [],
+                    original: null,
+                    proposed: item
+                });
+            } else if (dbRes.rowCount > 1) {
+                ambiguousCount++;
+                previewRows.push({
+                    rowIndex: idx + 1,
+                    status: 'ambiguous',
+                    statusText: `Coincide con ${dbRes.rowCount} expedientes. Especifique el ID para desambiguar.`,
+                    matchType,
+                    title: rowTitle || dbRes.rows[0].title,
+                    expediente_code: rowCode || dbRes.rows[0].expediente_code,
+                    changes: [],
+                    original: dbRes.rows[0],
+                    proposed: item
+                });
+            } else {
+                matchedCount++;
+                const existing = dbRes.rows[0];
+                let existingMeta = {};
+                try {
+                    existingMeta = typeof existing.metadata_values === 'string' 
+                        ? JSON.parse(existing.metadata_values || '{}') 
+                        : (existing.metadata_values || {});
+                } catch (e) {
+                    existingMeta = {};
+                }
+
+                const subLabels = trdLabelsMap[existing.subserie] || {};
+                const getMetaLabel = (mKey) => {
+                    const idxStr = mKey.replace('valor', '');
+                    const custom = subLabels[`meta_${idxStr}`] || subLabels[mKey];
+                    return custom ? `${custom} (Valor ${idxStr})` : `Metadato ${idxStr}`;
+                };
+
+                const changes = [];
+
+                const checkDiff = (field, label, oldV, newV, isDate = false) => {
+                    if (newV === undefined || newV === null) return;
+                    const cleanNew = String(newV).trim();
+                    if (cleanNew === '') return;
+
+                    let oldStr = oldV !== undefined && oldV !== null ? String(oldV).trim() : '';
+                    let newStr = cleanNew;
+
+                    if (isDate) {
+                        const parsedOld = normalizeDateVal(oldStr);
+                        const parsedNew = normalizeDateVal(newStr);
+                        if (parsedOld && parsedNew) {
+                            if (parsedOld !== parsedNew) {
+                                changes.push({ field, label, oldVal: parsedOld, newVal: parsedNew });
+                            }
+                            return;
+                        }
+                    }
+
+                    if (oldStr !== newStr) {
+                        changes.push({ field, label, oldVal: oldStr || '(Vacío)', newVal: newStr });
+                    }
+                };
+
+                if (rowCode !== undefined) checkDiff('expediente_code', 'Código Expediente', existing.expediente_code, rowCode);
+                if (rowTitle !== undefined) checkDiff('title', 'Título', existing.title, rowTitle);
+                if (rowBox !== undefined) checkDiff('box_id', 'Caja', existing.box_id, rowBox);
+                if (rowDate !== undefined) checkDiff('opening_date', 'Fecha Apertura', existing.opening_date, rowDate, true);
+                if (rowSubserie !== undefined) checkDiff('subserie', 'Subserie TRD', existing.subserie, rowSubserie);
+                if (rowStorage !== undefined) checkDiff('storage_type', 'Tipo Soporte', existing.storage_type, rowStorage);
+
+                for (let m = 1; m <= 8; m++) {
+                    const mKey = `valor${m}`;
+                    if (rowMeta[mKey] !== undefined) {
+                        checkDiff(mKey, getMetaLabel(mKey), existingMeta[mKey], rowMeta[mKey]);
+                    }
+                }
+
+                if (changes.length > 0) {
+                    withChangesCount++;
+                    previewRows.push({
+                        rowIndex: idx + 1,
+                        id: existing.id,
+                        status: 'changed',
+                        statusText: `${changes.length} campo(s) a actualizar`,
+                        matchType,
+                        title: existing.title || rowTitle,
+                        expediente_code: existing.expediente_code || rowCode,
+                        changes,
+                        original: existing,
+                        proposed: item
+                    });
+                } else {
+                    unchangedCount++;
+                    previewRows.push({
+                        rowIndex: idx + 1,
+                        id: existing.id,
+                        status: 'unchanged',
+                        statusText: 'Sin cambios (datos idénticos)',
+                        matchType,
+                        title: existing.title,
+                        expediente_code: existing.expediente_code,
+                        changes: [],
+                        original: existing,
+                        proposed: item
+                    });
+                }
+            }
+        }
+
+        res.json({
+            summary: {
+                total: rawRows.length,
+                matched: matchedCount,
+                withChanges: withChangesCount,
+                unchanged: unchangedCount,
+                notFound: notFoundCount,
+                ambiguous: ambiguousCount
+            },
+            previewRows
+        });
+
+    } catch (err) {
+        console.error('[EXPEDIENTES] Error en mass-update-preview:', err);
+        res.status(500).json({ error: 'Error analizando datos en el servidor: ' + err.message });
+    } finally {
+        client.release();
+    }
+});
+
+// POST mass update apply (Executes verified changes)
+router.post('/mass-update-apply', async (req, res) => {
+    const { updates, ignoreEmpty = true } = req.body;
+    if (!Array.isArray(updates) || updates.length === 0) {
+        return res.status(400).json({ error: 'No se enviaron registros para actualizar.' });
+    }
+
+    const client = await (db.pool || db).connect();
+    try {
+        await client.query('BEGIN');
+        let updatedCount = 0;
+        const errors = [];
+
+        for (let i = 0; i < updates.length; i++) {
+            const upd = updates[i];
+            const { id, changes } = upd;
+
+            if (!id || !changes || !Array.isArray(changes) || changes.length === 0) {
+                continue;
+            }
+
+            try {
+                const curRes = await client.query('SELECT * FROM expedientes WHERE id = $1', [id]);
+                if (curRes.rowCount === 0) {
+                    errors.push({ id, error: 'Expediente no encontrado en la base de datos' });
+                    continue;
+                }
+
+                const current = curRes.rows[0];
+                let currentMeta = {};
+                try {
+                    currentMeta = typeof current.metadata_values === 'string'
+                        ? JSON.parse(current.metadata_values || '{}')
+                        : (current.metadata_values || {});
+                } catch (e) {
+                    currentMeta = {};
+                }
+
+                let newCode = current.expediente_code;
+                let newTitle = current.title;
+                let newBox = current.box_id;
+                let newDate = current.opening_date;
+                let newSubserie = current.subserie;
+                let newStorage = current.storage_type;
+
+                changes.forEach(ch => {
+                    const { field, newVal } = ch;
+                    if (newVal === undefined || newVal === null) return;
+                    if (ignoreEmpty && String(newVal).trim() === '') return;
+
+                    if (field === 'expediente_code') newCode = String(newVal).trim();
+                    else if (field === 'title') newTitle = String(newVal).trim();
+                    else if (field === 'box_id') newBox = String(newVal).trim();
+                    else if (field === 'opening_date') newDate = normalizeDateVal(newVal);
+                    else if (field === 'subserie') newSubserie = String(newVal).trim();
+                    else if (field === 'storage_type') newStorage = String(newVal).trim();
+                    else if (field.startsWith('valor')) {
+                        currentMeta[field] = String(newVal).trim();
+                    }
+                });
+
+                const cleanedMeta = correctMetadata(currentMeta);
+
+                await client.query(`
+                    UPDATE expedientes SET
+                        expediente_code = $1,
+                        title = $2,
+                        box_id = $3,
+                        opening_date = $4,
+                        subserie = $5,
+                        storage_type = $6,
+                        metadata_values = $7
+                    WHERE id = $8
+                `, [newCode, newTitle, newBox, newDate, newSubserie, newStorage, JSON.stringify(cleanedMeta), id]);
+
+                updatedCount++;
+            } catch (itemErr) {
+                console.error(`[EXPEDIENTES] Error actualizando expediente ID ${id}:`, itemErr);
+                errors.push({ id, error: itemErr.message });
+            }
+        }
+
+        await client.query('COMMIT');
+        console.log(`[EXPEDIENTES] Actualización masiva completada: ${updatedCount} actualizados, ${errors.length} errores.`);
+        res.json({
+            success: true,
+            message: `Actualización masiva completada con éxito. ${updatedCount} expedientes actualizados.`,
+            updatedCount,
+            errors
+        });
+
+    } catch (fatalErr) {
+        await client.query('ROLLBACK');
+        console.error('[EXPEDIENTES] Error fatal en mass-update-apply:', fatalErr);
+        res.status(500).json({ error: 'Fallo crítico al actualizar en base de datos: ' + fatalErr.message });
+    } finally {
+        client.release();
+    }
 });
 
 // PUT update expediente

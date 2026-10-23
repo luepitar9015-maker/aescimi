@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
-import { Save, Download, Trash, FileText, Database, FileSpreadsheet, Search, RefreshCw, X } from 'lucide-react';
+import { 
+    Save, Download, Trash, FileText, Database, FileSpreadsheet, 
+    Search, RefreshCw, X, Upload, CheckCircle2, AlertTriangle, 
+    AlertCircle, ChevronDown, Check, ArrowRight 
+} from 'lucide-react';
 
 function ExpedienteCreation() {
     const [activeTab, setActiveTab] = useState('creacion');
@@ -88,10 +92,18 @@ function ExpedienteCreation() {
     const [typologies, setTypologies] = useState([]);
     const [loadingTypologies, setLoadingTypologies] = useState(false);
 
-    // ── Vista previa importación Excel ──
+    // ── Vista previa importación Excel (Creación) ──
     const [previewData, setPreviewData] = useState([]);
     const [showPreviewModal, setShowPreviewModal] = useState(false);
     const [previewLabels, setPreviewLabels] = useState({});
+
+    // ── Actualización Masiva de Metadatos (Excel) ──
+    const [updatePreviewData, setUpdatePreviewData] = useState(null); // { summary, previewRows }
+    const [showUpdateModal, setShowUpdateModal] = useState(false);
+    const [updateFilter, setUpdateFilter] = useState('changed'); // 'changed' | 'all' | 'not_found' | 'unchanged'
+    const [ignoreEmptyCells, setIgnoreEmptyCells] = useState(true);
+    const [isApplyingUpdates, setIsApplyingUpdates] = useState(false);
+    const [showUpdateMenu, setShowUpdateMenu] = useState(false);
 
     const fetchTypologies = async (subserieCode) => {
         if (!subserieCode) { setTypologies([]); return; }
@@ -612,11 +624,38 @@ function ExpedienteCreation() {
         e.target.value = null;
     };
 
-    const handleFileUpdateMassive = (e) => {
+    // ── Descargar Plantilla Editable con Datos Existentes ──
+    const handleDownloadEditableTemplate = async () => {
+        try {
+            setLoading(true);
+            setStatus('Generando plantilla de actualización con datos existentes...');
+            const response = await axios.get('/api/expedientes/export-editable', { responseType: 'blob' });
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'Expedientes_Para_Actualizacion_Masiva.xlsx');
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+            setStatus('Plantilla descargada correctamente.');
+        } catch (err) {
+            console.error("Error descargando plantilla editable:", err);
+            alert("Error al descargar plantilla de actualización.");
+            setStatus('Error al descargar plantilla.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // ── Subir y Analizar Excel para Actualización Masiva (Comparación Diff) ──
+    const handleFileUploadForUpdate = (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        console.log("Iniciando carga de archivo para actualización masiva:", file.name);
+        console.log("Iniciando análisis de archivo para actualización masiva:", file.name);
+        setLoading(true);
+        setStatus('Analizando archivo y comparando con la base de datos...');
 
         const reader = new FileReader();
         reader.onload = async (evt) => {
@@ -628,51 +667,83 @@ function ExpedienteCreation() {
                 const jsonData = XLSX.utils.sheet_to_json(ws);
 
                 if (jsonData.length === 0) {
-                    alert("El archivo está vacío o no tiene datos legibles.");
-                    return;
-                }
-
-                if (!confirm(`Se intentarán actualizar ${jsonData.length} expedientes. Asegúrese de que el Título y Código Expediente estén correctos. ¿Continuar?`)) {
-                    e.target.value = null;
-                    return;
-                }
-
-                setLoading(true);
-                setStatus('Actualizando códigos masivamente...');
-
-                try {
-                    const token = localStorage.getItem('token');
-                    const res = await axios.post('/api/expedientes/mass-update', jsonData, { 
-                        headers: { Authorization: `Bearer ${token}` } 
-                    });
-                    
-                    const msg = `✅ Proceso finalizado. ${res.data.updated} actualizados, ${res.data.errors?.length || 0} errores.`;
-                    setStatus(msg);
-                    alert(msg);
-                    
-                    if (res.data.errors?.length > 0) {
-                        console.warn("Errores en actualización masiva:", res.data.errors);
-                        alert("Hubo errores en algunos registros. Revise la consola (F12) para más detalles.");
-                    }
-
-                    if (activeTab === 'visualizador') {
-                        fetchSavedExpedientes();
-                    }
-                } catch (updateErr) {
-                    console.error("Error en actualización masiva:", updateErr);
-                    setStatus('Error al actualizar masivamente.');
-                    alert("Ocurrió un error al enviar los datos al servidor.");
-                } finally {
+                    alert("El archivo está vacío o no contiene filas con datos legibles.");
                     setLoading(false);
+                    setStatus('');
+                    return;
                 }
 
+                const token = localStorage.getItem('token');
+                const res = await axios.post('/api/expedientes/mass-update-preview', jsonData, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+
+                setUpdatePreviewData(res.data);
+                setShowUpdateModal(true);
+                setUpdateFilter(res.data.summary?.withChanges > 0 ? 'changed' : 'all');
+                setStatus('');
             } catch (err) {
-                console.error("Error leyendo el archivo:", err);
-                alert("Error crítico al leer el archivo Excel para actualización.");
+                console.error("Error analizando archivo para actualización:", err);
+                alert(err.response?.data?.error || "Error al procesar el archivo Excel.");
+                setStatus('Error en análisis.');
+            } finally {
+                setLoading(false);
             }
         };
         reader.readAsArrayBuffer(file);
         e.target.value = null;
+    };
+
+    // Alias para compatibilidad
+    const handleFileUpdateMassive = handleFileUploadForUpdate;
+
+    // ── Aplicar las Actualizaciones Verificadas a la Base de Datos ──
+    const handleApplyMassiveUpdates = async () => {
+        if (!updatePreviewData || !updatePreviewData.previewRows) return;
+        
+        const changedRows = updatePreviewData.previewRows.filter(r => r.status === 'changed' && r.id);
+        if (changedRows.length === 0) {
+            alert("No hay expedientes con cambios detectados para actualizar.");
+            return;
+        }
+
+        if (!confirm(`¿Confirmas aplicar la actualización masiva a ${changedRows.length} expediente(s)? Los datos anteriores serán actualizados con los nuevos valores del Excel.`)) {
+            return;
+        }
+
+        setIsApplyingUpdates(true);
+        setStatus('Aplicando actualizaciones en la base de datos...');
+
+        try {
+            const token = localStorage.getItem('token');
+            const updatesPayload = changedRows.map(r => ({
+                id: r.id,
+                changes: r.changes
+            }));
+
+            const res = await axios.post('/api/expedientes/mass-update-apply', {
+                updates: updatesPayload,
+                ignoreEmpty: ignoreEmptyCells
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const msg = `✅ ¡Actualización completada! ${res.data.updatedCount} expedientes actualizados exitosamente.`;
+            alert(msg);
+            setStatus(msg);
+            setShowUpdateModal(false);
+            setUpdatePreviewData(null);
+
+            if (activeTab === 'visualizador') {
+                fetchSavedExpedientes();
+            }
+        } catch (err) {
+            console.error("Error aplicando actualizaciones masivas:", err);
+            alert(err.response?.data?.error || "Ocurrió un error al aplicar las actualizaciones.");
+            setStatus('Error al aplicar cambios.');
+        } finally {
+            setIsApplyingUpdates(false);
+        }
     };
 
     // ── Confirmar carga desde vista previa ──
@@ -734,11 +805,43 @@ function ExpedienteCreation() {
                         <span>Cargar Nuevos</span>
                         <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="hidden" />
                     </label>
-                    <label className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded-lg font-medium shadow transition-colors flex items-center gap-2 cursor-pointer text-sm" title="Usa el Excel para ponerles Código a expedientes que ya existen en el sistema.">
-                        <RefreshCw size={16} />
-                        <span>Actualizar Códigos</span>
-                        <input type="file" accept=".xlsx, .xls" onChange={handleFileUpdateMassive} className="hidden" />
-                    </label>
+                    {/* Actualización Masiva de Metadatos con Excel */}
+                    <div className="relative inline-block">
+                        <button 
+                            type="button"
+                            onClick={() => setShowUpdateMenu(prev => !prev)}
+                            className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-lg font-medium shadow transition-colors flex items-center gap-1.5 text-sm"
+                            title="Actualizar masivamente metadatos, códigos o información de expedientes existentes"
+                        >
+                            <RefreshCw size={16} />
+                            <span>Actualizar Metadatos (Excel)</span>
+                            <ChevronDown size={14} className={showUpdateMenu ? 'rotate-180 transition-transform' : 'transition-transform'} />
+                        </button>
+                        {showUpdateMenu && (
+                            <div className="absolute left-0 mt-2 w-72 bg-white rounded-xl shadow-2xl border border-gray-200 z-[150] p-2 text-left animate-fadeIn">
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowUpdateMenu(false); handleDownloadEditableTemplate(); }}
+                                    className="w-full text-left p-2.5 rounded-lg hover:bg-amber-50 text-gray-800 transition-colors flex items-start gap-2.5"
+                                >
+                                    <Download size={16} className="text-amber-600 mt-0.5 shrink-0" />
+                                    <div>
+                                        <div className="text-xs font-bold text-gray-900">1. Descargar Plantilla con Datos</div>
+                                        <div className="text-[11px] text-gray-500 font-normal">Excel con los expedientes existentes listos para editar</div>
+                                    </div>
+                                </button>
+                                <div className="border-t border-gray-100 my-1"></div>
+                                <label className="w-full text-left p-2.5 rounded-lg hover:bg-green-50 text-gray-800 transition-colors flex items-start gap-2.5 cursor-pointer">
+                                    <Upload size={16} className="text-green-600 mt-0.5 shrink-0" />
+                                    <div>
+                                        <div className="text-xs font-bold text-gray-900">2. Cargar Excel con Cambios</div>
+                                        <div className="text-[11px] text-gray-500 font-normal">Analiza diferencias (Antes vs Después) y confirma</div>
+                                    </div>
+                                    <input type="file" accept=".xlsx, .xls" onChange={(e) => { setShowUpdateMenu(false); handleFileUploadForUpdate(e); }} className="hidden" />
+                                </label>
+                            </div>
+                        )}
+                    </div>
                     <button onClick={handleDownloadTemplate} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-medium shadow transition-colors flex items-center gap-2 text-sm">
                         <FileSpreadsheet size={16} />
                         <span>Plantilla</span>
@@ -1527,6 +1630,281 @@ function ExpedienteCreation() {
                                     style={{background: 'linear-gradient(135deg, #16a34a, #15803d)', boxShadow: '0 4px 15px rgba(22,163,74,0.4)'}}
                                 >
                                     <Save size={16}/> Confirmar y Cargar {previewData.length} Registros →
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════════
+                MODAL VISTA PREVIA — ACTUALIZACIÓN MASIVA DE METADATOS
+            ══════════════════════════════════════════════════════════════ */}
+            {showUpdateModal && updatePreviewData && (
+                <div className="fixed inset-0 z-[200] bg-black/75 backdrop-blur-sm flex items-center justify-center p-3">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[96vw] max-h-[94vh] flex flex-col overflow-hidden border border-amber-300">
+
+                        {/* ── Header con Branding SENA ── */}
+                        <div style={{background: 'linear-gradient(135deg, #78350f 0%, #b45309 50%, #d97706 100%)'}} className="p-5 text-white">
+                            <div className="flex justify-between items-start mb-3">
+                                <div>
+                                    <h2 className="text-xl font-bold flex items-center gap-2">
+                                        <RefreshCw size={22} className="animate-spin-slow"/> Vista Previa — Actualización Masiva de Metadatos
+                                    </h2>
+                                    <p className="text-amber-100 text-xs sm:text-sm mt-1">
+                                        Se cotejó el archivo Excel contra la base de datos. Revise las diferencias detectadas (Antes vs. Después) antes de confirmar.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => { setShowUpdateModal(false); setUpdatePreviewData(null); }}
+                                    className="text-white/70 hover:text-white p-2 rounded-xl hover:bg-white/20 transition-all"
+                                >
+                                    <X size={22}/>
+                                </button>
+                            </div>
+
+                            {/* Tarjetas de Métricas */}
+                            <div className="flex flex-wrap items-center justify-between gap-3 mt-3 pt-3 border-t border-white/20">
+                                <div className="flex flex-wrap gap-2.5">
+                                    <div className="bg-white/15 backdrop-blur-sm rounded-xl px-4 py-2 text-center min-w-[80px]">
+                                        <div className="text-xl font-black">{updatePreviewData.summary?.total || 0}</div>
+                                        <div className="text-[10px] text-amber-100 uppercase tracking-wider font-semibold">Total Excel</div>
+                                    </div>
+                                    <div className="bg-emerald-500/30 backdrop-blur-sm border border-emerald-400/40 rounded-xl px-4 py-2 text-center min-w-[80px]">
+                                        <div className="text-xl font-black text-emerald-200">{updatePreviewData.summary?.withChanges || 0}</div>
+                                        <div className="text-[10px] text-emerald-100 uppercase tracking-wider font-bold">Con Cambios</div>
+                                    </div>
+                                    <div className="bg-blue-500/25 backdrop-blur-sm border border-blue-400/30 rounded-xl px-4 py-2 text-center min-w-[80px]">
+                                        <div className="text-xl font-black text-blue-100">{updatePreviewData.summary?.unchanged || 0}</div>
+                                        <div className="text-[10px] text-blue-200 uppercase tracking-wider font-semibold">Sin Cambios</div>
+                                    </div>
+                                    {updatePreviewData.summary?.notFound > 0 && (
+                                        <div className="bg-red-500/30 backdrop-blur-sm border border-red-400/40 rounded-xl px-4 py-2 text-center min-w-[80px]">
+                                            <div className="text-xl font-black text-red-200">{updatePreviewData.summary?.notFound || 0}</div>
+                                            <div className="text-[10px] text-red-100 uppercase tracking-wider font-semibold">No Encontrados</div>
+                                        </div>
+                                    )}
+                                    {updatePreviewData.summary?.ambiguous > 0 && (
+                                        <div className="bg-purple-500/30 backdrop-blur-sm border border-purple-400/40 rounded-xl px-4 py-2 text-center min-w-[80px]">
+                                            <div className="text-xl font-black text-purple-200">{updatePreviewData.summary?.ambiguous || 0}</div>
+                                            <div className="text-[10px] text-purple-100 uppercase tracking-wider font-semibold">Ambiguos</div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Opciones de Fusión */}
+                                <div className="bg-white/10 backdrop-blur-md border border-white/20 px-3.5 py-2 rounded-xl flex items-center gap-2">
+                                    <input 
+                                        type="checkbox" 
+                                        id="chk-ignore-empty" 
+                                        checked={ignoreEmptyCells} 
+                                        onChange={e => setIgnoreEmptyCells(e.target.checked)}
+                                        className="accent-amber-500 cursor-pointer h-4 w-4"
+                                    />
+                                    <label htmlFor="chk-ignore-empty" className="text-xs text-amber-50 font-medium cursor-pointer select-none">
+                                        Conservar datos en BD si la celda de Excel está vacía
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ── Barra de Filtros ── */}
+                        <div className="px-5 py-2.5 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+                            <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-gray-500 uppercase tracking-wider mr-2">Filtrar:</span>
+                                <button
+                                    onClick={() => setUpdateFilter('changed')}
+                                    className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
+                                        updateFilter === 'changed' 
+                                            ? 'bg-emerald-600 text-white shadow-sm' 
+                                            : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                                    }`}
+                                >
+                                    Solo Con Cambios ({updatePreviewData.summary?.withChanges || 0})
+                                </button>
+                                <button
+                                    onClick={() => setUpdateFilter('all')}
+                                    className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
+                                        updateFilter === 'all' 
+                                            ? 'bg-amber-600 text-white shadow-sm' 
+                                            : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                                    }`}
+                                >
+                                    Todos ({updatePreviewData.summary?.total || 0})
+                                </button>
+                                <button
+                                    onClick={() => setUpdateFilter('unchanged')}
+                                    className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
+                                        updateFilter === 'unchanged' 
+                                            ? 'bg-blue-600 text-white shadow-sm' 
+                                            : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                                    }`}
+                                >
+                                    Sin Cambios ({updatePreviewData.summary?.unchanged || 0})
+                                </button>
+                                {updatePreviewData.summary?.notFound > 0 && (
+                                    <button
+                                        onClick={() => setUpdateFilter('not_found')}
+                                        className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
+                                            updateFilter === 'not_found' 
+                                                ? 'bg-red-600 text-white shadow-sm' 
+                                                : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                                        }`}
+                                    >
+                                        No Encontrados ({updatePreviewData.summary?.notFound || 0})
+                                    </button>
+                                )}
+                            </div>
+                            <span className="text-gray-500">
+                                Mostrando <strong>{
+                                    (updatePreviewData.previewRows || []).filter(r => {
+                                        if (updateFilter === 'changed') return r.status === 'changed';
+                                        if (updateFilter === 'unchanged') return r.status === 'unchanged';
+                                        if (updateFilter === 'not_found') return r.status === 'not_found' || r.status === 'ambiguous';
+                                        return true;
+                                    }).length
+                                }</strong> fila(s)
+                            </span>
+                        </div>
+
+                        {/* ── Tabla de Diferencias (Antes vs Después) ── */}
+                        <div className="overflow-auto flex-1 p-4 bg-gray-50/50">
+                            <table className="w-full text-sm text-left bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden" style={{borderCollapse: 'separate', borderSpacing: 0}}>
+                                <thead className="text-[10px] uppercase text-gray-500 tracking-wider bg-gray-100 sticky top-0 z-10">
+                                    <tr className="border-b border-gray-200">
+                                        <th className="px-3 py-3 font-bold text-center w-12">#</th>
+                                        <th className="px-3 py-3 font-bold w-44">Coincidencia BD</th>
+                                        <th className="px-3 py-3 font-bold w-60">Expediente / Título</th>
+                                        <th className="px-3 py-3 font-bold w-36">Estado</th>
+                                        <th className="px-4 py-3 font-bold">Detalle de Modificaciones (Valor Actual ➔ Valor Nuevo)</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {(updatePreviewData.previewRows || [])
+                                        .filter(r => {
+                                            if (updateFilter === 'changed') return r.status === 'changed';
+                                            if (updateFilter === 'unchanged') return r.status === 'unchanged';
+                                            if (updateFilter === 'not_found') return r.status === 'not_found' || r.status === 'ambiguous';
+                                            return true;
+                                        })
+                                        .map((row) => (
+                                            <tr key={row.rowIndex} className={`hover:bg-amber-50/40 transition-colors ${row.status === 'changed' ? 'bg-emerald-50/20' : ''}`}>
+                                                <td className="px-3 py-3 text-center text-xs font-mono text-gray-400">
+                                                    {row.rowIndex}
+                                                </td>
+                                                <td className="px-3 py-3 text-xs">
+                                                    <span className="font-semibold text-gray-800 font-mono block">
+                                                        {row.matchType}
+                                                    </span>
+                                                    {row.id && (
+                                                        <span className="text-[10px] text-gray-500">ID BD: #{row.id}</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-3 text-xs">
+                                                    <div className="font-bold text-gray-900 line-clamp-1" title={row.title}>
+                                                        {row.title || 'Sin Título'}
+                                                    </div>
+                                                    <div className="text-[11px] text-gray-500 font-mono">
+                                                        {row.expediente_code || '(Sin código asignado)'}
+                                                    </div>
+                                                </td>
+                                                <td className="px-3 py-3 text-xs whitespace-nowrap">
+                                                    {row.status === 'changed' && (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                                            <CheckCircle2 size={13} /> {row.statusText}
+                                                        </span>
+                                                    )}
+                                                    {row.status === 'unchanged' && (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-600 border border-gray-200">
+                                                            <Check size={13} /> Idéntico
+                                                        </span>
+                                                    )}
+                                                    {row.status === 'not_found' && (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-100 text-red-800 border border-red-200">
+                                                            <AlertCircle size={13} /> No coincide
+                                                        </span>
+                                                    )}
+                                                    {row.status === 'ambiguous' && (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                                                            <AlertTriangle size={13} /> Múltiples
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-xs">
+                                                    {row.status === 'changed' && (
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {row.changes.map((ch, chIdx) => (
+                                                                <div 
+                                                                    key={chIdx} 
+                                                                    className="inline-flex items-center gap-1.5 bg-white border border-gray-200 shadow-xs rounded-lg px-2.5 py-1 text-xs"
+                                                                >
+                                                                    <span className="font-bold text-gray-700">{ch.label}:</span>
+                                                                    <span className="text-red-700 bg-red-50 border border-red-100 line-through px-1.5 py-0.5 rounded text-[11px] font-mono">
+                                                                        {ch.oldVal || '(Vacío)'}
+                                                                    </span>
+                                                                    <ArrowRight size={12} className="text-gray-400 shrink-0" />
+                                                                    <span className="text-emerald-800 bg-emerald-100 border border-emerald-200 font-bold px-1.5 py-0.5 rounded text-[11px] font-mono">
+                                                                        {ch.newVal}
+                                                                    </span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    {row.status === 'unchanged' && (
+                                                        <span className="text-gray-400 italic text-[11px]">
+                                                            Todos los campos y metadatos coinciden exactamente con los registros actuales.
+                                                        </span>
+                                                    )}
+                                                    {(row.status === 'not_found' || row.status === 'ambiguous') && (
+                                                        <span className="text-red-600 text-[11px] font-medium">
+                                                            {row.statusText}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* ── Footer de Confirmación ── */}
+                        <div className="p-4 border-t flex flex-col sm:flex-row justify-between items-center gap-3 bg-white">
+                            <div className="text-xs text-gray-600">
+                                <span className="font-bold text-gray-800">
+                                    {updatePreviewData.summary?.withChanges || 0} expediente(s) con cambios listos
+                                </span> para ser actualizados en PostgreSQL.
+                            </div>
+                            <div className="flex gap-2.5">
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowUpdateModal(false); setUpdatePreviewData(null); }}
+                                    disabled={isApplyingUpdates}
+                                    className="px-5 py-2.5 rounded-xl font-semibold text-gray-700 border border-gray-300 hover:bg-gray-100 transition-colors text-sm"
+                                >
+                                    ✕ Cancelar
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleApplyMassiveUpdates}
+                                    disabled={isApplyingUpdates || (updatePreviewData.summary?.withChanges || 0) === 0}
+                                    className="px-6 py-2.5 rounded-xl font-bold text-white shadow-lg transition-all flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                    style={{
+                                        background: 'linear-gradient(135deg, #16a34a, #15803d)',
+                                        boxShadow: '0 4px 15px rgba(22,163,74,0.35)'
+                                    }}
+                                >
+                                    {isApplyingUpdates ? (
+                                        <>
+                                            <RefreshCw size={16} className="animate-spin" />
+                                            <span>Guardando en BD...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Save size={16} />
+                                            <span>Aplicar Cambios ({updatePreviewData.summary?.withChanges || 0} Expedientes) →</span>
+                                        </>
+                                    )}
                                 </button>
                             </div>
                         </div>
