@@ -853,19 +853,28 @@ router.post('/mass-update-preview', async (req, res) => {
 
     const client = await (db.pool || db).connect();
     try {
-        // Fetch all subseries labels for friendly metadata naming
-        const trdRes = await client.query('SELECT subseries_code, series_code, metadata_labels FROM trd_subseries');
+        // Fetch all subseries labels for friendly metadata naming safely
         const trdLabelsMap = {};
-        (trdRes.rows || []).forEach(r => {
-            let meta = null;
-            try {
-                meta = typeof r.metadata_labels === 'string' ? JSON.parse(r.metadata_labels) : r.metadata_labels;
-            } catch (e) {}
-            if (meta) {
-                if (r.subseries_code) trdLabelsMap[r.subseries_code] = meta;
-                if (r.series_code) trdLabelsMap[r.series_code] = meta;
-            }
-        });
+        try {
+            const subRes = await client.query('SELECT subseries_code, metadata_labels FROM trd_subseries');
+            (subRes.rows || []).forEach(r => {
+                let meta = null;
+                try {
+                    meta = typeof r.metadata_labels === 'string' ? JSON.parse(r.metadata_labels) : r.metadata_labels;
+                } catch (e) {}
+                if (meta && r.subseries_code) trdLabelsMap[r.subseries_code] = meta;
+            });
+            const serRes = await client.query('SELECT series_code, metadata_labels FROM trd_series');
+            (serRes.rows || []).forEach(r => {
+                let meta = null;
+                try {
+                    meta = typeof r.metadata_labels === 'string' ? JSON.parse(r.metadata_labels) : r.metadata_labels;
+                } catch (e) {}
+                if (meta && r.series_code) trdLabelsMap[r.series_code] = meta;
+            });
+        } catch (trdErr) {
+            console.warn('[EXPEDIENTES] Advertencia obteniendo etiquetas TRD:', trdErr.message);
+        }
 
         const previewRows = [];
         let matchedCount = 0;
@@ -919,8 +928,8 @@ router.post('/mass-update-preview', async (req, res) => {
                 params = [String(rowTitle).trim()];
                 matchType = `Título: ${rowTitle}`;
             } else if (rowMeta.valor1 && String(rowMeta.valor1).trim() !== '') {
-                query = `SELECT * FROM expedientes WHERE (metadata_values::jsonb)->>'valor1' = $1 OR (metadata_values::jsonb)->>'Metadato 1' = $1`;
-                params = [String(rowMeta.valor1).trim()];
+                query = `SELECT * FROM expedientes WHERE metadata_values ILIKE $1`;
+                params = [`%${String(rowMeta.valor1).trim()}%`];
                 matchType = `Valor 1: ${rowMeta.valor1}`;
             }
 
