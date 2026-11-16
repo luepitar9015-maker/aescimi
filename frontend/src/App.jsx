@@ -1,8 +1,9 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { LogOut, FileText, User, Settings as SettingsIcon, FolderKanban, Database, Play, Network, Folder, Cloud, Globe, Shield, FileSpreadsheet, Upload, BarChart2, Server } from 'lucide-react';
+import { LogOut, FileText, User, Settings as SettingsIcon, FolderKanban, Database, Play, Network, Folder, Cloud, Globe, Shield, FileSpreadsheet, Upload, BarChart2, Server, FileDown } from 'lucide-react';
 import AIChatBot from './components/AIChatBot'; // IA Assistant
+import InventoryPdfModal from './components/InventoryPdfModal';
 import './App.css';
 
 // Lazy loaded page components to optimize bundle size and speed up page switching
@@ -11,6 +12,7 @@ const ExpedienteCreation = lazy(() => import('./pages/ExpedienteCreation'));
 const UsersManagement = lazy(() => import('./pages/UsersManagement'));
 const Automation = lazy(() => import('./pages/Automation'));
 const DocumentManagement = lazy(() => import('./pages/DocumentManagement'));
+const BatchClassification = lazy(() => import('./pages/BatchClassification'));
 const DocumentQuery = lazy(() => import('./pages/DocumentQuery'));
 const CargueAes = lazy(() => import('./pages/CargueAes'));
 const OneDriveSettings = lazy(() => import('./pages/OneDriveSettings'));
@@ -46,6 +48,14 @@ axios.interceptors.request.use(
 axios.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (error.response && error.response.status === 403 && error.response.data?.licenseExpired) {
+      if (window.location.pathname !== '/login') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
+      return Promise.reject(error);
+    }
     if (error.response && error.response.status === 401) {
       console.warn('Axios Interceptor: 401 detectado, expulsando al usuario...');
       
@@ -76,7 +86,14 @@ function Login() {
   const [confirmPass, setConfirmPass] = useState('');
   const [tempToken, setTempToken] = useState(null);
   const [showPass, setShowPass] = useState(false);
-  
+  const [licenseStatus, setLicenseStatus] = useState(null);
+
+  useEffect(() => {
+    axios.get('/api/license/status')
+      .then(res => setLicenseStatus(res.data))
+      .catch(() => {});
+  }, []);
+
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
@@ -97,7 +114,11 @@ function Login() {
 
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
-      navigate('/dashboard');
+      if (licenseStatus && !licenseStatus.valid && res.data.user.role === 'superadmin') {
+        navigate('/superuser');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       console.error("Login error:", err);
       if (err.response) {
@@ -229,6 +250,17 @@ function Login() {
               Ingresar al Sistema
             </button>
           </form>
+
+          {licenseStatus && !licenseStatus.valid && (
+            <div style={{ width: '100%', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px', marginTop: '14px', textAlign: 'center' }}>
+              <div style={{ color: '#dc2626', fontWeight: '800', fontSize: '13px', marginBottom: '4px' }}>
+                🔒 LICENCIA DEL SISTEMA VENCIDA
+              </div>
+              <div style={{ color: '#7f1d1d', fontSize: '12px', fontWeight: '600' }}>
+                Debe ingresar con el Superusuario para activarlo.
+              </div>
+            </div>
+          )}
 
           <p style={styles.footerNote}>
             Sistema de uso institucional — Acceso restringido
@@ -428,9 +460,21 @@ const styles = {
 
 // Protected Route Wrapper
 
+const ALLOWED_USER_MODULES = ['dashboard', 'documents', 'clasificacion-masiva', 'query'];
+const ALLOWED_USER_PATHS = ['/dashboard', '/documents', '/clasificacion-masiva', '/query'];
+
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token');
   if (!token) return <Navigate to="/login" replace />;
+  try {
+    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    if (storedUser.role && storedUser.role !== 'admin' && storedUser.role !== 'superadmin') {
+      const currentPath = window.location.pathname;
+      if (!ALLOWED_USER_PATHS.includes(currentPath)) {
+        return <Navigate to="/dashboard" replace />;
+      }
+    }
+  } catch (e) {}
   return children;
 }
 
@@ -440,6 +484,7 @@ function Layout({ children }) {
   const [permissions, setPermissions] = useState([]);
   const [isLoadingPerms, setIsLoadingPerms] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
+  const [showInventoryPdfModal, setShowInventoryPdfModal] = useState(false);
 
   useEffect(() => {
     try {
@@ -476,8 +521,9 @@ function Layout({ children }) {
   const canView = (moduleId) => {
     if (!currentUser) return false;
     if (currentUser.role === 'admin' || currentUser.role === 'superadmin') return true;
+    if (!ALLOWED_USER_MODULES.includes(moduleId)) return false;
     const perm = permissions.find(p => p.module_id === moduleId);
-    return perm ? perm.can_view === 1 : false;
+    return perm ? Number(perm.can_view) === 1 : true;
   };
 
   if (!currentUser) return <div className="p-8">Cargando perfil...</div>;
@@ -495,10 +541,20 @@ function Layout({ children }) {
           {canView('trd') && <Link to="/creation" className="nav-item"><Network size={18} /> Estructura y TRD</Link>}
           {canView('expedientes') && <Link to="/expedientes" className="nav-item"><FolderKanban size={18} /> Crear Expedientes</Link>}
           {canView('documents') && <Link to="/documents" className="nav-item"><Folder size={18} /> Gestión Documental</Link>}
+          {canView('clasificacion-masiva') && <Link to="/clasificacion-masiva" className="nav-item"><Upload size={18} /> Clasificación Masiva</Link>}
           {canView('query') && <Link to="/query" className="nav-item"><Globe size={18} /> Consulta de Documentos</Link>}
+          <button
+            type="button"
+            onClick={() => setShowInventoryPdfModal(true)}
+            className="nav-item"
+            style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', font: 'inherit' }}
+          >
+            <FileDown size={18} />
+            {(currentUser?.role === 'admin' || currentUser?.role === 'superadmin') ? 'Inventario PDF (Usuarios)' : 'Mi Inventario PDF'}
+          </button>
           {canView('cargue-aes') && (currentUser?.role === 'admin' || currentUser?.role === 'superadmin') && <Link to="/cargue-aes" className="nav-item"><Play size={18} /> Cargue AES</Link>}
-          {canView('cargue-aes') && <Link to="/comunicaciones-producidas" className="nav-item"><Network size={18} /> Comunicaciones Producidas</Link>}
-          <Link to="/deserciones" className="nav-item"><FileSpreadsheet size={18} /> Deserciones (OnBase)</Link>
+          {canView('cargue-aes') && (currentUser?.role === 'admin' || currentUser?.role === 'superadmin') && <Link to="/comunicaciones-producidas" className="nav-item"><Network size={18} /> Comunicaciones Producidas</Link>}
+          {(currentUser?.role === 'admin' || currentUser?.role === 'superadmin') && <Link to="/deserciones" className="nav-item"><FileSpreadsheet size={18} /> Deserciones (OnBase)</Link>}
           {canView('formatos') && <Link to="/formatos" className="nav-item"><FileSpreadsheet size={18} /> Formatos (FUID/Control)</Link>}
           {canView('trd_query') && <Link to="/trd-query" className="nav-item"><Database size={18} /> Consulta TRD</Link>}
           {(currentUser.role === 'admin' || currentUser.role === 'superadmin' || canView('seguimiento')) && (
@@ -566,6 +622,10 @@ function Layout({ children }) {
       
       {/* Bot Chat de Inteligencia Artificial Flotante */}
       <AIChatBot />
+      <InventoryPdfModal
+        isOpen={showInventoryPdfModal}
+        onClose={() => setShowInventoryPdfModal(false)}
+      />
     </div>
   );
 }
@@ -592,6 +652,9 @@ function App() {
         } />
         <Route path="/documents" element={
           <ProtectedRoute><Layout><DocumentManagement /></Layout></ProtectedRoute>
+        } />
+        <Route path="/clasificacion-masiva" element={
+          <ProtectedRoute><Layout><BatchClassification /></Layout></ProtectedRoute>
         } />
         <Route path="/query" element={
           <ProtectedRoute><Layout><DocumentQuery /></Layout></ProtectedRoute>

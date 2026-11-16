@@ -83,6 +83,56 @@ router.get('/template', (req, res) => {
     res.send(buffer);
 });
 
+// Helper: garantiza permisos TRD (can_view=1, can_upload=1) sobre la subserie/serie de los expedientes asignados
+async function ensureAssignedTrdPermissions(client, userIds, expedienteIds) {
+    const cleanUsers = [...new Set((userIds || []).map(Number).filter(Boolean))];
+    const cleanExps = [...new Set((expedienteIds || []).map(Number).filter(Boolean))];
+    if (cleanUsers.length === 0 || cleanExps.length === 0) return;
+
+    const uRes = await client.query(
+        `SELECT id FROM users WHERE id = ANY($1::int[]) AND role NOT IN ('admin', 'superadmin')`,
+        [cleanUsers]
+    );
+    const nonAdminIds = uRes.rows.map(r => r.id);
+    if (nonAdminIds.length === 0) return;
+
+    const trdRes = await client.query(`
+        SELECT DISTINCT
+            sub.id AS subseries_id,
+            CASE WHEN sub.id IS NULL THEN ser.id ELSE NULL END AS series_id
+        FROM expedientes e
+        LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie LIKE '%-' || sub.subseries_code)
+        LEFT JOIN trd_series ser ON (sub.series_id = ser.id OR e.subserie = ser.series_code OR e.subserie LIKE '%-' || ser.series_code)
+        WHERE e.id = ANY($1::int[])
+          AND (sub.id IS NOT NULL OR ser.id IS NOT NULL)
+    `, [cleanExps]);
+
+    for (const uId of nonAdminIds) {
+        for (const row of trdRes.rows) {
+            const existing = await client.query(
+                `SELECT id FROM user_trd_permissions
+                 WHERE user_id = $1
+                   AND series_id IS NOT DISTINCT FROM $2
+                   AND subseries_id IS NOT DISTINCT FROM $3
+                 LIMIT 1`,
+                [uId, row.series_id, row.subseries_id]
+            );
+            if (existing.rowCount > 0) {
+                await client.query(
+                    `UPDATE user_trd_permissions SET can_view = 1, can_upload = 1 WHERE id = $1`,
+                    [existing.rows[0].id]
+                );
+            } else {
+                await client.query(
+                    `INSERT INTO user_trd_permissions (user_id, series_id, subseries_id, can_view, can_upload)
+                     VALUES ($1, $2, $3, 1, 1)`,
+                    [uId, row.series_id, row.subseries_id]
+                );
+            }
+        }
+    }
+}
+
 // GET expedientes for FUID document inventory
 router.get('/inventario-fuid', (req, res) => {
     const baseQuery = `
@@ -114,10 +164,9 @@ router.get('/inventario-fuid', (req, res) => {
         `;
         db.all(allowedQ, [req.user.id], (err, perms) => {
             if (err) return res.status(500).json({ error: 'Error verificando permisos.' });
-            if (perms.length === 0) return res.json({ data: [] });
 
-            const seriesIds = perms.map(p => p.series_id).filter(Boolean);
-            const subseriesIds = perms.map(p => p.subseries_id).filter(Boolean);
+            const seriesIds = (perms || []).map(p => p.series_id).filter(Boolean);
+            const subseriesIds = (perms || []).map(p => p.subseries_id).filter(Boolean);
 
             const paramSeriesIds = seriesIds.length > 0 ? seriesIds : [-1];
             const paramSubseriesIds = subseriesIds.length > 0 ? subseriesIds : [-1];
@@ -125,7 +174,8 @@ router.get('/inventario-fuid', (req, res) => {
             const filteredQuery = `
                 ${baseQuery}
                 WHERE (
-                    s.id = ANY($1::int[])
+                    e.id IN (SELECT expediente_id FROM expediente_assignments WHERE user_id = $3)
+                    OR s.id = ANY($1::int[])
                     OR sub.id = ANY($2::int[])
                     OR (s.series_name IS NOT NULL AND s.series_name IN (
                         SELECT ps.series_name FROM trd_series ps WHERE ps.id = ANY($1::int[]) AND ps.series_name IS NOT NULL
@@ -137,7 +187,7 @@ router.get('/inventario-fuid', (req, res) => {
                 ${groupOrder}
             `;
 
-            db.all(filteredQuery, [paramSeriesIds, paramSubseriesIds], (err, rows) => {
+            db.all(filteredQuery, [paramSeriesIds, paramSubseriesIds, req.user.id], (err, rows) => {
                 if (err) {
                     console.error("FUID query error (filtered):", err);
                     return res.status(500).json({ error: 'Error al obtener inventario.' });
@@ -164,23 +214,53 @@ router.get('/inventario-fuid', (req, res) => {
 
 // GET search expedientes
 router.get('/search', (req, res) => {
-    const term = req.query.term || '';
+    const term = (req.query.term || '').trim();
+    const docFilter = (req.query.doc_filter || 'todos').trim();
+    const assignedOnly = req.query.assigned_only === '1' || req.query.assigned_only === 'true';
+    const targetUserId = req.query.user_id ? parseInt(req.query.user_id, 10) : null;
+
+    let docFilterClause = '';
+    if (docFilter === 'sin_documentos') {
+        docFilterClause = 'AND NOT EXISTS (SELECT 1 FROM documents d WHERE d.expediente_id = e.id)';
+    } else if (docFilter === 'con_documentos') {
+        docFilterClause = 'AND EXISTS (SELECT 1 FROM documents d WHERE d.expediente_id = e.id)';
+    }
+
+    let assignFilterClause = '';
+    if (targetUserId && !isNaN(targetUserId)) {
+        assignFilterClause = `AND e.id IN (SELECT expediente_id FROM expediente_assignments WHERE user_id = ${targetUserId})`;
+    } else if (assignedOnly && req.user && req.user.id) {
+        assignFilterClause = `AND e.id IN (SELECT expediente_id FROM expediente_assignments WHERE user_id = ${Number(req.user.id)})`;
+    }
+
+    const adminLimitClause = (term === '' && docFilter === 'todos' && !assignFilterClause) ? 'LIMIT 500' : '';
+
     const query = `
-        SELECT e.*, MAX(sub.metadata_labels) as sub_labels, MAX(s.metadata_labels) as series_labels
+        SELECT e.*,
+               (SELECT COUNT(*)::int FROM documents d WHERE d.expediente_id = e.id) as doc_count,
+               MAX(sub.metadata_labels) as sub_labels,
+               MAX(s.metadata_labels) as series_labels,
+               MAX(sub.subseries_name) as subseries_name,
+               MAX(s.series_name) as series_name
         FROM expedientes e
         LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie LIKE '%-' || sub.subseries_code)
         LEFT JOIN trd_series s ON (e.subserie = s.series_code OR e.subserie LIKE '%-' || s.series_code OR sub.series_id = s.id)
-        WHERE (e.expediente_code ILIKE $1 
-           OR e.title ILIKE $2 
-           OR e.subserie ILIKE $3 
-           OR e.box_id ILIKE $4
-           OR e.metadata_values ILIKE $5)
+        WHERE ($1 = '%%'
+           OR COALESCE(e.expediente_code, '') ILIKE $1 
+           OR COALESCE(e.title, '') ILIKE $2 
+           OR COALESCE(e.subserie, '') ILIKE $3 
+           OR COALESCE(e.box_id, '') ILIKE $4
+           OR COALESCE(e.metadata_values, '') ILIKE $5
+           OR COALESCE(sub.subseries_name, '') ILIKE $1
+           OR COALESCE(s.series_name, '') ILIKE $1)
+        ${docFilterClause}
+        ${assignFilterClause}
         GROUP BY e.id
         ORDER BY e.created_at DESC
+        ${adminLimitClause}
     `;
     const searchPattern = `%${term}%`;
     
-    let finalQuery = query;
     let finalParams = [searchPattern, searchPattern, searchPattern, searchPattern, searchPattern];
 
     if (req.user && req.user.role !== 'admin' && req.user.role !== 'superadmin') {
@@ -190,26 +270,41 @@ router.get('/search', (req, res) => {
         `;
         db.all(allowedQ, [req.user.id], (err, perms) => {
             if (err) return res.status(500).json({ error: 'Error verificando permisos.' });
-            if (perms.length === 0) return res.json({ data: [] });
 
-            const seriesIds = perms.map(p => p.series_id).filter(Boolean);
-            const subseriesIds = perms.map(p => p.subseries_id).filter(Boolean);
+            const seriesIds = (perms || []).map(p => p.series_id).filter(Boolean);
+            const subseriesIds = (perms || []).map(p => p.subseries_id).filter(Boolean);
 
             const paramSeriesIds = seriesIds.length > 0 ? seriesIds : [-1];
             const paramSubseriesIds = subseriesIds.length > 0 ? subseriesIds : [-1];
+            const limitClause = (term === '' && docFilter === 'todos' && !assignedOnly) ? 'LIMIT 500' : '';
 
             const filteredQuery = `
-                SELECT e.*, MAX(sub.metadata_labels) as sub_labels, MAX(s.metadata_labels) as series_labels
+                SELECT e.*,
+                       (SELECT COUNT(*)::int FROM documents d WHERE d.expediente_id = e.id) as doc_count,
+                       MAX(sub.metadata_labels) as sub_labels,
+                       MAX(s.metadata_labels) as series_labels,
+                       MAX(sub.subseries_name) as subseries_name,
+                       MAX(s.series_name) as series_name,
+                       CASE WHEN EXISTS (
+                           SELECT 1 FROM expediente_assignments ea_ord
+                           WHERE ea_ord.expediente_id = e.id AND ea_ord.user_id = $4
+                       ) THEN 1 ELSE 0 END as is_assigned
                 FROM expedientes e
                 LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie LIKE '%-' || sub.subseries_code)
                 LEFT JOIN trd_series s ON (e.subserie = s.series_code OR e.subserie LIKE '%-' || s.series_code OR sub.series_id = s.id)
-                WHERE (e.expediente_code ILIKE $3
-                   OR e.title ILIKE $3
-                   OR e.subserie ILIKE $3
-                   OR e.box_id ILIKE $3
-                   OR e.metadata_values ILIKE $3)
+                WHERE ($3 = '%%'
+                   OR COALESCE(e.expediente_code, '') ILIKE $3
+                   OR COALESCE(e.title, '') ILIKE $3
+                   OR COALESCE(e.subserie, '') ILIKE $3
+                   OR COALESCE(e.box_id, '') ILIKE $3
+                   OR COALESCE(e.metadata_values, '') ILIKE $3
+                   OR COALESCE(sub.subseries_name, '') ILIKE $3
+                   OR COALESCE(s.series_name, '') ILIKE $3)
+                ${docFilterClause}
+                ${assignFilterClause}
                 AND (
-                    s.id = ANY($1::int[])
+                    e.id IN (SELECT expediente_id FROM expediente_assignments WHERE user_id = $4)
+                    OR s.id = ANY($1::int[])
                     OR sub.id = ANY($2::int[])
                     OR (s.series_name IS NOT NULL AND s.series_name IN (
                         SELECT ps.series_name FROM trd_series ps WHERE ps.id = ANY($1::int[]) AND ps.series_name IS NOT NULL
@@ -219,9 +314,10 @@ router.get('/search', (req, res) => {
                     ))
                 )
                 GROUP BY e.id
-                ORDER BY e.created_at DESC
+                ORDER BY is_assigned DESC, e.created_at DESC
+                ${limitClause}
             `;
-            db.all(filteredQuery, [paramSeriesIds, paramSubseriesIds, `%${term}%`], (err, rows) => {
+            db.all(filteredQuery, [paramSeriesIds, paramSubseriesIds, `%${term}%`, req.user.id], (err, rows) => {
                 if (err) return res.status(500).json({ error: 'Error al buscar expedientes.' });
                 const processed = rows.map(row => ({
                     ...row,
@@ -346,10 +442,9 @@ router.get('/', (req, res) => {
         `;
         db.all(allowedQ, [req.user.id], (err, perms) => {
             if (err) return res.status(500).json({ error: 'Error verificando permisos.' });
-            if (perms.length === 0) return res.json({ data: [] });
 
-            const seriesIds = perms.map(p => p.series_id).filter(Boolean);
-            const subseriesIds = perms.map(p => p.subseries_id).filter(Boolean);
+            const seriesIds = (perms || []).map(p => p.series_id).filter(Boolean);
+            const subseriesIds = (perms || []).map(p => p.subseries_id).filter(Boolean);
 
             const paramSeriesIds = seriesIds.length > 0 ? seriesIds : [-1];
             const paramSubseriesIds = subseriesIds.length > 0 ? subseriesIds : [-1];
@@ -361,7 +456,8 @@ router.get('/', (req, res) => {
                     LEFT JOIN trd_subseries sub ON (e2.subserie = sub.subseries_code OR e2.subserie LIKE '%-' || sub.subseries_code)
                     LEFT JOIN trd_series s ON (e2.subserie = s.series_code OR e2.subserie LIKE '%-' || s.series_code OR sub.series_id = s.id)
                     WHERE (
-                        s.id = ANY($1::int[])
+                        e2.id IN (SELECT expediente_id FROM expediente_assignments WHERE user_id = $3)
+                        OR s.id = ANY($1::int[])
                         OR sub.id = ANY($2::int[])
                         OR (s.series_name IS NOT NULL AND s.series_name IN (
                             SELECT ps.series_name FROM trd_series ps WHERE ps.id = ANY($1::int[]) AND ps.series_name IS NOT NULL
@@ -375,7 +471,7 @@ router.get('/', (req, res) => {
                 ORDER BY created_at DESC
             `;
 
-            db.all(filteredQuery, [paramSeriesIds, paramSubseriesIds], (err, rows) => {
+            db.all(filteredQuery, [paramSeriesIds, paramSubseriesIds, req.user.id], (err, rows) => {
                 if (err) return res.status(500).json({ error: 'Error al obtener expedientes.' });
                 const expedientes = rows.map(row => ({
                     ...row,
@@ -605,6 +701,7 @@ router.post('/mass', async (req, res) => {
                                     observaciones = EXCLUDED.observaciones,
                                     assigned_at = CURRENT_TIMESTAMP
                         `, [newId, exp.assigned_user_id, req.user?.id || null, 'Asignado/Actualizado en creación masiva (Excel)']);
+                        await ensureAssignedTrdPermissions(client, [exp.assigned_user_id], [newId]);
                     }
                 }
             } catch (err) {
@@ -630,6 +727,7 @@ router.post('/mass', async (req, res) => {
                     `, [expId, userId, req.user?.id || null, 'Asignado en creación masiva (Global)']);
                 }
             }
+            await ensureAssignedTrdPermissions(client, assignedUserIds, created_ids);
         }
 
         await client.query('COMMIT');
@@ -1474,5 +1572,95 @@ router.get('/run-deduplicate', async (req, res) => {
         console.error('[MIGRATION] Error during duplicate expedientes cleanup:', err.message);
     }
 })();
+
+// POST /batch-match - Fast bulk matching of extracted tokens (Cédula, TI, Código 2026EX, Ficha) to accessible expedientes
+router.post('/batch-match', async (req, res) => {
+    try {
+        const rawTokens = Array.isArray(req.body?.tokens) ? req.body.tokens : [];
+        const cleanTokens = [...new Set(
+            rawTokens
+                .map(t => String(t || '').trim())
+                .filter(t => t.length >= 5 && t.length <= 80)
+        )].slice(0, 120);
+
+        if (cleanTokens.length === 0) {
+            return res.json({ matches: {} });
+        }
+
+        const { pool } = require('../database_pg');
+        const patterns = cleanTokens.map(t => `%${t}%`);
+        const isAdmin = req.user && (req.user.role === 'admin' || req.user.role === 'superadmin');
+
+        let rows = [];
+        if (isAdmin) {
+            const q = `
+                SELECT e.id, e.expediente_code, e.title, e.subserie, e.box_id, e.opening_date, e.metadata_values,
+                       MAX(sub.subseries_name) as subseries_name, MAX(s.series_name) as series_name
+                FROM expedientes e
+                LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie LIKE '%-' || sub.subseries_code)
+                LEFT JOIN trd_series s ON (e.subserie = s.series_code OR e.subserie LIKE '%-' || s.series_code OR sub.series_id = s.id)
+                WHERE COALESCE(e.expediente_code, '') ILIKE ANY($1::text[])
+                   OR COALESCE(e.title, '') ILIKE ANY($1::text[])
+                   OR COALESCE(e.metadata_values, '') ILIKE ANY($1::text[])
+                GROUP BY e.id
+                LIMIT 400
+            `;
+            const r = await pool.query(q, [patterns]);
+            rows = r.rows || [];
+        } else if (req.user && req.user.id) {
+            const permRes = await pool.query(
+                `SELECT series_id, subseries_id FROM user_trd_permissions WHERE user_id = $1 AND can_view = 1`,
+                [req.user.id]
+            );
+            const seriesIds = permRes.rows.map(p => p.series_id).filter(Boolean);
+            const subseriesIds = permRes.rows.map(p => p.subseries_id).filter(Boolean);
+            const paramSeriesIds = seriesIds.length > 0 ? seriesIds : [-1];
+            const paramSubseriesIds = subseriesIds.length > 0 ? subseriesIds : [-1];
+
+            const q = `
+                SELECT e.id, e.expediente_code, e.title, e.subserie, e.box_id, e.opening_date, e.metadata_values,
+                       MAX(sub.subseries_name) as subseries_name, MAX(s.series_name) as series_name
+                FROM expedientes e
+                LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie LIKE '%-' || sub.subseries_code)
+                LEFT JOIN trd_series s ON (e.subserie = s.series_code OR e.subserie LIKE '%-' || s.series_code OR sub.series_id = s.id)
+                WHERE (
+                    COALESCE(e.expediente_code, '') ILIKE ANY($1::text[])
+                    OR COALESCE(e.title, '') ILIKE ANY($1::text[])
+                    OR COALESCE(e.metadata_values, '') ILIKE ANY($1::text[])
+                )
+                AND (
+                    e.id IN (SELECT expediente_id FROM expediente_assignments WHERE user_id = $4)
+                    OR s.id = ANY($2::int[])
+                    OR sub.id = ANY($3::int[])
+                )
+                GROUP BY e.id
+                LIMIT 400
+            `;
+            const r = await pool.query(q, [patterns, paramSeriesIds, paramSubseriesIds, req.user.id]);
+            rows = r.rows || [];
+        }
+
+        const parsedRows = rows.map(row => {
+            let mv = {};
+            try { mv = row.metadata_values ? correctMetadata(JSON.parse(row.metadata_values)) : {}; } catch (_) {}
+            return { ...row, metadata_values: mv, _raw_haystack: `${row.expediente_code || ''} ${row.title || ''} ${row.metadata_values || ''}`.toLowerCase() };
+        });
+
+        const matches = {};
+        for (const tok of cleanTokens) {
+            const low = tok.toLowerCase();
+            const hits = parsedRows
+                .filter(r => r._raw_haystack.includes(low))
+                .slice(0, 5)
+                .map(({ _raw_haystack, ...clean }) => clean);
+            if (hits.length > 0) matches[tok] = hits;
+        }
+
+        res.json({ matches });
+    } catch (err) {
+        console.error('[batch-match] Error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
 
 module.exports = router;

@@ -5,9 +5,10 @@ import {
     LayoutDashboard, CheckCircle, Clock, FileText,
     Network, FolderKanban, Folder, Globe, Play,
     Upload, FileSpreadsheet, Database, Cloud,
-    Settings, Shield, User, ChevronRight,
-    Lock, Zap, FolderOpen, FolderX, Files, Server, BarChart2
+    Settings, Shield, User, ChevronRight, ArrowRight,
+    Lock, Zap, FolderOpen, FolderX, Files, Server, BarChart2, FileDown
 } from 'lucide-react';
+import InventoryPdfModal from '../components/InventoryPdfModal';
 
 // ── Catálogo completo de módulos ──────────────────────────────────────────────
 const MODULOS = [
@@ -41,17 +42,23 @@ function StatCard({ icon: Icon, value, label, sublabel, colorBg, colorIcon, colo
         <button
             onClick={onClick}
             disabled={!onClick}
-            className={`bg-white rounded-xl border ${colorBg} shadow-sm p-4 flex items-center gap-4 text-left w-full transition-all ${onClick ? 'hover:shadow-md hover:-translate-y-0.5 cursor-pointer' : 'cursor-default'}`}
+            title={onClick ? `Haga clic para ver el listado de: ${label}` : undefined}
+            className={`group bg-white rounded-xl border ${colorBg} shadow-sm p-4 flex items-center gap-4 text-left w-full transition-all ${onClick ? 'hover:shadow-md hover:-translate-y-0.5 hover:ring-2 hover:ring-green-500/30 cursor-pointer' : 'cursor-default'}`}
         >
             <div className={`p-3 rounded-full ${colorBg}`}>
                 <Icon size={22} className={colorIcon} />
             </div>
-            <div>
+            <div className="flex-1 min-w-0">
                 <span className={`block text-2xl font-black ${colorText}`}>
                     {loading ? '—' : (value ?? 0)}
                 </span>
-                <span className={`text-xs font-semibold ${colorIcon}`}>{label}</span>
+                <span className={`text-xs font-semibold ${colorIcon} block`}>{label}</span>
                 {sublabel && <span className="block text-[10px] text-gray-400 mt-0.5">{sublabel}</span>}
+                {onClick && (
+                    <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold mt-1 opacity-75 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all ${colorIcon}`}>
+                        Ver detalle <ArrowRight size={10} />
+                    </span>
+                )}
             </div>
         </button>
     );
@@ -67,6 +74,7 @@ export default function Dashboard() {
     const [permissions, setPerms]   = useState([]);
     const [loadingStats, setLoadingStats] = useState(true);
     const [loadingPerms, setLoadingPerms] = useState(true);
+    const [showInventoryPdfModal, setShowInventoryPdfModal] = useState(false);
 
     useEffect(() => {
         const stored = JSON.parse(localStorage.getItem('user') || '{}');
@@ -145,14 +153,24 @@ export default function Dashboard() {
                             ? ' Visualizando estadísticas del sistema y tus asignaciones.'
                             : ' Visualizando tus expedientes asignados.'}
                     </p>
-                    <div className="mt-4 flex items-center gap-3">
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
                         <button
-                            onClick={() => navigate('/seguimiento')}
-                            className="bg-white/20 hover:bg-white/30 backdrop-blur-md text-white text-xs font-bold px-4 py-2 rounded-xl transition-all flex items-center gap-2 border border-white/30 shadow-sm cursor-pointer"
+                            type="button"
+                            onClick={() => setShowInventoryPdfModal(true)}
+                            className="bg-white text-[#00324D] hover:bg-emerald-50 text-xs font-extrabold px-4 py-2 rounded-xl transition-all flex items-center gap-2 shadow-md cursor-pointer"
                         >
-                            <BarChart2 size={16} />
-                            Estadísticas & Exportar a Excel (Pendientes)
+                            <FileDown size={16} className="text-[#39A900]" />
+                            {isSuperOrAdmin ? '📄 Descargar Inventario PDF por Usuario' : '📄 Descargar Mi Inventario Documental (PDF)'}
                         </button>
+                        {(isSuperOrAdmin || canView('seguimiento')) && (
+                            <button
+                                onClick={() => navigate('/seguimiento')}
+                                className="bg-white/20 hover:bg-white/30 backdrop-blur-md text-white text-xs font-bold px-4 py-2 rounded-xl transition-all flex items-center gap-2 border border-white/30 shadow-sm cursor-pointer"
+                            >
+                                <BarChart2 size={16} />
+                                Estadísticas & Exportar a Excel (Pendientes)
+                            </button>
+                        )}
                     </div>
                 </div>
                 <LayoutDashboard className="absolute right-0 bottom-0 text-white opacity-10 w-56 h-56 -mb-10 -mr-10" />
@@ -201,7 +219,7 @@ export default function Dashboard() {
                         colorIcon="text-green-600"
                         colorText="text-green-700"
                         loading={loadingStats}
-                        onClick={() => navigate('/expedientes')}
+                        onClick={() => navigate(`/documents?filter=todos&scope=${viewMode}`)}
                     />
                     <StatCard
                         icon={FileText}
@@ -212,7 +230,7 @@ export default function Dashboard() {
                         colorIcon="text-blue-600"
                         colorText="text-blue-700"
                         loading={loadingStats}
-                        onClick={() => navigate('/documents')}
+                        onClick={() => navigate(`/documents?filter=con_documentos&scope=${viewMode}`)}
                     />
                     <StatCard
                         icon={FolderX}
@@ -223,7 +241,7 @@ export default function Dashboard() {
                         colorIcon="text-orange-600"
                         colorText="text-orange-700"
                         loading={loadingStats}
-                        onClick={() => navigate('/seguimiento')}
+                        onClick={() => navigate(`/documents?filter=sin_documentos&scope=${viewMode}`)}
                     />
                     <StatCard
                         icon={Clock}
@@ -234,7 +252,7 @@ export default function Dashboard() {
                         colorIcon="text-red-600"
                         colorText="text-red-700"
                         loading={loadingStats}
-                        onClick={canView('cargue-aes') ? () => navigate('/cargue-aes') : null}
+                        onClick={() => canView('cargue-aes') ? navigate('/cargue-aes?status=Pendiente') : navigate(`/documents?tab=guardados&status=Pendiente&scope=${viewMode}`)}
                     />
                     <StatCard
                         icon={CheckCircle}
@@ -245,6 +263,7 @@ export default function Dashboard() {
                         colorIcon="text-teal-600"
                         colorText="text-teal-700"
                         loading={loadingStats}
+                        onClick={() => navigate(`/documents?tab=guardados&filter=hoy&scope=${viewMode}`)}
                     />
                     <StatCard
                         icon={CheckCircle}
@@ -255,6 +274,7 @@ export default function Dashboard() {
                         colorIcon="text-indigo-600"
                         colorText="text-indigo-700"
                         loading={loadingStats}
+                        onClick={() => canView('cargue-aes') ? navigate('/cargue-aes?status=Cargado') : navigate(`/documents?tab=guardados&status=Cargado&scope=${viewMode}`)}
                     />
                     <StatCard
                         icon={Files}
@@ -265,6 +285,7 @@ export default function Dashboard() {
                         colorIcon="text-purple-600"
                         colorText="text-purple-700"
                         loading={loadingStats}
+                        onClick={() => navigate(`/documents?tab=guardados&scope=${viewMode}`)}
                     />
                 </div>
             </div>
@@ -343,6 +364,11 @@ export default function Dashboard() {
                     </div>
                 );
             })()}
+
+            <InventoryPdfModal
+                isOpen={showInventoryPdfModal}
+                onClose={() => setShowInventoryPdfModal(false)}
+            />
         </div>
     );
 }

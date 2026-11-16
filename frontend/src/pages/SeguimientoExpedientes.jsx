@@ -3,8 +3,9 @@ import axios from 'axios';
 import {
   BarChart2, Users, FolderOpen, CheckCircle, Clock,
   UserCheck, Search, X, RefreshCw, Trash2, Package, Eye,
-  FileSpreadsheet, Download, AlertCircle, Filter, Check
+  FileSpreadsheet, Download, AlertCircle, Filter, Check, FileDown
 } from 'lucide-react';
+import InventoryPdfModal from '../components/InventoryPdfModal';
 
 /* ─── Barra de progreso ─────────────────────────────────── */
 function ProgressBar({ value, color = '#39A900' }) {
@@ -258,6 +259,8 @@ export default function SeguimientoExpedientes() {
   const [exportUser, setExportUser] = useState('todos');
   const [exportSoloPendientes, setExportSoloPendientes] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
+  const [showInventoryPdfModal, setShowInventoryPdfModal] = useState(false);
+  const [pdfTargetUserId, setPdfTargetUserId] = useState(null);
 
   /* ── Descargar Excel de Expedientes Pendientes por Responsable ── */
   const descargarExcelPendientes = async (userId = exportUser, soloPendientes = exportSoloPendientes) => {
@@ -512,7 +515,26 @@ export default function SeguimientoExpedientes() {
                 Control de Gestión Documental & Auditoría para Dirección
               </span>
             </div>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => {
+                  setPdfTargetUserId(filtroUsuarioStats !== 'todos' ? filtroUsuarioStats : 'all');
+                  setShowInventoryPdfModal(true);
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px',
+                  background: 'linear-gradient(135deg, #00324D 0%, #0b4a6f 100%)',
+                  color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer',
+                  fontSize: 13, fontWeight: 700,
+                  boxShadow: '0 4px 12px rgba(0, 50, 77, 0.25)',
+                  transition: 'all 0.2s ease'
+                }}
+                title="Generar y descargar en PDF el Inventario Documental (FUID o Detallado) realizado por cada usuario"
+              >
+                <FileDown size={16} />
+                📄 Inventario PDF por Usuario
+              </button>
+
               <button
                 onClick={() => {
                   setExportUser(filtroUsuarioStats);
@@ -575,20 +597,38 @@ export default function SeguimientoExpedientes() {
                 </select>
 
                 {filtroUsuarioStats !== 'todos' && (
-                  <button
-                    onClick={() => descargarExcelPendientes(filtroUsuarioStats, true)}
-                    disabled={isExporting}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
-                      background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0',
-                      borderRadius: 8, cursor: isExporting ? 'not-allowed' : 'pointer',
-                      fontSize: 12, fontWeight: 700
-                    }}
-                    title="Descargar Excel de expedientes pendientes de este responsable específico"
-                  >
-                    <Download size={14} />
-                    {isExporting ? 'Descargando...' : 'Descargar Excel de este Responsable'}
-                  </button>
+                  <>
+                    <button
+                      onClick={() => {
+                        setPdfTargetUserId(filtroUsuarioStats);
+                        setShowInventoryPdfModal(true);
+                      }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
+                        background: '#00324D', color: '#fff', border: 'none',
+                        borderRadius: 8, cursor: 'pointer',
+                        fontSize: 12, fontWeight: 700
+                      }}
+                      title="Descargar Inventario Documental en PDF realizado por este usuario"
+                    >
+                      <FileDown size={14} />
+                      📄 Descargar Inventario PDF
+                    </button>
+                    <button
+                      onClick={() => descargarExcelPendientes(filtroUsuarioStats, true)}
+                      disabled={isExporting}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
+                        background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0',
+                        borderRadius: 8, cursor: isExporting ? 'not-allowed' : 'pointer',
+                        fontSize: 12, fontWeight: 700
+                      }}
+                      title="Descargar Excel de expedientes pendientes de este responsable específico"
+                    >
+                      <Download size={14} />
+                      {isExporting ? 'Descargando...' : 'Descargar Excel de este Responsable'}
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -706,7 +746,7 @@ export default function SeguimientoExpedientes() {
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                         <thead>
                           <tr style={{ background: '#f9fafb' }}>
-                            {['Usuario','Área','Exp. Asignados','Con Docs','% Cargue','Documentos'].map(h => (
+                            {['Usuario','Área','Exp. Asignados','Con Docs','% Cargue','Documentos','Inventario PDF'].map(h => (
                               <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e5e7eb' }}>{h}</th>
                             ))}
                           </tr>
@@ -725,10 +765,28 @@ export default function SeguimientoExpedientes() {
                                 </div>
                               </td>
                               <td style={{ padding: '10px 12px' }}>{u.total_documentos}</td>
+                              <td style={{ padding: '10px 12px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPdfTargetUserId(u.user_id);
+                                    setShowInventoryPdfModal(true);
+                                  }}
+                                  style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                                    padding: '5px 10px', background: '#00324D', color: '#fff',
+                                    border: 'none', borderRadius: 6, cursor: 'pointer',
+                                    fontSize: 11, fontWeight: 700
+                                  }}
+                                  title={`Descargar Inventario Documental PDF de ${u.usuario}`}
+                                >
+                                  <FileDown size={13} /> PDF
+                                </button>
+                              </td>
                             </tr>
                           ))}
                           {(stats.usuarios || []).filter(u => u.expedientes_asignados > 0).length === 0 && (
-                            <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#9ca3af' }}>
+                            <tr><td colSpan={7} style={{ padding: 24, textAlign: 'center', color: '#9ca3af' }}>
                               Sin usuarios con expedientes asignados aún.
                             </td></tr>
                           )}
@@ -1487,6 +1545,12 @@ export default function SeguimientoExpedientes() {
           </div>
         </div>
       )}
+
+      <InventoryPdfModal
+        isOpen={showInventoryPdfModal}
+        onClose={() => setShowInventoryPdfModal(false)}
+        initialUserId={pdfTargetUserId}
+      />
     </div>
   );
 }

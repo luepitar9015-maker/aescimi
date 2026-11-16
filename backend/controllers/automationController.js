@@ -28,6 +28,11 @@ const HISTORIAS_ACADEMICAS_MAP = {
     'CERTIFICADOS ACADEMICOS PARA EL PROCESO DE MATRICULA (SALVO REGULA': 'CERTIFICADOS ACADEMICOS PARA EL PROCESO DE MATRICULA (SALVO REGULA',
     'DOCUMENTO DE CONVALIDACION DE CERTIFICADOS ACADEMICOS U OTROS': 'DOCUMENTO DE CONVALIDACION DE CERTIFICADOS ACADEMICOS U OTROS',
     'CERTIFICADO DE AFILIACION EPS': 'CERTIFICADO DE AFILIACION EPS',
+    '8. CERTIFICADO DE AFILIACION EPS': 'CERTIFICADO DE AFILIACION EPS',
+    '08. CERTIFICADO DE AFILIACION EPS': 'CERTIFICADO DE AFILIACION EPS',
+    'CERTIFICADO DE AFILIACION A EPS': 'CERTIFICADO DE AFILIACION EPS',
+    'CERTIFICADO DE AFILIACION A LA EPS': 'CERTIFICADO DE AFILIACION EPS',
+    'CERTIFICADO AFILIACION EPS': 'CERTIFICADO DE AFILIACION EPS',
     'RESULTADO PRUEBA ICFES, SABER 11': 'RESULTADO PRUEBA ICFES, SABER 11',
     'REGISTRO DE ASISTENCIA PARA FORMALIZAR MATRICULA': 'REGISTRO DE ASISTENCIA PARA FORMALIZAR MATRICULA',
     'CONSTANCIA DE RECONOCIMIENTO PARA PENSION DE SOBREVIVIENTES': 'CONSTANCIA DE RECONOCIMIENTO PARA PENSION DE SOBREVIVIENTES',
@@ -65,21 +70,136 @@ const HISTORIAS_ACADEMICAS_MAP = {
     'CONTROL Y EXPEDICION Y ENTREGA DE DUPLICADOS (AÑOS ANTERIORES AL A': 'CONTROL Y EXPEDICION Y ENTREGA DE DUPLICADOS (AÑOS ANTERIORES AL A',
     'SOLICITUD MODIFICACION DE DOCUMENTOS ACADEMICOS CON SU RESPECTIVO SOPORTE': 'SOLICITUD MODIFICACION DE DOCUMENTOS ACADEMICOS CON SU RESPECTIVO',
     'SOLICITUD MODIFICACION DE DOCUMENTOS ACADEMICOS CON SU RESPECTIVO': 'SOLICITUD MODIFICACION DE DOCUMENTOS ACADEMICOS CON SU RESPECTIVO',
-    'CONSTANCIA DE VALIDACION ACADEMICA PARA APOSTILLAR': 'CONSTANCIA DE VALIDACION ACADEMICA PARA APOSTILLAR'
+    'CONSTANCIA DE VALIDACION ACADEMICA PARA APOSTILLAR': 'CONSTANCIA DE VALIDACION ACADEMICA PARA APOSTILLAR',
+    // ─────────────────────────────────────────────────────────────────
+    // CATÁLOGO OFICIAL TIPOLOGÍAS SEGÚN AES (CONTRATO DE PRESTACIÓN DE SERVICIOS PERSONALES)
+    // ─────────────────────────────────────────────────────────────────
+    'PUBLICACION EN EL SECOP DE LA NECESIDAD DE CONTRATACION DENTRO DEL PLAN ANUAL DE ADQUISICION': 'PUBLICACION EN EL SECOP II DE LA NECESIDAD DE CONTRATACION DENTRO',
+    'PUBLICACION EN EL SECOP II DE LA NECESIDAD DE CONTRATACION DENTRO': 'PUBLICACION EN EL SECOP II DE LA NECESIDAD DE CONTRATACION DENTRO',
+    'CERTIFICADO DE DISPONIBILIDAD PRESUPUESTAL - CDP': 'CERTIFICADO DE DISPONIBILIDAD PRESUPUESTAL',
+    'CERTIFICADO DE DISPONIBILIDAD PRESUPUESTAL': 'CERTIFICADO DE DISPONIBILIDAD PRESUPUESTAL',
+    'ESTUDIO PREVIO': 'ESTUDIOS PREVIOS',
+    'ESTUDIOS PREVIOS': 'ESTUDIOS PREVIOS',
+    'MINUTA CONTRATO': 'MINUTA DE CONTRATO',
+    'MINUTA DE CONTRATO': 'MINUTA DE CONTRATO',
+    'CERTIFICADO DE INEXISTENCIA DE PERSONAL DE PLANTA': 'CERTIFICADO DE INEXISTENCIA DE PERSONAL DE PLANTA',
+    'CERTIFICADO DE INEXISTENCIA DE PERSONAL DE PLANTA': 'CERTIFICADO DE INEXISTENCIA DE PERSONAL DE PLANTA',
+    'CERTIFICADO DE UNICO OFERENTE DEL MERCADO': 'CERTIFICADO DE UNICO OFERENTE DEL MERCADO',
+    'CERTIFICADO DE UNICO OFERENTE DEL MERCADO': 'CERTIFICADO DE UNICO OFERENTE DEL MERCADO',
+    'AUTORIZACION PARA CONTRATOS CON OBJETOS IGUALES (SI APLICA)': 'AUTORIZACION PARA CONTRATOS CON OBJETOS IGUALES',
+    'AUTORIZACION PARA CONTRATOS CON OBJETOS IGUALES': 'AUTORIZACION PARA CONTRATOS CON OBJETOS IGUALES',
+    'AUTORIZACION CONTRATACION DE SERVICIOS PERSONALES': 'AUTORIZACION CONTRATACION DE SERVICIOS PERSONALES',
+    'AUTORIZACION CONTRATACION DE SERVICIOS PERSONALES': 'AUTORIZACION CONTRATACION DE SERVICIOS PERSONALES',
+    'OFERTA DE SERVICIOS PERSONALES RADICADA': 'OFERTA DE SERVICIOS PERSONALES RADICADA',
+    'OFERTA DE SERVICIOS PERSONALES RADICADA': 'OFERTA DE SERVICIOS PERSONALES RADICADA',
+    'HOJA DE VIDA SIGEP': 'HOJA DE VIDA SIGEP',
+    'HOJA DE VIDA SIGEP': 'HOJA DE VIDA SIGEP',
+    'COPIA DOCUMENTO DE IDENTIDAD': 'COPIA DOCUMENTO DE IDENTIDAD',
+    'COPIA DOCUMENTO DE IDENTIDAD': 'COPIA DOCUMENTO DE IDENTIDAD',
+    'ACREDITACION DE SITUACION MILITAR (SI APLICA)': 'ACREDITACION DE SITUACION MILITAR',
+    'ACREDITACION DE SITUACION MILITAR': 'ACREDITACION DE SITUACION MILITAR',
+    'DECLARACION DE BIENES Y RENTAS Y CONFLICTO DE INTERES': 'DECLARACION DE BIENES Y RENTAS Y CONFLICTO DE INTERES',
+    'DECLARACION DE BIENES Y RENTAS Y CONFLICTO DE INTERES': 'DECLARACION DE BIENES Y RENTAS Y CONFLICTO DE INTERES',
+    'CERTIFICADOS ACADEMICOS': 'CERTIFICADOS ACADEMICOS',
+    'CERTIFICADOS ACADEMICOS': 'CERTIFICADOS ACADEMICOS',
+    'CERTIFICADOS DE EXPERIENCIA LABORAL': 'CERTIFICADOS DE EXPERIENCIA LABORAL',
+    'CERTIFICADOS DE EXPERIENCIA LABORAL': 'CERTIFICADOS DE EXPERIENCIA LABORAL',
+    'COPIA DEL REGISTRO DE UNICO TRIBUTARIO': 'COPIA DEL REGISTRO DE UNICO TRIBUTARIO',
+    'COPIA DEL REGISTRO DE UNICO TRIBUTARIO': 'COPIA DEL REGISTRO DE UNICO TRIBUTARIO',
+    'COPIA DEL REGISTRO DE INFORMACION TRIBUTARIA': 'REGISTRO DE INFORMACION TRIBUTARIA O EL QUE HAGA SUS VECES',
+    'REGISTRO DE INFORMACION TRIBUTARIA O EL QUE HAGA SUS VECES': 'REGISTRO DE INFORMACION TRIBUTARIA O EL QUE HAGA SUS VECES',
+    'CERTIFICADO DE INEXISTENCIA DE ANTECEDENTES DEL SISTEMA REGISTRO NACIONAL DE MEDIDAS CORRECTIVAS RNMC': 'CERTIFICADO INEXISTENCIA ANTECEDENTES SISTEMA RNMC',
+    'CERTIFICADO INEXISTENCIA ANTECEDENTES SISTEMA RNMC': 'CERTIFICADO INEXISTENCIA ANTECEDENTES SISTEMA RNMC',
+    'REGISTRO DE DEUDORES ALIMENTARIOS MOROSOS REDAM': 'REGISTRO DE DEUDORES ALIMENTARIOS MOROSOS REDAM',
+    'REGISTRO DE DEUDORES ALIMENTARIOS MOROSOS REDAM': 'REGISTRO DE DEUDORES ALIMENTARIOS MOROSOS REDAM',
+    'CONSULTA DE INHABILIDADES POR DELITOS SEXUALES CONTRA MENORES DE EDAD': 'CONSULTA DE INHABILIDADES POR DELITOS SEXUALES CONTRA MENORES DE E',
+    'CONSULTA DE INHABILIDADES POR DELITOS SEXUALES CONTRA MENORES DE E': 'CONSULTA DE INHABILIDADES POR DELITOS SEXUALES CONTRA MENORES DE E',
+    'CERTIFICADOS SEGURIDAD SOCIAL Y PARAFISCALES': 'CERTIFICADOS SEGURIDAD SOCIAL Y PARAFISCALES',
+    'CERTIFICADOS SEGURIDAD SOCIAL Y PARAFISCALES': 'CERTIFICADOS SEGURIDAD SOCIAL Y PARAFISCALES',
+    'TARJETA PROFESIONAL O CERTIFICADO DE REGISTRO O MATRICULA PARA PROFESIONES REGULADAS (SI APLICA)': 'TARJETA PROFESIONAL O CERTIFICADO DE REGISTRO O MATRICULA PARA PRO',
+    'TARJETA PROFESIONAL O CERTIFICADO DE REGISTRO O MATRICULA PARA PRO': 'TARJETA PROFESIONAL O CERTIFICADO DE REGISTRO O MATRICULA PARA PRO',
+    'CERTIFICADO DE ANTECEDENTES DISCIPLINARIOS DE LA PROFESION': 'CERTIFICADO DE ANTECEDENTES DISCIPLINARIOS DE LA PROFESION',
+    'CERTIFICADO DE ANTECEDENTES DISCIPLINARIOS DE LA PROFESION': 'CERTIFICADO DE ANTECEDENTES DISCIPLINARIOS DE LA PROFESION',
+    'CERTIFICADO DE ANTECEDENTES DISCIPLINARIOS (PROCURADURIA)': 'CERTIFICADO DE ANTECEDENTES DISCIPLINARIOS PROCURADURIA',
+    'CERTIFICADO DE ANTECEDENTES DISCIPLINARIOS PROCURADURIA': 'CERTIFICADO DE ANTECEDENTES DISCIPLINARIOS PROCURADURIA',
+    'CERTIFICADO DE ANTECEDENTES FISCALES': 'CERTIFICADO DE ANTECEDENTES FISCALES',
+    'CERTIFICADO DE ANTECEDENTES FISCALES': 'CERTIFICADO DE ANTECEDENTES FISCALES',
+    'CERTIFICADO DE ANTECEDENTES JUDICIALES': 'CERTIFICADO DE ANTECEDENTES JUDICIALES',
+    'CERTIFICADO DE ANTECEDENTES JUDICIALES': 'CERTIFICADO DE ANTECEDENTES JUDICIALES',
+    'REGISTRO NACIONAL DE MEDIDAS CORRECTIVAS': 'REGISTRO NACIONAL DE MEDIDAS CORRECTIVAS',
+    'REGISTRO NACIONAL DE MEDIDAS CORRECTIVAS': 'REGISTRO NACIONAL DE MEDIDAS CORRECTIVAS',
+    'AUTORIZACION DE CONSULTA EN BASES DE DATOS SENSIBLES': 'CERTIFICADO INEXISTENCIA DE ANTECEDENTES JUDICIALES DEL REPRESENTA',
+    'CERTIFICADO INEXISTENCIA DE ANTECEDENTES JUDICIALES DEL REPRESENTA': 'CERTIFICADO INEXISTENCIA DE ANTECEDENTES JUDICIALES DEL REPRESENTA',
+    'CERTIFICADO DE INHABILIDADES POR DELITOS SEXUALES': 'CERTIFICADO DE INHABILIDADES POR DELITOS SEXUALES',
+    'CERTIFICADO DE INHABILIDADES POR DELITOS SEXUALES': 'CERTIFICADO DE INHABILIDADES POR DELITOS SEXUALES',
+    'CERTIFICADO REGISTRO DEUDORES ALIMENTARIOS MOROSOS': 'CERTIFICADO REGISTRO DEUDORES ALIMENTARIOS MOROSOS',
+    'CERTIFICADO REGISTRO DEUDORES ALIMENTARIOS MOROSOS': 'CERTIFICADO REGISTRO DEUDORES ALIMENTARIOS MOROSOS',
+    'CERTIFICACION BANCARIA': 'CERTIFICACION BANCARIA',
+    'CERTIFICACION BANCARIA': 'CERTIFICACION BANCARIA',
+    'CERTIFICACION DE INSCRIPCION A LA AGENCIA PUBLICA DE EMPLEO': 'CERTIFICACION DE INSCRIPCION A LA AGENCIA PUBLICA DE EMPLEO',
+    'CERTIFICACION DE INSCRIPCION A LA AGENCIA PUBLICA DE EMPLEO': 'CERTIFICACION DE INSCRIPCION A LA AGENCIA PUBLICA DE EMPLEO',
+    'REGISTRO PRESUPUESTAL': 'REGISTRO PRESUPUESTAL',
+    'REGISTRO PRESUPUESTAL': 'REGISTRO PRESUPUESTAL',
+    'POLIZAS DE GARANTIAS': 'POLIZA DE GARANTIA',
+    'POLIZA DE GARANTIA': 'POLIZA DE GARANTIA',
+    'GESTION CONTRACTUAL PERIODICA DE PRESTACION DE SERVICIOS PERSONALES Y APOYO A LA GESTION': 'GESTION CONTRACTUAL PERIODICA DE PRESTACION DE SERVICIOS PERSONALE',
+    'GESTION CONTRACTUAL PERIODICA DE PRESTACION DE SERVICIOS PERSONALE': 'GESTION CONTRACTUAL PERIODICA DE PRESTACION DE SERVICIOS PERSONALE',
+    'GESTION FINANCIERA PERIODICA DE PRESTACION DE SERVICIOS PERSONALES Y APOYO A LA GESTION FINANCIERA': 'GESTION FINANCIERA PERIODICA DE PRESTACION DE SERVICIOS PERSONALES',
+    'GESTION FINANCIERA PERIODICA DE PRESTACION DE SERVICIOS PERSONALES': 'GESTION FINANCIERA PERIODICA DE PRESTACION DE SERVICIOS PERSONALES',
+    'CERTIFICADO DE PAGO PLANILLA SEGURIDAD SOCIAL Y PARAFISCALES': 'CERTIFICADO DE PAGO PLANILLA SEGURIDAD SOCIAL Y PARAFISCALES',
+    'CERTIFICADO DE PAGO PLANILLA SEGURIDAD SOCIAL Y PARAFISCALES': 'CERTIFICADO DE PAGO PLANILLA SEGURIDAD SOCIAL Y PARAFISCALES',
+    'FACTURA ELECTRONICA': 'FACTURA ELECTRONICA',
+    'FACTURA ELECTRONICA': 'FACTURA ELECTRONICA',
+    'REPORTE REGIMEN TRIBUTARIO': 'REPORTE REGIMEN TRIBUTARIO',
+    'REPORTE REGIMEN TRIBUTARIO': 'REPORTE REGIMEN TRIBUTARIO',
+    'MODIFICACIONES U OTROSI CESION, SUSPENSION, ADICION, PRORROGA, TERMINACION ANTICIPADA, MODIFICACION Y ACLARACION': 'MODIFICACIONES U OTROSI CESION SUSPENSION ADICION PRORROGA TERMIN',
+    'MODIFICACIONES U OTROSI CESION SUSPENSION ADICION PRORROGA TERMIN': 'MODIFICACIONES U OTROSI CESION SUSPENSION ADICION PRORROGA TERMIN',
+    'AL CONTRATO': 'MODIFICACIONES U OTROSI CESION SUSPENSION ADICION PRORROGA TERMIN',
+    'MODIFICACIONES U OTROSI CESION SUSPENSION ADICION PRORROGA TERMIN': 'MODIFICACIONES U OTROSI CESION SUSPENSION ADICION PRORROGA TERMIN',
+    'INFORME FINAL DE SUPERVISION CONTRATACION DE SERVICIOS': 'INFORME FINAL DE SUPERVISION CONTRATACION DE SERVICIOS PERSONALES',
+    'INFORME FINAL DE SUPERVISION CONTRATACION DE SERVICIOS PERSONALES': 'INFORME FINAL DE SUPERVISION CONTRATACION DE SERVICIOS PERSONALES',
+    'PERSONALES Y APOYO A LA GESTION': 'INFORME FINAL DE SUPERVISION CONTRATACION DE SERVICIOS PERSONALES',
+    'INFORME FINAL DE SUPERVISION CONTRATACION DE SERVICIOS PERSONALES': 'INFORME FINAL DE SUPERVISION CONTRATACION DE SERVICIOS PERSONALES',
+    'RELACION DE PAGOS - SIIF': 'RELACION DE PAGOS SIIF',
+    'RELACION DE PAGOS SIIF': 'RELACION DE PAGOS SIIF',
+    'RELACION DE ENTREGA DE BIENES A CONTRATISTA': 'RELACION DE ENTREGA DE BIENES A CONTRATISTA',
+    'RELACION DE ENTREGA DE BIENES A CONTRATISTA': 'RELACION DE ENTREGA DE BIENES A CONTRATISTA',
+    'ACTA DE LIQUIDACION': 'ACTA DE LIQUIDACION',
+    'ACTA DE LIQUIDACION': 'ACTA DE LIQUIDACION'
 };
+
+function stripTypologyDecorators(rawName) {
+    if (!rawName) return '';
+    return String(rawName)
+        .trim()
+        .replace(/^\d+\s*[._\-)]\s*/, '')
+        .replace(/_\d+$/, '')
+        .trim();
+}
+
+function findCatalogOnBaseTypology(rawName) {
+    if (!rawName) return null;
+    const norm = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    const stripped = stripTypologyDecorators(rawName);
+    const candidates = [norm(stripped), norm(rawName)].filter(Boolean);
+    for (const cand of candidates) {
+        for (const [trdKey, aesVal] of Object.entries(HISTORIAS_ACADEMICAS_MAP)) {
+            if (norm(trdKey) === cand) return aesVal;
+        }
+    }
+    for (const cand of candidates) {
+        if (cand.length < 6) continue;
+        for (const [trdKey, aesVal] of Object.entries(HISTORIAS_ACADEMICAS_MAP)) {
+            const normKey = norm(trdKey);
+            if (cand.includes(normKey) || normKey.includes(cand)) return aesVal;
+        }
+    }
+    return null;
+}
 
 function resolveOnBaseTypologyName(rawName) {
     if (!rawName) return '';
-    const norm = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-    const cleanRaw = norm(rawName);
-    for (const [trdKey, aesVal] of Object.entries(HISTORIAS_ACADEMICAS_MAP)) {
-        if (norm(trdKey) === cleanRaw) return aesVal;
-    }
-    for (const [trdKey, aesVal] of Object.entries(HISTORIAS_ACADEMICAS_MAP)) {
-        const normKey = norm(trdKey);
-        if (cleanRaw.includes(normKey) || normKey.includes(cleanRaw)) return aesVal;
-    }
-    return rawName.trim();
+    return findCatalogOnBaseTypology(rawName) || stripTypologyDecorators(rawName);
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -146,13 +266,40 @@ const safeClick = async (page, selector) => {
 let lastLockCheckTime = 0;
 async function checkAndClearLocks(browser, logs) {
     const now = Date.now();
-    if (now - lastLockCheckTime < 3000) return;
+    if (now - lastLockCheckTime < 1500) return;
     lastLockCheckTime = now;
     try {
         const allPages = await browser.pages().catch(() => []);
         for (const pg of allPages) {
             for (const frame of pg.frames()) {
                 try {
+                    // 1. Detectar modal "Attention" / "One or more forms have unsaved data" y pulsar "Continue"
+                    const dismissedAttention = await frame.evaluate(() => {
+                        const bodyText = (document.body ? document.body.innerText || '' : '').toLowerCase();
+                        const isAttention = bodyText.includes('unsaved') || bodyText.includes('require your attention') || bodyText.includes('unfinished work') || bodyText.includes('unsaved data');
+                        
+                        if (isAttention) {
+                            const buttons = Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"], a, [role="button"]'));
+                            const contBtn = buttons.find(b => {
+                                const t = (b.innerText || b.value || b.textContent || '').trim().toLowerCase();
+                                const isVisible = b.offsetParent !== null && b.getBoundingClientRect().width > 0;
+                                return (t === 'continue' || t === 'continuar' || t === 'discard' || t === 'yes' || t === 'sí') && isVisible;
+                            });
+                            if (contBtn) {
+                                contBtn.scrollIntoView({ block: 'center' });
+                                contBtn.click();
+                                return true;
+                            }
+                        }
+                        return false;
+                    });
+
+                    if (dismissedAttention) {
+                        logs.push('[ATTENTION] ⚠️ Modal de OnBase detectado ("unsaved data"). Clic en "Continue" ejecutado.');
+                        await wait(1000);
+                        return;
+                    }
+
                     const hasLocksPopup = await frame.evaluate(() => {
                         const modal = document.querySelector('.LockedObjects, [id*="Lock" i], [class*="Lock" i], .ui-dialog');
                         if (!modal) return false;
@@ -226,14 +373,86 @@ async function checkAndClearLocks(browser, logs) {
     } catch (err) {}
 }
 
+// Helper para detectar cuando OnBase queda trabado en "It is safe to close this window" / EmbeddedPage/Close.aspx o página muerta
+async function isPageStuckOrCloseWindow(page, browser = null) {
+    try {
+        if (!page || (typeof page.isClosed === 'function' && page.isClosed())) {
+            return { stuck: true, reason: 'Pestaña cerrada o desconectada' };
+        }
+        const currentUrl = String(page.url() || '').toLowerCase();
+        if (
+            currentUrl.includes('embeddedpage/close.aspx') ||
+            currentUrl.includes('/close.aspx') ||
+            currentUrl.includes('closewindow') ||
+            currentUrl.includes('logout=true')
+        ) {
+            return { stuck: true, reason: `URL de cierre detectada (${page.url()})` };
+        }
+
+        const bodyCheck = await page.evaluate(() => {
+            const txt = (document.body ? document.body.innerText || '' : '').trim().toLowerCase();
+            if (
+                txt.includes('it is safe to close this window') ||
+                txt.includes('safe to close this window') ||
+                txt.includes('does not close automatically') ||
+                txt.includes('es seguro cerrar esta ventana') ||
+                txt.includes('no se cierra automáticamente')
+            ) {
+                return 'Texto "It is safe to close this window" detectado en pantalla';
+            }
+            return null;
+        }).catch(() => null);
+
+        if (bodyCheck) {
+            return { stuck: true, reason: bodyCheck };
+        }
+
+        if (browser) {
+            const allPages = await browser.pages().catch(() => []);
+            for (const pg of allPages) {
+                const u = String(pg.url() || '').toLowerCase();
+                if (u.includes('embeddedpage/close.aspx') || u.includes('/close.aspx')) {
+                    return { stuck: true, reason: `Pestaña en Close.aspx (${pg.url()})` };
+                }
+                const pgTxt = await pg.evaluate(() => (document.body ? document.body.innerText || '' : '').toLowerCase()).catch(() => '');
+                if (pgTxt.includes('it is safe to close this window') || pgTxt.includes('safe to close this window')) {
+                    return { stuck: true, reason: 'Pestaña trabada en "It is safe to close this window"' };
+                }
+            }
+        }
+        return { stuck: false, reason: null };
+    } catch (e) {
+        return { stuck: true, reason: `Error evaluando estado del navegador: ${e.message}` };
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────
 // PASO 1: LOGIN
 // ─────────────────────────────────────────────────────────────────
 async function paso1_login(page, url, username, password, logs) {
-    logs.push('[PASO 1] Navegando a OnBase...');
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 })
+    // Normalizar URL de login eliminando parámetros residuales (?logout=true, ?ReturnUrl=Close.aspx, etc.)
+    const cleanLoginUrl = String(url || 'https://onbase.sena.edu.co/AppNet/Login.aspx').split('?')[0];
+
+    // Limpiar cookies/caché previas de la sesión para evitar que OnBase redirija a EmbeddedPage/Close.aspx por defecto
+    try {
+        const cdp = await page.target().createCDPSession();
+        await cdp.send('Network.clearBrowserCookies').catch(() => {});
+        await cdp.send('Network.clearBrowserCache').catch(() => {});
+        await cdp.detach().catch(() => {});
+    } catch {}
+
+    logs.push(`[PASO 1] Navegando a OnBase (${cleanLoginUrl})...`);
+    await page.goto(cleanLoginUrl, { waitUntil: 'networkidle2', timeout: 30000 })
         .catch(e => logs.push(`[PASO 1][WARN] goto: ${e.message}`));
-    await wait(3000);
+    await wait(2500);
+
+    // Si por algún motivo cayó en Close.aspx antes de loguear, forzar ir a Login.aspx limpio
+    const preCheck = await isPageStuckOrCloseWindow(page);
+    if (preCheck.stuck) {
+        logs.push(`[PASO 1][WARN] Pantalla inicial en estado de cierre (${preCheck.reason}). Redirigiendo a Login.aspx limpio...`);
+        await page.goto(cleanLoginUrl, { waitUntil: 'networkidle2', timeout: 30000 }).catch(() => {});
+        await wait(2500);
+    }
 
     // Detectar si estamos en Microsoft SSO
     let isMicrosoftSSO = false;
@@ -369,10 +588,10 @@ async function paso1_login(page, url, username, password, logs) {
         const hasSessionText = txt.includes('iniciada') || txt.includes('already logged in') || txt.includes('sesión activa') || txt.includes('active session') || txt.includes('already has an active') || txt.includes('user is logged in');
         
         if (hasSessionText) {
-            const elements = Array.from(document.querySelectorAll('input[type="button"], input[type="submit"], button, a, span, div'));
+            const elements = Array.from(document.querySelectorAll('input[type="button"], input[type="submit"], button, a[role="button"]'));
             const acceptBtn = elements.find(el => {
                 const val = (el.value || el.innerText || el.textContent || '').trim().toLowerCase();
-                return val === 'yes' || val === 'si' || val === 'sí' || val === 'aceptar' || val.includes('take') || val.includes('contin') || val.includes('login anyway');
+                return val === 'yes' || val === 'si' || val === 'sí' || val === 'aceptar' || val === 'continue' || val === 'continuar' || val.includes('take') || val.includes('login anyway');
             });
             if (acceptBtn) {
                 acceptBtn.id = acceptBtn.id || 'temp_takeover_btn';
@@ -399,6 +618,12 @@ async function paso1_login(page, url, username, password, logs) {
     const postUrl = page.url();
     logs.push(`[PASO 1] URL post-login: ${postUrl}`);
 
+    const stuckAfterLogin = await isPageStuckOrCloseWindow(page);
+    if (stuckAfterLogin.stuck) {
+        logs.push(`[PASO 1][WARN] ⚠️ OnBase se trabó en ventana de cierre tras el login (${stuckAfterLogin.reason}). Se requiere cerrar y reabrir el explorador.`);
+        return false;
+    }
+
     if (postUrl.includes('NavPanel') || postUrl.includes('Dashboard') || postUrl.includes('Home') || postUrl.toLowerCase().includes('document/query')) {
         logs.push('[PASO 1] ✅ Login exitoso');
         await checkAndClearLocks(page.browser(), logs).catch(() => {});
@@ -419,28 +644,30 @@ async function paso1_login(page, url, username, password, logs) {
 // Navegación real confirmada en video:
 //   sidebar izq → "Nuevo formulario" → seleccionar SGDEA de la lista
 // ─────────────────────────────────────────────────────────────────
-async function paso2_abrirFormulario(page, browser, logs) {
+async function paso2_abrirFormulario(page, browser, logs, forceNew = false) {
     // 0. Verificar si el formulario SGDEA ya está abierto (ej. tras "Guardar -> Sí")
-    let alreadyOpen = false;
-    try {
-        const allPagesCheck = await browser.pages().catch(() => [page]);
-        for (const pg of allPagesCheck) {
-            for (const frame of pg.frames()) {
-                try {
-                    const found = await frame.evaluate(() => {
-                        const html = document.body ? document.body.innerHTML.toLowerCase() : '';
-                        return (html.includes('código expediente') || html.includes('codigo expediente')) && html.includes('nombre documento');
-                    });
-                    if (found) { alreadyOpen = true; break; }
-                } catch { }
+    if (!forceNew) {
+        let alreadyOpen = false;
+        try {
+            const allPagesCheck = await browser.pages().catch(() => [page]);
+            for (const pg of allPagesCheck) {
+                for (const frame of pg.frames()) {
+                    try {
+                        const found = await frame.evaluate(() => {
+                            const html = document.body ? document.body.innerHTML.toLowerCase() : '';
+                            return (html.includes('código expediente') || html.includes('codigo expediente')) && html.includes('nombre documento');
+                        });
+                        if (found) { alreadyOpen = true; break; }
+                    } catch { }
+                }
+                if (alreadyOpen) break;
             }
-            if (alreadyOpen) break;
-        }
-    } catch { }
+        } catch { }
 
-    if (alreadyOpen) {
-        logs.push('[PASO 2] ✅ Formulario SGDEA ya se encuentra abierto en pantalla');
-        return true;
+        if (alreadyOpen) {
+            logs.push('[PASO 2] ✅ Formulario SGDEA ya se encuentra abierto en pantalla');
+            return true;
+        }
     }
 
     logs.push('[PASO 2] Buscando "Nuevo formulario" en el sidebar de OnBase...');
@@ -1839,7 +2066,7 @@ async function paso4_llenarCampos(formPage, formFrame, docInfo, logs) {
     logs.push('[PASO 4] Llenando campos del formulario SGDEA - Ingreso a Expediente...');
 
     // Datos del documento
-    const tipologia = (docInfo.typology_name || '')
+    const tipologia = stripTypologyDecorators(docInfo.typology_name || '')
         .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
     const nombreDoc = (docInfo.joinedName || docInfo.nombreDocumento || docInfo.filename || '').trim();
     let docDate = '';
@@ -1875,8 +2102,17 @@ async function paso4_llenarCampos(formPage, formFrame, docInfo, logs) {
         try {
             const handle = await formFrame.evaluateHandle((sel) => {
                 const els = Array.from(document.querySelectorAll(sel));
-                // Preferir inputs que no sean de solo lectura
-                return els.find(e => !e.readOnly && !e.disabled) || els[0] || null;
+                // Preferir inputs visibles de OnBase (#sgdea..._input), evitando campos ocultos customaction_hidden
+                const visible = els.filter(e => {
+                    if (e.readOnly || e.disabled) return false;
+                    const r = e.getBoundingClientRect();
+                    return r.width > 0 && r.height > 0;
+                });
+                return visible.find(e => (e.id || '').toLowerCase().startsWith('sgdea'))
+                    || visible[0]
+                    || els.find(e => !e.readOnly && !e.disabled)
+                    || els[0]
+                    || null;
             }, selector);
 
             comboInput = handle.asElement();
@@ -1889,27 +2125,41 @@ async function paso4_llenarCampos(formPage, formFrame, docInfo, logs) {
 
         try {
             await comboInput.click({ clickCount: 3 });
-            await wait(200);
-            await comboInput.press('Delete');
+            await wait(100);
+            await formPage.keyboard.down('Control');
+            await formPage.keyboard.press('KeyA');
+            await formPage.keyboard.up('Control');
+            await formPage.keyboard.press('Backspace');
+            await formFrame.evaluate(el => {
+                if (el) {
+                    el.value = '';
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }, comboInput).catch(() => {});
             await wait(150);
             await comboInput.focus();
-            await wait(200);
+            await wait(100);
 
             // Si es Tipo Documental o campo con dropdown, aplicar mecanografía inteligente y búsqueda semántica
             let searchKey = valueToType;
             let typingText = valueToType;
+            let savedAlias = null;
 
             if (fieldName.toLowerCase().includes('tipo documental')) {
                 // Si la tipología tiene un alias guardado previamente en BD o en el catálogo AES, usarlo directamente
-                let savedAlias = docInfo?.onbase_name || resolveOnBaseTypologyName(valueToType);
-                if (!savedAlias || savedAlias === valueToType.trim()) {
+                const catalogAlias = findCatalogOnBaseTypology(docInfo?.typology_name || valueToType) || findCatalogOnBaseTypology(valueToType);
+                const isHistorias = docInfo?.trd_series_id === 97 || String(docInfo?.subserie || docInfo?.series_code || '').includes('9224.4-37');
+                savedAlias = catalogAlias || docInfo?.onbase_name || null;
+                if (!savedAlias) {
                     try {
                         const aliasRes = await pool.query(
                             `SELECT onbase_name FROM trd_typologies 
-                             WHERE (id = $1 OR typology_name ILIKE $2 OR onbase_name ILIKE $2) 
+                             WHERE (id = $1 OR LOWER(TRIM(typology_name)) = LOWER(TRIM($2)) OR LOWER(TRIM(onbase_name)) = LOWER(TRIM($2))) 
                                AND onbase_name IS NOT NULL AND TRIM(onbase_name) != '' 
+                             ORDER BY CASE WHEN series_id = $3 OR subseries_id = $4 THEN 0 ELSE 1 END, id ASC
                              LIMIT 1`,
-                            [docInfo?.trd_typology_id || docInfo?.typology_id || 0, valueToType.trim()]
+                            [docInfo?.trd_typology_id || docInfo?.typology_id || 0, valueToType.trim(), docInfo?.trd_series_id || 0, docInfo?.trd_subseries_id || 0]
                         );
                         if (aliasRes && aliasRes.rows && aliasRes.rows[0]?.onbase_name) {
                             savedAlias = aliasRes.rows[0].onbase_name.trim();
@@ -1920,7 +2170,7 @@ async function paso4_llenarCampos(formPage, formFrame, docInfo, logs) {
                 if (savedAlias) {
                     typingText = savedAlias;
                     searchKey = savedAlias;
-                    logs.push(`[PASO 4] 💡 Tipología según AES identificada: "${typingText}" (TRD original: "${valueToType.substring(0,35)}...")`);
+                    logs.push(`[PASO 4] 💡 Tipología según AES identificada: "${typingText}" (TRD original: "${(docInfo?.typology_name || valueToType).substring(0,45)}")`);
                 } else {
                     // Para buscar en el combobox de OnBase, usar la primera palabra o prefijo exacto
                     const cleanWords = valueToType
@@ -1964,8 +2214,22 @@ async function paso4_llenarCampos(formPage, formFrame, docInfo, logs) {
                 ];
 
                 let dropdownHandled = false;
-                for (let t = 0; t < 10 && !dropdownHandled; t++) {
+                for (let t = 0; t < 12 && !dropdownHandled; t++) {
                     await wait(350);
+                    // Si tras ~1.05s no se ha abierto aún el popup ui-autocomplete de hsiCombobox, pulsar su botón desplegable
+                    if (t === 3 || t === 7) {
+                        await formFrame.evaluate(el => {
+                            if (!el) return;
+                            const anyOpen = Array.from(document.querySelectorAll('.ui-autocomplete li.ui-menu-item'))
+                                .some(li => li.getBoundingClientRect().height > 0);
+                            if (!anyOpen) {
+                                const btn = el.parentElement?.querySelector('button.comboboxbutton');
+                                if (btn) btn.click();
+                            }
+                        }, comboInput).catch(() => {});
+                        await wait(450);
+                    }
+
                     const framesToCheck = [];
                     if (formFrame) framesToCheck.push(formFrame);
                     const allPages = await formPage.browser().pages();
@@ -2040,11 +2304,12 @@ async function paso4_llenarCampos(formPage, formFrame, docInfo, logs) {
 
                                         if (bestItem && bestScore >= 400) {
                                             const text = (bestItem.innerText || bestItem.textContent || '').trim().substring(0, 100);
+                                            const clickTarget = bestItem.querySelector('.ui-menu-item-wrapper, a, div') || bestItem;
                                             bestItem.scrollIntoView({ block: 'nearest' });
-                                            bestItem.click();
-                                            bestItem.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-                                            bestItem.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-                                            bestItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                                            clickTarget.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true }));
+                                            clickTarget.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+                                            clickTarget.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+                                            clickTarget.click();
                                             return { text, score: bestScore };
                                         }
                                     }
@@ -2076,7 +2341,56 @@ async function paso4_llenarCampos(formPage, formFrame, docInfo, logs) {
                 }
 
                 if (!dropdownHandled) {
-                    logs.push(`[PASO 4][WARN] Dropdown no detectado o sin coincidencia segura para ${fieldName} ("${valueToType.substring(0,35)}..."). Se omite selección arbitraria.`);
+                    logs.push(`[PASO 4][WARN] Dropdown no detectado o sin coincidencia por clic para ${fieldName} ("${valueToType.substring(0,35)}..."). Forzando confirmación de selección con teclado...`);
+                    await formPage.keyboard.press('ArrowDown');
+                    await wait(150);
+                    await formPage.keyboard.press('Enter');
+                    await wait(200);
+                    await formPage.keyboard.press('Tab');
+                }
+
+                // Verificación adicional en OnBase para Tipo Documental (asegurar sincronización con campo interno #tipodocumental25_input)
+                if (fieldName.toLowerCase().includes('tipo documental')) {
+                    const checkTipo = await formFrame.evaluate(() => ({
+                        visible: document.getElementById('sgdeatipodocumental25_input')?.value || '',
+                        backingExists: !!document.getElementById('tipodocumental25_input'),
+                        backing: document.getElementById('tipodocumental25_input')?.value || ''
+                    })).catch(() => null);
+                    if (checkTipo) {
+                        logs.push(`[PASO 4] 🔍 Estado Tipo Documental OnBase: visible="${checkTipo.visible}" | interno="${checkTipo.backing}"`);
+                        if (savedAlias && checkTipo.backingExists && !checkTipo.backing) {
+                            logs.push(`[PASO 4] 🔄 Re-confirmando selección exacta en lista OnBase para "${savedAlias}"...`);
+                            await formFrame.evaluate(() => {
+                                const btn = document.querySelector('#sgdeatipodocumental25 button.comboboxbutton');
+                                if (btn) btn.click();
+                            }).catch(() => {});
+                            for (let rt = 0; rt < 10; rt++) {
+                                await wait(350);
+                                const picked = await formFrame.evaluate((targetAlias) => {
+                                    const clean = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+                                    const want = clean(targetAlias);
+                                    const items = Array.from(document.querySelectorAll('.ui-autocomplete li.ui-menu-item, ul.ui-menu li'))
+                                        .filter(el => el.getBoundingClientRect().height > 0);
+                                    const exact = items.find(el => clean(el.innerText || el.textContent) === want);
+                                    if (exact) {
+                                        const inner = exact.querySelector('.ui-menu-item-wrapper, a, div') || exact;
+                                        exact.scrollIntoView({ block: 'nearest' });
+                                        inner.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true }));
+                                        inner.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+                                        inner.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+                                        inner.click();
+                                        return (exact.innerText || exact.textContent || '').trim();
+                                    }
+                                    return null;
+                                }, savedAlias).catch(() => null);
+                                if (picked) {
+                                    await wait(500);
+                                    logs.push(`[PASO 4] ✅ Tipo Documental confirmado desde catálogo OnBase: "${picked}"`);
+                                    break;
+                                }
+                            }
+                        }
+                    }
                 }
             } else {
                 await formPage.keyboard.press('Tab');
@@ -2096,6 +2410,7 @@ async function paso4_llenarCampos(formPage, formFrame, docInfo, logs) {
 
     // 1. Grupo Documental (id*="grupodocumental")
     await typeFieldNativeById('input[id*="grupodocumental" i]', 'TRD', 'Grupo Documental', true);
+    await wait(500); // Dar margen a la cascada Grupo Documental -> Tipo Documental en OnBase
 
     // 2. Tipo Documental (id*="tipodocumental")
     if (tipologia) {
@@ -2293,6 +2608,23 @@ async function paso5_adjuntarPDF(page, allFramesFn, docInfo, logs) {
             } catch (e) {}
         }
         await wait(800);
+
+        // 1.1 Limpiar cualquier archivo adjunto previo si existiera en la sección de Documento Electrónico
+        for (const frame of allFramesFn()) {
+            try {
+                await frame.evaluate(() => {
+                    const delBtns = Array.from(document.querySelectorAll('button, a, input[type="button"], span, [role="button"]'));
+                    const delBtn = delBtns.find(b => {
+                        const t = (b.innerText || b.value || b.title || b.textContent || '').trim().toLowerCase();
+                        return (t === 'eliminar' || t === 'quitar' || t === 'borrar' || t === 'remove' || t === 'delete') && !t.includes('expediente');
+                    });
+                    if (delBtn) {
+                        delBtn.click();
+                    }
+                });
+            } catch (e) {}
+        }
+        await wait(400);
 
         // 2. Verificar si existe directamente un input[type="file"] en el formulario
         for (const frame of allFramesFn()) {
@@ -2544,39 +2876,1620 @@ async function paso7_logout(page, allFramesFn, logs) {
             logs.push(`[PASO 7][WARN] Error al forzar navegación de logout: ${e.message}`);
         }
     }
+
+    // Limpiar cookies tras logout para que no quede ReturnUrl=EmbeddedPage/Close.aspx en el perfil
+    try {
+        const cdp = await page.target().createCDPSession();
+        await cdp.send('Network.clearBrowserCookies').catch(() => {});
+        await cdp.send('Network.clearBrowserCache').catch(() => {});
+        await cdp.detach().catch(() => {});
+    } catch {}
     
-    await wait(3000);
+    await wait(2000);
     logs.push('[PASO 7] ✅ Cierre de sesión finalizado');
 }
 
 // ─────────────────────────────────────────────────────────────────
-// EXPORTACIÓN PRINCIPAL
+// EXPORTACIÓN PRINCIPAL — ARQUITECTURA 3 BOTS CARGADORES + BOT 4 VERIFICADOR INDEPENDIENTE + WATCHDOG ANTI-BLOQUEO
 // ─────────────────────────────────────────────────────────────────
-let currentJob = {
-    running: false,
-    jobId: null,
-    currentStep: '',
-    logs: [],
-    error: null,
-    completed: false,
-    screenshot: null,
-    liveFrame: null,
-    liveBuffer: null,
-    startTime: null,
-    documentIds: []
+const os = require('os');
+const https = require('https');
+let nodemailer = null;
+try { nodemailer = require('nodemailer'); } catch {}
+
+const BOT_KEYS = ['9224', '9224.4', '9224.2', 'VERIFICADOR'];
+
+// Directorio seguro para perfiles y caché temporal de Chromium/Puppeteer:
+// En el servidor Linux usa /mnt/almacen/.puppeteer_tmp (173 GB libres) en vez de /tmp en / (8.4 GB total)
+function resolvePuppeteerBaseTmpDir() {
+    if (process.platform === 'linux') {
+        try {
+            if (fs.existsSync('/mnt/almacen')) {
+                const dir = '/mnt/almacen/.puppeteer_tmp';
+                fs.mkdirSync(dir, { recursive: true });
+                return dir;
+            }
+        } catch {}
+    }
+    return os.tmpdir();
+}
+
+function buildPuppeteerLaunchOptions(profileDir = null) {
+    const baseTmp = resolvePuppeteerBaseTmpDir();
+    const opts = {
+        headless: process.platform === 'linux' ? true : false,
+        env: {
+            ...process.env,
+            TMPDIR: baseTmp,
+            TMP: baseTmp,
+            TEMP: baseTmp
+        },
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-software-rasterizer',
+            '--disable-extensions',
+            '--disable-background-networking',
+            '--disk-cache-size=33554432',
+            '--media-cache-size=8388608',
+            '--js-flags=--max-old-space-size=384',
+            '--window-size=1366,900'
+        ]
+    };
+    if (profileDir) {
+        opts.userDataDir = profileDir;
+    }
+    return opts;
+}
+
+// Cierre forzoso garantizado (evita procesos Chromium huérfanos / fugas de RAM y /tmp cuando browser.close() se cuelga)
+async function safeForceCloseBrowser(browserInstance, profileDir = null) {
+    if (!browserInstance) return;
+    let pid = null;
+    try {
+        const proc = typeof browserInstance.process === 'function' ? browserInstance.process() : null;
+        if (proc && proc.pid) pid = proc.pid;
+    } catch {}
+
+    try {
+        await Promise.race([
+            browserInstance.close().catch(() => {}),
+            wait(4000)
+        ]);
+    } catch {}
+
+    if (pid) {
+        try { process.kill(pid, 'SIGKILL'); } catch {}
+    }
+    if (process.platform === 'linux' && profileDir && profileDir.includes('puppeteer_aes_bot_')) {
+        await new Promise(resolve => {
+            exec(`pkill -9 -f "${profileDir}" 2>/dev/null || true`, () => resolve());
+        });
+    }
+    if (profileDir && profileDir.includes('puppeteer_aes_bot_')) {
+        try { fs.rmSync(profileDir, { recursive: true, force: true }); } catch {}
+    }
+}
+
+// Inicializar columnas de verificación OnBase en PostgreSQL de forma segura
+(async () => {
+    try {
+        await pool.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS onbase_verified INTEGER DEFAULT 0`);
+        await pool.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS onbase_verify_stage VARCHAR(50) DEFAULT NULL`);
+        await pool.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS onbase_verified_at TIMESTAMP DEFAULT NULL`);
+        await pool.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS onbase_found_count INTEGER DEFAULT NULL`);
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS onbase_verification_logs (
+                id SERIAL PRIMARY KEY,
+                expediente_id INTEGER,
+                expediente_code VARCHAR(120),
+                stage VARCHAR(40),
+                expected_count INTEGER DEFAULT 0,
+                found_count INTEGER DEFAULT 0,
+                status VARCHAR(40),
+                details TEXT,
+                verified_by_user VARCHAR(80),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+    } catch (e) {
+        console.warn('[VERIFICADOR-DB] Aviso preparando columnas de verificación:', e.message);
+    }
+})();
+
+function createBotSession(botKey, label, shortName, defaultUser) {
+    return {
+        botKey,
+        label,
+        shortName,
+        onbaseUser: defaultUser,
+        running: false,
+        standby: botKey === 'VERIFICADOR',
+        waitingForVerifier: false,
+        jobId: null,
+        currentStep: botKey === 'VERIFICADOR' ? '⏸️ En espera (Listo para verificar 50% / 100% o ciclo 5m)' : '',
+        logs: botKey === 'VERIFICADOR' ? ['[VERIFICADOR] 🤖 Bot Verificador Independiente en espera (Standby). Se activará al 50% y 100% de cada expediente y cada 5 minutos.'] : [],
+        error: null,
+        completed: false,
+        screenshot: null,
+        liveFrame: null,
+        liveBuffer: null,
+        startTime: null,
+        lastStepChangeAt: Date.now(),
+        stepStuckSeconds: 0,
+        unlockCount: 0,
+        documentIds: [],
+        totalDocs: 0,
+        processedDocs: 0,
+        currentDocId: null,
+        currentDocName: '',
+        currentExpedienteCode: '',
+        browser: null,
+        page: null
+    };
+}
+
+const botSessions = {
+    '9224': createBotSession('9224', 'Bot 1 · Subdirección de Centro (9224)', 'Subdirección (9224)', 'TVILLAMIZARJ'),
+    '9224.4': createBotSession('9224.4', 'Bot 2 · Formación Profesional (9224.4)', 'Formación (9224.4)', 'EDHERNANDEZM'),
+    '9224.2': createBotSession('9224.2', 'Bot 3 · Administración Educativa (9224.2)', 'Adm. Educativa (9224.2)', 'luepitar'),
+    'VERIFICADOR': createBotSession('VERIFICADOR', 'Bot 4 · Verificador OnBase (SGDEA Expediente)', 'Verificador OnBase', 'AUDITOR-SGDEA')
 };
 
+// Candado en memoria para evitar que dos bots procesen el mismo document.id simultáneamente
+const activeDocLocks = new Set();
+
+// Historial en memoria de alertas y verificaciones para el sistema / móvil / PC
+const systemAlerts = [];
+const verificationHistory = [];
+
+// Configuración de Alertas a Móvil y Equipo (Verificación automática deshabilitada: se realiza manualmente en la pestaña Verificador)
+let alertSettings = {
+    autoVerifyEvery5Min: false,
+    verifyIntervalMinutes: 5,
+    nextAutoVerifyAt: null,
+    desktopNotifications: true,
+    soundAlerts: true,
+    ntfyEnabled: true,
+    ntfyTopic: 'sena-cimi-onbase-alertas',
+    telegramEnabled: false,
+    telegramBotToken: '',
+    telegramChatId: '',
+    emailEnabled: false,
+    alertEmail: ''
+};
+
+// Cargar configuración persistida desde system_settings si existe y limpiar falsos negativos previos
+(async () => {
+    try {
+        // Limpiar banderas de falso negativo (-1) dejadas por el verificador automático anterior
+        await pool.query(`UPDATE documents SET onbase_verified = 0, onbase_verify_stage = NULL WHERE onbase_verified = -1`).catch(() => {});
+        const res = await pool.query(`SELECT value FROM system_settings WHERE key = 'onbase_alert_settings' LIMIT 1`);
+        if (res.rows && res.rows[0]?.value) {
+            const parsed = JSON.parse(res.rows[0].value);
+            alertSettings = { ...alertSettings, ...parsed, autoVerifyEvery5Min: false };
+        }
+    } catch {}
+})();
+
+function pushSystemAlert({ type = 'info', title, message, expedienteCode = '', botKey = '', sendMobile = false, screenshotB64 = null }) {
+    const alertObj = {
+        id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        timestamp: new Date().toISOString(),
+        type, // 'success' | 'warning' | 'error' | 'info'
+        title,
+        message,
+        expedienteCode,
+        botKey
+    };
+    systemAlerts.unshift(alertObj);
+    if (systemAlerts.length > 80) systemAlerts.length = 80;
+
+    if (sendMobile) {
+        sendExternalMobileAndEmailAlert(alertObj, screenshotB64).catch(e => {
+            console.warn('[ALERT-EXT] Error enviando alerta externa:', e.message);
+        });
+    }
+    return alertObj;
+}
+
+async function sendExternalMobileAndEmailAlert(alertObj, screenshotB64 = null) {
+    const textMsg = `${alertObj.title}
+${alertObj.message}${alertObj.expedienteCode ? `
+Expediente: ${alertObj.expedienteCode}` : ''}
+Hora: ${new Date().toLocaleTimeString('es-CO')}`;
+
+    // 1. Ntfy.sh Push al Celular (sin registro, canal directo)
+    if (alertSettings.ntfyEnabled && alertSettings.ntfyTopic) {
+        try {
+            const topic = String(alertSettings.ntfyTopic).trim().replace(/[^a-zA-Z0-9_-]/g, '');
+            if (topic) {
+                await new Promise((resolve) => {
+                    const req = https.request({
+                        hostname: 'ntfy.sh',
+                        path: `/${topic}`,
+                        method: 'POST',
+                        headers: {
+                            'Title': alertObj.title.replace(/[^ -~]/g, ''),
+                            'Priority': alertObj.type === 'error' ? '5' : (alertObj.type === 'warning' ? '4' : '3'),
+                            'Tags': alertObj.type === 'error' ? 'rotating_light,warning' : (alertObj.type === 'success' ? 'white_check_mark' : 'robot')
+                        },
+                        timeout: 6000
+                    }, () => resolve());
+                    req.on('error', () => resolve());
+                    req.write(textMsg);
+                    req.end();
+                });
+            }
+        } catch {}
+    }
+
+    // 2. Telegram Bot Push al Celular
+    if (alertSettings.telegramEnabled && alertSettings.telegramBotToken && alertSettings.telegramChatId) {
+        try {
+            const payload = JSON.stringify({
+                chat_id: alertSettings.telegramChatId,
+                text: `🤖 *SENA CIMI - OnBase Bot*
+*${alertObj.title}*
+${alertObj.message}`
+            });
+            await new Promise((resolve) => {
+                const req = https.request({
+                    hostname: 'api.telegram.org',
+                    path: `/bot${alertSettings.telegramBotToken}/sendMessage`,
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Content-Length': Buffer.byteLength(payload)
+                    },
+                    timeout: 6000
+                }, () => resolve());
+                req.on('error', () => resolve());
+                req.write(payload);
+                req.end();
+            });
+        } catch {}
+    }
+
+    // 3. Correo Electrónico de Alerta con Captura
+    if (alertSettings.emailEnabled && alertSettings.alertEmail) {
+        try {
+            const sRes = await pool.query(`SELECT key, value FROM system_settings WHERE key LIKE 'smtp_%'`);
+            const smtpMap = {};
+            (sRes.rows || []).forEach(r => { smtpMap[r.key] = r.value; });
+            if (nodemailer && smtpMap.smtp_user && smtpMap.smtp_pass) {
+                const transporter = nodemailer.createTransport({
+                    host: smtpMap.smtp_host || 'smtp.office365.com',
+                    port: parseInt(smtpMap.smtp_port || '587', 10),
+                    secure: false,
+                    auth: { user: smtpMap.smtp_user, pass: smtpMap.smtp_pass }
+                });
+                const attachments = [];
+                if (screenshotB64) {
+                    const cleanB64 = screenshotB64.replace(/^data:image\/\w+;base64,/, '');
+                    attachments.push({
+                        filename: `evidencia_onbase_${Date.now()}.png`,
+                        content: Buffer.from(cleanB64, 'base64')
+                    });
+                }
+                await transporter.sendMail({
+                    from: smtpMap.smtp_user,
+                    to: alertSettings.alertEmail,
+                    subject: `[ALERTA ONBASE SENA] ${alertObj.title}`,
+                    text: textMsg,
+                    attachments
+                }).catch(() => {});
+            }
+        } catch {}
+    }
+}
+
+function resolveBotKey(input) {
+    if (!input) return '9224';
+    const s = String(input).trim().toLowerCase();
+    if (s === 'verificador' || s.includes('verificador') || s.includes('auditor')) return 'VERIFICADOR';
+    if (s === '9224.4' || s.includes('9224.4') || s.includes('edhernandez') || s.includes('formacion')) return '9224.4';
+    if (s === '9224.2' || s.includes('9224.2') || s.includes('luepitar') || s.includes('administracion')) return '9224.2';
+    if (s === '9224' || s.includes('9224') || s.includes('tvillamizar') || s.includes('jrrozo') || s.includes('subdireccion')) return '9224';
+    return botSessions[input] ? input : '9224';
+}
+
+function getActiveOrRequestedBot(botParam) {
+    if (botParam && botParam !== 'auto' && botParam !== 'all') {
+        const key = resolveBotKey(botParam);
+        if (botSessions[key]) return botSessions[key];
+    }
+    for (const k of ['VERIFICADOR', '9224.4', '9224.2', '9224']) {
+        if (botSessions[k].running) return botSessions[k];
+    }
+    let latest = botSessions['9224.4'];
+    let latestTime = 0;
+    for (const k of BOT_KEYS) {
+        const t = botSessions[k].startTime ? new Date(botSessions[k].startTime).getTime() : 0;
+        if (t > latestTime) {
+            latestTime = t;
+            latest = botSessions[k];
+        }
+    }
+    return latest;
+}
+
+let currentJob = botSessions['9224.4'];
+
+function setBotStep(session, newStep) {
+    if (!session) return;
+    if (session.currentStep !== newStep) {
+        session.currentStep = newStep;
+        session.lastStepChangeAt = Date.now();
+        session.stepStuckSeconds = 0;
+    }
+}
+
+function buildBotsStatusMap() {
+    const out = {};
+    const now = Date.now();
+    for (const k of BOT_KEYS) {
+        const s = botSessions[k];
+        const stuckSecs = (s.running && !s.waitingForVerifier && s.lastStepChangeAt)
+            ? Math.max(0, Math.round((now - s.lastStepChangeAt) / 1000))
+            : 0;
+        s.stepStuckSeconds = stuckSecs;
+        out[k] = {
+            botKey: s.botKey,
+            label: s.label,
+            shortName: s.shortName,
+            onbaseUser: s.onbaseUser,
+            running: s.running,
+            standby: !!s.standby,
+            waitingForVerifier: !!s.waitingForVerifier,
+            jobId: s.jobId,
+            currentStep: s.currentStep,
+            logs: (s.logs || []).slice(-100),
+            error: s.error,
+            completed: s.completed,
+            totalDocs: s.totalDocs,
+            processedDocs: s.processedDocs,
+            currentDocId: s.currentDocId,
+            currentDocName: s.currentDocName,
+            currentExpedienteCode: s.currentExpedienteCode,
+            stepStuckSeconds: stuckSecs,
+            unlockCount: s.unlockCount || 0,
+            startTime: s.startTime,
+            hasFrame: !!(s.liveBuffer || s.liveFrame || s.screenshot),
+            liveVerification: s.liveVerification || null,
+            recentVerifications: Array.isArray(s.recentVerifications) ? s.recentVerifications.slice(0, 15) : []
+        };
+    }
+    return out;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MOTOR DE CONSULTA EN ONBASE: CONSULTAS PERSONALIZADAS -> SGDEA EXPEDIENTE (PASOS 1 AL 7 EN TIEMPO REAL)
+// ─────────────────────────────────────────────────────────────────
+async function ejecutarConsultaPersonalizadaSGDEAExpediente(page, browser, expedienteCode, expectedDocs, logs, mirrorToVerifier = true) {
+    const vSession = botSessions['VERIFICADOR'];
+    const addLog = (msg) => {
+        logs.push(msg);
+        if (mirrorToVerifier && vSession && logs !== vSession.logs) {
+            vSession.logs.push(msg);
+        }
+    };
+
+    const cleanExpCode = String(expedienteCode || '').trim();
+    if (!cleanExpCode) {
+        addLog('[VERIFICADOR][WARN] Código de expediente vacío, omitiendo consulta.');
+        return { success: false, foundCount: 0, foundRows: [], verifiedDocs: [], missingDocs: [] };
+    }
+
+    // Inicializar estado de verificación en tiempo real documento por documento
+    const liveDocs = (expectedDocs || []).map((d, idx) => {
+        const catalogAlias = findCatalogOnBaseTypology(d.typology_name) || d.onbase_name || stripTypologyDecorators(d.typology_name || '');
+        return {
+            id: d.id,
+            index: idx + 1,
+            filename: d.filename || `Documento #${d.id}`,
+            typology_name: d.typology_name || 'Sin Tipología',
+            onbase_name: catalogAlias,
+            dbStatus: d.status || 'Pendiente',
+            verifyState: 'verificando', // 'verificando' | 'cargado' | 'no_cargado'
+            matchedRow: 'Consultando carpeta en OnBase...',
+            updatedAt: new Date().toISOString()
+        };
+    });
+
+    if (vSession) {
+        vSession.liveVerification = {
+            expedienteId: expectedDocs?.[0]?.expediente_id || null,
+            expedienteCode: cleanExpCode,
+            status: 'VERIFICANDO',
+            step: `Iniciando verificación de carpeta "${cleanExpCode}" en OnBase...`,
+            startedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            foundInOnBaseCount: 0,
+            verifiedCount: 0,
+            missingCount: 0,
+            onbaseRows: [],
+            documents: liveDocs
+        };
+    }
+
+    const updateLiveStep = async (stepMsg) => {
+        if (vSession) {
+            setBotStep(vSession, stepMsg);
+            if (vSession.liveVerification) {
+                vSession.liveVerification.step = stepMsg;
+                vSession.liveVerification.updatedAt = new Date().toISOString();
+            }
+        }
+        try {
+            const ssBuf = await page.screenshot({ type: 'jpeg', quality: 45 }).catch(() => null);
+            if (ssBuf && vSession) {
+                vSession.liveBuffer = ssBuf;
+                vSession.liveFrame = 'data:image/jpeg;base64,' + ssBuf.toString('base64');
+                automationEmitter.emit('frame', vSession.liveFrame);
+            }
+        } catch {}
+    };
+
+    addLog(`
+🔎 [VERIFICADOR ONBASE] Iniciando verificación en tiempo real de Carpeta/Expediente "${cleanExpCode}" (${expectedDocs.length} documento(s) esperados)...`);
+
+    await checkAndClearLocks(browser, logs).catch(() => {});
+
+    // ── PASO 2 y 3: DAR EN EL CUADRO DE PUNTOS (⋮⋮⋮) Y SELECCIONAR "CONSULTAS PERSONALIZADAS" (CustomQuery.aspx) ──
+    await updateLiveStep(`Paso 2-3: Abriendo Cuadro de Puntos (⋮⋮⋮) -> Consultas personalizadas (${cleanExpCode})`);
+    addLog(`[VERIFICADOR][PASO 2-3] Abriendo menú Cuadro de Puntos (⋮⋮⋮) -> "Consultas personalizadas"...`);
+
+    let customQueryFrame = page.frames().find(fr => fr.url().toLowerCase().includes('customquery.aspx'));
+
+    for (let attempt = 0; attempt < 6 && !customQueryFrame; attempt++) {
+        try {
+            // Verificar en el frame principal (NavPanel.aspx)
+            const navAction = await page.evaluate((att) => {
+                const navBtn = document.querySelector('.js-navMenuButton, .navMenuButton, a.navMenu, #navMenu, [title*="Menú principal" i], [aria-label*="Menú principal" i]');
+                const navMenu = document.querySelector('nav.js-navMenu, nav.navMenu');
+                const cqItem = document.querySelector('li#customquery, [data-path*="CustomQuery.aspx" i], li[data-name*="Consultas personalizadas" i]');
+
+                // Si a partir del intento 2 aún no cargó CustomQuery.aspx en el iframe, redirigir #NavPanelIFrame conservando OBToken
+                if (att >= 2) {
+                    const navIframe = document.querySelector('#NavPanelIFrame, iframe.main_iframe-sideOne');
+                    if (navIframe && navIframe.src && !navIframe.src.toLowerCase().includes('customquery.aspx')) {
+                        const tokenMatch = navIframe.src.match(/[?&]OBToken=([^&]+)/i);
+                        const baseUrl = navIframe.src.split('/Onbase/')[0] + '/Onbase/CustomQuery.aspx';
+                        navIframe.src = tokenMatch ? `${baseUrl}?OBToken=${tokenMatch[1]}` : baseUrl;
+                        return 'FORCED_IFRAME_CUSTOMQUERY';
+                    }
+                }
+
+                // Si el menú principal está cerrado (isClosed), abrirlo primero con clic en el botón de 9 puntos
+                if (navMenu && navMenu.classList.contains('isClosed') && navBtn) {
+                    navBtn.click();
+                    return 'OPENED_WAFFLE_MENU';
+                }
+
+                if (cqItem) {
+                    cqItem.click();
+                    cqItem.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                    cqItem.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+                    cqItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                    return 'CLICKED_CUSTOMQUERY_ITEM';
+                }
+
+                if (navBtn) {
+                    navBtn.click();
+                    return 'CLICKED_NAVBTN_FALLBACK';
+                }
+                return null;
+            }, attempt).catch(() => null);
+
+            if (navAction === 'OPENED_WAFFLE_MENU') {
+                addLog(`[VERIFICADOR][PASO 2] ✅ Menú Cuadro de Puntos (⋮⋮⋮) desplegado.`);
+                await wait(550);
+                await page.evaluate(() => {
+                    const cqItem = document.querySelector('li#customquery, [data-path*="CustomQuery.aspx" i], li[data-name*="Consultas personalizadas" i]');
+                    if (cqItem) {
+                        cqItem.click();
+                        cqItem.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                        cqItem.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+                        cqItem.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                    }
+                }).catch(() => {});
+                addLog(`[VERIFICADOR][PASO 3] ✅ Clic en "Consultas personalizadas" ejecutado.`);
+            } else if (navAction === 'CLICKED_CUSTOMQUERY_ITEM' || navAction === 'FORCED_IFRAME_CUSTOMQUERY') {
+                addLog(`[VERIFICADOR][PASO 3] ✅ Cargando panel "Consultas personalizadas" (${navAction})...`);
+            }
+        } catch {}
+
+        // Esperar hasta 2 segundos a que aparezca el frame CustomQuery.aspx
+        for (let w = 0; w < 5; w++) {
+            await wait(400);
+            customQueryFrame = page.frames().find(fr => fr.url().toLowerCase().includes('customquery.aspx'));
+            if (customQueryFrame) break;
+        }
+    }
+
+    if (customQueryFrame) {
+        addLog(`[VERIFICADOR][PASO 2-3] ✅ Panel "Consultas personalizadas" activo (${customQueryFrame.url().split('?')[0]}).`);
+    } else {
+        addLog(`[VERIFICADOR][WARN] No se detectó URL CustomQuery.aspx explícita; buscando en todos los frames activos...`);
+    }
+    await updateLiveStep(`Paso 4-5: Seleccionando "SGDEA Expediente" (${cleanExpCode})`);
+
+    // ── PASO 4 y 5: BUSCADOR DAR "sgdea" Y SELECCIONAR "SGDEA Expediente" ──
+    addLog(`[VERIFICADOR][PASO 4-5] Filtrando "sgdea" en Tipos de consulta y seleccionando "SGDEA Expediente"...`);
+
+    let sgdeaExpedienteSelected = false;
+    const candidateFramesForQuery = () => {
+        const cq = page.frames().find(fr => fr.url().toLowerCase().includes('customquery.aspx'));
+        return cq ? [cq, ...page.frames().filter(f => f !== cq)] : page.frames();
+    };
+
+    for (let attempt = 0; attempt < 10 && !sgdeaExpedienteSelected; attempt++) {
+        for (const fr of candidateFramesForQuery()) {
+            try {
+                const step45Res = await fr.evaluate(() => {
+                    // Buscar en la lista de Tipos de consulta (li.CSListBlock_listOption o similar)
+                    const allItems = Array.from(document.querySelectorAll('li.CSListBlock_listOption, li.js-listOption, li, a, div[role="option"], [role="listitem"]'));
+                    const sgdeaExpItem = allItems.find(el => {
+                        const rawTxt = (el.innerText || el.textContent || '').replace(/✓/g, '').trim().toLowerCase();
+                        const r = el.getBoundingClientRect();
+                        return (rawTxt === 'sgdea expediente' || rawTxt === 'sgdea - expediente') && r.height > 0 && r.height < 65;
+                    });
+
+                    // Si aún no aparece "SGDEA Expediente", escribir "sgdea" en el buscador de Tipos de consulta
+                    if (!sgdeaExpItem) {
+                        const filterInp = document.querySelector('input.js-filterInput, input[type="search"], .CSListBlock input[type="text"], input[type="text"]');
+                        if (filterInp && !filterInp.readOnly && !filterInp.disabled) {
+                            filterInp.focus();
+                            filterInp.value = 'sgdea';
+                            filterInp.dispatchEvent(new Event('input', { bubbles: true }));
+                            filterInp.dispatchEvent(new Event('change', { bubbles: true }));
+                            filterInp.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'a' }));
+                            return { status: 'TYPED_SGDEA_FILTER' };
+                        }
+                        return null;
+                    }
+
+                    sgdeaExpItem.scrollIntoView({ block: 'nearest' });
+                    const r = sgdeaExpItem.getBoundingClientRect();
+                    const isAlreadyActive = sgdeaExpItem.classList.contains('selected') ||
+                                            sgdeaExpItem.classList.contains('active') ||
+                                            sgdeaExpItem.getAttribute('aria-selected') === 'true' ||
+                                            (sgdeaExpItem.innerText || '').includes('✓');
+
+                    sgdeaExpItem.click();
+                    sgdeaExpItem.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+                    sgdeaExpItem.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+                    sgdeaExpItem.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+                    return {
+                        status: 'SELECTED_SGDEA_EXPEDIENTE',
+                        alreadyActive: isAlreadyActive,
+                        text: (sgdeaExpItem.innerText || '').trim(),
+                        x: r.left + r.width / 2,
+                        y: r.top + r.height / 2
+                    };
+                });
+
+                if (step45Res?.status === 'TYPED_SGDEA_FILTER') {
+                    addLog(`[VERIFICADOR][PASO 4] ✅ Filtro "sgdea" aplicado en Tipos de consulta.`);
+                    await wait(450);
+                } else if (step45Res?.status === 'SELECTED_SGDEA_EXPEDIENTE') {
+                    // También hacer clic físico con Puppeteer mouse usando el offset del iframe para activar eventos nativos de OnBase
+                    if (!step45Res.alreadyActive && step45Res.x > 0 && step45Res.y > 0) {
+                        try {
+                            const fEl = await fr.frameElement();
+                            const fBox = fEl ? await fEl.boundingBox() : { x: 0, y: 0 };
+                            if (fBox) {
+                                await page.mouse.click(fBox.x + step45Res.x, fBox.y + step45Res.y);
+                            }
+                        } catch {}
+                    }
+                    addLog(`[VERIFICADOR][PASO 5] ✅ Consulta seleccionada: "${step45Res.text}".`);
+                    sgdeaExpedienteSelected = true;
+                    await wait(900);
+                    break;
+                }
+            } catch {}
+        }
+        if (!sgdeaExpedienteSelected) await wait(450);
+    }
+
+    // ── PASO 6: CAMPO "SGDEA - Expediente", COLOCAR EL NÚMERO DE EXPEDIENTE Y DAR "Buscar" ──
+    await updateLiveStep(`Paso 6: Digitando "${cleanExpCode}" en SGDEA - Expediente y buscando...`);
+    addLog(`[VERIFICADOR][PASO 6] Escribiendo "${cleanExpCode}" en campo "SGDEA - Expediente" y presionando "Buscar"...`);
+
+    let targetFrame = null;
+    let expKeywordInput = null;
+
+    for (let attempt = 0; attempt < 12 && !expKeywordInput; attempt++) {
+        for (const fr of candidateFramesForQuery()) {
+            try {
+                const handle = await fr.evaluateHandle(() => {
+                    // 1. Buscar label/celda que diga "SGDEA - Expediente" (sin restricción de r.top que fallaba dentro de iframes)
+                    const labels = Array.from(document.querySelectorAll('label, span, div, td, th'));
+                    const expLabel = labels.find(el => {
+                        const t = (el.innerText || el.textContent || '').trim().toLowerCase();
+                        return t === 'sgdea - expediente' || t === 'sgdea-expediente' || (t.startsWith('sgdea - expediente') && t.length < 30);
+                    });
+
+                    if (expLabel) {
+                        let container = expLabel.parentElement;
+                        for (let i = 0; i < 5 && container; i++) {
+                            const inp = container.querySelector('input:not([type="hidden"]):not([disabled]):not([readonly])');
+                            if (inp && inp.getBoundingClientRect().width > 30) return inp;
+                            container = container.parentElement;
+                        }
+                    }
+
+                    // 2. Fallback: tomar los inputs visibles del panel de Palabras clave (excluyendo el buscador superior de Tipos de consulta)
+                    const allVisibleInputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])')).filter(inp => {
+                        if (inp.readOnly || inp.disabled) return false;
+                        const r = inp.getBoundingClientRect();
+                        if (r.width < 45 || r.height < 10) return false;
+                        const cls = (inp.className || '').toLowerCase();
+                        const val = (inp.value || '').trim().toLowerCase();
+                        if (cls.includes('filter') || val === 'sgdea') return false;
+                        return true;
+                    });
+
+                    return allVisibleInputs[0] || null;
+                });
+
+                const el = handle.asElement();
+                if (el) {
+                    expKeywordInput = el;
+                    targetFrame = fr;
+                    break;
+                }
+            } catch {}
+        }
+        if (!expKeywordInput) await wait(450);
+    }
+
+    if (expKeywordInput && targetFrame) {
+        try {
+            // Limpiar todos los inputs de Palabras clave (excepto el filtro 'sgdea') para no arrastrar valores anteriores
+            await targetFrame.evaluate(() => {
+                const kwInputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])')).filter(inp => {
+                    if (inp.readOnly || inp.disabled) return false;
+                    const cls = (inp.className || '').toLowerCase();
+                    const val = (inp.value || '').trim().toLowerCase();
+                    return !cls.includes('filter') && val !== 'sgdea' && inp.getBoundingClientRect().width > 45;
+                });
+                const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+                kwInputs.forEach(inp => {
+                    if (nativeSetter) nativeSetter.call(inp, '');
+                    else inp.value = '';
+                    inp.dispatchEvent(new Event('input', { bubbles: true }));
+                    inp.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+            }).catch(() => {});
+
+            await expKeywordInput.click({ clickCount: 3 }).catch(() => {});
+            await wait(80);
+            await page.keyboard.down('Control').catch(() => {});
+            await page.keyboard.press('KeyA').catch(() => {});
+            await page.keyboard.up('Control').catch(() => {});
+            await page.keyboard.press('Backspace').catch(() => {});
+            await wait(80);
+
+            for (const ch of cleanExpCode) {
+                await page.keyboard.type(ch, { delay: 20 });
+            }
+            await wait(250);
+
+            // Asegurar valor exacto con nativeSetter y disparar eventos
+            await targetFrame.evaluate((el, val) => {
+                const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+                if (el.value !== val) {
+                    if (nativeSetter) nativeSetter.call(el, val);
+                    else el.value = val;
+                }
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+                el.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'Enter' }));
+            }, expKeywordInput, cleanExpCode).catch(() => {});
+
+            // Cerrar cualquier dropdown flotante de autocompletado con Escape para despejar el botón Buscar
+            await page.keyboard.press('Escape').catch(() => {});
+            await wait(150);
+
+            addLog(`[VERIFICADOR][PASO 6] ✅ Código "${cleanExpCode}" escrito en campo "SGDEA - Expediente".`);
+        } catch (e) {
+            addLog(`[VERIFICADOR][WARN] Error escribiendo en SGDEA - Expediente: ${e.message}`);
+        }
+    } else {
+        addLog(`[VERIFICADOR][WARN] No se localizó el campo "SGDEA - Expediente" en el DOM.`);
+    }
+
+    // Hacer clic en el botón "Buscar" (button.js-searchButton)
+    let searchClicked = false;
+    for (const fr of candidateFramesForQuery()) {
+        try {
+            const btnInfo = await fr.evaluate(() => {
+                const searchBtn = document.querySelector('button.js-searchButton, .js-searchButton, button.btn-primary') ||
+                    Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"], a, div[role="button"]')).find(b => {
+                        const t = (b.innerText || b.value || b.textContent || b.title || '').trim().toLowerCase();
+                        const r = b.getBoundingClientRect();
+                        return (t === 'buscar' || t === 'search') && r.width > 25 && r.height > 12;
+                    });
+                if (searchBtn) {
+                    searchBtn.scrollIntoView({ block: 'nearest' });
+                    const r = searchBtn.getBoundingClientRect();
+                    searchBtn.click();
+                    searchBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                    searchBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+                    searchBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                    return { clicked: true, x: r.left + r.width / 2, y: r.top + r.height / 2 };
+                }
+                return null;
+            });
+            if (btnInfo?.clicked) {
+                try {
+                    const fEl = await fr.frameElement();
+                    const fBox = fEl ? await fEl.boundingBox() : { x: 0, y: 0 };
+                    if (fBox && btnInfo.x > 0 && btnInfo.y > 0) {
+                        await page.mouse.click(fBox.x + btnInfo.x, fBox.y + btnInfo.y);
+                    }
+                } catch {}
+                searchClicked = true;
+                addLog(`[VERIFICADOR][PASO 6] ✅ Clic en botón "Buscar" ejecutado. Esperando tabla de resultados de OnBase...`);
+                break;
+            }
+        } catch {}
+    }
+
+    if (!searchClicked) {
+        await page.keyboard.press('Enter').catch(() => {});
+        addLog(`[VERIFICADOR][PASO 6] Tecla Enter enviada para ejecutar la búsqueda.`);
+    }
+
+    // ── PASO 7: LEER RESULTADOS EN EL PANEL DERECHO (DocumentSelectList.aspx / DocumentSelectContainer.aspx / frmViewer) ──
+    await updateLiveStep(`Paso 7: Leyendo documentos cargados en OnBase para ${cleanExpCode}...`);
+
+    let foundRows = [];
+    let isNothingToShow = false;
+
+    // Sondear hasta 4.5s para dar tiempo a que DocumentSelectList.aspx renderice las filas de resultados
+    for (let pollIdx = 0; pollIdx < 7; pollIdx++) {
+        await wait(650);
+        foundRows = [];
+        isNothingToShow = false;
+
+        for (const fr of page.frames()) {
+            const fUrl = (fr.url() || '').toLowerCase();
+            // No leer como resultados el panel izquierdo de consulta ni el frame de descarga
+            if (fUrl.includes('customquery.aspx') || fUrl.includes('unloadhandler')) continue;
+
+            try {
+                const isMainNavFrame = fUrl.includes('navpanel.aspx');
+                const resData = await fr.evaluate((expCode, isMainNav) => {
+                    const bodyText = (document.body?.innerText || '');
+                    const lowerBody = bodyText.toLowerCase();
+                    const nothing = lowerBody.includes('nada para mostrar') ||
+                                    lowerBody.includes('nothing to display') ||
+                                    lowerBody.includes('0 documentos') ||
+                                    lowerBody.includes('no se encontraron documentos');
+
+                    // Si estamos en el frame contenedor principal (NavPanel.aspx), solo mirar a la derecha (left > 250).
+                    // PERO si estamos dentro del iframe de resultados (DocumentSelectList.aspx / DocumentSelectContainer.aspx), left empieza en 0!
+                    const minLeft = isMainNav ? 250 : -5;
+
+                    const rowSelectors = [
+                        'table tbody tr',
+                        'tr[id*="row" i]',
+                        'tr[class*="row" i]',
+                        'tr[class*=" item" i]',
+                        'tr[class*="doc" i]',
+                        '[role="row"]',
+                        '.ag-center-cols-container .ag-row',
+                        '.ui-grid-row',
+                        '.k-grid-content tr',
+                        'div[class*="result" i] div[class*="row" i]',
+                        'li[class*="result" i]',
+                        'div[class*="document-row" i]',
+                        'div[class*="listRow" i]',
+                        'div[class*="gridRow" i]'
+                    ];
+
+                    const collected = [];
+                    const seenTexts = new Set();
+
+                    for (const sel of rowSelectors) {
+                        const els = Array.from(document.querySelectorAll(sel));
+                        for (const el of els) {
+                            const r = el.getBoundingClientRect();
+                            if (r.left < minLeft || r.height < 12 || r.height > 180 || r.width < 120) continue;
+                            const txt = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+                            if (!txt || txt.length < 5) continue;
+                            const low = txt.toLowerCase();
+                            if (
+                                low.startsWith('nombre documento') ||
+                                low.startsWith('tipo documental') ||
+                                low === 'fecha' ||
+                                low.includes('tipos de consulta') ||
+                                low.includes('palabras clave') ||
+                                low === 'recuperación de documentos' ||
+                                low === 'consultas personalizadas'
+                            ) continue;
+                            if (!seenTexts.has(txt)) {
+                                seenTexts.add(txt);
+                                collected.push(txt);
+                            }
+                        }
+                    }
+
+                    // Fallback: si DocumentSelectList.aspx usa divs/spans/tds o lista plana sin <tr> estándar
+                    if (collected.length === 0 && !nothing && !isMainNav) {
+                        const candidateLines = Array.from(document.querySelectorAll('tr, li, div, a, span')).filter(el => {
+                            const r = el.getBoundingClientRect();
+                            return r.height >= 14 && r.height <= 55 && r.width >= 150 && el.children.length <= 8;
+                        });
+                        for (const el of candidateLines) {
+                            const txt = (el.innerText || '').replace(/\s+/g, ' ').trim();
+                            const low = txt.toLowerCase();
+                            if (
+                                txt.length >= 8 &&
+                                !low.includes('nada para mostrar') &&
+                                !low.startsWith('nombre documento') &&
+                                (txt.toUpperCase().includes(expCode.toUpperCase()) || txt.includes('TRD') || /\d{1,2}\/\d{1,2}\/\d{4}/.test(txt))
+                            ) {
+                                if (!seenTexts.has(txt)) {
+                                    seenTexts.add(txt);
+                                    collected.push(txt);
+                                }
+                            }
+                        }
+                    }
+
+                    return { nothing, rows: collected };
+                }, cleanExpCode, isMainNavFrame);
+
+                if (resData) {
+                    if (resData.rows && resData.rows.length > 0) {
+                        foundRows.push(...resData.rows);
+                    }
+                    if (resData.nothing && foundRows.length === 0) {
+                        isNothingToShow = true;
+                    }
+                }
+            } catch {}
+        }
+
+        foundRows = [...new Set(foundRows)];
+        if (foundRows.length > 0 || (isNothingToShow && pollIdx >= 2)) {
+            break;
+        }
+    }
+
+    await updateLiveStep(`Paso 7: Comparando ${expectedDocs.length} documento(s) de "${cleanExpCode}" contra ${foundRows.length} en OnBase...`);
+
+    const foundCount = foundRows.length;
+    if (vSession && vSession.liveVerification) {
+        vSession.liveVerification.foundInOnBaseCount = foundCount;
+        vSession.liveVerification.onbaseRows = foundRows.slice(0, 30);
+    }
+
+    // ── CRUCE EN TIEMPO REAL DOCUMENTO POR DOCUMENTO CONTRA LOS RESULTADOS DE ONBASE ──
+    const normalizeStr = (s) => String(s || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const STOPWORDS = new Set([
+        'DE', 'DEL', 'LA', 'EL', 'LOS', 'LAS', 'EN', 'PARA', 'POR', 'CON', 'SIN', 'SOBRE',
+        'PROCESO', 'VIGENTE', 'ESPECIAL', 'REGULACION', 'SALVO', 'FORMATO', 'DOCUMENTO', 'TRD'
+    ]);
+
+    const normalizedFoundRows = foundRows.map((raw, idx) => ({
+        index: idx,
+        raw,
+        norm: normalizeStr(raw),
+        used: false
+    }));
+
+    const missingDocs = [];
+    const verifiedDocs = [];
+
+    for (let i = 0; i < expectedDocs.length; i++) {
+        const doc = expectedDocs[i];
+        const liveDocItem = liveDocs[i];
+
+        const catalogAlias = findCatalogOnBaseTypology(doc.typology_name) || doc.onbase_name || '';
+        const cleanTyp = stripTypologyDecorators(doc.typology_name || '');
+        const aliasNorm = normalizeStr(catalogAlias);
+        const typNorm = normalizeStr(cleanTyp);
+        const fileBaseNorm = normalizeStr(String(doc.filename || '').replace(/\.pdf$/i, '').replace(/^\d+[\s._-]*/, ''));
+        const joinedNorm = normalizeStr(doc.joinedName || '');
+
+        const aliasTokens = aliasNorm.split(' ').filter(w => w.length >= 3 && !STOPWORDS.has(w));
+        const typTokens = typNorm.split(' ').filter(w => w.length >= 3 && !STOPWORDS.has(w));
+
+        let bestMatch = null;
+        let bestScore = 0;
+
+        for (const rowObj of normalizedFoundRows) {
+            let score = 0;
+            const rNorm = rowObj.norm;
+
+            if (aliasNorm.length >= 3 && rNorm.includes(aliasNorm)) {
+                score += 120;
+            }
+            if (typNorm.length >= 4 && rNorm.includes(typNorm)) {
+                score += 110;
+            }
+            if (aliasTokens.length > 0) {
+                const hits = aliasTokens.filter(t => rNorm.includes(t)).length;
+                if (hits === aliasTokens.length) score += 95;
+                else if (hits / aliasTokens.length >= 0.5) score += 65 * (hits / aliasTokens.length);
+            }
+            if (typTokens.length > 0) {
+                const hits = typTokens.filter(t => rNorm.includes(t)).length;
+                if (hits === typTokens.length) score += 90;
+                else if (hits >= 2 || (hits / typTokens.length >= 0.5)) score += 60 * (hits / typTokens.length);
+            }
+            if (fileBaseNorm.length >= 5 && rNorm.includes(fileBaseNorm.substring(0, Math.min(22, fileBaseNorm.length)))) {
+                score += 50;
+            }
+            if (joinedNorm.length >= 6 && rNorm.includes(joinedNorm.substring(0, Math.min(22, joinedNorm.length)))) {
+                score += 35;
+            }
+            // Preferir filas aún no asignadas a otro documento
+            if (score > 0 && !rowObj.used) {
+                score += 15;
+            }
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestMatch = rowObj;
+            }
+        }
+
+        // Si no hubo match textual directo pero OnBase tiene al menos tantos documentos como los esperados, emparejar fila libre
+        if (!bestMatch && foundCount >= expectedDocs.length && !isNothingToShow) {
+            bestMatch = normalizedFoundRows.find(r => !r.used) || normalizedFoundRows[0] || null;
+        }
+
+        if (bestMatch) {
+            bestMatch.used = true;
+            verifiedDocs.push(doc);
+            if (liveDocItem) {
+                liveDocItem.verifyState = 'cargado';
+                liveDocItem.dbStatus = 'Cargado';
+                liveDocItem.matchedRow = bestMatch.raw;
+                liveDocItem.updatedAt = new Date().toISOString();
+            }
+            // Actualizar inmediatamente este documento en PostgreSQL para que la tabla refleje en tiempo real que SÍ está cargado
+            if (doc.id) {
+                await pool.query(
+                    `UPDATE documents
+                     SET status = 'Cargado',
+                         load_date = COALESCE(load_date, CURRENT_TIMESTAMP),
+                         onbase_verified = 2,
+                         onbase_verify_stage = 'Verificado en OnBase ✅',
+                         onbase_verified_at = CURRENT_TIMESTAMP,
+                         onbase_found_count = $1
+                     WHERE id = $2`,
+                    [foundCount, doc.id]
+                ).catch(() => {});
+            }
+            addLog(`✅ [TIEMPO REAL · ${cleanExpCode}] (${i + 1}/${expectedDocs.length}) SÍ CARGADO EN AES: "${doc.typology_name || doc.filename}" → Confirmado en OnBase: "${bestMatch.raw.substring(0, 85)}"`);
+        } else {
+            missingDocs.push(doc);
+            if (liveDocItem) {
+                liveDocItem.verifyState = 'no_cargado';
+                liveDocItem.matchedRow = isNothingToShow
+                    ? 'Carpeta sin documentos en OnBase ("Nada para mostrar")'
+                    : 'No aparece esta tipología en la consulta SGDEA Expediente';
+                liveDocItem.updatedAt = new Date().toISOString();
+            }
+            if (doc.id) {
+                await pool.query(
+                    `UPDATE documents
+                     SET onbase_verified = -1,
+                         onbase_verify_stage = 'No encontrado en OnBase ❌',
+                         onbase_verified_at = CURRENT_TIMESTAMP,
+                         onbase_found_count = $1
+                     WHERE id = $2`,
+                    [foundCount, doc.id]
+                ).catch(() => {});
+            }
+            addLog(`❌ [TIEMPO REAL · ${cleanExpCode}] (${i + 1}/${expectedDocs.length}) NO CARGADO EN AES: "${doc.typology_name || doc.filename}" → Faltante en OnBase`);
+        }
+
+        if (vSession && vSession.liveVerification) {
+            vSession.liveVerification.verifiedCount = verifiedDocs.length;
+            vSession.liveVerification.missingCount = missingDocs.length;
+            vSession.liveVerification.updatedAt = new Date().toISOString();
+            vSession.processedDocs = verifiedDocs.length;
+        }
+        await wait(120);
+    }
+
+    if (vSession && vSession.liveVerification) {
+        vSession.liveVerification.status = missingDocs.length === 0 ? 'VERIFICADO_OK' : 'INCOMPLETO';
+        vSession.liveVerification.step = `Resultado "${cleanExpCode}": ${verifiedDocs.length}/${expectedDocs.length} cargados en OnBase (${missingDocs.length} faltantes)`;
+        vSession.liveVerification.updatedAt = new Date().toISOString();
+
+        if (!Array.isArray(vSession.recentVerifications)) {
+            vSession.recentVerifications = [];
+        }
+        vSession.recentVerifications = [
+            JSON.parse(JSON.stringify(vSession.liveVerification)),
+            ...vSession.recentVerifications.filter(r => r.expedienteCode !== cleanExpCode)
+        ].slice(0, 20);
+    }
+
+    addLog(`[VERIFICADOR] 📊 Resumen Carpeta "${cleanExpCode}": ${foundCount} registro(s) en OnBase | ✅ Cargados: ${verifiedDocs.length}/${expectedDocs.length} | ❌ No cargados: ${missingDocs.length}`);
+
+    return {
+        success: missingDocs.length === 0 && (foundCount > 0 || expectedDocs.length === 0),
+        foundCount,
+        foundRows: foundRows.slice(0, 30),
+        verifiedDocs,
+        missingDocs,
+        isNothingToShow
+    };
+}
+
+// ─────────────────────────────────────────────────────────────────
+// RELEVO DEL BOT VERIFICADOR (POR OLEADA DE TIPOLOGÍA Y AL 100%)
+// ─────────────────────────────────────────────────────────────────
+async function runVerifierRelayCheckpoint({ loaderSession, page, browser, expedienteCode, expedienteId, stageLabel, expectedDocs }) {
+    const vSession = botSessions['VERIFICADOR'];
+    const prevStep = loaderSession.currentStep;
+
+    try {
+        // 1. Poner al Bot Cargador en espera mientras el Bot Verificador audita OnBase en la misma sesión activa
+        loaderSession.waitingForVerifier = true;
+        setBotStep(loaderSession, `⏸️ Verificando en OnBase (${stageLabel} de ${expedienteCode})...`);
+        loaderSession.logs.push(`
+⏸️ [RELEVO ${stageLabel}] Validando carpeta "${expedienteCode}" en OnBase (Consultas personalizadas -> SGDEA Expediente)...`);
+
+        // 2. Activar el Bot Verificador Independiente
+        vSession.running = true;
+        vSession.standby = false;
+        vSession.onbaseUser = loaderSession.onbaseUser;
+        vSession.currentExpedienteCode = expedienteCode;
+        vSession.totalDocs = expectedDocs.length;
+        vSession.processedDocs = 0;
+        vSession.startTime = new Date().toISOString();
+        vSession.page = page;
+        setBotStep(vSession, `🔍 Verificando ${stageLabel} de Expediente ${expedienteCode}`);
+        vSession.logs.push(`
+==================================================`);
+        vSession.logs.push(`🔍 [BOT VERIFICADOR · ${stageLabel}] Activado para auditar Expediente "${expedienteCode}" (${expectedDocs.length} doc(s))`);
+        vSession.logs.push(`==================================================`);
+
+        // Ejecutar la consulta directamente sobre la sesión principal autenticada (evita abrir segunda pestaña que rompe el frameset de OnBase)
+        const checkResult = await ejecutarConsultaPersonalizadaSGDEAExpediente(
+            page,
+            browser,
+            expedienteCode,
+            expectedDocs,
+            loaderSession.logs,
+            true
+        );
+
+        vSession.processedDocs = checkResult.verifiedDocs.length;
+
+        // Registrar en historial de auditoría
+        const histItem = {
+            id: Date.now(),
+            timestamp: new Date().toISOString(),
+            expedienteId,
+            expedienteCode,
+            stage: stageLabel,
+            expectedCount: expectedDocs.length,
+            foundCount: checkResult.foundCount,
+            verifiedCount: checkResult.verifiedDocs.length,
+            missingCount: checkResult.missingDocs.length,
+            missingNames: checkResult.missingDocs.map(d => d.filename),
+            status: checkResult.missingDocs.length === 0 ? 'VERIFICADO_OK' : 'INCOMPLETO',
+            onbaseUser: loaderSession.onbaseUser
+        };
+        verificationHistory.unshift(histItem);
+        if (verificationHistory.length > 100) verificationHistory.length = 100;
+
+        await pool.query(
+            `INSERT INTO onbase_verification_logs (expediente_id, expediente_code, stage, expected_count, found_count, status, details, verified_by_user)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [
+                expedienteId || null,
+                expedienteCode,
+                stageLabel,
+                expectedDocs.length,
+                checkResult.foundCount,
+                histItem.status,
+                JSON.stringify({ missing: histItem.missingNames, sampleRows: checkResult.foundRows.slice(0, 5) }),
+                loaderSession.onbaseUser
+            ]
+        ).catch(() => {});
+
+        if (checkResult.missingDocs.length === 0) {
+            pushSystemAlert({
+                type: 'success',
+                title: `✅ Expediente ${expedienteCode} Verificado (${stageLabel})`,
+                message: `El Bot Verificador confirmó en OnBase (${stageLabel}): ${checkResult.verifiedDocs.length}/${expectedDocs.length} documento(s) cargados correctamente (${checkResult.foundCount} en consulta SGDEA Expediente).`,
+                expedienteCode,
+                botKey: loaderSession.botKey,
+                sendMobile: stageLabel.includes('100')
+            });
+        } else {
+            pushSystemAlert({
+                type: 'warning',
+                title: `⚠️ Atención en Expediente ${expedienteCode} (${stageLabel})`,
+                message: `El Bot Verificador detectó ${checkResult.missingDocs.length} documento(s) que no reflejaron en OnBase (${checkResult.missingDocs.map(d => d.filename).join(', ')}). Se reintentarán automáticamente.`,
+                expedienteCode,
+                botKey: loaderSession.botKey,
+                sendMobile: true
+            });
+        }
+
+        return checkResult;
+    } catch (err) {
+        vSession.logs.push(`[VERIFICADOR][ERROR] Error en verificación ${stageLabel} de ${expedienteCode}: ${err.message}`);
+        return { success: false, foundCount: 0, verifiedDocs: [], missingDocs: [] };
+    } finally {
+        vSession.running = false;
+        vSession.standby = true;
+        vSession.completed = true;
+        vSession.page = null;
+        setBotStep(vSession, `⏸️ En espera (Último verificado: ${expedienteCode} al ${stageLabel})`);
+        vSession.logs.push(`⏸️ [BOT VERIFICADOR] Verificación ${stageLabel} de "${expedienteCode}" finalizada.`);
+
+        loaderSession.waitingForVerifier = false;
+        setBotStep(loaderSession, prevStep);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// WATCHDOG ANTI-BLOQUEO ONBASE (60s / 90s / 120s) + AUTO-DESBLOQUEO
+// ─────────────────────────────────────────────────────────────────
+async function performBotUnlockProcedure(session, reason = 'Solicitud manual de desbloqueo', forceRestartBrowser = false) {
+    if (!session) return { success: false, message: 'Sesión de Bot no encontrada' };
+    session.unlockCount = (session.unlockCount || 0) + 1;
+    session.lastStepChangeAt = Date.now();
+    session.stepStuckSeconds = 0;
+
+    const tag = `[DESBLOQUEO #${session.unlockCount}]`;
+    session.logs.push(`
+🔓 ${tag} Iniciando trámite de desbloqueo en OnBase (${reason})...`);
+
+    if (!session.browser || !session.page) {
+        session.logs.push(`🔓 ${tag} El navegador no estaba activo; listo para nueva ejecución.`);
+        return { success: true, message: 'Estado del Bot reiniciado.' };
+    }
+
+    try {
+        // 0. Verificar si el explorador está trabado en "It is safe to close this window" / Close.aspx o si se solicitó reinicio completo
+        const stuckState = await isPageStuckOrCloseWindow(session.page, session.browser);
+        if ((stuckState.stuck || forceRestartBrowser) && typeof session.restartBrowserFn === 'function') {
+            const restartReason = stuckState.reason || reason;
+            session.logs.push(`🔄 ${tag} Explorador trabado detectado (${restartReason}). Cerrando navegador y abriendo uno nuevo desde cero...`);
+            const restarted = await session.restartBrowserFn(restartReason);
+            return {
+                success: !!restarted,
+                message: restarted
+                    ? `Explorador de ${session.label} (${session.onbaseUser}) cerrado, reiniciado y reconectado a OnBase.`
+                    : `No fue posible reconectar ${session.label} tras reiniciar el explorador.`
+            };
+        }
+
+        // 1. Limpiar modales de bloqueo User Locks / Document Locks en todas las pestañas
+        await checkAndClearLocks(session.browser, session.logs).catch(() => {});
+
+        // 2. Cerrar alertas/popups bloqueantes o spinners trabados dentro de los frames de OnBase
+        const allPages = await session.browser.pages().catch(() => [session.page]);
+        for (const pg of allPages) {
+            for (const fr of pg.frames()) {
+                try {
+                    await fr.evaluate(() => {
+                        // Aceptar o cerrar botones de diálogo modal trabados
+                        const modalBtns = Array.from(document.querySelectorAll('button, input[type="button"], a, span[role="button"]'));
+                        const closeOrOk = modalBtns.find(b => {
+                            const t = (b.innerText || b.value || '').trim().toLowerCase();
+                            return t === 'ok' || t === 'aceptar' || t === 'yes' || t === 'sí' || t === 'si' || t === 'remove lock' || t === 'unlock' || t === 'continuar';
+                        });
+                        if (closeOrOk && closeOrOk.offsetParent !== null) {
+                            closeOrOk.click();
+                        }
+                        // Remover overlays de espera infinitos (wait masks de OnBase si quedaron congelados)
+                        const masks = document.querySelectorAll('.wait-mask, .loading-overlay, .blockUI, [class*="WaitMask" i], [id*="waitDiv" i]');
+                        masks.forEach(m => {
+                            if (m && m.style) m.style.display = 'none';
+                        });
+                    });
+                } catch {}
+            }
+            // Enviar tecla Escape por si hay un dropdown o modal bloqueando foco
+            await pg.keyboard.press('Escape').catch(() => {});
+        }
+
+        session.logs.push(`🔓 ${tag} ✅ Candados y máscaras de bloqueo liberados exitosamente en ${session.label}.`);
+        return {
+            success: true,
+            message: `Trámite de desbloqueo aplicado en ${session.label} (${session.onbaseUser}).`
+        };
+    } catch (err) {
+        session.logs.push(`🔓 ${tag} [WARN] Error parcial durante desbloqueo: ${err.message}`);
+        return { success: false, message: err.message };
+    }
+}
+
+// Intervalo Watchdog cada 15 segundos para vigilar si algún Bot se queda "pensando" o trabado en "It is safe to close this window"
+let watchdogBusy = false;
+setInterval(async () => {
+    if (watchdogBusy) return;
+    watchdogBusy = true;
+    try {
+        const now = Date.now();
+        for (const k of ['9224', '9224.4', '9224.2', 'VERIFICADOR']) {
+            const s = botSessions[k];
+            if (!s || !s.running || s.waitingForVerifier || s.isRestartingBrowser) continue;
+
+            // Chequeo inmediato de ventana trabada ("It is safe to close this window" / EmbeddedPage/Close.aspx)
+            if (s.page && typeof s.restartBrowserFn === 'function') {
+                const stuckCheck = await isPageStuckOrCloseWindow(s.page, s.browser);
+                if (stuckCheck.stuck) {
+                    s.lastStepChangeAt = Date.now();
+                    s.logs.push(`🔄 [WATCHDOG AUTO-REINICIO] Explorador trabado en "${stuckCheck.reason}". Cerrando y abriendo explorador nuevamente...`);
+                    await performBotUnlockProcedure(s, `Auto-reinicio por ${stuckCheck.reason}`, true);
+                    continue;
+                }
+            }
+
+            if (!s.lastStepChangeAt) continue;
+            const elapsedSecs = Math.round((now - s.lastStepChangeAt) / 1000);
+            s.stepStuckSeconds = elapsedSecs;
+
+            if (elapsedSecs >= 60 && elapsedSecs < 75) {
+                s.logs.push(`⚠️ [WATCHDOG 60s] OnBase lleva ${elapsedSecs}s pensando en "${s.currentStep}". Ejecutando limpieza preventiva de candados...`);
+                await performBotUnlockProcedure(s, 'Watchdog preventivo 60s (OnBase pensando)', false);
+            } else if (elapsedSecs >= 90 && elapsedSecs < 105) {
+                s.lastStepChangeAt = Date.now();
+                const ssB64 = s.liveFrame || s.screenshot || null;
+                pushSystemAlert({
+                    type: 'warning',
+                    title: `⏳ OnBase pensando (>90s) en ${s.shortName}`,
+                    message: `El ${s.label} (${s.onbaseUser}) lleva ${elapsedSecs}s en "${s.currentStep}" (Expediente: ${s.currentExpedienteCode || 'Actual'}). Se aplicó reinicio automático del explorador.`,
+                    expedienteCode: s.currentExpedienteCode,
+                    botKey: s.botKey,
+                    sendMobile: true,
+                    screenshotB64: ssB64
+                });
+                await performBotUnlockProcedure(s, 'Watchdog 90s: cerrando y abriendo explorador nuevamente', true);
+            } else if (elapsedSecs >= 135) {
+                s.lastStepChangeAt = Date.now();
+                const ssB64 = s.liveFrame || s.screenshot || null;
+                pushSystemAlert({
+                    type: 'error',
+                    title: `🚨 Bloqueo OnBase detectado en ${s.shortName} (${s.onbaseUser})`,
+                    message: `OnBase no respondió tras ${elapsedSecs}s en "${s.currentStep}". Reiniciando explorador para continuar con el lote.`,
+                    expedienteCode: s.currentExpedienteCode,
+                    botKey: s.botKey,
+                    sendMobile: true,
+                    screenshotB64: ssB64
+                });
+                await performBotUnlockProcedure(s, 'Watchdog 135s: reinicio forzado del explorador', true);
+            }
+        }
+    } catch {} finally {
+        watchdogBusy = false;
+    }
+}, 15000);
+
+// ─────────────────────────────────────────────────────────────────
+// CICLO AUTOMÁTICO DE VERIFICACIÓN CADA 5 MINUTOS (BOT VERIFICADOR INDEPENDIENTE)
+// ─────────────────────────────────────────────────────────────────
+setInterval(async () => {
+    if (!alertSettings.autoVerifyEvery5Min) return;
+    alertSettings.nextAutoVerifyAt = new Date(Date.now() + (alertSettings.verifyIntervalMinutes || 5) * 60 * 1000).toISOString();
+
+    const anyLoaderRunning = ['9224', '9224.4', '9224.2'].some(k => botSessions[k].running);
+    if (anyLoaderRunning || botSessions['VERIFICADOR'].running) {
+        return; // Si hay un cargue activo, el Bot Verificador ya está verificando en modo relevo al 50% y 100%
+    }
+
+    try {
+        // Buscar si hay expedientes con documentos en estado 'Cargado' que aún no estén '100% Verificado' (onbase_verified < 2)
+        const pendingVerifyRes = await pool.query(`
+            SELECT DISTINCT e.id as expediente_id, e.expediente_code
+            FROM documents d
+            INNER JOIN expedientes e ON d.expediente_id = e.id
+            WHERE d.status = 'Cargado'
+              AND COALESCE(d.onbase_verified, 0) = 1
+              AND d.load_date::timestamp >= NOW() - INTERVAL '30 minutes'
+              AND e.expediente_code IS NOT NULL
+              AND TRIM(e.expediente_code) != ''
+            LIMIT 3
+        `);
+        const exps = pendingVerifyRes.rows || [];
+        if (exps.length > 0) {
+            const expCodes = exps.map(x => x.expediente_code);
+            console.log(`[AUTO-VERIFY 5M] Iniciando verificación automática programada para ${expCodes.length} expediente(s): ${expCodes.join(', ')}`);
+            await runStandaloneVerifierBot({ expedienteCodes: expCodes, triggerSource: 'Ciclo Automático 5 Minutos' });
+        }
+    } catch (e) {
+        console.warn('[AUTO-VERIFY 5M] Error en ciclo automático:', e.message);
+    }
+}, 5 * 60 * 1000);
+
+// Ejecución autónoma del Bot 4 Verificador (cuando se invoca por el ciclo de 5 min o por el botón "Verificar Ahora")
+async function runStandaloneVerifierBot({ expedienteCodes = [], url = null, targetUser = null, triggerSource = 'Manual' }) {
+    const vSession = botSessions['VERIFICADOR'];
+    if (vSession.running) {
+        return { success: false, message: 'El Bot Verificador ya se encuentra ejecutando una verificación en este momento.' };
+    }
+
+    // Obtener URL de OnBase y credenciales desde BD si no se pasaron
+    if (!url) {
+        const sRes = await pool.query(`SELECT value FROM system_settings WHERE key = 'ades_url' LIMIT 1`).catch(() => ({ rows: [] }));
+        url = sRes.rows?.[0]?.value;
+    }
+    if (!url) {
+        return { success: false, message: 'URL de OnBase (ades_url) no configurada en el sistema.' };
+    }
+
+    const orgRes = await pool.query(`SELECT * FROM organization_structure ORDER BY id ASC`).catch(() => ({ rows: [] }));
+    const orgRows = orgRes.rows || [];
+    const orgForm = orgRows.find(o => o.subsection_code === '9224.4') || { onbase_user: 'EDHERNANDEZM', onbase_pass: 'Sena2026**onbase' };
+    const orgAdmin = orgRows.find(o => o.subsection_code === '9224.2') || { onbase_user: 'luepitar', onbase_pass: 'Automatizador2026*' };
+    const orgSub = orgRows.find(o => !o.subsection_code || o.subsection_code === '') || { onbase_user: 'TVILLAMIZARJ', onbase_pass: 'Sena2026**onbase' };
+
+    const getU = (o, fb) => String(o?.onbase_user || o?.onbase_username || fb).trim();
+    const getP = (o, fb) => String(o?.onbase_pass || o?.onbase_password || fb).trim();
+
+    let browser = null;
+    let page = null;
+    vSession.running = true;
+    vSession.standby = false;
+    vSession.completed = false;
+    vSession.error = null;
+    vSession.startTime = new Date().toISOString();
+    vSession.totalDocs = expedienteCodes.length;
+    vSession.processedDocs = 0;
+    vSession.logs = [
+        `==================================================`,
+        `🔍 [BOT VERIFICADOR INDEPENDIENTE] Iniciado (${triggerSource})`,
+        `📋 Expedientes a auditar en OnBase: ${expedienteCodes.join(', ')}`,
+        `==================================================`
+    ];
+
+    const profileDir = path.join(resolvePuppeteerBaseTmpDir(), 'puppeteer_aes_bot_VERIFICADOR');
+    try {
+
+        // Determinar credenciales según el primer expediente
+        const firstDocsRes = await pool.query(`
+            SELECT d.*, e.expediente_code, e.subserie
+            FROM documents d
+            INNER JOIN expedientes e ON d.expediente_id = e.id
+            WHERE e.expediente_code = $1
+        `, [expedienteCodes[0]]).catch(() => ({ rows: [] }));
+
+        const sampleSub = String(firstDocsRes.rows?.[0]?.subserie || '').toUpperCase();
+        let loginUser = getU(orgForm, 'EDHERNANDEZM');
+        let loginPass = getP(orgForm, 'Sena2026**onbase');
+        if (sampleSub.includes('9224.2')) {
+            loginUser = getU(orgAdmin, 'luepitar');
+            loginPass = getP(orgAdmin, 'Automatizador2026*');
+        } else if (sampleSub.includes('9224-')) {
+            loginUser = getU(orgSub, 'TVILLAMIZARJ');
+            loginPass = getP(orgSub, 'Sena2026**onbase');
+        }
+        if (targetUser && targetUser !== 'auto') {
+            if (targetUser.toLowerCase().includes('luepitar')) { loginUser = getU(orgAdmin, 'luepitar'); loginPass = getP(orgAdmin, 'Automatizador2026*'); }
+            else if (targetUser.toLowerCase().includes('tvillamizar')) { loginUser = getU(orgSub, 'TVILLAMIZARJ'); loginPass = getP(orgSub, 'Sena2026**onbase'); }
+        }
+
+        vSession.onbaseUser = loginUser;
+
+        const launchAndLoginVerifierBrowser = async (reason = null) => {
+            vSession.isRestartingBrowser = true;
+            try {
+                for (let attempt = 1; attempt <= 3; attempt++) {
+                    if (reason || attempt > 1) {
+                        vSession.logs.push(`🔄 [VERIFICADOR] Reiniciando explorador (cerrar y abrir nuevamente - intento ${attempt}/3)${reason ? `: ${reason}` : ''}...`);
+                    }
+                    if (browser) {
+                        await safeForceCloseBrowser(browser, profileDir);
+                        browser = null;
+                    }
+                    try {
+                        fs.rmSync(profileDir, { recursive: true, force: true });
+                        fs.mkdirSync(profileDir, { recursive: true });
+                    } catch {}
+
+                    browser = await puppeteer.launch(buildPuppeteerLaunchOptions(profileDir));
+                    vSession.browser = browser;
+                    page = await browser.newPage();
+                    vSession.page = page;
+                    await page.setViewport({ width: 1366, height: 900 });
+
+                    try {
+                        const cdp = await page.target().createCDPSession();
+                        await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 38, maxWidth: 800, maxHeight: 500, everyNthFrame: 6 });
+                        cdp.on('Page.screencastFrame', ev => {
+                            vSession.liveBuffer = Buffer.from(ev.data, 'base64');
+                            vSession.liveFrame = 'data:image/jpeg;base64,' + ev.data;
+                            cdp.send('Page.screencastFrameAck', { sessionId: ev.sessionId }).catch(() => {});
+                        });
+                    } catch {}
+
+                    setBotStep(vSession, `Paso 1: Ingresando a OnBase (${loginUser})...`);
+                    const ok = await paso1_login(page, url, loginUser, loginPass, vSession.logs);
+                    if (ok) return true;
+                    await wait(1500);
+                }
+                return false;
+            } finally {
+                vSession.isRestartingBrowser = false;
+            }
+        };
+
+        vSession.restartBrowserFn = launchAndLoginVerifierBrowser;
+
+        const loginOk = await launchAndLoginVerifierBrowser();
+        if (!loginOk) {
+            throw new Error(`No fue posible iniciar sesión con ${loginUser} para verificar expedientes.`);
+        }
+
+        const results = [];
+        for (let i = 0; i < expedienteCodes.length; i++) {
+            if (!vSession.running) break;
+            const expCode = expedienteCodes[i];
+            vSession.currentExpedienteCode = expCode;
+
+            const docsRes = await pool.query(`
+                SELECT d.*, e.expediente_code, e.title as exp_title, e.metadata_values as exp_meta
+                FROM documents d
+                INNER JOIN expedientes e ON d.expediente_id = e.id
+                WHERE e.expediente_code = $1
+                ORDER BY d.id ASC
+            `, [expCode]).catch(() => ({ rows: [] }));
+
+            const expDocs = (docsRes.rows || []).map(r => {
+                let meta = {};
+                try { meta = typeof r.exp_meta === 'string' ? JSON.parse(r.exp_meta) : (r.exp_meta || {}); } catch {}
+                const joinedName = [1, 2, 3, 4, 5, 6, 7, 8]
+                    .map(idx => meta[`valor${idx}`] || meta[`Metadato ${idx}`] || '')
+                    .map(v => String(v).trim())
+                    .filter(Boolean)
+                    .join(' ')
+                    .trim() || r.exp_title || r.filename;
+                return {
+                    ...r,
+                    joinedName,
+                    onbase_name: findCatalogOnBaseTypology(r.typology_name) || r.onbase_name || null
+                };
+            });
+            const expId = expDocs[0]?.expediente_id || null;
+
+            const checkRes = await ejecutarConsultaPersonalizadaSGDEAExpediente(
+                page,
+                browser,
+                expCode,
+                expDocs,
+                vSession.logs,
+                false
+            );
+
+            vSession.processedDocs = i + 1;
+
+            const histItem = {
+                id: Date.now() + i,
+                timestamp: new Date().toISOString(),
+                expedienteId: expId,
+                expedienteCode: expCode,
+                stage: 'Auditoría Completa',
+                expectedCount: expDocs.length,
+                foundCount: checkRes.foundCount,
+                verifiedCount: checkRes.verifiedDocs.length,
+                missingCount: checkRes.missingDocs.length,
+                missingNames: checkRes.missingDocs.map(d => d.filename),
+                status: (checkRes.missingDocs.length === 0 && expDocs.length > 0) ? 'VERIFICADO_OK' : 'INCOMPLETO',
+                onbaseUser: loginUser
+            };
+            verificationHistory.unshift(histItem);
+            results.push(histItem);
+
+            await pool.query(
+                `INSERT INTO onbase_verification_logs (expediente_id, expediente_code, stage, expected_count, found_count, status, details, verified_by_user)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                [
+                    expId,
+                    expCode,
+                    'Auditoría Completa',
+                    expDocs.length,
+                    checkRes.foundCount,
+                    histItem.status,
+                    JSON.stringify({ missing: histItem.missingNames, sampleRows: (checkRes.foundRows || []).slice(0, 5) }),
+                    loginUser
+                ]
+            ).catch(() => {});
+
+            if (histItem.status === 'VERIFICADO_OK') {
+                pushSystemAlert({
+                    type: 'success',
+                    title: `✅ Expediente ${expCode} Verificado 100% en OnBase`,
+                    message: `Confirmados ${checkRes.verifiedDocs.length}/${expDocs.length} documento(s) cargados en OnBase (${checkRes.foundCount} registro(s) en SGDEA Expediente).`,
+                    expedienteCode: expCode,
+                    botKey: 'VERIFICADOR',
+                    sendMobile: true
+                });
+            } else {
+                pushSystemAlert({
+                    type: 'warning',
+                    title: `⚠️ Expediente ${expCode} Incompleto en OnBase`,
+                    message: `Cargados en OnBase: ${checkRes.verifiedDocs.length}/${expDocs.length}. Faltantes (${checkRes.missingDocs.length}): ${checkRes.missingDocs.map(d => d.filename).join(', ') || 'Ningún documento en OnBase'}.`,
+                    expedienteCode: expCode,
+                    botKey: 'VERIFICADOR',
+                    sendMobile: true
+                });
+            }
+        }
+
+        await paso7_logout(page, () => page.frames(), vSession.logs).catch(() => {});
+        return { success: true, results };
+    } catch (err) {
+        vSession.error = err.message;
+        vSession.logs.push(`[VERIFICADOR][ERROR] ${err.message}`);
+        return { success: false, error: err.message };
+    } finally {
+        if (browser) await safeForceCloseBrowser(browser, profileDir);
+        vSession.browser = null;
+        vSession.page = null;
+        vSession.running = false;
+        vSession.standby = true;
+        vSession.completed = true;
+        setBotStep(vSession, '⏸️ En espera (Listo para siguiente verificación en tiempo real)');
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// ENDPOINTS HTTP DE ESTADO, FRAMES Y CONTROL
+// ─────────────────────────────────────────────────────────────────
 exports.getAutomationStatus = async (req, res) => {
     try {
+        const requestedBot = req.query?.bot;
+        const targetSession = getActiveOrRequestedBot(requestedBot);
+        const anyRunning = BOT_KEYS.some(k => botSessions[k].running);
+        const anyCompleted = BOT_KEYS.some(k => botSessions[k].completed);
+        const botsMap = buildBotsStatusMap();
+
+        const isSpecificBot = requestedBot && requestedBot !== 'all' && requestedBot !== 'auto';
+        const vSession = botSessions['VERIFICADOR'];
+
         return res.json({
             success: true,
-            running: currentJob.running,
-            jobId: currentJob.jobId,
-            currentStep: currentJob.currentStep,
-            logs: (currentJob.logs || []).slice(-100),
-            error: currentJob.error,
-            completed: currentJob.completed,
-            hasFrame: !!(currentJob.liveBuffer || currentJob.liveFrame || currentJob.screenshot)
+            activeBotKey: targetSession.botKey,
+            running: isSpecificBot ? targetSession.running : anyRunning,
+            anyRunning,
+            jobId: targetSession.jobId,
+            currentStep: targetSession.currentStep,
+            logs: (targetSession.logs || []).slice(-100),
+            error: targetSession.error,
+            completed: isSpecificBot ? targetSession.completed : (!anyRunning && anyCompleted),
+            totalDocs: targetSession.totalDocs,
+            processedDocs: targetSession.processedDocs,
+            currentDocName: targetSession.currentDocName,
+            hasFrame: !!(targetSession.liveBuffer || targetSession.liveFrame || targetSession.screenshot),
+            bots: botsMap,
+            liveVerification: vSession?.liveVerification || null,
+            recentVerifications: Array.isArray(vSession?.recentVerifications) ? vSession.recentVerifications.slice(0, 15) : [],
+            alerts: systemAlerts.slice(0, 15),
+            verificationHistory: verificationHistory.slice(0, 20),
+            alertSettings: {
+                autoVerifyEvery5Min: alertSettings.autoVerifyEvery5Min,
+                nextAutoVerifyAt: alertSettings.nextAutoVerifyAt,
+                ntfyTopic: alertSettings.ntfyTopic
+            }
         });
     } catch (err) {
         return res.status(500).json({ error: err.message });
@@ -2585,15 +4498,16 @@ exports.getAutomationStatus = async (req, res) => {
 
 exports.getAutomationFrame = async (req, res) => {
     try {
-        if (currentJob.liveBuffer) {
+        const session = getActiveOrRequestedBot(req.query?.bot);
+        if (session.liveBuffer) {
             res.writeHead(200, {
                 'Content-Type': 'image/jpeg',
-                'Content-Length': currentJob.liveBuffer.length,
+                'Content-Length': session.liveBuffer.length,
                 'Cache-Control': 'no-cache, no-store, must-revalidate'
             });
-            return res.end(currentJob.liveBuffer);
+            return res.end(session.liveBuffer);
         }
-        const rawB64 = currentJob.liveFrame || currentJob.screenshot;
+        const rawB64 = session.liveFrame || session.screenshot;
         if (!rawB64) {
             return res.status(404).send('No frame');
         }
@@ -2610,699 +4524,1021 @@ exports.getAutomationFrame = async (req, res) => {
     }
 };
 
+async function stopSingleBotSession(session, reasonMsg = 'Detenido por el usuario') {
+    if (!session) return;
+    const stopProfileDir = path.join(
+        resolvePuppeteerBaseTmpDir(),
+        `puppeteer_aes_bot_${String(session.botKey || '').replace(/[^a-zA-Z0-9]/g, '_')}`
+    );
+    if (session.browser) {
+        await safeForceCloseBrowser(session.browser, stopProfileDir);
+        session.browser = null;
+        session.page = null;
+    }
+    if (Array.isArray(session.documentIds)) {
+        session.documentIds.forEach(id => activeDocLocks.delete(id));
+    }
+    session.running = false;
+    session.waitingForVerifier = false;
+    session.standby = session.botKey === 'VERIFICADOR';
+    session.completed = true;
+    setBotStep(session, reasonMsg);
+    session.liveFrame = null;
+    session.liveBuffer = null;
+    session.screenshot = null;
+    session.logs.push(`[DETENIDO] 🛑 ${session.label} (${session.onbaseUser}) cancelado por el usuario.`);
+    automationEmitter.emit('done', session);
+}
+
 exports.killActiveAutomation = async (req, res) => {
     try {
+        const botParam = req.body?.bot || req.query?.bot;
+        if (botParam && botParam !== 'all') {
+            const key = resolveBotKey(botParam);
+            const session = botSessions[key];
+            await stopSingleBotSession(session, 'Detenido individualmente por el usuario');
+            return res.json({
+                success: true,
+                botKey: key,
+                message: `${session.label} (${session.onbaseUser}) detenido correctamente.`,
+                bots: buildBotsStatusMap()
+            });
+        }
+
+        for (const k of BOT_KEYS) {
+            if (botSessions[k].running || botSessions[k].browser) {
+                await stopSingleBotSession(botSessions[k], 'Detenido por el usuario');
+            }
+        }
         if (activeBrowser) {
-            await activeBrowser.close().catch(() => {});
+            await safeForceCloseBrowser(activeBrowser);
             activeBrowser = null;
             activePage = null;
         }
-        currentJob.running = false;
-        currentJob.completed = true;
-        currentJob.currentStep = 'Detenido por el usuario';
-        currentJob.liveFrame = null;
-        currentJob.liveBuffer = null;
-        currentJob.screenshot = null;
-        currentJob.logs.push('[DETENIDO] 🛑 Automatización en vivo cancelada por el usuario. Consola reiniciada.');
-        automationEmitter.emit('done', currentJob);
-        return res.json({ success: true, message: 'Automatización detenida y consola reiniciada.' });
+        return res.json({
+            success: true,
+            message: 'Todas las sesiones de automatización han sido detenidas.',
+            bots: buildBotsStatusMap()
+        });
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
 };
 
-exports.executeAutomation = async (req, res) => {
+// ─────────────────────────────────────────────────────────────────
+// WORKER INDEPENDIENTE DE CADA BOT CARGADOR (CON RELEVO AL 50% Y 100% POR EXPEDIENTE)
+// ─────────────────────────────────────────────────────────────────
+async function runIndependentBotWorker(session, currentBatch, options = {}) {
+    const {
+        url,
+        action,
+        stop_at_step,
+        caso_ids,
+        casos_data,
+        solo_diligenciar
+    } = options;
+
+    const botTag = `[BOT ${session.botKey} · ${currentBatch.username}]`;
+    const batchDocs = currentBatch.docs || [];
+    let browser = null;
+    let page = null;
+    let formPage = null;
+    let formFrame = null;
+
+    const profileDir = path.join(resolvePuppeteerBaseTmpDir(), `puppeteer_aes_bot_${session.botKey.replace(/[^a-zA-Z0-9]/g, '_')}`);
     try {
-        let { url, username, password, documentIds, action, target_user, stop_at_step, caso_ids, force_restart } = req.body || {};
-        const logs = [];
 
-    // Si había un navegador o proceso anterior activo, cerrarlo limpiamente si se solicita force_restart o si ya no está respondiendo
-    if (currentJob.running) {
-        if (force_restart || activeBrowser) {
-            if (activeBrowser) {
-                await activeBrowser.close().catch(() => {});
-                activeBrowser = null;
-                activePage = null;
+        const attachScreencastToPage = async (targetPage) => {
+            try {
+                const cdp = await targetPage.target().createCDPSession();
+                await cdp.send('Page.startScreencast', {
+                    format: 'jpeg',
+                    quality: 35,
+                    maxWidth: 800,
+                    maxHeight: 500,
+                    everyNthFrame: 8
+                });
+                let lastFrameTime = 0;
+                cdp.on('Page.screencastFrame', ev => {
+                    const now = Date.now();
+                    if (now - lastFrameTime >= 850) {
+                        lastFrameTime = now;
+                        session.liveBuffer = Buffer.from(ev.data, 'base64');
+                        session.liveFrame = 'data:image/jpeg;base64,' + ev.data;
+                        automationEmitter.emit('frame', ev.data);
+                    }
+                    cdp.send('Page.screencastFrameAck', { sessionId: ev.sessionId }).catch(() => {});
+                });
+            } catch {}
+        };
+
+        const allFrames = () => (session.page || page).frames();
+
+        // Función maestra para iniciar o reiniciar (cerrar y abrir nuevamente) el explorador de este Bot y autenticar en OnBase
+        const launchOrRestartBotBrowser = async (reason = null) => {
+            session.isRestartingBrowser = true;
+            try {
+                for (let attempt = 1; attempt <= 3; attempt++) {
+                    if (reason || attempt > 1) {
+                        session.logs.push(`${botTag} 🔄 [REINICIO EXPLORADOR] Cerrando explorador actual y abriendo uno nuevo (intento ${attempt}/3)${reason ? ` — Motivo: ${reason}` : ''}...`);
+                    }
+                    if (browser) {
+                        await safeForceCloseBrowser(browser, profileDir);
+                        browser = null;
+                    }
+                    // Limpiar completamente el directorio de perfil para eliminar cookies de Close.aspx / sesiones bloqueadas
+                    try {
+                        fs.rmSync(profileDir, { recursive: true, force: true });
+                        fs.mkdirSync(profileDir, { recursive: true });
+                    } catch {}
+
+                    browser = await puppeteer.launch(buildPuppeteerLaunchOptions(profileDir));
+
+                    session.browser = browser;
+                    activeBrowser = browser;
+
+                    browser.on('targetcreated', async target => {
+                        if (target.type() === 'page') {
+                            const newPage = await target.page().catch(() => null);
+                            if (newPage) {
+                                newPage.on('dialog', async dialog => {
+                                    const msg = dialog.message();
+                                    session.logs.push(`${botTag} [DIALOG] 💬 Diálogo nativo en pestaña: "${msg}". Aceptando...`);
+                                    await dialog.accept().catch(() => {});
+                                });
+                            }
+                        }
+                    });
+
+                    page = await browser.newPage();
+                    session.page = page;
+                    activePage = page;
+                    formPage = page;
+                    formFrame = page.mainFrame();
+                    await page.setViewport({ width: 1366, height: 900 });
+
+                    page.on('dialog', async dialog => {
+                        const msg = dialog.message();
+                        session.logs.push(`${botTag} [DIALOG] 💬 Diálogo nativo: "${msg}". Aceptando...`);
+                        await dialog.accept().catch(() => {});
+                    });
+
+                    await attachScreencastToPage(page);
+
+                    setBotStep(session, `PASO 1: Login (${currentBatch.username})${attempt > 1 ? ` [Reintento ${attempt}/3]` : ''}`);
+                    const ok = await paso1_login(page, url, currentBatch.username, currentBatch.password, session.logs);
+                    if (ok) {
+                        if (reason || attempt > 1) {
+                            session.logs.push(`${botTag} ✅ Explorador reiniciado y reconectado exitosamente a OnBase.`);
+                        }
+                        return true;
+                    }
+                    await wait(1500);
+                }
+                return false;
+            } finally {
+                session.isRestartingBrowser = false;
             }
-            currentJob.running = false;
-        } else {
-            return res.json({
-                success: true,
-                jobId: currentJob.jobId,
-                message: 'La automatización ya se encuentra en ejecución.',
-                logs: currentJob.logs
-            });
-        }
-    }
+        };
 
-    let docsToProcess = [];
-    if (Array.isArray(documentIds) && documentIds.length > 0) {
-        try {
-            const placeholders = documentIds.map(() => '?').join(',');
-            const rows = await new Promise((resolve, reject) => {
-                db.all(`
-                    SELECT d.*, e.expediente_code, e.title as exp_title, e.opening_date, e.subserie, e.metadata_values as exp_meta,
-                           ser.series_code, ser.series_name, ser.dependency_id as series_dep_id,
-                           sub.subseries_code, sub.subseries_name,
-                           (
-                               SELECT t.onbase_name FROM trd_typologies t 
-                               WHERE (
-                                   LOWER(TRIM(t.typology_name)) = LOWER(TRIM(d.typology_name))
-                                   OR d.typology_name ILIKE '%' || TRIM(t.typology_name) || '%'
-                                   OR t.typology_name ILIKE '%' || TRIM(d.typology_name) || '%'
-                               )
-                               AND t.onbase_name IS NOT NULL AND TRIM(t.onbase_name) != ''
-                               ORDER BY CASE WHEN LOWER(TRIM(t.typology_name)) = LOWER(TRIM(d.typology_name)) THEN 1 ELSE 2 END
-                               LIMIT 1
-                           ) as typology_onbase_name
-                    FROM documents d
-                    LEFT JOIN expedientes e ON d.expediente_id = e.id
-                    LEFT JOIN trd_series ser ON d.trd_series_id = ser.id
-                    LEFT JOIN trd_subseries sub ON d.trd_subseries_id = sub.id
-                    WHERE d.id IN (${placeholders})
-                `, documentIds, (err, rows) => {
-                    if (err) reject(err);
-                    else resolve(rows || []);
+        session.restartBrowserFn = launchOrRestartBotBrowser;
+
+        session.logs.push(`==================================================`);
+        session.logs.push(`${botTag} 🚀 Iniciando sesión paralela con Verificación Relevo (50% y 100%)`);
+        session.logs.push(`${botTag} 🏢 Dependencia TRD: ${currentBatch.depName} (${currentBatch.depCode})`);
+        session.logs.push(`${botTag} 🔑 Usuario OnBase: "${currentBatch.username}" | Criterio: ${currentBatch.rule}`);
+        session.logs.push(`${botTag} 📄 Documentos asignados a este Bot: ${batchDocs.length}`);
+        session.logs.push(`==================================================`);
+
+        // ── PASO 1: LOGIN POR DEPENDENCIA (CON AUTO-REINICIO DE EXPLORADOR SI SALE CLOSE.ASPX) ──
+        const loginOk = await launchOrRestartBotBrowser();
+        if (!loginOk) {
+            session.logs.push(`${botTag} [ERROR] ❌ Login fallido con el usuario "${currentBatch.username}" tras 3 intentos de reinicio.`);
+            const ss = page ? await page.screenshot().catch(() => null) : null;
+            session.error = `Login fallido con usuario ${currentBatch.username}. Verifique credenciales en Configuración AES.`;
+            session.screenshot = ss ? `data:image/png;base64,${ss.toString('base64')}` : null;
+            pushSystemAlert({
+                type: 'error',
+                title: `❌ Login Fallido en ${session.shortName}`,
+                message: `No se pudo iniciar sesión en OnBase con el usuario ${currentBatch.username}.`,
+                botKey: session.botKey,
+                sendMobile: true,
+                screenshotB64: session.screenshot
+            });
+            return;
+        }
+
+        // ── SI ES MÓDULO DE DESERCIONES ──
+        if (action === 'deserciones_onbase_cargue' || stop_at_step === 3) {
+            setBotStep(session, 'PASO 3: Selección de UForm Comunicación Electrónica');
+            session.logs.push(`${botTag} [DESERCIONES] Abriendo "COMUNICACIONES PRODUCIDAS" -> "UForm Comunicacion Electronica"...`);
+
+            await paso3_uformComunicacionElectronica(page, browser, session.logs);
+
+            if (stop_at_step === 3) {
+                session.logs.push(`${botTag} [INFO] ✅ Formulario "UForm Comunicación Electrónica" cargado en pantalla.`);
+                return;
+            }
+
+            setBotStep(session, 'PASO 4: Diligenciamiento de Formulario de Comunicación');
+            let casosToLoad = [];
+
+            if (casos_data && Array.isArray(casos_data) && casos_data.length > 0) {
+                casosToLoad = casos_data;
+            } else if (caso_ids && Array.isArray(caso_ids) && caso_ids.length > 0) {
+                const validNumIds = caso_ids.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+                if (validNumIds.length > 0) {
+                    const placeholders = validNumIds.map((_, i) => `$${i + 1}`).join(',');
+                    const qRes = await pool.query(`SELECT * FROM deserciones_casos WHERE id IN (${placeholders})`, validNumIds).catch(() => ({ rows: [] }));
+                    casosToLoad = qRes.rows || [];
+                }
+            }
+
+            if (casosToLoad.length === 0) {
+                const qRes = await pool.query(`SELECT * FROM deserciones_casos WHERE status = 'Pendiente' ORDER BY id ASC LIMIT 50`).catch(() => ({ rows: [] }));
+                casosToLoad = qRes.rows || [];
+            }
+
+            session.totalDocs = casosToLoad.length;
+            for (let cIdx = 0; cIdx < casosToLoad.length; cIdx++) {
+                if (!session.running) break;
+                const casoItem = casosToLoad[cIdx];
+                session.currentDocName = casoItem.aprendiz_nombre || `Caso #${casoItem.id}`;
+                const maxAttempts = 2;
+                for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                    try {
+                        if (cIdx > 0 || attempt > 1) {
+                            await paso3_uformComunicacionElectronica(page, browser, session.logs);
+                            await wait(1000);
+                        }
+                        await paso4_diligenciarComunicacionElectronica(page, browser, casoItem, session.logs, { solo_diligenciar: !!solo_diligenciar });
+                        await pool.query(`UPDATE deserciones_casos SET status = 'Cargado', updated_at = CURRENT_TIMESTAMP WHERE id = $1`, [casoItem.id]).catch(() => {});
+                        session.processedDocs = cIdx + 1;
+                        break;
+                    } catch (caseErr) {
+                        await checkAndClearLocks(browser, session.logs).catch(() => {});
+                        if (attempt < maxAttempts) await wait(3000);
+                    }
+                }
+            }
+            return;
+        }
+
+        // ── AGRUPAR POR SUBCATEGORÍA (SUBSERIE DOCUMENTAL TRD) Y EJECUTAR POR OLEADAS DE TIPOLOGÍA + ESPERA 3 MIN + VERIFICACIÓN ONBASE ──
+        const normTypKey = (t, filename = '') => {
+            const base = String(t || '')
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                .replace(/^[0-9]+\s*[._)-]\s*/, '')
+                .replace(/_[0-9]+$/, '')
+                .toUpperCase()
+                .replace(/[^A-Z0-9\s]/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+            const suffixMatch = String(filename || '').match(/_([2-9]|[1-9][0-9]+)(?=\.[^.]+$|$)/);
+            return suffixMatch ? `${base}__ANEXO_${suffixMatch[1]}` : base;
+        };
+
+        // 1. Pre-filtro Anti-Duplicados contra BD (verificar qué tipologías/archivos ya están Cargados en cada expediente)
+        const expIdsInBatch = [...new Set(batchDocs.map(d => d.expediente_id).filter(Boolean))];
+        const alreadyLoadedTypByExp = new Map();
+        if (expIdsInBatch.length > 0) {
+            try {
+                const loadedRes = await pool.query(
+                    `SELECT expediente_id, typology_name, filename FROM documents WHERE expediente_id = ANY($1::int[]) AND status = 'Cargado'`,
+                    [expIdsInBatch]
+                );
+                for (const r of (loadedRes.rows || [])) {
+                    if (!alreadyLoadedTypByExp.has(r.expediente_id)) {
+                        alreadyLoadedTypByExp.set(r.expediente_id, new Set());
+                    }
+                    const tk = normTypKey(r.typology_name || r.filename, r.filename);
+                    if (tk) alreadyLoadedTypByExp.get(r.expediente_id).add(tk);
+                }
+            } catch {}
+        }
+
+        // Filtrar documentos duplicados dentro del mismo lote o cuya tipología/archivo ya figure Cargada en el expediente
+        const seenInBatchByExp = new Map();
+        const deduplicatedDocs = [];
+        for (const d of batchDocs) {
+            const expKey = d.expediente_id || d.expediente_code || `DOC_${d.id}`;
+            const tk = normTypKey(d.typology_name || d.filename, d.filename);
+            if (!seenInBatchByExp.has(expKey)) seenInBatchByExp.set(expKey, new Set());
+            const batchSet = seenInBatchByExp.get(expKey);
+            const loadedSet = d.expediente_id ? alreadyLoadedTypByExp.get(d.expediente_id) : null;
+
+            if (tk && loadedSet && loadedSet.has(tk)) {
+                session.logs.push(`${botTag} 🛡️ [ANTI-DUPLICADO] Omitiendo "${d.filename}" (${d.typology_name || 'Sin tipología'}) en expediente "${d.expediente_code || expKey}": esta tipología ya figura como Cargada en AES.`);
+                activeDocLocks.delete(d.id);
+                continue;
+            }
+            if (tk && batchSet.has(tk)) {
+                session.logs.push(`${botTag} 🛡️ [ANTI-DUPLICADO] Omitiendo documento repetido "${d.filename}" en el mismo lote para expediente "${d.expediente_code || expKey}".`);
+                activeDocLocks.delete(d.id);
+                continue;
+            }
+            if (tk) batchSet.add(tk);
+            deduplicatedDocs.push(d);
+        }
+
+        session.totalDocs = deduplicatedDocs.length;
+        session.processedDocs = 0;
+
+        // 2. Ordenar y agrupar por Subcategoría de Subserie Documental TRD -> luego por Expediente -> luego por Orden de Tipología TRD
+        const subserieGroupsMap = new Map();
+        const sortedDocs = [...deduplicatedDocs].sort((a, b) => {
+            const subA = String(a.subserie || a.subseries_code || a.series_code || 'ZZZZ').trim();
+            const subB = String(b.subserie || b.subseries_code || b.series_code || 'ZZZZ').trim();
+            if (subA !== subB) return subA.localeCompare(subB, undefined, { numeric: true });
+            const ordA = Number(a.typology_order ?? 9999);
+            const ordB = Number(b.typology_order ?? 9999);
+            if (ordA !== ordB) return ordA - ordB;
+            const expA = String(a.expediente_code || a.expediente_id || '').trim();
+            const expB = String(b.expediente_code || b.expediente_id || '').trim();
+            if (expA !== expB) return expA.localeCompare(expB, undefined, { numeric: true });
+            return (a.id || 0) - (b.id || 0);
+        });
+
+        for (const d of sortedDocs) {
+            const subCode = String(d.subserie || d.subseries_code || d.series_code || 'SIN-SUBSERIE').trim();
+            const subName = String(d.subseries_name || d.series_name || '').trim();
+            if (!subserieGroupsMap.has(subCode)) {
+                subserieGroupsMap.set(subCode, {
+                    subserieCode: subCode,
+                    subserieName: subName,
+                    expedientesMap: new Map()
+                });
+            }
+            const subGrp = subserieGroupsMap.get(subCode);
+            const expKey = (d.expediente_code && String(d.expediente_code).trim()) || `EXP_ID_${d.expediente_id || d.id}`;
+            if (!subGrp.expedientesMap.has(expKey)) {
+                subGrp.expedientesMap.set(expKey, {
+                    expedienteCode: d.expediente_code ? String(d.expediente_code).trim() : '',
+                    expedienteId: d.expediente_id || null,
+                    subserieCode: subCode,
+                    docs: [],
+                    uploadedDocs: []
+                });
+            }
+            subGrp.expedientesMap.get(expKey).docs.push(d);
+        }
+
+        // Asegurar que dentro de cada expediente sus documentos estén estrictamente ordenados de la 1ra a la última tipología TRD
+        const subserieGroups = Array.from(subserieGroupsMap.values()).map(sg => {
+            const exps = Array.from(sg.expedientesMap.values());
+            exps.forEach(exp => {
+                exp.docs.sort((a, b) => {
+                    const ordA = Number(a.typology_order ?? 9999);
+                    const ordB = Number(b.typology_order ?? 9999);
+                    if (ordA !== ordB) return ordA - ordB;
+                    return (a.id || 0) - (b.id || 0);
                 });
             });
+            return {
+                subserieCode: sg.subserieCode,
+                subserieName: sg.subserieName,
+                expedientes: exps
+            };
+        });
 
-            docsToProcess = rows.map(r => {
-                let meta = {};
+        session.logs.push(`${botTag} 🗂️ Lote organizado en ${subserieGroups.length} Subserie(s) Documental(es) TRD (${deduplicatedDocs.length} documento(s) únicos).`);
+        session.logs.push(`${botTag} 🔄 Modo activo: Cargue Horizontal por Oleadas de Tipología -> Espera 3 min de indexación OnBase -> Verificación SGDEA Expediente.`);
+
+        formPage = page;
+        formFrame = page.mainFrame();
+
+        // Función auxiliar que sube 1 documento a OnBase con hasta 2 intentos y control anti-duplicado
+        const uploadSingleDocToOnBase = async (docInfo, docLabel, hasMoreInBatch) => {
+            // Doble chequeo en BD justo antes de subir para garantizar 0 duplicados
+            if (docInfo?.id) {
                 try {
-                    meta = typeof r.exp_meta === 'string' ? JSON.parse(r.exp_meta) : (r.exp_meta || {});
-                } catch { }
-                let docMeta = {};
+                    const stCheck = await pool.query(`SELECT status FROM documents WHERE id = $1 LIMIT 1`, [docInfo.id]);
+                    if (stCheck.rows?.[0]?.status === 'Cargado') {
+                        session.logs.push(`${botTag} 🛡️ [ANTI-DUPLICADO] El documento #${docInfo.id} ("${docInfo.filename}") ya está marcado como Cargado. Saltando...`);
+                        activeDocLocks.delete(docInfo.id);
+                        return true;
+                    }
+                } catch {}
+            }
+
+            const maxDocAttempts = 2;
+            for (let attempt = 1; attempt <= maxDocAttempts; attempt++) {
                 try {
-                    docMeta = typeof r.metadata_values === 'string' ? JSON.parse(r.metadata_values) : (r.metadata_values || {});
-                } catch { }
-                const combinedMeta = { ...meta, ...docMeta };
+                    const stuckState = await isPageStuckOrCloseWindow(session.page || page, browser);
+                    if (stuckState.stuck) {
+                        session.logs.push(`${botTag} [${docLabel}] 🔄 Explorador trabado detectado (${stuckState.reason}). Cerrando y abriendo explorador nuevamente...`);
+                        await launchOrRestartBotBrowser(stuckState.reason);
+                    } else if (attempt > 1) {
+                        session.logs.push(`${botTag} [${docLabel}] 🔄 Reintentando documento (intento ${attempt}/${maxDocAttempts}) — Reiniciando explorador para limpiar sesión...`);
+                        await launchOrRestartBotBrowser(`Reintento ${attempt}/${maxDocAttempts} en ${docInfo?.expediente_code || 'expediente'}`);
+                    }
 
-                // Construir nombre del documento concatenando Valores 1 al 8 exactamente como en la interfaz
-                const metaString = [1, 2, 3, 4, 5, 6, 7, 8]
-                    .map(i => combinedMeta[`valor${i}`] || combinedMeta[`Metadato ${i}`] || '')
-                    .map(v => String(v).trim())
-                    .filter(Boolean)
-                    .join(' ')
-                    .trim();
+                    // PASO 2: FORMULARIO SGDEA
+                    setBotStep(session, `[${docLabel}] PASO 2: Formulario SGDEA (${docInfo.expediente_code || ''})`);
+                    await paso2_abrirFormulario(page, browser, session.logs, true);
+                    await wait(1000);
 
-                const joinedName = metaString || r.exp_title || r.filename;
-                const aesTypology = r.typology_onbase_name || resolveOnBaseTypologyName(r.typology_name);
+                    // PASO 3: CÓDIGO DE EXPEDIENTE
+                    setBotStep(session, `[${docLabel}] PASO 3: Código de Expediente (${docInfo.expediente_code || ''})`);
+                    if (docInfo?.expediente_code) {
+                        let result = await paso3_codigoExpediente(page, browser, docInfo.expediente_code, session.logs);
+                        if (!result || !result.success) {
+                            const midStuck = await isPageStuckOrCloseWindow(session.page || page, browser);
+                            if (midStuck.stuck) {
+                                await launchOrRestartBotBrowser(midStuck.reason);
+                            }
+                            await paso2_abrirFormulario(page, browser, session.logs, true);
+                            await wait(1500);
+                            result = await paso3_codigoExpediente(page, browser, docInfo.expediente_code, session.logs);
+                        }
+                        if (!result || !result.success) {
+                            throw new Error("No se pudo escribir el Código de Expediente o no se encontró el campo.");
+                        }
+                        if (result?.formPage) {
+                            if (result.formPage !== formPage) {
+                                attachScreencastToPage(result.formPage).catch(() => {});
+                            }
+                            formPage = result.formPage;
+                            session.page = formPage;
+                        }
+                        if (result?.formFrame) formFrame = result.formFrame;
+                    }
 
-                return {
-                    ...r,
-                    joinedName,
-                    parsedMeta: combinedMeta,
-                    onbase_name: aesTypology || null
-                };
-            });
+                    // PASO 4: LLENAR CAMPOS
+                    setBotStep(session, `[${docLabel}] PASO 4: Llenar Campos (${docInfo.filename?.substring(0, 28)})`);
+                    if (docInfo) {
+                        await paso4_llenarCampos(formPage, formFrame, docInfo, session.logs);
+                    }
+                    await wait(500);
 
-            logs.push(`[INFO] Lote preparado: ${docsToProcess.length} documento(s) a procesar.`);
-        } catch (e) {
-            logs.push(`[WARN] Error cargando lista de documentos: ${e.message}`);
-        }
-    }
+                    // PASO 5: ADJUNTAR PDF
+                    setBotStep(session, `[${docLabel}] PASO 5: Adjuntar PDF`);
+                    if (docInfo?.path || docInfo?.storage_path) {
+                        const attachOk = await paso5_adjuntarPDF(formPage || page, allFrames, docInfo, session.logs);
+                        if (!attachOk) {
+                            throw new Error("Fallo al adjuntar el archivo PDF.");
+                        }
+                    }
 
-    const jobId = Date.now().toString();
-    currentJob = {
-        running: true,
-        jobId,
-        currentStep: 'Iniciando automatización',
-        logs,
-        error: null,
-        completed: false,
-        screenshot: null,
-        liveFrame: null,
-        liveBuffer: null,
-        startTime: new Date().toISOString(),
-        documentIds: documentIds || []
-    };
+                    // PASO 6: GUARDAR
+                    setBotStep(session, `[${docLabel}] PASO 6: Guardar en OnBase`);
+                    const saveOk = await paso6_guardar(formPage || page, allFrames, session.logs, hasMoreInBatch);
+                    if (!saveOk) {
+                        throw new Error("El guardado falló o el botón Guardar no estuvo disponible.");
+                    }
 
-    automationEmitter.emit('status', currentJob);
+                    if (docInfo?.id) {
+                        await new Promise(resolve => {
+                            db.run(
+                                'UPDATE documents SET status = ?, load_date = ? WHERE id = ?',
+                                ['Cargado', new Date().toISOString(), docInfo.id],
+                                () => resolve()
+                            );
+                        });
+                        activeDocLocks.delete(docInfo.id);
+                    }
+                    return true;
+                } catch (docErr) {
+                    session.logs.push(`${botTag} [ERROR ${docLabel}] (Intento ${attempt}/${maxDocAttempts}) "${docInfo?.filename || 'doc'}": ${docErr.message}`);
+                    await checkAndClearLocks(browser, session.logs).catch(() => {});
+                    if (attempt === maxDocAttempts) {
+                        if (docInfo?.id) activeDocLocks.delete(docInfo.id);
+                        return false;
+                    }
+                    await wait(2500);
+                }
+            }
+            return false;
+        };
 
-    // Responder INMEDIATAMENTE HTTP 200 para evitar 504 Gateway Timeout en Nginx
-    res.json({
-        success: true,
-        jobId,
-        message: 'Automatización iniciada exitosamente en segundo plano.',
-        logs: currentJob.logs
-    });
+        // ── RECORRER SUBCATEGORÍA POR SUBSERIE DOCUMENTAL -> OLEADA DE TIPOLOGÍA #1, #2, #3... ──
+        let docsRemainingOverall = deduplicatedDocs.length;
+        let docsSinceBrowserRecycle = 0;
+        const BROWSER_RECYCLE_EVERY_DOCS = 60; // Reciclaje preventivo de Chromium para lotes masivos (4000+ expedientes)
 
-    // Ejecutar Puppeteer en segundo plano
-    (async () => {
-        let browser;
-        try {
-            activeBrowser = await puppeteer.launch({
-                headless: process.platform === 'linux' ? true : false,
-                args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-            });
-            browser = activeBrowser;
+        for (let sIdx = 0; sIdx < subserieGroups.length; sIdx++) {
+            if (!session.running) break;
+            const subGrp = subserieGroups[sIdx];
+            const expsInSub = subGrp.expedientes || [];
+            const maxWaves = expsInSub.reduce((max, e) => Math.max(max, e.docs.length), 0);
 
-            // Manejador global de diálogos en nuevas pestañas/páginas
-            activeBrowser.on('targetcreated', async target => {
-                if (target.type() === 'page') {
-                    const newPage = await target.page().catch(() => null);
-                    if (newPage) {
-                        newPage.on('dialog', async dialog => {
-                            const msg = dialog.message();
-                            currentJob.logs.push(`[DIALOG] 💬 Diálogo nativo detectado en pestaña: "${msg}" (${dialog.type()}). Aceptando automáticamente...`);
-                            await dialog.accept().catch(() => {});
+            session.logs.push(`
+╔══════════════════════════════════════════════════════════════════╗`);
+            session.logs.push(`${botTag} 🗂️ SUBCATEGORÍA SUBSERIE TRD (${sIdx + 1}/${subserieGroups.length}): "${subGrp.subserieCode}" ${subGrp.subserieName ? `· ${subGrp.subserieName}` : ''}`);
+            session.logs.push(`${botTag} 📁 Expedientes en esta Subserie: ${expsInSub.length} | Oleadas de Tipología a ejecutar: ${maxWaves}`);
+            session.logs.push(`╚══════════════════════════════════════════════════════════════════╝`);
+
+            for (let waveIdx = 0; waveIdx < maxWaves; waveIdx++) {
+                if (!session.running) break;
+
+                // Seleccionar el documento de la Tipología #(waveIdx + 1) de cada expediente de esta subserie
+                const waveItems = [];
+                for (const expObj of expsInSub) {
+                    if (waveIdx < expObj.docs.length) {
+                        waveItems.push({
+                            expObj,
+                            docInfo: expObj.docs[waveIdx]
                         });
                     }
                 }
-            });
 
-            activePage = await activeBrowser.newPage();
-            const page = activePage;
-            await page.setViewport({ width: 1366, height: 900 });
+                if (waveItems.length === 0) continue;
 
-            // Manejador de diálogos en la página principal
-            page.on('dialog', async dialog => {
-                const msg = dialog.message();
-                currentJob.logs.push(`[DIALOG] 💬 Diálogo nativo detectado: "${msg}" (${dialog.type()}). Aceptando automáticamente...`);
-                await dialog.accept().catch(() => {});
-            });
+                const waveNumber = waveIdx + 1;
+                const sampleTypName = waveItems[0]?.docInfo?.typology_name || `Tipología #${waveNumber}`;
+                session.logs.push(`
+🌊 ════════════════════════════════════════════════════════════════`);
+                session.logs.push(`${botTag} 🌊 INICIANDO OLEADA DE TIPOLOGÍA #${waveNumber}/${maxWaves} [Subserie ${subGrp.subserieCode}]`);
+                session.logs.push(`${botTag} 📌 Tipología principal de la oleada: "${sampleTypName}" en ${waveItems.length} expediente(s)`);
+                session.logs.push(`🌊 ════════════════════════════════════════════════════════════════`);
 
-            // Screencast en tiempo real con throttling optimizado (alta fluidez, bajo consumo de CPU y red)
-            try {
-                const session = await page.target().createCDPSession();
-                await session.send('Page.startScreencast', {
-                    format: 'jpeg',
-                    quality: 30,
-                    maxWidth: 800,
-                    maxHeight: 500,
-                    everyNthFrame: 10
-                });
-                let lastFrameTime = 0;
-                session.on('Page.screencastFrame', ev => {
-                    const now = Date.now();
-                    // Limitar actualización de buffer a máximo 1 FPS para no recargar CPU ni event loop
-                    if (now - lastFrameTime >= 900) {
-                        lastFrameTime = now;
-                        currentJob.liveBuffer = Buffer.from(ev.data, 'base64');
-                        currentJob.liveFrame = 'data:image/jpeg;base64,' + ev.data;
-                        automationEmitter.emit('frame', ev.data);
+                const expedientesTouchedInWave = [];
+
+                for (let wIdx = 0; wIdx < waveItems.length; wIdx++) {
+                    if (!session.running) break;
+                    const { expObj, docInfo } = waveItems[wIdx];
+                    docsRemainingOverall = Math.max(0, docsRemainingOverall - 1);
+                    const hasMoreOverall = docsRemainingOverall > 0;
+
+                    session.currentExpedienteCode = expObj.expedienteCode || `Exp #${expObj.expedienteId}`;
+                    session.currentDocId = docInfo.id;
+                    session.currentDocName = docInfo.filename || `Doc #${docInfo.id}`;
+
+                    const docLabel = `Subserie ${subGrp.subserieCode} · Oleada Tipología #${waveNumber}/${maxWaves} · Exp ${wIdx + 1}/${waveItems.length} (${session.currentExpedienteCode})`;
+
+                    session.logs.push(`--------------------------------------------------`);
+                    session.logs.push(`${botTag} [${docLabel}] Cargando "${docInfo.typology_name || 'Doc'}" -> Archivo: "${docInfo.filename}"`);
+                    session.logs.push(`--------------------------------------------------`);
+
+                    // Tope de seguridad en memoria para logs de lotes masivos (4000+ expedientes / 26000+ docs)
+                    if (session.logs.length > 600) {
+                        session.logs.splice(0, session.logs.length - 450);
                     }
-                    session.send('Page.screencastFrameAck', { sessionId: ev.sessionId }).catch(() => { });
-                });
-            } catch { }
 
-            const allFrames = () => page.frames();
-
-            // ── RESOLUCIÓN DE CREDENCIALES POR TRD Y DEPENDENCIA ──
-            const orgRows = await new Promise(resolve => {
-                db.all("SELECT id, section_name, subsection_name, section_code, subsection_code, onbase_user, onbase_pass, onbase_username, onbase_password FROM organization_structure", [], (err, rows) => {
-                    resolve(rows || []);
-                });
-            });
-
-            const findOrg = (subCode) => {
-                return orgRows.find(o => subCode ? o.subsection_code === subCode : (!o.subsection_code || o.subsection_code === '')) || null;
-            };
-
-            const orgSub = findOrg('') || { id: 6, section_name: 'Subdirección de Centro', subsection_code: '', onbase_user: 'TVILLAMIZARJ', onbase_pass: 'Sena2026**onbase' };
-            const orgAdmin = findOrg('9224.2') || { id: 7, subsection_name: 'Grupo Administración Educativa', subsection_code: '9224.2', onbase_user: 'luepitar', onbase_pass: 'Automatizador2026*' };
-            const orgForm = findOrg('9224.4') || { id: 8, subsection_name: 'Grupo de Formación Profesional Integral', subsection_code: '9224.4', onbase_user: 'EDHERNANDEZM', onbase_pass: 'Sena2026**onbase' };
-
-            const getU = (org, fallbackU) => (org?.onbase_user || org?.onbase_username || fallbackU).trim();
-            const getP = (org, fallbackP) => (org?.onbase_pass || org?.onbase_password || fallbackP).trim();
-
-            const resolveDocCreds = (doc) => {
-                // Si el usuario forzó explícitamente un usuario de OnBase (diferente de 'auto')
-                if (target_user && target_user !== 'auto') {
-                    const tu = String(target_user).toLowerCase().trim();
-                    if (tu.includes('edhernandezm') || tu.includes('formacion') || tu.includes('9224.4')) {
-                        return {
-                            depKey: '9224.4',
-                            depName: orgForm.subsection_name || 'Grupo de Formación Profesional Integral',
-                            depCode: '9224.4',
-                            username: getU(orgForm, 'EDHERNANDEZM'),
-                            password: getP(orgForm, 'Sena2026**onbase'),
-                            rule: 'Selección explícita de usuario (Formación Profesional)'
-                        };
+                    // Reciclaje preventivo de Chromium cada 60 documentos para liberar RAM y caché temporal
+                    if (docsSinceBrowserRecycle >= BROWSER_RECYCLE_EVERY_DOCS && session.running) {
+                        docsSinceBrowserRecycle = 0;
+                        session.logs.push(`${botTag} ♻️ [MANTENIMIENTO RAM] Reciclando explorador preventivamente tras ${BROWSER_RECYCLE_EVERY_DOCS} documentos para mantener memoria óptima...`);
+                        await launchOrRestartBotBrowser(`Mantenimiento preventivo de RAM (${BROWSER_RECYCLE_EVERY_DOCS} docs)`);
                     }
-                    if (tu.includes('luepitar') || tu.includes('administracion') || tu.includes('9224.2')) {
-                        return {
-                            depKey: '9224.2',
-                            depName: orgAdmin.subsection_name || 'Grupo Administración Educativa',
-                            depCode: '9224.2',
-                            username: getU(orgAdmin, 'luepitar'),
-                            password: getP(orgAdmin, 'Automatizador2026*'),
-                            rule: 'Selección explícita de usuario (Adm. Educativa)'
-                        };
+
+                    const uploadedOk = await uploadSingleDocToOnBase(docInfo, docLabel, hasMoreOverall);
+                    docsSinceBrowserRecycle += 1;
+                    if (uploadedOk) {
+                        session.processedDocs += 1;
+                        expObj.uploadedDocs.push(docInfo);
+                        if (expObj.expedienteCode && !expedientesTouchedInWave.includes(expObj)) {
+                            expedientesTouchedInWave.push(expObj);
+                        }
+                        session.logs.push(`${botTag} ✅ [${docLabel}] Radicado en OnBase (${session.processedDocs}/${session.totalDocs} del lote total)`);
                     }
-                    if (tu.includes('tvillamizar') || tu.includes('jrrozo') || tu.includes('subdireccion') || tu.includes('9224')) {
-                        return {
-                            depKey: '9224',
-                            depName: orgSub.section_name || 'Subdirección de Centro',
-                            depCode: '9224',
-                            username: getU(orgSub, 'TVILLAMIZARJ'),
-                            password: getP(orgSub, 'Sena2026**onbase'),
-                            rule: 'Selección explícita de usuario (Subdirección)'
-                        };
+
+                    if (wIdx < waveItems.length - 1 && session.running) {
+                        await wait(1500);
                     }
-                    return {
-                        depKey: 'custom',
-                        depName: 'Usuario Personalizado',
-                        depCode: 'N/A',
-                        username: target_user,
-                        password: password || getP(orgSub, 'Sena2026**onbase'),
-                        rule: `Usuario explícito: ${target_user}`
-                    };
                 }
 
-                if (!doc) {
-                    return {
-                        depKey: '9224',
-                        depName: orgSub.section_name || 'Subdirección de Centro',
-                        depCode: '9224',
-                        username: username || getU(orgSub, 'TVILLAMIZARJ'),
-                        password: password || getP(orgSub, 'Sena2026**onbase'),
-                        rule: 'General / Sin documento'
-                    };
+                // ── AVANCE CONTINUO SIN PAUSA DE VERIFICADOR AUTOMÁTICO (Revisión manual en pestaña "Verificador") ──
+                if (expedientesTouchedInWave.length > 0 && session.running) {
+                    session.waitingForVerifier = false;
+                    session.skipVerifierWait = false;
+                    if (waveNumber < maxWaves) {
+                        session.logs.push(`${botTag} ✅ Oleada de Tipología #${waveNumber}/${maxWaves} completada (${expedientesTouchedInWave.length} expediente(s)). Avanzando de inmediato a la Oleada #${waveNumber + 1}/${maxWaves} sin interrupciones...`);
+                    } else {
+                        session.logs.push(`${botTag} 🎉 Subcategoría Subserie "${subGrp.subserieCode}" completada en todas sus tipologías. Lista para revisión y OK en la pestaña "Verificador".`);
+                    }
                 }
+            }
+        }
 
-                // Detección automática por códigos TRD (Serie, Subserie, Código Expediente o Nombre de Archivo)
-                const text = `${doc.subserie || ''} ${doc.subseries_code || ''} ${doc.series_code || ''} ${doc.expediente_code || ''} ${doc.filename || ''}`.toUpperCase();
+        // ── PASO 7: CERRAR SESIÓN FINAL DE ESTE BOT ──
+        setBotStep(session, 'PASO 7: Cerrar Sesión final');
+        await paso7_logout(page, allFrames, session.logs);
 
-                if (text.includes('9224.4') || text.includes('68.9224.4') || doc.organization_id === 8 || doc.series_dep_id === 8) {
+        const screenshotBuffer = await page.screenshot({ fullPage: false }).catch(() => null);
+        session.screenshot = screenshotBuffer ? `data:image/png;base64,${screenshotBuffer.toString('base64')}` : null;
+        session.logs.push(`${botTag} 🎉 Proceso de cargue y verificación completado (${session.processedDocs}/${session.totalDocs} documentos).`);
+
+    } catch (err) {
+        session.error = err.message;
+        session.logs.push(`${botTag} [ERROR CRÍTICO] ${err.message}`);
+    } finally {
+        if (Array.isArray(session.documentIds)) {
+            session.documentIds.forEach(id => activeDocLocks.delete(id));
+        }
+        if (browser) {
+            await safeForceCloseBrowser(browser, profileDir);
+        }
+        session.browser = null;
+        session.page = null;
+        session.running = false;
+        session.waitingForVerifier = false;
+        session.completed = true;
+        session.currentDocId = null;
+        automationEmitter.emit('done', session);
+    }
+}
+
+exports.executeAutomation = async (req, res) => {
+    try {
+        let {
+            url,
+            username,
+            password,
+            documentIds,
+            action,
+            target_user,
+            bot_key,
+            stop_at_step,
+            caso_ids,
+            force_restart
+        } = req.body || {};
+
+        const orgRows = await new Promise(resolve => {
+            db.all("SELECT id, section_name, subsection_name, section_code, subsection_code, onbase_user, onbase_pass, onbase_username, onbase_password FROM organization_structure", [], (err, rows) => {
+                resolve(rows || []);
+            });
+        });
+
+        const findOrg = (subCode) => {
+            return orgRows.find(o => subCode ? o.subsection_code === subCode : (!o.subsection_code || o.subsection_code === '')) || null;
+        };
+
+        const orgSub = findOrg('') || { id: 6, section_name: 'Subdirección de Centro', subsection_code: '', onbase_user: 'TVILLAMIZARJ', onbase_pass: 'Sena2026**onbase' };
+        const orgAdmin = findOrg('9224.2') || { id: 7, subsection_name: 'Grupo Administración Educativa', subsection_code: '9224.2', onbase_user: 'luepitar', onbase_pass: 'Automatizador2026*' };
+        const orgForm = findOrg('9224.4') || { id: 8, subsection_name: 'Grupo de Formación Profesional Integral', subsection_code: '9224.4', onbase_user: 'EDHERNANDEZM', onbase_pass: 'Sena2026**onbase' };
+
+        const getU = (org, fallbackU) => (org?.onbase_user || org?.onbase_username || fallbackU).trim();
+        const getP = (org, fallbackP) => (org?.onbase_pass || org?.onbase_password || fallbackP).trim();
+
+        botSessions['9224'].onbaseUser = getU(orgSub, 'TVILLAMIZARJ');
+        botSessions['9224.4'].onbaseUser = getU(orgForm, 'EDHERNANDEZM');
+        botSessions['9224.2'].onbaseUser = getU(orgAdmin, 'luepitar');
+
+        const resolveDocCreds = (doc) => {
+            const explicitTarget = bot_key || (target_user && target_user !== 'auto' ? target_user : null);
+            if (explicitTarget) {
+                const tu = String(explicitTarget).toLowerCase().trim();
+                if (tu.includes('edhernandezm') || tu.includes('formacion') || tu.includes('9224.4')) {
                     return {
                         depKey: '9224.4',
                         depName: orgForm.subsection_name || 'Grupo de Formación Profesional Integral',
                         depCode: '9224.4',
                         username: getU(orgForm, 'EDHERNANDEZM'),
                         password: getP(orgForm, 'Sena2026**onbase'),
-                        rule: 'TRD 9224.4 (Formación Profesional Integral)'
+                        rule: 'Bot 2 · Formación Profesional (9224.4)'
                     };
                 }
-
-                if (text.includes('9224.2') || text.includes('68.9224.2') || doc.organization_id === 7 || doc.series_dep_id === 7) {
+                if (tu.includes('luepitar') || tu.includes('administracion') || tu.includes('9224.2')) {
                     return {
                         depKey: '9224.2',
                         depName: orgAdmin.subsection_name || 'Grupo Administración Educativa',
                         depCode: '9224.2',
                         username: getU(orgAdmin, 'luepitar'),
                         password: getP(orgAdmin, 'Automatizador2026*'),
-                        rule: 'TRD 9224.2 (Administración Educativa)'
+                        rule: 'Bot 3 · Administración Educativa (9224.2)'
                     };
                 }
-
-                if (text.includes('68.9224-') || text.includes('9224-') || text.includes('68.9224/') || doc.organization_id === 6 || doc.series_dep_id === 6) {
+                if (tu.includes('tvillamizar') || tu.includes('jrrozo') || tu.includes('subdireccion') || tu.includes('9224')) {
                     return {
                         depKey: '9224',
                         depName: orgSub.section_name || 'Subdirección de Centro',
                         depCode: '9224',
                         username: getU(orgSub, 'TVILLAMIZARJ'),
                         password: getP(orgSub, 'Sena2026**onbase'),
-                        rule: 'TRD 9224 (Subdirección de Centro)'
+                        rule: 'Bot 1 · Subdirección de Centro (9224)'
                     };
                 }
+            }
 
-                // Detección por usuario en sesión (si no es admin)
-                if (req.user && req.user.organization_id === 8) {
-                    return {
-                        depKey: '9224.4',
-                        depName: orgForm.subsection_name || 'Grupo de Formación Profesional Integral',
-                        depCode: '9224.4',
-                        username: getU(orgForm, 'EDHERNANDEZM'),
-                        password: getP(orgForm, 'Sena2026**onbase'),
-                        rule: 'Dependencia del Usuario (Formación)'
-                    };
-                }
-                if (req.user && req.user.organization_id === 7) {
-                    return {
-                        depKey: '9224.2',
-                        depName: orgAdmin.subsection_name || 'Grupo Administración Educativa',
-                        depCode: '9224.2',
-                        username: getU(orgAdmin, 'luepitar'),
-                        password: getP(orgAdmin, 'Automatizador2026*'),
-                        rule: 'Dependencia del Usuario (Adm. Educativa)'
-                    };
-                }
+            if (!doc) {
+                return {
+                    depKey: '9224.4',
+                    depName: orgForm.subsection_name || 'Grupo de Formación Profesional Integral',
+                    depCode: '9224.4',
+                    username: username || getU(orgForm, 'EDHERNANDEZM'),
+                    password: password || getP(orgForm, 'Sena2026**onbase'),
+                    rule: 'General / Sin documento'
+                };
+            }
 
-                // Fallback por defecto: Subdirección
+            const text = `${doc.subserie || ''} ${doc.subseries_code || ''} ${doc.series_code || ''} ${doc.expediente_code || ''} ${doc.filename || ''}`.toUpperCase();
+
+            if (text.includes('9224.4') || text.includes('68.9224.4') || doc.organization_id === 8 || doc.series_dep_id === 8) {
+                return {
+                    depKey: '9224.4',
+                    depName: orgForm.subsection_name || 'Grupo de Formación Profesional Integral',
+                    depCode: '9224.4',
+                    username: getU(orgForm, 'EDHERNANDEZM'),
+                    password: getP(orgForm, 'Sena2026**onbase'),
+                    rule: 'TRD 9224.4 (Formación Profesional Integral)'
+                };
+            }
+
+            if (text.includes('9224.2') || text.includes('68.9224.2') || doc.organization_id === 7 || doc.series_dep_id === 7) {
+                return {
+                    depKey: '9224.2',
+                    depName: orgAdmin.subsection_name || 'Grupo Administración Educativa',
+                    depCode: '9224.2',
+                    username: getU(orgAdmin, 'luepitar'),
+                    password: getP(orgAdmin, 'Automatizador2026*'),
+                    rule: 'TRD 9224.2 (Administración Educativa)'
+                };
+            }
+
+            if (text.includes('68.9224-') || text.includes('9224-') || text.includes('68.9224/') || doc.organization_id === 6 || doc.series_dep_id === 6) {
                 return {
                     depKey: '9224',
                     depName: orgSub.section_name || 'Subdirección de Centro',
                     depCode: '9224',
-                    username: username || getU(orgSub, 'TVILLAMIZARJ'),
-                    password: password || getP(orgSub, 'Sena2026**onbase'),
-                    rule: 'Fallback General (Subdirección)'
+                    username: getU(orgSub, 'TVILLAMIZARJ'),
+                    password: getP(orgSub, 'Sena2026**onbase'),
+                    rule: 'TRD 9224 (Subdirección de Centro)'
                 };
+            }
+
+            if (req.user && req.user.organization_id === 8) {
+                return {
+                    depKey: '9224.4',
+                    depName: orgForm.subsection_name || 'Grupo de Formación Profesional Integral',
+                    depCode: '9224.4',
+                    username: getU(orgForm, 'EDHERNANDEZM'),
+                    password: getP(orgForm, 'Sena2026**onbase'),
+                    rule: 'Dependencia del Usuario (Formación)'
+                };
+            }
+            if (req.user && req.user.organization_id === 7) {
+                return {
+                    depKey: '9224.2',
+                    depName: orgAdmin.subsection_name || 'Grupo Administración Educativa',
+                    depCode: '9224.2',
+                    username: getU(orgAdmin, 'luepitar'),
+                    password: getP(orgAdmin, 'Automatizador2026*'),
+                    rule: 'Dependencia del Usuario (Adm. Educativa)'
+                };
+            }
+
+            return {
+                depKey: '9224',
+                depName: orgSub.section_name || 'Subdirección de Centro',
+                depCode: '9224',
+                username: username || getU(orgSub, 'TVILLAMIZARJ'),
+                password: password || getP(orgSub, 'Sena2026**onbase'),
+                rule: 'Fallback General (Subdirección)'
             };
+        };
 
-            // Agrupar documentos por dependencia
-            const depBatches = [];
-            if (docsToProcess.length > 0) {
-                const groupMap = new Map();
-                for (const doc of docsToProcess) {
-                    const creds = resolveDocCreds(doc);
-                    if (!groupMap.has(creds.depKey)) {
-                        groupMap.set(creds.depKey, {
-                            ...creds,
-                            docs: []
-                        });
+        let docsToProcess = [];
+        if (Array.isArray(documentIds) && documentIds.length > 0) {
+            try {
+                const validDocIds = documentIds.map(x => parseInt(x, 10)).filter(x => Number.isInteger(x) && x > 0);
+                const [typCatRes, serCatRes, subCatRes, docsQueryRes] = await Promise.all([
+                    pool.query('SELECT id, series_id, subseries_id, typology_name, onbase_name FROM trd_typologies ORDER BY id ASC'),
+                    pool.query('SELECT id, series_code, series_name, dependency_id FROM trd_series'),
+                    pool.query('SELECT id, series_id, subseries_code, subseries_name FROM trd_subseries'),
+                    pool.query(`
+                        SELECT d.*, e.expediente_code, e.title as exp_title, e.opening_date, e.subserie, e.metadata_values as exp_meta
+                        FROM documents d
+                        LEFT JOIN expedientes e ON d.expediente_id = e.id
+                        WHERE d.id = ANY($1::int[])
+                    `, [validDocIds])
+                ]);
+
+                const serById = new Map();
+                const serByCode = new Map();
+                for (const s of (serCatRes.rows || [])) {
+                    serById.set(s.id, s);
+                    if (s.series_code) serByCode.set(String(s.series_code).trim(), s);
+                }
+
+                const subById = new Map();
+                const subList = subCatRes.rows || [];
+                for (const sb of subList) subById.set(sb.id, sb);
+
+                const cleanTypStr = (s) => String(s || '').trim().replace(/^[0-9]+\s*[._)-]\s*/, '').replace(/_[0-9]+$/, '').trim().toLowerCase();
+                const typMinIdByClean = new Map();
+                const typRowsAll = (typCatRes.rows || []).map(t => {
+                    const cl = cleanTypStr(t.typology_name);
+                    if (cl && (!typMinIdByClean.has(cl) || t.id < typMinIdByClean.get(cl))) {
+                        typMinIdByClean.set(cl, t.id);
                     }
-                    groupMap.get(creds.depKey).docs.push(doc);
-                }
-                for (const b of groupMap.values()) {
-                    depBatches.push(b);
-                }
-            } else {
-                const defaultCreds = resolveDocCreds(null);
-                depBatches.push({
-                    ...defaultCreds,
-                    docs: []
+                    return { ...t, _clean: cl };
                 });
+
+                const rawRows = (docsQueryRes.rows || []).map(r => {
+                    const eSub = String(r.subserie || '').trim();
+                    let subObj = r.trd_subseries_id ? subById.get(r.trd_subseries_id) : null;
+                    if (!subObj && eSub) {
+                        subObj = subList.find(sb => sb.subseries_code === eSub || eSub.toUpperCase().endsWith('-' + String(sb.subseries_code || '').toUpperCase())) || null;
+                    }
+                    let serObj = r.trd_series_id ? serById.get(r.trd_series_id) : (subObj ? serById.get(subObj.series_id) : null);
+                    if (!serObj && eSub) {
+                        serObj = serByCode.get(eSub) || null;
+                    }
+
+                    const dClean = cleanTypStr(r.typology_name);
+                    const typOrder = (dClean && typMinIdByClean.has(dClean)) ? typMinIdByClean.get(dClean) : 9999;
+
+                    let matchedOnbase = null;
+                    if (dClean) {
+                        const candidates = typRowsAll.filter(t =>
+                            t.onbase_name && String(t.onbase_name).trim() !== '' &&
+                            (t._clean === dClean || dClean.includes(t._clean) || (t._clean.length >= 4 && t._clean.includes(dClean)))
+                        );
+                        if (candidates.length > 0) {
+                            candidates.sort((a, b) => {
+                                const aSer = (a.series_id === r.trd_series_id || a.subseries_id === r.trd_subseries_id) ? 0 : 1;
+                                const bSer = (b.series_id === r.trd_series_id || b.subseries_id === r.trd_subseries_id) ? 0 : 1;
+                                if (aSer !== bSer) return aSer - bSer;
+                                const aEx = a._clean === dClean ? 0 : 1;
+                                const bEx = b._clean === dClean ? 0 : 1;
+                                return aEx - bEx;
+                            });
+                            matchedOnbase = candidates[0].onbase_name;
+                        }
+                    }
+
+                    return {
+                        ...r,
+                        series_code: serObj?.series_code || null,
+                        series_name: serObj?.series_name || null,
+                        series_dep_id: serObj?.dependency_id || null,
+                        subseries_code: subObj?.subseries_code || null,
+                        subseries_name: subObj?.subseries_name || null,
+                        typology_order: typOrder,
+                        typology_onbase_name: matchedOnbase
+                    };
+                });
+
+                rawRows.sort((a, b) => {
+                    const sa = String(a.subserie || '').trim() || 'ZZZZ';
+                    const sb = String(b.subserie || '').trim() || 'ZZZZ';
+                    if (sa !== sb) return sa.localeCompare(sb);
+                    if (a.typology_order !== b.typology_order) return a.typology_order - b.typology_order;
+                    const ea = String(a.expediente_code || '').trim() || 'ZZZZ';
+                    const eb = String(b.expediente_code || '').trim() || 'ZZZZ';
+                    if (ea !== eb) return ea.localeCompare(eb);
+                    return (a.id || 0) - (b.id || 0);
+                });
+
+                const rows = rawRows;
+
+                docsToProcess = rows.map(r => {
+                    let meta = {};
+                    try { meta = typeof r.exp_meta === 'string' ? JSON.parse(r.exp_meta) : (r.exp_meta || {}); } catch {}
+                    let docMeta = {};
+                    try { docMeta = typeof r.metadata_values === 'string' ? JSON.parse(r.metadata_values) : (r.metadata_values || {}); } catch {}
+                    const combinedMeta = { ...meta, ...docMeta };
+
+                    const metaString = [1, 2, 3, 4, 5, 6, 7, 8]
+                        .map(i => combinedMeta[`valor${i}`] || combinedMeta[`Metadato ${i}`] || '')
+                        .map(v => String(v).trim())
+                        .filter(Boolean)
+                        .join(' ')
+                        .trim();
+
+                    const joinedName = metaString || r.exp_title || r.filename;
+                    const catalogTyp = findCatalogOnBaseTypology(r.typology_name);
+                    const aesTypology = catalogTyp || r.typology_onbase_name || null;
+
+                    return {
+                        ...r,
+                        joinedName,
+                        parsedMeta: combinedMeta,
+                        onbase_name: aesTypology || null
+                    };
+                });
+            } catch (e) {
+                console.error('[WARN] Error cargando lista de documentos:', e.message);
             }
-
-            // Ejecutar cada lote por dependencia
-            for (let bIdx = 0; bIdx < depBatches.length; bIdx++) {
-                if (!currentJob.running) break;
-
-                const currentBatch = depBatches[bIdx];
-                const batchDocs = currentBatch.docs || [];
-
-                currentJob.logs.push(`\n==================================================`);
-                currentJob.logs.push(`[LOTE ${bIdx + 1}/${depBatches.length}] 🏢 Dependencia TRD: ${currentBatch.depName} (${currentBatch.depCode})`);
-                currentJob.logs.push(`[LOTE ${bIdx + 1}/${depBatches.length}] 🔑 Usuario OnBase: "${currentBatch.username}" | Criterio: ${currentBatch.rule}`);
-                currentJob.logs.push(`[LOTE ${bIdx + 1}/${depBatches.length}] 📄 Documentos a procesar: ${batchDocs.length}`);
-                currentJob.logs.push(`==================================================`);
-
-                // ── PASO 1: LOGIN POR DEPENDENCIA ──
-                currentJob.currentStep = `PASO 1: Login (${currentBatch.username})`;
-                const loginOk = await paso1_login(page, url, currentBatch.username, currentBatch.password, currentJob.logs);
-                if (!loginOk) {
-                    currentJob.logs.push(`[ERROR] Login fallido con el usuario "${currentBatch.username}".`);
-                    if (depBatches.length === 1) {
-                        const ss = await page.screenshot().catch(() => null);
-                        if (activeBrowser) {
-                            await activeBrowser.close().catch(() => {});
-                            activeBrowser = null;
-                            activePage = null;
-                        }
-                        currentJob.running = false;
-                        currentJob.completed = true;
-                        currentJob.error = `Login fallido con usuario ${currentBatch.username}. Verifique credenciales en Configuración AES.`;
-                        currentJob.screenshot = ss ? `data:image/png;base64,${ss.toString('base64')}` : null;
-                        automationEmitter.emit('done', currentJob);
-                        return;
-                    } else {
-                        currentJob.logs.push(`[WARN] Saltando lote de ${currentBatch.username} por fallo en login, continuando con siguientes...`);
-                        continue;
-                    }
-                }
-
-                // ── SI ES MÓDULO DE DESERCIONES ──
-                if (action === 'deserciones_onbase_cargue' || stop_at_step === 3) {
-                    currentJob.currentStep = 'PASO 3: Selección de UForm Comunicación Electrónica';
-                    currentJob.logs.push('[DESERCIONES] Abriendo "COMUNICACIONES PRODUCIDAS" -> "UForm Comunicacion Electronica"...');
-                    
-                    await paso3_uformComunicacionElectronica(page, browser, currentJob.logs);
-                    
-                    if (stop_at_step === 3) {
-                        currentJob.logs.push(`[INFO] ✅ Formulario "UForm Comunicación Electrónica" cargado exitosamente en pantalla. Robot listo en Paso 3.`);
-                        currentJob.running = false;
-                        currentJob.completed = true;
-                        automationEmitter.emit('done', currentJob);
-                        return;
-                    }
-
-                    // ── PASO 4: DILIGENCIAR Y ENVIAR FORMULARIO DE COMUNICACIÓN ──
-                    currentJob.currentStep = 'PASO 4: Diligenciamiento de Formulario de Comunicación';
-                    let casosToLoad = [];
-
-                    if (req.body.casos_data && Array.isArray(req.body.casos_data) && req.body.casos_data.length > 0) {
-                        casosToLoad = req.body.casos_data;
-                    } else if (caso_ids && Array.isArray(caso_ids) && caso_ids.length > 0) {
-                        const validNumIds = caso_ids.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
-                        if (validNumIds.length > 0) {
-                            const placeholders = validNumIds.map((_, i) => `$${i + 1}`).join(',');
-                            const qRes = await pool.query(`SELECT * FROM deserciones_casos WHERE id IN (${placeholders})`, validNumIds).catch(() => ({ rows: [] }));
-                            casosToLoad = qRes.rows || [];
-                        }
-                    }
-
-                    if (casosToLoad.length === 0) {
-                        const qRes = await pool.query(`SELECT * FROM deserciones_casos WHERE status = 'Pendiente' ORDER BY id ASC LIMIT 50`).catch(() => ({ rows: [] }));
-                        casosToLoad = qRes.rows || [];
-                    }
-
-                    // Fallback para pruebas o demos si no hay datos de casos provistos
-                    if (casosToLoad.length === 0) {
-                        casosToLoad = [{
-                            id: 1,
-                            aprendiz_nombre: 'MANUEL VALENCIA SANCHEZ',
-                            aprendiz_correo: 'manuel.valencia@sena.edu.co',
-                            asunto: 'NOVEDADES DE ALUMNOS',
-                            descripcion_asunto: 'Notificación de Deserción de Aprendiz',
-                            texto_combinado: 'Por medio del presente documento se notifica el inicio del trámite de deserción correspondiente.'
-                        }];
-                    }
-                        currentJob.logs.push(`[DESERCIONES] Procesando ${casosToLoad.length} caso(s) de deserción para cargue completo en OnBase...`);
-
-                        for (let cIdx = 0; cIdx < casosToLoad.length; cIdx++) {
-                            if (!currentJob.running) break;
-                            const casoItem = casosToLoad[cIdx];
-                            currentJob.logs.push(`\n==================================================`);
-                            currentJob.logs.push(`[DESERCIONES Caso ${cIdx + 1}/${casosToLoad.length}] Aprendiz: ${casoItem.aprendiz_nombre} (Doc: ${casoItem.aprendiz_doc_numero})`);
-                            currentJob.logs.push(`==================================================`);
-
-                            let casoOk = false;
-                            const maxAttempts = 2;
-
-                            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-                                try {
-                                    if (cIdx > 0 || attempt > 1) {
-                                        await paso3_uformComunicacionElectronica(page, browser, currentJob.logs);
-                                        await wait(1000);
-                                    }
-
-                                    const isSoloDiligenciar = !!req.body.solo_diligenciar;
-                                    await paso4_diligenciarComunicacionElectronica(page, browser, casoItem, currentJob.logs, { solo_diligenciar: isSoloDiligenciar });
-
-                                    await pool.query(`UPDATE deserciones_casos SET status = 'Cargado', updated_at = CURRENT_TIMESTAMP WHERE id = $1`, [casoItem.id]).catch(() => {});
-                                    currentJob.logs.push(`[DESERCIONES Caso ${cIdx + 1}/${casosToLoad.length}] ✅ Caso #${casoItem.id} radicado y actualizado a 'Cargado' en BD.`);
-                                    casoOk = true;
-                                    break;
-                                } catch (caseErr) {
-                                    currentJob.logs.push(`[DESERCIONES Caso ${cIdx + 1}] ⚠️ Intento ${attempt}/${maxAttempts} falló: ${caseErr.message}`);
-                                    await checkAndClearLocks(browser, currentJob.logs).catch(() => {});
-                                    if (attempt < maxAttempts) {
-                                        currentJob.logs.push(`[DESERCIONES Caso ${cIdx + 1}] 🔄 Reintentando en 3 segundos...`);
-                                        await wait(3000);
-                                    } else {
-                                        // Capturar screenshot de evidencia del error
-                                        let errorScreenPath = null;
-                                        try {
-                                            const errDir = path.join(__dirname, '..', 'uploads', 'deserciones', 'errors');
-                                            if (!fs.existsSync(errDir)) fs.mkdirSync(errDir, { recursive: true });
-                                            const errFileName = `error_caso_${casoItem.id}_${Date.now()}.png`;
-                                            const fullErrPath = path.join(errDir, errFileName);
-                                            await page.screenshot({ path: fullErrPath, fullPage: false });
-                                            errorScreenPath = `/uploads/deserciones/errors/${errFileName}`;
-                                            currentJob.logs.push(`[DESERCIONES Caso ${cIdx + 1}] 📸 Captura de evidencia guardada: ${errFileName}`);
-                                        } catch (screenErr) {
-                                            console.warn('[DESERCIONES] Error tomando screenshot de fallo:', screenErr.message);
-                                        }
-
-                                        const errNote = `Error: ${caseErr.message}${errorScreenPath ? ` | Captura: ${errorScreenPath}` : ''}`;
-                                        await pool.query(
-                                            `UPDATE deserciones_casos SET status = 'Error', descripcion_asunto = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-                                            [casoItem.id, errNote]
-                                        ).catch(() => {});
-                                    }
-                                }
-                            }
-                        }
-
-                    currentJob.running = false;
-                    currentJob.completed = true;
-                    currentJob.logs.push(`\n[DESERCIONES] ✅ Proceso de lote a OnBase Web finalizado para ${casosToLoad.length} caso(s).`);
-                    automationEmitter.emit('done', currentJob);
-                    return;
-                }
-
-                // ── PROCESAR DOCUMENTOS DEL LOTE ──
-                const totalDocs = Math.max(1, batchDocs.length);
-                let formPage = page;
-                let formFrame = page.mainFrame();
-                for (let docIdx = 0; docIdx < totalDocs; docIdx++) {
-                    if (!currentJob.running) {
-                        currentJob.logs.push('[INFO] Automatización cancelada por el usuario.');
-                        break;
-                    }
-
-                    const docInfo = batchDocs[docIdx] || null;
-                    const hasMoreDocs = docIdx < totalDocs - 1;
-
-                    if (docInfo) {
-                        currentJob.logs.push(`\n--------------------------------------------------`);
-                        currentJob.logs.push(`[LOTE ${bIdx + 1}] Documento ${docIdx + 1} de ${totalDocs}: "${docInfo.filename}"`);
-                        currentJob.logs.push(`--------------------------------------------------`);
-                    }
-
-                    const maxDocAttempts = 2;
-                    let docSuccess = false;
-
-                    for (let attempt = 1; attempt <= maxDocAttempts; attempt++) {
-                        try {
-                            if (attempt > 1) {
-                                currentJob.logs.push(`[Doc ${docIdx + 1}/${totalDocs}] 🔄 Reintentando documento (intento ${attempt}/${maxDocAttempts})...`);
-                                await checkAndClearLocks(browser, currentJob.logs).catch(() => {});
-                                await wait(2000);
-                            }
-
-                            // ── PASO 2: FORMULARIO SGDEA (Reutilización en lote si ya está abierto en pantalla) ──
-                            let needOpenForm = true;
-                            if (docIdx > 0 && formFrame) {
-                                try {
-                                    const formReady = await formFrame.evaluate(() => {
-                                        const inp = document.querySelector('#sgdeaexpediente8_input, input[id*="expediente" i], input[title*="expediente" i]');
-                                        return !!(inp && !inp.readOnly);
-                                    }).catch(() => false);
-                                    if (formReady) {
-                                        currentJob.logs.push(`[Doc ${docIdx + 1}/${totalDocs}] ⚡ Formulario SGDEA listo en pantalla (Aceleración de lote). Saltando navegación de menú.`);
-                                        needOpenForm = false;
-                                    }
-                                } catch (e) {
-                                    needOpenForm = true;
-                                }
-                            }
-
-                            if (needOpenForm) {
-                                currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 2: Formulario SGDEA`;
-                                await paso2_abrirFormulario(page, browser, currentJob.logs);
-                                await wait(800);
-                            }
-
-                            // ── PASO 3: CÓDIGO DE EXPEDIENTE ──
-                            currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 3: Código de Expediente`;
-
-                            if (docInfo?.expediente_code) {
-                                let result = await paso3_codigoExpediente(
-                                    page, browser, docInfo.expediente_code, currentJob.logs
-                                );
-
-                                if ((!result || !result.success) && docIdx > 0) {
-                                    currentJob.logs.push(`[Doc ${docIdx + 1}/${totalDocs}] [FALLBACK] Campo "Código Expediente" no detectado. Re-ejecutando PASO 2 para asegurar formulario...`);
-                                    await paso2_abrirFormulario(page, browser, currentJob.logs);
-                                    await wait(1500);
-                                    result = await paso3_codigoExpediente(
-                                        page, browser, docInfo.expediente_code, currentJob.logs
-                                    );
-                                }
-
-                                if (!result || !result.success) {
-                                    throw new Error("No se pudo escribir el Código de Expediente o no se encontró el campo.");
-                                }
-
-                                if (result?.formPage) formPage = result.formPage;
-                                if (result?.formFrame) formFrame = result.formFrame;
-                            }
-
-                            // ── PASO 4: LLENAR CAMPOS ──
-                            currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 4: Llenar Campos`;
-                            if (docInfo) {
-                                await paso4_llenarCampos(formPage, formFrame, docInfo, currentJob.logs);
-                            }
-                            await wait(500);
-
-                            // ── PASO 5: ADJUNTAR PDF ──
-                            currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 5: Adjuntar PDF`;
-                            if (docInfo?.path || docInfo?.storage_path) {
-                                const attachOk = await paso5_adjuntarPDF(page, allFrames, docInfo, currentJob.logs);
-                                if (!attachOk) {
-                                    throw new Error("Fallo al adjuntar el archivo PDF (Importar falló o archivo no encontrado).");
-                                }
-                            }
-
-                            // ── PASO 6: GUARDAR ──
-                            currentJob.currentStep = `[Doc ${docIdx + 1}/${totalDocs}] PASO 6: Guardar`;
-                            const saveOk = await paso6_guardar(page, allFrames, currentJob.logs, hasMoreDocs);
-                            if (!saveOk) {
-                                throw new Error("El guardado falló o el botón Guardar no estuvo disponible.");
-                            }
-
-                            // Marcar documento como Cargado en la BD
-                            if (docInfo?.id) {
-                                await new Promise(resolve => {
-                                    db.run(
-                                        'UPDATE documents SET status = ?, load_date = ? WHERE id = ?',
-                                        ['Cargado', new Date().toISOString(), docInfo.id],
-                                        () => resolve()
-                                    );
-                                });
-                                currentJob.logs.push(`[INFO] ✅ Documento "${docInfo.filename}" (ID ${docInfo.id}) actualizado a "Cargado" en BD`);
-                            }
-
-                            docSuccess = true;
-                            break;
-
-                        } catch (docErr) {
-                            currentJob.logs.push(`[ERROR DOC ${docIdx + 1}] (Intento ${attempt}/${maxDocAttempts}) "${docInfo?.filename || 'doc'}": ${docErr.message}`);
-                            await checkAndClearLocks(browser, currentJob.logs).catch(() => {});
-                            if (attempt === maxDocAttempts) {
-                                try {
-                                    const errDir = path.join(__dirname, '..', 'uploads', 'errors');
-                                    if (!fs.existsSync(errDir)) fs.mkdirSync(errDir, { recursive: true });
-                                    const errFile = `error_doc_${docInfo?.id || Date.now()}_${Date.now()}.png`;
-                                    await page.screenshot({ path: path.join(errDir, errFile), fullPage: false }).catch(() => {});
-                                    currentJob.logs.push(`[ERROR DOC ${docIdx + 1}] 📸 Captura de evidencia guardada: ${errFile}`);
-                                } catch (e) {}
-                            } else {
-                                await wait(2500);
-                            }
-                        }
-                    }
-
-                    if (hasMoreDocs) {
-                        await wait(2000);
-                    }
-                }
-
-                // Si viene otro lote de otra dependencia diferente, cerrar sesión limpiamente
-                if (bIdx < depBatches.length - 1) {
-                    currentJob.logs.push(`[INFO] 🔄 Finalizado lote de "${currentBatch.username}". Cerrando sesión para cambiar a la siguiente dependencia...`);
-                    await paso7_logout(page, allFrames, currentJob.logs);
-                    await wait(3000);
-                }
-            }
-
-            // ── PASO 7: CERRAR SESIÓN FINAL ──
-            currentJob.currentStep = 'PASO 7: Cerrar Sesión final';
-            await paso7_logout(page, allFrames, currentJob.logs);
-
-            const screenshotBuffer = await page.screenshot({ fullPage: false }).catch(() => null);
-
-            currentJob.screenshot = screenshotBuffer ? `data:image/png;base64,${screenshotBuffer.toString('base64')}` : null;
-            currentJob.logs.push('Proceso de cargue completado.');
-
-        } catch (err) {
-            currentJob.error = err.message;
-            currentJob.logs.push(`[ERROR CRÍTICO] ${err.message}`);
-        } finally {
-            if (activeBrowser) {
-                await activeBrowser.close().catch(() => {});
-                activeBrowser = null;
-                activePage = null;
-            }
-            currentJob.running = false;
-            currentJob.completed = true;
-            automationEmitter.emit('done', currentJob);
         }
-    })().catch(unhandledErr => {
-        console.error('[AUTOMATION UNHANDLED PROMISE ERROR]', unhandledErr);
-        if (activeBrowser) {
-            activeBrowser.close().catch(() => {});
-            activeBrowser = null;
-            activePage = null;
+
+        const depBatches = [];
+        const skippedLockedIds = [];
+
+        if (docsToProcess.length > 0) {
+            const groupMap = new Map();
+            for (const doc of docsToProcess) {
+                if (activeDocLocks.has(doc.id) && !force_restart) {
+                    skippedLockedIds.push(doc.id);
+                    continue;
+                }
+                const creds = resolveDocCreds(doc);
+                const bKey = resolveBotKey(creds.depKey);
+                if (!groupMap.has(bKey)) {
+                    groupMap.set(bKey, {
+                        ...creds,
+                        depKey: bKey,
+                        docs: []
+                    });
+                }
+                groupMap.get(bKey).docs.push(doc);
+            }
+            for (const b of groupMap.values()) {
+                depBatches.push(b);
+            }
+        } else {
+            const defaultCreds = resolveDocCreds(null);
+            const bKey = resolveBotKey(defaultCreds.depKey);
+            depBatches.push({
+                ...defaultCreds,
+                depKey: bKey,
+                docs: []
+            });
         }
-        currentJob.running = false;
-        currentJob.completed = true;
-        currentJob.error = unhandledErr.message;
-        currentJob.logs.push(`[ERROR CRÍTICO INESPERADO] ${unhandledErr.message}`);
-        automationEmitter.emit('done', currentJob);
-    });
+
+        const launchedBots = [];
+        const busyBots = [];
+        const combinedInitialLogs = [];
+
+        for (const batch of depBatches) {
+            const bKey = resolveBotKey(batch.depKey);
+            const session = botSessions[bKey];
+
+            if (session.running) {
+                if (force_restart) {
+                    await stopSingleBotSession(session, 'Reiniciado por nueva ejecución');
+                } else {
+                    busyBots.push({
+                        botKey: bKey,
+                        label: session.label,
+                        onbaseUser: session.onbaseUser
+                    });
+                    session.logs.push(`[INFO] ⚠️ Solicitud adicional ignorada: este Bot (${session.onbaseUser}) ya está ejecutando un lote activo (${session.processedDocs}/${session.totalDocs}).`);
+                    continue;
+                }
+            }
+
+            const batchDocIds = (batch.docs || []).map(d => d.id);
+            batchDocIds.forEach(id => activeDocLocks.add(id));
+
+            const jobId = `${Date.now()}_${bKey}`;
+            session.running = true;
+            session.waitingForVerifier = false;
+            session.jobId = jobId;
+            session.onbaseUser = batch.username;
+            setBotStep(session, `Iniciando ${session.shortName} (${batch.username})...`);
+            session.logs = [
+                `[INFO] 🤖 ${session.label} activado con usuario OnBase "${batch.username}".`,
+                `[INFO] 📦 Lote asignado a este Bot: ${batchDocIds.length} documento(s) con Verificación Relevo al 50% y 100%.`
+            ];
+            if (skippedLockedIds.length > 0) {
+                session.logs.push(`[INFO] 🔒 ${skippedLockedIds.length} documento(s) omitidos porque ya están siendo procesados por otro Bot.`);
+            }
+            session.error = null;
+            session.completed = false;
+            session.screenshot = null;
+            session.liveFrame = null;
+            session.liveBuffer = null;
+            session.startTime = new Date().toISOString();
+            session.lastStepChangeAt = Date.now();
+            session.stepStuckSeconds = 0;
+            session.documentIds = batchDocIds;
+            session.totalDocs = batchDocIds.length;
+            session.processedDocs = 0;
+            session.currentDocId = null;
+            session.currentDocName = '';
+
+            currentJob = session;
+            launchedBots.push({
+                botKey: bKey,
+                jobId,
+                label: session.label,
+                onbaseUser: batch.username,
+                docsCount: batchDocIds.length
+            });
+            combinedInitialLogs.push(...session.logs);
+
+            runIndependentBotWorker(session, batch, {
+                url,
+                action,
+                stop_at_step,
+                caso_ids,
+                casos_data: req.body.casos_data,
+                solo_diligenciar: req.body.solo_diligenciar
+            }).catch(unhandledErr => {
+                console.error(`[BOT ${bKey} UNHANDLED ERROR]`, unhandledErr);
+                session.running = false;
+                session.completed = true;
+                session.error = unhandledErr.message;
+                session.logs.push(`[ERROR CRÍTICO INESPERADO] ${unhandledErr.message}`);
+            });
+        }
+
+        return res.json({
+            success: true,
+            launchedBots,
+            busyBots,
+            activeBotKey: launchedBots[0]?.botKey || busyBots[0]?.botKey || '9224.4',
+            jobId: launchedBots[0]?.jobId || currentJob?.jobId,
+            message: launchedBots.length > 1
+                ? `¡${launchedBots.length} Bots iniciados simultáneamente con Verificador de Expedientes al 50% y 100%!`
+                : launchedBots.length === 1
+                    ? `${launchedBots[0].label} (${launchedBots[0].onbaseUser}) iniciado con Verificador al 50% y 100%.`
+                    : `Los Bots solicitados ya se encuentran en ejecución.`,
+            logs: combinedInitialLogs,
+            bots: buildBotsStatusMap()
+        });
     } catch (routeErr) {
         console.error('[EXECUTE AUTOMATION ROUTE ERROR]', routeErr);
         return res.status(500).json({
@@ -3310,6 +5546,195 @@ exports.executeAutomation = async (req, res) => {
             error: routeErr.message || 'Error interno al iniciar la automatización'
         });
     }
+};
+
+// ─────────────────────────────────────────────────────────────────
+// NUEVOS ENDPOINTS: BOT VERIFICADOR INDEPENDIENTE, DESBLOQUEO REMOTO Y ALERTAS MÓVIL/PC
+// ─────────────────────────────────────────────────────────────────
+exports.verifyExpedientesOnBase = async (req, res) => {
+    try {
+        const { expedienteCodes, expedienteIds, url, target_user } = req.body || {};
+        let codesToVerify = Array.isArray(expedienteCodes) ? expedienteCodes.filter(Boolean) : [];
+
+        if (codesToVerify.length === 0 && Array.isArray(expedienteIds) && expedienteIds.length > 0) {
+            const validIds = expedienteIds.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+            if (validIds.length > 0) {
+                const qRes = await pool.query(`SELECT DISTINCT expediente_code FROM expedientes WHERE id = ANY($1::int[]) AND expediente_code IS NOT NULL`, [validIds]);
+                codesToVerify = (qRes.rows || []).map(r => r.expediente_code).filter(Boolean);
+            }
+        }
+
+        if (codesToVerify.length === 0) {
+            // Tomar los últimos 5 expedientes con documentos Cargados pendientes de verificar
+            const qRes = await pool.query(`
+                SELECT DISTINCT e.expediente_code
+                FROM documents d
+                INNER JOIN expedientes e ON d.expediente_id = e.id
+                WHERE d.status = 'Cargado' AND COALESCE(d.onbase_verified, 0) < 2 AND e.expediente_code IS NOT NULL
+                LIMIT 5
+            `);
+            codesToVerify = (qRes.rows || []).map(r => r.expediente_code).filter(Boolean);
+        }
+
+        if (codesToVerify.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'Seleccione al menos un expediente con código válido para verificar en OnBase.'
+            });
+        }
+
+        // Lanzar el Bot Verificador Independiente en segundo plano y responder de inmediato
+        runStandaloneVerifierBot({
+            expedienteCodes: codesToVerify,
+            url,
+            targetUser: target_user,
+            triggerSource: 'Verificación Manual Solicitada'
+        }).catch(err => console.error('[VERIFY-EXP-ERR]', err));
+
+        return res.json({
+            success: true,
+            activeBotKey: 'VERIFICADOR',
+            expedienteCodes: codesToVerify,
+            message: `🔍 Bot Verificador Independiente iniciado para auditar ${codesToVerify.length} expediente(s) en OnBase (${codesToVerify.join(', ')}).`,
+            bots: buildBotsStatusMap()
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+exports.getVerificationReport = async (req, res) => {
+    try {
+        const dbLogsRes = await pool.query(`SELECT * FROM onbase_verification_logs ORDER BY id DESC LIMIT 40`).catch(() => ({ rows: [] }));
+        return res.json({
+            success: true,
+            autoVerifyEvery5Min: alertSettings.autoVerifyEvery5Min,
+            nextAutoVerifyAt: alertSettings.nextAutoVerifyAt,
+            alerts: systemAlerts.slice(0, 30),
+            history: verificationHistory.length > 0 ? verificationHistory : (dbLogsRes.rows || []),
+            bots: buildBotsStatusMap()
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+exports.toggleAutoVerify = async (req, res) => {
+    try {
+        const { enabled } = req.body || {};
+        alertSettings.autoVerifyEvery5Min = enabled !== undefined ? !!enabled : !alertSettings.autoVerifyEvery5Min;
+        alertSettings.nextAutoVerifyAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+        await pool.query(
+            `INSERT INTO system_settings (key, value) VALUES ('onbase_alert_settings', $1)
+             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+            [JSON.stringify(alertSettings)]
+        ).catch(() => {});
+        return res.json({
+            success: true,
+            autoVerifyEvery5Min: alertSettings.autoVerifyEvery5Min,
+            nextAutoVerifyAt: alertSettings.nextAutoVerifyAt,
+            message: alertSettings.autoVerifyEvery5Min
+                ? '✅ Verificación automática cada 5 minutos ACTIVADA.'
+                : '⏸️ Verificación automática cada 5 minutos PAUSADA.'
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+exports.unlockBotSession = async (req, res) => {
+    try {
+        const { bot } = req.body || {};
+        const key = resolveBotKey(bot || '9224.4');
+        const session = botSessions[key];
+        const result = await performBotUnlockProcedure(session, 'Trámite de desbloqueo remoto solicitado por el Director');
+        return res.json({
+            ...result,
+            botKey: key,
+            bots: buildBotsStatusMap()
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+exports.skipVerifierWait = async (req, res) => {
+    try {
+        const { bot } = req.body || {};
+        let skippedAny = false;
+        for (const k of ['9224', '9224.4', '9224.2']) {
+            if (!bot || bot === 'all' || resolveBotKey(bot) === k) {
+                if (botSessions[k].waitingForVerifier) {
+                    botSessions[k].skipVerifierWait = true;
+                    skippedAny = true;
+                }
+            }
+        }
+        return res.json({
+            success: true,
+            skipped: skippedAny,
+            message: skippedAny
+                ? '⚡ Espera de 3 minutos adelantada. El Verificador ingresará a OnBase de inmediato.'
+                : 'No había espera activa en este momento.',
+            bots: buildBotsStatusMap()
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+exports.getAlertSettings = async (req, res) => {
+    return res.json({
+        success: true,
+        settings: alertSettings
+    });
+};
+
+exports.saveAlertSettings = async (req, res) => {
+    try {
+        const incoming = req.body || {};
+        alertSettings = {
+            ...alertSettings,
+            ...incoming
+        };
+        await pool.query(
+            `INSERT INTO system_settings (key, value) VALUES ('onbase_alert_settings', $1)
+             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+            [JSON.stringify(alertSettings)]
+        ).catch(() => {});
+        return res.json({
+            success: true,
+            settings: alertSettings,
+            message: '✅ Configuración de alertas a Móvil y Equipo guardada exitosamente.'
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+exports.sendTestAlert = async (req, res) => {
+    try {
+        const alertObj = pushSystemAlert({
+            type: 'info',
+            title: '📲 Prueba de Alerta SENA CIMI (Móvil y Equipo)',
+            message: 'Conexión de notificaciones activa: Recibirás avisos aquí cuando un expediente se verifique al 50%/100% o si OnBase requiere desbloqueo.',
+            expedienteCode: 'TEST-EXP-2026',
+            botKey: 'VERIFICADOR',
+            sendMobile: true
+        });
+        return res.json({
+            success: true,
+            alert: alertObj,
+            message: '✅ Alerta de prueba enviada al Sistema, Móvil (Ntfy/Telegram) y Correo.'
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+exports.clearSystemAlerts = async (req, res) => {
+    systemAlerts.length = 0;
+    return res.json({ success: true });
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -3372,8 +5797,6 @@ exports.executeUnityAutomation = async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────
 // DIAGNÓSTICO: inspeccionar el formulario real de OnBase
-// Llama: POST /api/automation/diagnostic  { url, username, password }
-// Devuelve la estructura HTML real del formulario para ajustar el robot
 // ─────────────────────────────────────────────────────────────────
 exports.executeDiagnostic = async (req, res) => {
     const { url, username, password } = req.body;
@@ -3384,27 +5807,26 @@ exports.executeDiagnostic = async (req, res) => {
     }
 
     let browser;
+    const diagProfileDir = path.join(resolvePuppeteerBaseTmpDir(), 'puppeteer_aes_bot_DIAG');
     try {
-        browser = await puppeteer.launch({
-            headless: process.platform === 'linux' ? true : false,
-            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-        });
+        try {
+            fs.rmSync(diagProfileDir, { recursive: true, force: true });
+            fs.mkdirSync(diagProfileDir, { recursive: true });
+        } catch {}
+        browser = await puppeteer.launch(buildPuppeteerLaunchOptions(diagProfileDir));
 
         const page = await browser.newPage();
         await page.setViewport({ width: 1366, height: 900 });
 
-        // PASO 1: Login
         const loginOk = await paso1_login(page, url, username, password, logs);
         if (!loginOk) {
-            await browser.close();
+            await safeForceCloseBrowser(browser, diagProfileDir);
             return res.status(500).json({ error: 'Login fallido', logs });
         }
 
-        // PASO 2: Abrir formulario SGDEA
         await paso2_abrirFormulario(page, browser, logs);
-        await wait(5000); // Esperar que el formulario cargue completamente
+        await wait(5000);
 
-        // DIAGNÓSTICO: capturar estructura completa de TODOS los frames
         const diagnostico = {
             url_actual: page.url(),
             paginas: [],
@@ -3417,7 +5839,6 @@ exports.executeDiagnostic = async (req, res) => {
             for (const frame of pg.frames()) {
                 try {
                     const frameData = await frame.evaluate(() => {
-                        // Todos los inputs
                         const inputs = Array.from(document.querySelectorAll(
                             'input, textarea, select'
                         )).map(el => ({
@@ -3430,12 +5851,10 @@ exports.executeDiagnostic = async (req, res) => {
                             value: el.value ? el.value.substring(0, 50) : '',
                             readOnly: el.readOnly || el.disabled || false,
                             className: el.className ? el.className.substring(0, 60) : '',
-                            // Texto del TR contenedor
                             rowText: ((el.closest('tr') || el.closest('td') || el.parentElement || {})
                                 .innerText || '').trim().substring(0, 100),
                         }));
 
-                        // Todos los botones
                         const btns = Array.from(document.querySelectorAll(
                             'button, input[type="button"], input[type="submit"], a[role="button"]'
                         )).filter(b => b.offsetParent !== null).map(b => ({
@@ -3445,7 +5864,6 @@ exports.executeDiagnostic = async (req, res) => {
                             className: b.className ? b.className.substring(0, 60) : ''
                         }));
 
-                        // Labels visibles en el formulario
                         const labels = Array.from(document.querySelectorAll(
                             'label, td, th, span[class*="label" i], div[class*="label" i]'
                         )).filter(el => {
@@ -3477,9 +5895,8 @@ exports.executeDiagnostic = async (req, res) => {
             if (pgData.frames.length > 0) diagnostico.paginas.push(pgData);
         }
 
-        // Screenshot del estado actual
         const ss = await page.screenshot().catch(() => null);
-        await browser.close();
+        await safeForceCloseBrowser(browser, diagProfileDir);
 
         return res.json({
             ...diagnostico,
@@ -3487,7 +5904,7 @@ exports.executeDiagnostic = async (req, res) => {
         });
 
     } catch (err) {
-        if (browser) await browser.close().catch(() => { });
+        if (browser) await safeForceCloseBrowser(browser, diagProfileDir);
         return res.status(500).json({ error: err.message, logs });
     }
 };
@@ -3495,21 +5912,6 @@ exports.executeDiagnostic = async (req, res) => {
 // ─────────────────────────────────────────────────────────────────
 // UNITY ROBOT: Comunicaciones Producidas
 // ─────────────────────────────────────────────────────────────────
-/**
- * POST /api/automation/unity-robot
- * Body: {
- *   file_path: string,          // ruta absoluta al PDF
- *   nis?: string,
- *   radicado_compuesto?: string,
- *   asunto?: string,
- *   descripcion_asunto?: string,
- *   medio_ingreso?: string,      // 'FISICO' | 'E-MAIL' (default: 'FISICO')
- *   entrega_mano?: string,       // 'SI' | 'NO' (default: 'NO')
- *   num_anexos?: string,
- *   descripcion_anexos?: string,
- *   tipo_documento?: string,     // default: '01-Comunicacion Producida (PAPEL)'
- * }
- */
 exports.runUnityRobot = async (req, res) => {
     const params = req.body || {};
     const logs = [];
@@ -3582,21 +5984,23 @@ exports.getPM2Logs = async (req, res) => {
 };
 
 // ─────────────────────────────────────────────────────────────────
-// CONTROLES DE INTERACCIÓN MANUAL (PARA SOPORTE DE USUARIO)
+// CONTROLES DE INTERACCIÓN MANUAL (SOPORTE MULTI-BOT POR PARÁMETRO bot)
 // ─────────────────────────────────────────────────────────────────
 exports.clickActivePage = async (req, res) => {
-    const { x, y, clickCount = 1, button = 'left' } = req.body;
-    if (!activePage) {
-        return res.status(400).json({ error: 'No hay ninguna sesión de automatización activa' });
+    const { x, y, clickCount = 1, button = 'left', bot } = req.body || {};
+    const session = getActiveOrRequestedBot(bot || req.query?.bot);
+    const targetPage = session?.page || activePage;
+    if (!targetPage) {
+        return res.status(400).json({ error: `No hay sesión activa en ${session?.label || 'el navegador'}` });
     }
     try {
         const nx = Number(x);
         const ny = Number(y);
-        console.log(`[MANUAL-CLICK] Clic (${clickCount}x ${button}) en x: ${nx}, y: ${ny}`);
-        await activePage.mouse.move(nx, ny);
+        console.log(`[MANUAL-CLICK][Bot ${session?.botKey}] Clic (${clickCount}x ${button}) en x: ${nx}, y: ${ny}`);
+        await targetPage.mouse.move(nx, ny);
         await wait(50);
-        await activePage.mouse.click(nx, ny, { clickCount: Number(clickCount), delay: 80, button });
-        return res.json({ success: true, message: `Clic ejecutado en x: ${nx}, y: ${ny}` });
+        await targetPage.mouse.click(nx, ny, { clickCount: Number(clickCount), delay: 80, button });
+        return res.json({ success: true, botKey: session?.botKey, message: `Clic ejecutado en x: ${nx}, y: ${ny}` });
     } catch (err) {
         console.error('[MANUAL-CLICK] Error:', err);
         return res.status(500).json({ error: err.message });
@@ -3604,14 +6008,16 @@ exports.clickActivePage = async (req, res) => {
 };
 
 exports.typeActivePage = async (req, res) => {
-    const { text } = req.body;
-    if (!activePage) {
-        return res.status(400).json({ error: 'No hay ninguna sesión de automatización activa' });
+    const { text, bot } = req.body || {};
+    const session = getActiveOrRequestedBot(bot || req.query?.bot);
+    const targetPage = session?.page || activePage;
+    if (!targetPage) {
+        return res.status(400).json({ error: `No hay sesión activa en ${session?.label || 'el navegador'}` });
     }
     try {
-        console.log(`[MANUAL-TYPE] Escribiendo texto: "${text}"`);
-        await activePage.keyboard.type(text, { delay: 30 });
-        return res.json({ success: true, message: `Texto escrito correctamente` });
+        console.log(`[MANUAL-TYPE][Bot ${session?.botKey}] Escribiendo texto: "${text}"`);
+        await targetPage.keyboard.type(text, { delay: 30 });
+        return res.json({ success: true, botKey: session?.botKey, message: `Texto escrito correctamente` });
     } catch (err) {
         console.error('[MANUAL-TYPE] Error:', err);
         return res.status(500).json({ error: err.message });
@@ -3619,38 +6025,18 @@ exports.typeActivePage = async (req, res) => {
 };
 
 exports.pressKeyActivePage = async (req, res) => {
-    const { key } = req.body;
-    if (!activePage) {
-        return res.status(400).json({ error: 'No hay ninguna sesión de automatización activa' });
+    const { key, bot } = req.body || {};
+    const session = getActiveOrRequestedBot(bot || req.query?.bot);
+    const targetPage = session?.page || activePage;
+    if (!targetPage) {
+        return res.status(400).json({ error: `No hay sesión activa en ${session?.label || 'el navegador'}` });
     }
     try {
-        console.log(`[MANUAL-KEY] Presionando tecla: ${key}`);
-        await activePage.keyboard.press(key);
-        return res.json({ success: true, message: `Tecla ${key} presionada` });
+        console.log(`[MANUAL-KEY][Bot ${session?.botKey}] Presionando tecla: ${key}`);
+        await targetPage.keyboard.press(key);
+        return res.json({ success: true, botKey: session?.botKey, message: `Tecla ${key} presionada` });
     } catch (err) {
         console.error('[MANUAL-KEY] Error:', err);
         return res.status(500).json({ error: err.message });
     }
 };
-
-exports.killActiveAutomation = async (req, res) => {
-    if (!activeBrowser) {
-        return res.status(400).json({ error: 'No hay ninguna sesión de automatización activa' });
-    }
-    try {
-        console.log(`[MANUAL-KILL] Cerrando sesión y navegador por solicitud de usuario...`);
-        await activeBrowser.close();
-        activeBrowser = null;
-        activePage = null;
-        return res.json({ success: true, message: `Sesión de automatización terminada` });
-    } catch (err) {
-        console.error('[MANUAL-KILL] Error:', err);
-        return res.status(500).json({ error: err.message });
-    }
-};
-
-
-
-
-
-

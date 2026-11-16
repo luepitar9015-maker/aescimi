@@ -9,7 +9,7 @@ const xlsx = require('xlsx');
 const ALLOWED_TABLES = [
     'users', 'expedientes', 'documents', 'organization_structure',
     'trd_series', 'trd_subseries', 'trd_typologies',
-    'user_trd_permissions', 'system_settings'
+    'user_trd_permissions'
 ];
 
 const validateTable = (name, res) => {
@@ -158,41 +158,35 @@ router.post('/limpiar-expedientes', async (req, res) => {
 
 // Update Expiration Date
 router.post('/set-expiration', (req, res) => {
-    const { date } = req.body;
-    if (!date) {
-        return res.status(400).json({ error: 'Fecha requerida.' });
-    }
-
-    pool.query(
-        "UPDATE system_settings SET value = $1 WHERE key = 'system_expiration_date'",
-        [date],
-        (err) => {
-            if (err) {
-                console.error('[SUPERUSER] Error setting expiration:', err);
-                return res.status(500).json({ error: 'Error al actualizar la fecha de caducidad.' });
-            }
-            res.json({ message: 'Fecha de caducidad actualizada' });
-        }
-    );
+    return res.status(403).json({ error: 'Deshabilitado por seguridad. Utilice el Protocolo Criptográfico Ed25519 (Estrategia 180).' });
 });
 
-// ──────────────────────────────────────────────────────────────────────────────
-// EXPLORADOR DE ARCHIVOS
-// ──────────────────────────────────────────────────────────────────────────────
-const fs      = require('fs');
-const path    = require('path');
+const fs = require('fs');
+const path = require('path');
 const archiver = require('archiver');
-const db_main  = require('../database'); // para leer storage_path de settings
 
-/** Obtiene la ruta raíz del almacenamiento desde system_settings o por defecto */
-const getStoragePath = () => new Promise((resolve) => {
-    if (process.env.LOCAL_STORAGE_PATH) {
-        return resolve(process.env.LOCAL_STORAGE_PATH);
+/** Obtiene la ruta raíz de almacenamiento configurada en organization_structure o fallback a /mnt/almacen */
+const getStoragePath = async () => {
+    try {
+        const res = await pool.query(
+            "SELECT storage_path FROM organization_structure WHERE storage_path IS NOT NULL AND TRIM(storage_path) != '' ORDER BY id ASC LIMIT 1"
+        );
+        const cfgPath = res.rows?.[0]?.storage_path?.trim();
+        if (cfgPath && fs.existsSync(cfgPath)) {
+            return path.resolve(cfgPath);
+        }
+    } catch (e) {
+        console.warn('[EXPLORADOR] Aviso consultando storage_path:', e.message);
     }
-    db_main.get("SELECT value FROM system_settings WHERE key = 'storage_path'", [], (err, row) => {
-        resolve(row?.value || path.join(__dirname, '../uploads/Gestion_Documental'));
-    });
-});
+    if (fs.existsSync('/mnt/almacen')) {
+        return path.resolve('/mnt/almacen');
+    }
+    const localUploads = path.resolve(__dirname, '../uploads');
+    if (!fs.existsSync(localUploads)) {
+        fs.mkdirSync(localUploads, { recursive: true });
+    }
+    return localUploads;
+};
 
 /** Construye un árbol de nodos a partir de un directorio */
 const buildTree = (dir, relativeTo) => {

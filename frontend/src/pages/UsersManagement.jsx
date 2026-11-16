@@ -14,6 +14,7 @@ export default function UsersManagement() {
     const [selectedUserTrd, setSelectedUserTrd] = useState(null);
     const [userTrdPerms, setUserTrdPerms] = useState([]);
     const [allTrdItems, setAllTrdItems] = useState([]);
+    const [trdSearchTerm, setTrdSearchTerm] = useState('');
     const [formData, setFormData] = useState({
         full_name: '',
         document_no: '',
@@ -187,9 +188,10 @@ export default function UsersManagement() {
 
     const openTrdPermissions = async (user) => {
         setSelectedUserTrd(user);
+        setTrdSearchTerm('');
         setShowTrdModal(true);
         fetchUserTrdPerms(user.id);
-        if (allTrdItems.length === 0) fetchAllTrdItems();
+        fetchAllTrdItems();
     };
 
     const fetchUserTrdPerms = async (userId) => {
@@ -206,7 +208,7 @@ export default function UsersManagement() {
         } catch (err) { console.error(err); }
     };
 
-    const addTrdPermission = async (trd) => {
+    const addTrdPermission = async (trd, allowedStages = null) => {
         const isSub = trd.type === 'subseries';
         try {
             await axios.post('/api/trd-permissions', {
@@ -214,10 +216,40 @@ export default function UsersManagement() {
                 series_id: isSub ? null : trd.id,
                 subseries_id: isSub ? trd.id : null,
                 can_view: 1,
-                can_upload: 1
+                can_upload: 1,
+                allowed_stages: allowedStages
             });
             fetchUserTrdPerms(selectedUserTrd.id);
         } catch { alert("Error asignando permiso"); }
+    };
+
+    const updatePermissionStages = async (perm, nextStages) => {
+        try {
+            await axios.put(`/api/trd-permissions/${perm.id}`, {
+                allowed_stages: nextStages && nextStages.length > 0 ? nextStages : null
+            });
+            fetchUserTrdPerms(selectedUserTrd.id);
+        } catch {
+            alert("Error actualizando etapas del permiso");
+        }
+    };
+
+    const toggleStageForPerm = (perm, stageName, availableStages) => {
+        const current = Array.isArray(perm.allowed_stages) ? perm.allowed_stages : [];
+        let next;
+        if (current.length === 0) {
+            // Estaba en "Todas", pasa a solo la etapa seleccionada
+            next = [stageName];
+        } else if (current.includes(stageName)) {
+            next = current.filter(s => s !== stageName);
+        } else {
+            next = [...current, stageName];
+        }
+        // Si seleccionó todas las disponibles o quedó vacío, dejamos null ("Todas las etapas")
+        if (availableStages && next.length === availableStages.length) {
+            next = null;
+        }
+        updatePermissionStages(perm, next);
     };
 
     const deleteTrdPermission = async (id) => {
@@ -521,45 +553,140 @@ export default function UsersManagement() {
 
                         <div className="p-6 overflow-y-auto flex-1 grid grid-cols-2 gap-6">
                             <div>
-                                <h3 className="font-bold mb-3 text-gray-700 border-b pb-2">Series/Subseries Disponibles</h3>
-                                <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-2">
-                                    {allTrdItems.map(item => (
-                                        <div key={`${item.type}-${item.id}`} className="flex justify-between items-center p-2 bg-gray-50 rounded border text-sm">
-                                            <span>
-                                                <strong className="text-blue-600 mr-2">[{item.concatenated_code}]</strong>
-                                                {item.subseries_name}
-                                            </span>
-                                            <button 
-                                                onClick={() => addTrdPermission(item)}
-                                                className="text-blue-600 hover:bg-blue-100 p-1 rounded"
-                                            >
-                                                Asignar
-                                            </button>
-                                        </div>
-                                    ))}
+                                <h3 className="font-bold mb-2 text-gray-700 border-b pb-2">Series/Subseries Disponibles</h3>
+                                <input
+                                    type="text"
+                                    placeholder="Buscar serie, subserie o código (ej. Historias Académicas)..."
+                                    value={trdSearchTerm}
+                                    onChange={(e) => setTrdSearchTerm(e.target.value)}
+                                    className="w-full mb-3 px-3 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                                />
+                                <div className="space-y-2 max-h-[48vh] overflow-y-auto pr-2">
+                                    {allTrdItems
+                                        .filter(item => {
+                                            if (!trdSearchTerm.trim()) return true;
+                                            const q = trdSearchTerm.toLowerCase();
+                                            return (
+                                                (item.subseries_name || '').toLowerCase().includes(q) ||
+                                                (item.series_name || '').toLowerCase().includes(q) ||
+                                                (item.concatenated_code || '').toLowerCase().includes(q)
+                                            );
+                                        })
+                                        .map(item => {
+                                            const stages = item.available_stages && item.available_stages.length > 0
+                                                ? item.available_stages
+                                                : ((item.subseries_name || item.series_name || '').toUpperCase().includes('HISTORIA') ? ['1. Ingreso', '2. Ejecución', '3. Certificación'] : []);
+                                            return (
+                                                <div key={`${item.type}-${item.id}`} className="p-2.5 bg-gray-50 rounded border text-sm space-y-2">
+                                                    <div className="flex justify-between items-center gap-2">
+                                                        <span className="leading-snug">
+                                                            <strong className="text-blue-600 mr-2">[{item.concatenated_code}]</strong>
+                                                            {item.subseries_name}
+                                                        </span>
+                                                        <button 
+                                                            onClick={() => addTrdPermission(item, null)}
+                                                            className="bg-blue-600 text-white hover:bg-blue-700 px-2.5 py-1 rounded text-xs font-semibold shrink-0"
+                                                        >
+                                                            Asignar {stages.length > 0 ? 'Todas' : ''}
+                                                        </button>
+                                                    </div>
+                                                    {stages.length > 0 && (
+                                                        <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-gray-200">
+                                                            <span className="text-[10px] font-bold text-gray-500 uppercase">Asignar por etapa:</span>
+                                                            {stages.map(st => (
+                                                                <button
+                                                                    key={st}
+                                                                    type="button"
+                                                                    onClick={() => addTrdPermission(item, [st])}
+                                                                    className="text-[10px] px-2 py-0.5 rounded-full font-semibold border bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200 transition-colors"
+                                                                    title={`Asignar únicamente la etapa ${st}`}
+                                                                >
+                                                                    + {st}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
                                 </div>
                             </div>
 
                             <div>
                                 <h3 className="font-bold mb-3 text-gray-700 border-b pb-2">Permisos Asignados</h3>
-                                <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-2">
+                                <div className="space-y-2 max-h-[54vh] overflow-y-auto pr-2">
                                     {userTrdPerms.length === 0 && <p className="text-gray-400 italic text-sm">No hay permisos asignados.</p>}
-                                    {userTrdPerms.map(p => (
-                                        <div key={p.id} className="flex justify-between items-center p-2 bg-pink-50 rounded border border-pink-100 text-sm">
-                                            <span>
-                                                {p.subseries_name || p.series_name}
-                                                <div className="text-[10px] text-gray-500">
-                                                    Ver: {p.can_view ? 'SÍ' : 'NO'} | Cargar: {p.can_upload ? 'SÍ' : 'NO'}
+                                    {userTrdPerms.map(p => {
+                                        const matchedItem = allTrdItems.find(it =>
+                                            (p.subseries_id && it.type === 'subseries' && it.id === p.subseries_id) ||
+                                            (p.series_id && it.type === 'series' && it.id === p.series_id)
+                                        );
+                                        const availableStages = (matchedItem?.available_stages && matchedItem.available_stages.length > 0)
+                                            ? matchedItem.available_stages
+                                            : (((p.subseries_name || p.series_name || '').toUpperCase().includes('HISTORIA'))
+                                                ? ['1. Ingreso', '2. Ejecución', '3. Certificación']
+                                                : []);
+                                        const activeStages = Array.isArray(p.allowed_stages) ? p.allowed_stages : [];
+
+                                        return (
+                                            <div key={p.id} className="p-3 bg-pink-50 rounded border border-pink-100 text-sm space-y-2">
+                                                <div className="flex justify-between items-start gap-2">
+                                                    <div>
+                                                        <div className="font-semibold text-gray-800">
+                                                            {p.subseries_name || p.series_name}
+                                                        </div>
+                                                        <div className="text-[10px] text-gray-500">
+                                                            Ver: {p.can_view ? 'SÍ' : 'NO'} | Cargar: {p.can_upload ? 'SÍ' : 'NO'}
+                                                        </div>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => deleteTrdPermission(p.id)}
+                                                        className="text-red-600 hover:bg-red-100 px-2 py-1 rounded text-xs font-semibold"
+                                                    >
+                                                        Quitar
+                                                    </button>
                                                 </div>
-                                            </span>
-                                            <button 
-                                                onClick={() => deleteTrdPermission(p.id)}
-                                                className="text-red-600 hover:bg-red-100 p-1 rounded"
-                                            >
-                                                Quitar
-                                            </button>
-                                        </div>
-                                    ))}
+
+                                                {availableStages.length > 0 && (
+                                                    <div className="pt-2 border-t border-pink-200/70">
+                                                        <div className="text-[10px] font-bold text-gray-600 uppercase mb-1.5">
+                                                            Etapas habilitadas para este usuario:
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-1.5">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => updatePermissionStages(p, null)}
+                                                                className={`text-[10px] px-2.5 py-1 rounded-full font-bold border transition-all ${
+                                                                    activeStages.length === 0
+                                                                        ? 'bg-green-600 text-white border-green-700 shadow-sm'
+                                                                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-100'
+                                                                }`}
+                                                            >
+                                                                ✓ Todas las etapas
+                                                            </button>
+                                                            {availableStages.map(st => {
+                                                                const isSelected = activeStages.includes(st);
+                                                                return (
+                                                                    <button
+                                                                        key={st}
+                                                                        type="button"
+                                                                        onClick={() => toggleStageForPerm(p, st, availableStages)}
+                                                                        className={`text-[10px] px-2.5 py-1 rounded-full font-bold border transition-all ${
+                                                                            isSelected
+                                                                                ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm'
+                                                                                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-100'
+                                                                        }`}
+                                                                    >
+                                                                        {st}
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         </div>

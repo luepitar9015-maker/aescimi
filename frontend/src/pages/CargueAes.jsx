@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { Play, CheckCircle, CheckSquare, Clock, AlertCircle, FileText, Search, RefreshCw, Monitor, X, Globe, Settings as SettingsIcon, Save, Download, Trash, Database, Eye, ChevronDown, ChevronRight, Maximize2 } from 'lucide-react';
@@ -15,8 +15,12 @@ function CargueAes() {
     const [editingModal, setEditingModal] = useState(false);
     const [modalEditFields, setModalEditFields] = useState({});
     const [editingCode, setEditingCode] = useState({});
-    const [statusFilter, setStatusFilter] = useState('Pendiente'); // 'Todos', 'Pendiente', 'Cargado'
+    const [statusFilter, setStatusFilter] = useState(() => {
+        const urlStatus = new URLSearchParams(window.location.search).get('status');
+        return ['Todos', 'Pendiente', 'Cargado', 'SinCodigo'].includes(urlStatus) ? urlStatus : 'Pendiente';
+    }); // 'Todos', 'Pendiente', 'Cargado'
     const [dependencyFilter, setDependencyFilter] = useState('all'); // 'all', '9224', '9224.4', '9224.2'
+    const [subserieFilter, setSubserieFilter] = useState('all'); // 'all' o código de subserie documental TRD
     const [selectedOnBaseUser, setSelectedOnBaseUser] = useState('auto'); // 'auto', 'JRROZO', 'EDHERNANDEZM', 'luepitar'
     const [documents, setDocuments] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -27,6 +31,87 @@ function CargueAes() {
     const [isMonitorExpanded, setIsMonitorExpanded] = useState(false);
     const [manualText, setManualText] = useState('');
     const [isInteracting, setIsInteracting] = useState(false);
+
+    // ── ESTADO MULTI-BOT (3 BOTS CONCURRENTES POR USUARIO ONBASE) ──
+    const [activeMonitorBot, setActiveMonitorBot] = useState('9224.4'); // '9224' | '9224.4' | '9224.2'
+    const [mosaicView, setMosaicView] = useState(false);
+    const [frameTick, setFrameTick] = useState(Date.now());
+    const pollIntervalRef = useRef(null);
+    const lastProcessedTotalRef = useRef(0);
+    const [botsStatus, setBotsStatus] = useState({
+        '9224': { botKey: '9224', label: 'Bot 1 · Subdirección (9224)', shortName: 'Subdirección', onbaseUser: 'TVILLAMIZARJ', running: false, completed: false, error: null, logs: [], totalDocs: 0, processedDocs: 0, currentStep: '', currentDocName: '', hasFrame: false, waitingForVerifier: false, stepStuckSeconds: 0, isBlocked: false },
+        '9224.4': { botKey: '9224.4', label: 'Bot 2 · Formación (9224.4)', shortName: 'Formación', onbaseUser: 'EDHERNANDEZM', running: false, completed: false, error: null, logs: [], totalDocs: 0, processedDocs: 0, currentStep: '', currentDocName: '', hasFrame: false, waitingForVerifier: false, stepStuckSeconds: 0, isBlocked: false },
+        '9224.2': { botKey: '9224.2', label: 'Bot 3 · Adm. Educativa (9224.2)', shortName: 'Adm. Educativa', onbaseUser: 'luepitar', running: false, completed: false, error: null, logs: [], totalDocs: 0, processedDocs: 0, currentStep: '', currentDocName: '', hasFrame: false, waitingForVerifier: false, stepStuckSeconds: 0, isBlocked: false },
+        'VERIFICADOR': { botKey: 'VERIFICADOR', label: 'Bot 4 · Verificador OnBase (SGDEA Expediente)', shortName: 'Verificador OnBase', onbaseUser: 'TVILLAMIZARJ', running: false, completed: false, error: null, logs: [], totalDocs: 0, processedDocs: 0, currentStep: '⏸️ En espera (listo para verificar 50% / 100%)', currentDocName: '', hasFrame: false, autoVerifyEnabled: true, stepStuckSeconds: 0, isBlocked: false }
+    });
+    const [systemAlerts, setSystemAlerts] = useState([]);
+    const [autoVerifyEvery5Min, setAutoVerifyEvery5Min] = useState(true);
+    const [verifyingExpCode, setVerifyingExpCode] = useState(null);
+    const [liveVerification, setLiveVerification] = useState(null);
+    const [recentVerifications, setRecentVerifications] = useState([]);
+    const [showVerifierPanel, setShowVerifierPanel] = useState(true);
+    const [unlockingBotKey, setUnlockingBotKey] = useState(null);
+    const [alertModalOpen, setAlertModalOpen] = useState(false);
+    const [savingAlertSettings, setSavingAlertSettings] = useState(false);
+    const [testingAlert, setTestingAlert] = useState(false);
+    const [alertSettingsForm, setAlertSettingsForm] = useState({
+        onbase_alert_email: '',
+        onbase_alert_ntfy_topic: 'sena-cimi-onbase-alertas',
+        onbase_alert_telegram_token: '',
+        onbase_alert_telegram_chat_id: '',
+        onbase_watchdog_timeout_sec: '90',
+        onbase_auto_verify_5min: 'true'
+    });
+    const seenAlertIdsRef = useRef(new Set());
+
+    // Sonido Web Audio API + Notificación nativa del navegador
+    const playNotificationSound = (type = 'success') => {
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            const ctx = new AudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            if (type === 'critical' || type === 'warning') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(520, ctx.currentTime);
+                osc.frequency.setValueAtTime(360, ctx.currentTime + 0.18);
+                osc.frequency.setValueAtTime(520, ctx.currentTime + 0.36);
+                gain.gain.setValueAtTime(0.18, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.65);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.65);
+            } else {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+                osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.12, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.45);
+            }
+        } catch {}
+    };
+
+    const notifyIncomingAlerts = (incomingAlerts = []) => {
+        if (!Array.isArray(incomingAlerts)) return;
+        setSystemAlerts(incomingAlerts);
+        incomingAlerts.forEach(al => {
+            if (!al || !al.id || seenAlertIdsRef.current.has(al.id)) return;
+            seenAlertIdsRef.current.add(al.id);
+            playNotificationSound(al.level || 'info');
+            try {
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    new Notification(al.title || 'Aviso Sistema OnBase SENA', {
+                        body: al.message || '',
+                        tag: al.id
+                    });
+                }
+            } catch {}
+        });
+    };
 
     // Estado dinámico de usuarios OnBase asignados a dependencias
     const [orgUsers, setOrgUsers] = useState({
@@ -100,6 +185,17 @@ function CargueAes() {
         };
     };
 
+    // Helper que clasifica un documento en uno de los 3 Bots ('9224', '9224.4', '9224.2')
+    const getDocBotKey = (doc) => {
+        if (!doc) return '9224';
+        const dep = String(doc.dependency_code || '').trim();
+        const sub = String(doc.subserie || '').trim();
+        const u = String(doc.target_onbase_user || '').toUpperCase();
+        if (dep === '9224.4' || sub.includes('9224.4') || u.includes('EDHERNANDEZ')) return '9224.4';
+        if (dep === '9224.2' || sub.includes('9224.2') || u.includes('LUEPITAR')) return '9224.2';
+        return '9224';
+    };
+
     // Automation Flow Tracking
     const [currentStepIndex, setCurrentStepIndex] = useState(-1);
     const [automationError, setAutomationError] = useState(false);
@@ -114,6 +210,28 @@ function CargueAes() {
         { id: 'save', label: '6. Guardando y Radicando Documento', match: ['Guardando y radicando', 'Botón guardar activado', 'Documento radicado exitosamente', 'Ventana aceptada', 'PASO 6'] },
         { id: 'restart', label: '7. Continuar Siguiente Documento (Inicia en Etapa 3)', match: ['Esperando para procesar', 'Reiniciando ciclo', 'ETAPA 3 DIRECTA'] }
     ];
+
+    // Sincronizar vista del Monitor Activo (logs, frame, paso actual y estado de error) cuando cambia el bot seleccionado o su estado
+    const activeBotState = botsStatus[activeMonitorBot] || botsStatus['9224.4'] || {};
+    useEffect(() => {
+        const botLogs = activeBotState.logs || [];
+        setLogs(botLogs);
+        if (activeBotState.hasFrame) {
+            const token = localStorage.getItem('token');
+            setLiveFrame(`/api/automation/frame?bot=${encodeURIComponent(activeMonitorBot)}&t=${frameTick}&token=${token}`);
+        } else {
+            setLiveFrame(null);
+        }
+        if (activeBotState.error) {
+            setAutomationError(true);
+        } else if (!activeBotState.running && activeBotState.completed) {
+            setAutomationError(false);
+            setCurrentStepIndex(automationSteps.length);
+        } else if (!activeBotState.running && botLogs.length === 0) {
+            setAutomationError(false);
+            setCurrentStepIndex(-1);
+        }
+    }, [activeMonitorBot, botsStatus, frameTick]);
 
     useEffect(() => {
         if (logs.length > 0) {
@@ -133,7 +251,6 @@ function CargueAes() {
 
                 if (foundIndex !== -1) {
                     setCurrentStepIndex(foundIndex);
-                    // Also clear error if we are advancing successfully after a retry
                     setAutomationError(false);
                 } else if (lastLog.includes('form saved successfully') || lastLog.includes('Proceso de cargue completado')) {
                     setCurrentStepIndex(automationSteps.length); // All done
@@ -228,23 +345,171 @@ function CargueAes() {
         try {
             const res = await axios.get('/api/trd/subseries/all');
             setAllSubseries(res.data.data || []);
+            const typRes = await axios.get('/api/trd/all-typologies');
+            setAllTypologies(typRes.data?.data || []);
         } catch (err) {
             console.error("Error fetching subseries list:", err);
         }
     };
 
-    const handleRunAutomation = async (specificDocId = null) => {
-        // Enforce the logical order and filter only 'Pendiente' documents for bulk processing
+    const startStatusPolling = () => {
+        if (pollIntervalRef.current) return; // Ya hay un polling activo
+
+        pollIntervalRef.current = setInterval(async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+                const statusRes = await axios.get('/api/automation/status', { headers: authHeaders });
+                const st = statusRes.data;
+
+                if (st.bots) {
+                    setBotsStatus(st.bots);
+                    setFrameTick(Date.now());
+
+                    const vBot = st.bots.VERIFICADOR || {};
+                    const liveVerif = st.liveVerification || vBot.liveVerification || null;
+                    const recentVerif = st.recentVerifications || vBot.recentVerifications || [];
+                    if (liveVerif) setLiveVerification(liveVerif);
+                    if (Array.isArray(recentVerif) && recentVerif.length > 0) setRecentVerifications(recentVerif);
+
+                    // Actualizar en tiempo real el estado de los documentos en pantalla conforme el Verificador los valida uno por uno
+                    if (liveVerif && Array.isArray(liveVerif.documents)) {
+                        const docMap = new Map();
+                        liveVerif.documents.forEach(ld => {
+                            if (ld.id) docMap.set(ld.id, ld);
+                        });
+                        if (docMap.size > 0) {
+                            setDocuments(prev => prev.map(d => {
+                                const ld = docMap.get(d.id);
+                                if (!ld) return d;
+                                if (ld.verifyState === 'cargado') {
+                                    return {
+                                        ...d,
+                                        status: 'Cargado',
+                                        onbase_verified: 2,
+                                        onbase_verify_stage: 'Verificado en OnBase ✅',
+                                        _liveMatchedRow: ld.matchedRow
+                                    };
+                                }
+                                if (ld.verifyState === 'no_cargado') {
+                                    return {
+                                        ...d,
+                                        onbase_verified: -1,
+                                        onbase_verify_stage: 'No encontrado en OnBase ❌',
+                                        _liveMatchedRow: ld.matchedRow
+                                    };
+                                }
+                                return {
+                                    ...d,
+                                    _liveVerifying: true
+                                };
+                            }));
+                        }
+                    }
+
+                    if (!vBot.running) {
+                        setVerifyingExpCode(null);
+                    }
+
+                    // Calcular total de documentos procesados entre los 4 bots para refrescar la tabla en tiempo real cuando avance
+                    const totalProc = Object.values(st.bots).reduce((acc, b) => acc + (b.processedDocs || 0) + (b.verifiedCount || 0), 0);
+                    if (totalProc > lastProcessedTotalRef.current) {
+                        lastProcessedTotalRef.current = totalProc;
+                        fetchPending();
+                    }
+                }
+                if (st.alerts) {
+                    notifyIncomingAlerts(st.alerts);
+                }
+                if (st.autoVerifyEvery5Min !== undefined) {
+                    setAutoVerifyEvery5Min(!!st.autoVerifyEvery5Min);
+                }
+
+                const anyActive = st.anyRunning !== undefined ? st.anyRunning : st.running;
+                setAutomationLoading(!!anyActive);
+
+                if (!anyActive) {
+                    if (pollIntervalRef.current) {
+                        clearInterval(pollIntervalRef.current);
+                        pollIntervalRef.current = null;
+                    }
+                    lastProcessedTotalRef.current = 0;
+                    await fetchPending();
+                }
+            } catch (pollErr) {
+                console.error("Error al consultar estado de automatización:", pollErr);
+            }
+        }, 1500);
+    };
+
+    // Al montar la vista, consultar si ya hay alguno de los 3 Bots ejecutándose en segundo plano
+    useEffect(() => {
+        (async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+                const statusRes = await axios.get('/api/automation/status', { headers: authHeaders });
+                const st = statusRes.data;
+                if (st?.bots) {
+                    setBotsStatus(st.bots);
+                    setFrameTick(Date.now());
+                    const vBot = st.bots.VERIFICADOR || {};
+                    if (st.liveVerification || vBot.liveVerification) {
+                        setLiveVerification(st.liveVerification || vBot.liveVerification);
+                    }
+                    if (Array.isArray(st.recentVerifications || vBot.recentVerifications)) {
+                        setRecentVerifications(st.recentVerifications || vBot.recentVerifications);
+                    }
+                }
+                if (st?.activeBotKey) {
+                    setActiveMonitorBot(st.activeBotKey);
+                }
+                if (st?.alerts) {
+                    st.alerts.forEach(a => a?.id && seenAlertIdsRef.current.add(a.id));
+                    setSystemAlerts(st.alerts);
+                }
+                if (st?.autoVerifyEvery5Min !== undefined) {
+                    setAutoVerifyEvery5Min(!!st.autoVerifyEvery5Min);
+                }
+                if (st?.anyRunning || st?.running) {
+                    setAutomationLoading(true);
+                    startStatusPolling();
+                }
+                if ('Notification' in window && Notification.permission === 'default') {
+                    Notification.requestPermission().catch(() => {});
+                }
+            } catch {}
+        })();
+        return () => {
+            if (pollIntervalRef.current) {
+                clearInterval(pollIntervalRef.current);
+                pollIntervalRef.current = null;
+            }
+        };
+    }, []);
+
+    const handleRunAutomation = async (specificDocId = null, targetBotKey = null) => {
+        // Filtrar documentos pendientes a procesar (individual, por Bot específico o todos los seleccionados)
         let docsToProcess = [];
         if (specificDocId) {
             docsToProcess = documents.filter(d => d.id === specificDocId);
         } else if (selectedDocs.length > 0) {
             docsToProcess = documents.filter(d => selectedDocs.includes(d.id) && d.status === 'Pendiente');
+            if (targetBotKey && targetBotKey !== 'all') {
+                docsToProcess = docsToProcess.filter(d => getDocBotKey(d) === targetBotKey);
+            }
+        } else if (targetBotKey && targetBotKey !== 'all') {
+            return alert(`Seleccione al menos un documento pendiente de ${targetBotKey} marcando las casillas.`);
         } else {
             return alert("Seleccione al menos un documento pendiente de la lista marcando las casillas.");
         }
 
-        if (docsToProcess.length === 0) return alert("Los documentos seleccionados no son válidos o ya están cargados.");
+        if (docsToProcess.length === 0) {
+            return alert(targetBotKey
+                ? `No hay documentos pendientes seleccionados para el Bot ${targetBotKey}.`
+                : "Los documentos seleccionados no son válidos o ya están cargados."
+            );
+        }
 
         // ── VALIDACIÓN: Primer documento obligatorio ──────────────────
         const docsSinPrimerDoc = [];
@@ -269,10 +534,9 @@ function CargueAes() {
         }
         // ─────────────────────────────────────────────────────────────
 
-        if (specificDocId) setConfigDoc(null); // Close modal if starting from there
+        if (specificDocId) setConfigDoc(null);
         setAutomationLoading(true);
 
-        // Fetch latest settings once before batch
         const token = localStorage.getItem('token');
         const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
         let settings;
@@ -288,58 +552,33 @@ function CargueAes() {
         }
 
         const docIdsToProcess = docsToProcess.map(d => d.id);
-
-        setLogs([
-            `=== Procesando Lote de ${docsToProcess.length} documento(s) ===`,
-            'Iniciando proceso de cargue AES en sesión única de OnBase...',
-            'Conectando con OnBase...'
-        ]);
-        setLiveFrame(null);
-        setCurrentStepIndex(0);
-        setAutomationError(false);
+        const focusBot = targetBotKey && targetBotKey !== 'all'
+            ? targetBotKey
+            : getDocBotKey(docsToProcess[0]);
+        setActiveMonitorBot(focusBot);
 
         try {
             const res = await axios.post('/api/automation/execute', {
                 url: settings.ades_url,
                 username: settings.ades_username,
                 password: settings.ades_password,
-                target_user: selectedOnBaseUser,
+                target_user: targetBotKey && targetBotKey !== 'all' ? targetBotKey : selectedOnBaseUser,
+                bot_key: targetBotKey && targetBotKey !== 'all' ? targetBotKey : undefined,
                 documentIds: docIdsToProcess
             }, { headers: authHeaders });
 
-            if (res.data?.logs && res.data.logs.length > 0) {
-                setLogs(res.data.logs);
+            if (res.data?.bots) {
+                setBotsStatus(res.data.bots);
+                setFrameTick(Date.now());
             }
+            if (res.data?.activeBotKey) {
+                setActiveMonitorBot(res.data.activeBotKey);
+            }
+            // Desmarcar de la selección los documentos que ya se enviaron a este(os) Bot(s)
+            setSelectedDocs(prev => prev.filter(id => !docIdsToProcess.includes(id)));
 
-            // Iniciar Polling de Estado cada 1.5 segundos hasta que termine la automatización
-            const pollInterval = setInterval(async () => {
-                try {
-                    const statusRes = await axios.get('/api/automation/status', { headers: authHeaders });
-                    const st = statusRes.data;
-                    if (st.logs && st.logs.length > 0) {
-                        setLogs(st.logs);
-                    }
-                    if (st.hasFrame) {
-                        const token = localStorage.getItem('token');
-                        setLiveFrame(`/api/automation/frame?t=${Date.now()}&token=${token}`);
-                    }
-                    if (st.error) {
-                        setAutomationError(true);
-                    }
-
-                    if (!st.running) {
-                        clearInterval(pollInterval);
-                        setAutomationLoading(false);
-                        if (st.completed) {
-                            setCurrentStepIndex(automationSteps.length);
-                            await fetchPending();
-                            setSelectedDocs([]);
-                        }
-                    }
-                } catch (pollErr) {
-                    console.error("Error al consultar estado de automatización:", pollErr);
-                }
-            }, 1500);
+            // Iniciar o mantener el polling de los 3 Bots
+            startStatusPolling();
 
         } catch (err) {
             console.error("Automation error:", err);
@@ -349,11 +588,45 @@ function CargueAes() {
             setAutomationLoading(false);
         }
     };
-    const filteredDocs = documents.filter(doc => {
-        // Filtro de Dependencia
+    // Documentos filtrados por dependencia (base para calcular subcategorías de Subserie TRD)
+    const depFilteredDocs = documents.filter(doc => {
         if (dependencyFilter !== 'all') {
             const docDep = doc.dependency_code || (doc.subserie && doc.subserie.includes('9224.4') ? '9224.4' : (doc.subserie && doc.subserie.includes('9224.2') ? '9224.2' : '9224'));
             if (docDep !== dependencyFilter) return false;
+        }
+        return true;
+    });
+
+    // Subcategorías de Subserie Documental TRD disponibles (ordenadas por código de subserie)
+    const subseriesSummaryList = (() => {
+        const map = new Map();
+        depFilteredDocs.forEach(doc => {
+            const code = String(doc.subserie || '').trim() || 'SIN-SUBSERIE';
+            if (!map.has(code)) {
+                const catMatch = allSubseries.find(s =>
+                    s.subseries_code === code || s.concatenated_code === code || s.series_code === code
+                );
+                map.set(code, {
+                    code,
+                    name: doc.subserie_name || doc.series_name || catMatch?.subseries_name || catMatch?.series_name || (code === 'SIN-SUBSERIE' ? 'Sin Subserie Asignada' : 'Subserie Documental'),
+                    expIds: new Set(),
+                    docCount: 0,
+                    pendingCount: 0
+                });
+            }
+            const item = map.get(code);
+            if (doc.expediente_id) item.expIds.add(doc.expediente_id);
+            item.docCount += 1;
+            if (doc.status === 'Pendiente' && !doc.is_duplicate_typology) item.pendingCount += 1;
+        });
+        return Array.from(map.values()).sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+    })();
+
+    const filteredDocs = depFilteredDocs.filter(doc => {
+        // Filtro por Subcategoría de Subserie Documental TRD
+        if (subserieFilter !== 'all') {
+            const docSub = String(doc.subserie || '').trim() || 'SIN-SUBSERIE';
+            if (docSub !== subserieFilter) return false;
         }
 
         if (!searchTerm) return true;
@@ -377,6 +650,7 @@ function CargueAes() {
             doc.typology_name,
             doc.box_id,
             doc.subserie,
+            doc.subserie_name,
             doc.dependency_name,
             doc.dependency_code,
             doc.target_onbase_user,
@@ -405,7 +679,8 @@ function CargueAes() {
         setConfigDoc({
             ...doc,
             joinedName: joinedName || doc.filename,
-            grupo: 'TRD'
+            grupo: 'TRD',
+            _initTyp: setEditingTypology(prev => ({ ...prev, [doc.id]: doc.typology_name || '' }))
         });
     };
 
@@ -414,7 +689,91 @@ function CargueAes() {
     };
 
     const handleView = (doc) => {
-        window.open(`/api/ades/view/${doc.id}`, '_blank');
+        setEditingTypology(prev => ({
+            ...prev,
+            [doc.id]: prev[doc.id] !== undefined ? prev[doc.id] : (doc.typology_name || '')
+        }));
+        setInlinePreviewDocIds(prev =>
+            prev.includes(doc.id) ? prev.filter(id => id !== doc.id) : [...prev, doc.id]
+        );
+    };
+
+    const [allTypologies, setAllTypologies] = useState([]);
+    const [inlinePreviewDocIds, setInlinePreviewDocIds] = useState([]);
+    const [editingTypology, setEditingTypology] = useState({});
+    const [savingTypologyId, setSavingTypologyId] = useState(null);
+    const [showModalPreview, setShowModalPreview] = useState(false);
+
+    const getTypologiesForDoc = (doc) => {
+        if (!allTypologies || allTypologies.length === 0) return [];
+        const rawSub = String(doc?.subserie || '').trim().toUpperCase();
+        const bareCode = rawSub.includes('-') ? rawSub.split('-').pop().trim() : rawSub;
+        let matched = allTypologies.filter(t => {
+            const sCode = String(t.series_code || '').trim().toUpperCase();
+            const subCode = String(t.subseries_code || '').trim().toUpperCase();
+            if (!rawSub) return false;
+            return (
+                subCode === rawSub ||
+                sCode === rawSub ||
+                (bareCode && (subCode.endsWith(`-${bareCode}`) || sCode.endsWith(`-${bareCode}`) || subCode === bareCode || sCode === bareCode))
+            );
+        });
+        const source = matched.length > 0 ? matched : allTypologies;
+        const seen = new Set();
+        const unique = [];
+        source.forEach(t => {
+            const nameKey = String(t.name || '').trim().toUpperCase();
+            if (nameKey && !seen.has(nameKey)) {
+                seen.add(nameKey);
+                unique.push(t);
+            }
+        });
+        return unique;
+    };
+
+    const saveDocTypology = async (docId, newTypologyValue) => {
+        const cleanTyp = String(newTypologyValue ?? editingTypology[docId] ?? '').trim();
+        if (!cleanTyp) {
+            return alert('⚠️ Por favor seleccione o escriba una tipología documental válida.');
+        }
+        setSavingTypologyId(docId);
+        try {
+            const token = localStorage.getItem('token');
+            const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+            const res = await axios.post('/api/ades/update-typology', {
+                id: docId,
+                typology_name: cleanTyp
+            }, { headers: authHeaders });
+
+            const updatedFilename = res.data?.filename;
+            const updatedPath = res.data?.path;
+            const updatedOnbase = res.data?.onbase_name;
+
+            setDocuments(prev => prev.map(d => d.id === docId ? {
+                ...d,
+                typology_name: cleanTyp,
+                filename: updatedFilename || d.filename,
+                path: updatedPath || d.path,
+                onbase_name: updatedOnbase !== undefined ? updatedOnbase : d.onbase_name
+            } : d));
+
+            setEditingTypology(prev => ({ ...prev, [docId]: cleanTyp }));
+
+            if (configDoc && configDoc.id === docId) {
+                setConfigDoc(prev => prev ? ({
+                    ...prev,
+                    typology_name: cleanTyp,
+                    filename: updatedFilename || prev.filename,
+                    path: updatedPath || prev.path,
+                    onbase_name: updatedOnbase !== undefined ? updatedOnbase : prev.onbase_name
+                }) : null);
+            }
+            alert(`✅ Tipología actualizada a: "${cleanTyp}"`);
+        } catch (err) {
+            alert('❌ Error al actualizar la tipología: ' + (err.response?.data?.error || err.message));
+        } finally {
+            setSavingTypologyId(null);
+        }
     };
 
     const [clickPoint, setClickPoint] = useState(null);
@@ -461,7 +820,7 @@ function CargueAes() {
 
             try {
                 const token = localStorage.getItem('token');
-                await axios.post('/api/automation/click', { x, y, button: e.button === 2 ? 'right' : 'left' }, {
+                await axios.post('/api/automation/click', { x, y, button: e.button === 2 ? 'right' : 'left', bot: activeMonitorBot }, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
             } catch (err) {
@@ -477,7 +836,7 @@ function CargueAes() {
         setIsInteracting(true);
         try {
             const token = localStorage.getItem('token');
-            await axios.post('/api/automation/type', { text: manualText }, {
+            await axios.post('/api/automation/type', { text: manualText, bot: activeMonitorBot }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setManualText('');
@@ -493,7 +852,7 @@ function CargueAes() {
         setIsInteracting(true);
         try {
             const token = localStorage.getItem('token');
-            await axios.post('/api/automation/press-key', { key }, {
+            await axios.post('/api/automation/press-key', { key, bot: activeMonitorBot }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
         } catch (err) {
@@ -503,21 +862,202 @@ function CargueAes() {
         }
     };
 
-    const killAutomation = async () => {
-        if (!window.confirm('¿Seguro que deseas forzar el cierre de la automatización activa?')) return;
+    const killAutomation = async (botKeyToKill = null) => {
+        const targetBot = typeof botKeyToKill === 'string' ? botKeyToKill : activeMonitorBot;
+        const msg = targetBot === 'all'
+            ? '¿Seguro que deseas detener TODOS los Bots de automatización activos?'
+            : `¿Seguro que deseas detener el Bot ${targetBot} (${orgUsers[targetBot] || targetBot})? Los demás Bots seguirán ejecutándose normalmente.`;
+        if (!window.confirm(msg)) return;
         setIsInteracting(true);
         try {
             const token = localStorage.getItem('token');
-            await axios.post('/api/automation/kill', {}, {
+            const res = await axios.post('/api/automation/kill', { bot: targetBot }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setIsMonitorExpanded(false);
-            alert('Automatización finalizada por el usuario.');
+            if (res.data?.bots) {
+                setBotsStatus(res.data.bots);
+            }
+            if (targetBot === 'all') {
+                setIsMonitorExpanded(false);
+            }
+            alert(res.data?.message || 'Bot detenido por el usuario.');
         } catch (err) {
             alert('Error al detener: ' + (err.response?.data?.error || err.message));
         } finally {
             setIsInteracting(false);
         }
+    };
+
+    // Destrabar sesión de Bot OnBase (Watchdog Manual / Remoto)
+    const handleUnlockBot = async (botKeyToUnlock = null) => {
+        const targetBot = botKeyToUnlock || activeMonitorBot || '9224.4';
+        setUnlockingBotKey(targetBot);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.post('/api/automation/unlock-bot', {
+                bot: targetBot,
+                action: 'escape_and_close_modals'
+            }, { headers: { Authorization: `Bearer ${token}` } });
+            if (res.data?.bots) setBotsStatus(res.data.bots);
+            setFrameTick(Date.now());
+            alert(`🔓 ${res.data?.message || `Maniobra de desbloqueo ejecutada en Bot ${targetBot}.`}`);
+        } catch (err) {
+            alert('Error al destrabar Bot: ' + (err.response?.data?.error || err.message));
+        } finally {
+            setUnlockingBotKey(null);
+        }
+    };
+
+    // Adelantar espera de 3 minutos entre oleadas para ingresar a verificar de inmediato
+    const handleSkipVerifierWait = async (botKey = 'all') => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.post('/api/automation/skip-verifier-wait', { bot: botKey }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.data?.bots) setBotsStatus(res.data.bots);
+        } catch (err) {
+            alert('Error al adelantar verificación: ' + (err.response?.data?.error || err.message));
+        }
+    };
+
+    // Lanzar Bot 4 · Verificador OnBase (SGDEA Expediente) para un expediente o para todos los expedientes visibles
+    const handleVerifyExpedientesOnBase = async (singleExpCode = null, autoReuploadMissing = true) => {
+        const token = localStorage.getItem('token');
+        const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+        let expCodes = [];
+        if (singleExpCode) {
+            expCodes = [singleExpCode];
+        } else {
+            const selectedDocsList = documents.filter(d => selectedDocs.includes(d.id));
+            const sourceDocs = selectedDocsList.length > 0 ? selectedDocsList : filteredDocs;
+            expCodes = [...new Set(sourceDocs.map(d => (d.expediente_code || '').trim()).filter(Boolean))];
+        }
+        if (expCodes.length === 0) {
+            return alert('No hay códigos de expediente válidos para verificar en OnBase.');
+        }
+
+        // Expandir automáticamente las carpetas (expedientes) que se van a verificar para ver sus documentos en tiempo real
+        const matchingExpIds = documents
+            .filter(d => expCodes.includes((d.expediente_code || '').trim()) && d.expediente_id)
+            .map(d => d.expediente_id);
+        if (matchingExpIds.length > 0) {
+            setExpandedExpedientes(prev => [...new Set([...prev, ...matchingExpIds])]);
+        }
+
+        // Inicializar vista previa en tiempo real mientras conecta con OnBase
+        const firstCode = expCodes[0];
+        const firstExpDocs = documents
+            .filter(d => (d.expediente_code || '').trim() === firstCode)
+            .map((d, idx) => ({
+                id: d.id,
+                index: idx + 1,
+                filename: d.filename,
+                typology_name: d.typology_name,
+                dbStatus: d.status,
+                verifyState: 'verificando',
+                matchedRow: 'Conectando con OnBase para verificar...'
+            }));
+        setLiveVerification({
+            expedienteCode: firstCode,
+            status: 'VERIFICANDO',
+            step: `Iniciando sesión en OnBase y consultando carpeta "${firstCode}"...`,
+            foundInOnBaseCount: 0,
+            verifiedCount: 0,
+            missingCount: 0,
+            documents: firstExpDocs
+        });
+        setShowVerifierPanel(true);
+        setVerifyingExpCode(singleExpCode || 'ALL');
+        setActiveMonitorBot('VERIFICADOR');
+        try {
+            const res = await axios.post('/api/automation/verify-expedientes', {
+                expedienteCodes: expCodes,
+                stage: 'MANUAL',
+                autoReuploadMissing
+            }, { headers: authHeaders });
+            if (res.data?.bots) {
+                setBotsStatus(res.data.bots);
+                setFrameTick(Date.now());
+            }
+            startStatusPolling();
+        } catch (err) {
+            setVerifyingExpCode(null);
+            alert('Error al iniciar verificación en OnBase: ' + (err.response?.data?.error || err.message));
+        }
+    };
+
+    const handleToggleAutoVerify5Min = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const nextState = !autoVerifyEvery5Min;
+            const res = await axios.post('/api/automation/toggle-auto-verify', {
+                enabled: nextState
+            }, { headers: { Authorization: `Bearer ${token}` } });
+            setAutoVerifyEvery5Min(!!res.data?.autoVerifyEvery5Min);
+            if (res.data?.bots) setBotsStatus(res.data.bots);
+        } catch (err) {
+            alert('Error al cambiar verificación periódica: ' + (err.response?.data?.error || err.message));
+        }
+    };
+
+    const openAlertSettingsModal = async () => {
+        setAlertModalOpen(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.get('/api/automation/alert-settings', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.data?.settings) {
+                setAlertSettingsForm(prev => ({ ...prev, ...res.data.settings }));
+            }
+        } catch {}
+    };
+
+    const handleSaveAlertSettings = async (e) => {
+        if (e) e.preventDefault();
+        setSavingAlertSettings(true);
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post('/api/automation/alert-settings', alertSettingsForm, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            alert('✅ Configuración de alertas a Móvil y Equipo guardada correctamente.');
+            setAlertModalOpen(false);
+        } catch (err) {
+            alert('Error al guardar alertas: ' + (err.response?.data?.error || err.message));
+        } finally {
+            setSavingAlertSettings(false);
+        }
+    };
+
+    const handleSendTestAlert = async () => {
+        setTestingAlert(true);
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post('/api/automation/alert-settings', alertSettingsForm, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const res = await axios.post('/api/automation/test-alert', {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.data?.alerts) notifyIncomingAlerts(res.data.alerts);
+            alert('📲 Alerta de prueba enviada al Móvil (Ntfy / Telegram), Correo y Panel del Sistema.');
+        } catch (err) {
+            alert('Error enviando alerta de prueba: ' + (err.response?.data?.error || err.message));
+        } finally {
+            setTestingAlert(false);
+        }
+    };
+
+    const handleClearAlerts = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post('/api/automation/clear-alerts', {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setSystemAlerts([]);
+        } catch {}
     };
 
     const saveExpedienteCode = async (docId) => {
@@ -598,6 +1138,103 @@ function CargueAes() {
         }
     };
 
+    // ── ESTADO Y FUNCIONES DE LA PESTAÑA "VERIFICADOR" MANUAL DEL DIRECTOR ──
+    const [verifierDocs, setVerifierDocs] = useState([]);
+    const [verifierLoading, setVerifierLoading] = useState(false);
+    const [verifierFilter, setVerifierFilter] = useState('PorRevisar'); // 'PorRevisar' | 'Todos' | 'VerificadosOK' | 'ConPendientes'
+    const [verifierDepFilter, setVerifierDepFilter] = useState('all');
+    const [verifierSearch, setVerifierSearch] = useState('');
+    const [verifierExpandedExps, setVerifierExpandedExps] = useState([]);
+    const [verifierSelectedDocs, setVerifierSelectedDocs] = useState([]);
+    const [verifierPreviewDocIds, setVerifierPreviewDocIds] = useState([]);
+    const [copiedExpCode, setCopiedExpCode] = useState(null);
+    const [verifierToast, setVerifierToast] = useState(null);
+
+    const showVerifierNotice = (msg) => {
+        setVerifierToast(msg);
+        setTimeout(() => setVerifierToast(null), 2600);
+    };
+
+    const fetchVerifierDocuments = async () => {
+        setVerifierLoading(true);
+        try {
+            const res = await axios.get('/api/ades/pending?status=Todos');
+            const data = Array.isArray(res.data) ? res.data : [];
+            setVerifierDocs(data);
+        } catch (err) {
+            console.error('Error cargando documentos del Verificador:', err);
+        } finally {
+            setVerifierLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'verificador') {
+            fetchVerifierDocuments();
+        }
+    }, [activeTab]);
+
+    const openExpedienteInVerificador = (exp) => {
+        setActiveTab('verificador');
+        if (exp?.expediente_code) {
+            setVerifierSearch(exp.expediente_code);
+            setVerifierFilter('Todos');
+        }
+        if (exp?.expediente_id) {
+            setVerifierExpandedExps(prev => prev.includes(exp.expediente_id) ? prev : [...prev, exp.expediente_id]);
+        }
+        fetchVerifierDocuments();
+    };
+
+    const handleManualVerifyAction = async ({ action = 'ok', documentIds = [], expedienteIds = [], label = '' }) => {
+        try {
+            const token = localStorage.getItem('token');
+            const isOk = action === 'ok';
+            // Actualización optimista inmediata en ambas tablas (Verificador y Gestión de Cargue)
+            const applyLocalUpdate = (list) => list.map(d => {
+                const hit = (documentIds.length > 0 && documentIds.includes(d.id)) ||
+                            (expedienteIds.length > 0 && expedienteIds.includes(d.expediente_id));
+                if (!hit) return d;
+                return {
+                    ...d,
+                    status: isOk ? 'Cargado' : 'Pendiente',
+                    onbase_verified: isOk ? 2 : 0,
+                    onbase_verify_stage: isOk ? 'Verificado Manualmente OK ✅' : null
+                };
+            });
+            setVerifierDocs(prev => applyLocalUpdate(prev));
+            setDocuments(prev => applyLocalUpdate(prev));
+
+            await axios.post(
+                '/api/ades/manual-verify',
+                { action, document_ids: documentIds, expediente_ids: expedienteIds },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            if (documentIds.length > 0) {
+                setVerifierSelectedDocs(prev => prev.filter(id => !documentIds.includes(id)));
+            }
+            showVerifierNotice(
+                isOk
+                    ? `✅ OK confirmado${label ? `: ${label}` : ''}`
+                    : `↩️ Devuelto a Pendiente para cargue${label ? `: ${label}` : ''}`
+            );
+            fetchPending();
+        } catch (err) {
+            alert('Error al actualizar estado de verificación: ' + (err.response?.data?.error || err.message));
+            fetchVerifierDocuments();
+        }
+    };
+
+    const handleCopyExpCode = (code) => {
+        if (!code) return;
+        try {
+            navigator.clipboard.writeText(code);
+            setCopiedExpCode(code);
+            setTimeout(() => setCopiedExpCode(null), 1800);
+        } catch {}
+    };
+
     // --- CREACION MASIVA LOGIC ---
     const handleMassChange = (e) => {
         const { id, value } = e.target;
@@ -667,11 +1304,13 @@ function CargueAes() {
         if (expedientes.length === 0) return alert("No hay datos para guardar.");
         setMassCreationLoading(true);
         setMassCreationStatus('Guardando...');
+        const expedientesSnapshot = [...expedientes];
+        const responsiblesSnapshot = [...selectedResponsibles];
         try {
             const token = localStorage.getItem('token');
             const res = await axios.post('/api/expedientes/mass', {
-                expedientes,
-                assigned_user_ids: selectedResponsibles.map(u => u.id)
+                expedientes: expedientesSnapshot,
+                assigned_user_ids: responsiblesSnapshot.map(u => u.id)
             }, { headers: { Authorization: `Bearer ${token}` } });
             
             const { message, errors, created_ids } = res.data;
@@ -690,20 +1329,60 @@ function CargueAes() {
                 if (autoLote && created_ids && created_ids.length > 0) {
                     try {
                         const nombreLote = `Lote Excel (AES) - ${new Date().toLocaleString('es-CO')}`;
-                        let userId = 1;
+                        let fallbackUserId = null;
                         try {
                            const payload = JSON.parse(atob(token.split('.')[1]));
-                           userId = payload.id;
+                           if (payload.role !== 'superadmin') {
+                               fallbackUserId = payload.id;
+                           }
                         } catch(e) {}
 
-                        await axios.post('/api/seguimiento/paquetes', {
-                            nombre: nombreLote,
-                            descripcion: 'Lote creado automáticamente desde Cargue AES',
-                            user_id: userId,
-                            expediente_ids: created_ids
-                        }, { headers: { Authorization: `Bearer ${token}` } });
+                        const packagesToCreate = [];
+                        if (responsiblesSnapshot.length > 0) {
+                            for (const resp of responsiblesSnapshot) {
+                                packagesToCreate.push({
+                                    nombre: responsiblesSnapshot.length > 1 ? `${nombreLote} (${resp.full_name})` : nombreLote,
+                                    user_id: resp.id,
+                                    expediente_ids: created_ids
+                                });
+                            }
+                        } else {
+                            const byAssignedUser = new Map();
+                            expedientesSnapshot.forEach((exp, idx) => {
+                                const expId = created_ids[idx];
+                                if (!expId) return;
+                                const targetUid = Number(exp.assigned_user_id) || fallbackUserId;
+                                if (!targetUid) return;
+                                if (!byAssignedUser.has(targetUid)) byAssignedUser.set(targetUid, []);
+                                byAssignedUser.get(targetUid).push(expId);
+                            });
+                            if (byAssignedUser.size === 0 && fallbackUserId) {
+                                packagesToCreate.push({ nombre: nombreLote, user_id: fallbackUserId, expediente_ids: created_ids });
+                            } else {
+                                for (const [uid, idsForUser] of byAssignedUser.entries()) {
+                                    packagesToCreate.push({
+                                        nombre: nombreLote,
+                                        user_id: uid,
+                                        expediente_ids: idsForUser
+                                    });
+                                }
+                            }
+                        }
+
+                        for (const pkg of packagesToCreate) {
+                            await axios.post('/api/seguimiento/paquetes', {
+                                nombre: pkg.nombre,
+                                descripcion: 'Lote creado automáticamente desde Cargue AES',
+                                user_id: pkg.user_id,
+                                expediente_ids: pkg.expediente_ids
+                            }, { headers: { Authorization: `Bearer ${token}` } });
+                        }
                         
-                        alert(`✅ ¡Guardado exitoso!\nSe creó automáticamente el paquete de seguimiento "${nombreLote}".`);
+                        if (packagesToCreate.length > 0) {
+                            alert(`✅ ¡Guardado exitoso!\nSe creó automáticamente el paquete de seguimiento "${nombreLote}".`);
+                        } else {
+                            alert('✅ ¡Guardado exitoso en base de datos!');
+                        }
                     } catch (loteErr) {
                         console.error('Error creando lote automático:', loteErr);
                         alert(`Los expedientes se guardaron, pero hubo un error al crear el lote de seguimiento: ${loteErr.response?.data?.error || loteErr.message}`);
@@ -816,6 +1495,8 @@ function CargueAes() {
             try {
                 const res = await axios.get('/api/trd/subseries/all');
                 setAllSubseries(res.data.data || []);
+            const typRes = await axios.get('/api/trd/all-typologies');
+            setAllTypologies(typRes.data?.data || []);
             } catch (e) { console.error(e); }
         }
         setShowPreviewModal(false);
@@ -1050,7 +1731,7 @@ function CargueAes() {
     };
 
     const handleSelectExpediente = (exp, checked) => {
-        const pendingDocIds = exp.documents.filter(d => d.status === 'Pendiente').map(d => d.id);
+        const pendingDocIds = exp.documents.filter(d => d.status === 'Pendiente' && !d.is_duplicate_typology).map(d => d.id);
         if (checked) {
             setSelectedDocs(prev => [...new Set([...prev, ...pendingDocIds])]);
         } else {
@@ -1058,18 +1739,35 @@ function CargueAes() {
         }
     };
 
-    // Group filteredDocs by expediente
+    const handleSelectSubserieGroup = (subCode, checked) => {
+        const targetSub = String(subCode || '').trim() || 'SIN-SUBSERIE';
+        const subDocIds = filteredDocs
+            .filter(d => (String(d.subserie || '').trim() || 'SIN-SUBSERIE') === targetSub && d.status === 'Pendiente' && !d.is_duplicate_typology)
+            .map(d => d.id);
+        if (checked) {
+            setSelectedDocs(prev => [...new Set([...prev, ...subDocIds])]);
+        } else {
+            setSelectedDocs(prev => prev.filter(id => !subDocIds.includes(id)));
+        }
+    };
+
+    // Group filteredDocs by expediente and sort by Subcategoría Subserie TRD -> Código Expediente -> Orden Tipología TRD
     const groupedExpedientes = [];
     const expGroupMap = {};
 
     filteredDocs.forEach(doc => {
         const expId = doc.expediente_id || 999999;
         if (!expGroupMap[expId]) {
+            const codeSub = String(doc.subserie || '').trim();
+            const catMatch = allSubseries.find(s =>
+                s.subseries_code === codeSub || s.concatenated_code === codeSub || s.series_code === codeSub
+            );
             expGroupMap[expId] = {
                 expediente_id: doc.expediente_id,
                 expediente_code: doc.expediente_code || '',
                 title: doc.title || 'Expediente Sin Título',
-                subserie: doc.subserie || '',
+                subserie: codeSub,
+                subserie_name: doc.subserie_name || doc.series_name || catMatch?.subseries_name || catMatch?.series_name || '',
                 box_id: doc.box_id || '',
                 storage_type: doc.storage_type || '',
                 opening_date: doc.opening_date || '',
@@ -1085,22 +1783,46 @@ function CargueAes() {
         expGroupMap[expId].documents.push(doc);
     });
 
+    // Ordenar documentos internos de cada expediente por orden de tipología TRD (1ra tipología, 2da tipología...)
+    groupedExpedientes.forEach(exp => {
+        exp.documents.sort((a, b) => {
+            const ordA = Number(a.typology_order ?? 9999);
+            const ordB = Number(b.typology_order ?? 9999);
+            if (ordA !== ordB) return ordA - ordB;
+            return (a.id || 0) - (b.id || 0);
+        });
+    });
+
+    // Ordenar expedientes por Subcategoría Subserie Documental TRD y luego por Código de Expediente
+    groupedExpedientes.sort((a, b) => {
+        const subA = a.subserie || 'ZZZZ';
+        const subB = b.subserie || 'ZZZZ';
+        if (subA !== subB) return subA.localeCompare(subB, undefined, { numeric: true });
+        return String(a.expediente_code || '').localeCompare(String(b.expediente_code || ''), undefined, { numeric: true });
+    });
+
     return (
         <div className="cargue-ades-container" style={{ padding: '20px', width: '100%', maxWidth: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <h1 style={{ margin: 0, color: '#2e7d32' }}>Cargue AES (OnBase)</h1>
-                <div className="tabs" style={{ display: 'flex', gap: '5px' }}>
+                <div className="tabs" style={{ display: 'flex', gap: '8px' }}>
                     <button
                         onClick={() => setActiveTab('cargue')}
-                        style={{ padding: '10px 20px', borderRadius: '8px 8px 0 0', border: 'none', background: activeTab === 'cargue' ? '#fff' : '#e0e0e0', fontWeight: 'bold', cursor: 'pointer', borderBottom: activeTab === 'cargue' ? '3px solid #2e7d32' : 'none' }}
+                        style={{ padding: '10px 20px', borderRadius: '8px 8px 0 0', border: 'none', background: activeTab === 'cargue' ? '#fff' : '#e0e0e0', color: activeTab === 'cargue' ? '#1b5e20' : '#444', fontWeight: 'bold', cursor: 'pointer', borderBottom: activeTab === 'cargue' ? '3px solid #2e7d32' : 'none' }}
                     >
-                        Gestión de Cargue
+                        🚀 Gestión de Cargue
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('verificador')}
+                        style={{ padding: '10px 22px', borderRadius: '8px 8px 0 0', border: 'none', background: activeTab === 'verificador' ? '#e8f5e9' : '#e0e0e0', color: activeTab === 'verificador' ? '#1b5e20' : '#333', fontWeight: 'bold', cursor: 'pointer', borderBottom: activeTab === 'verificador' ? '3px solid #2e7d32' : 'none', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                        ✅ Verificador
                     </button>
                     <button
                         onClick={() => setActiveTab('creacion')}
-                        style={{ padding: '10px 20px', borderRadius: '8px 8px 0 0', border: 'none', background: activeTab === 'creacion' ? '#fff' : '#e0e0e0', fontWeight: 'bold', cursor: 'pointer', borderBottom: activeTab === 'creacion' ? '3px solid #2e7d32' : 'none' }}
+                        style={{ padding: '10px 20px', borderRadius: '8px 8px 0 0', border: 'none', background: activeTab === 'creacion' ? '#fff' : '#e0e0e0', color: activeTab === 'creacion' ? '#1b5e20' : '#444', fontWeight: 'bold', cursor: 'pointer', borderBottom: activeTab === 'creacion' ? '3px solid #2e7d32' : 'none' }}
                     >
-                        Creación de Expedientes
+                        📁 Creación de Expedientes
                     </button>
                 </div>
             </div>
@@ -1204,6 +1926,79 @@ function CargueAes() {
                                 })}
                             </div>
 
+                            {/* Barra de Subcategorías por Subserie Documental TRD (Ordenado por Oleadas de Tipología + Espera 3m Pre-Verificación) */}
+                            {subseriesSummaryList.length > 0 && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '15px', padding: '10px 14px', backgroundColor: '#f1f8e9', borderRadius: '10px', border: '1px solid #c5e1a5' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                                        <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#1b5e20', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            🗂️ Subcategorías por Subserie Documental TRD ({subseriesSummaryList.length}):
+                                        </span>
+                                        <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#00695c', backgroundColor: '#e0f2f1', padding: '3px 10px', borderRadius: '12px', border: '1px solid #80cbc4' }}>
+                                            🌊 Cargue Continuo por Oleadas de Tipología (Sin pausas automáticas · Revisión en pestaña "✅ Verificador")
+                                        </span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', maxHeight: '115px', overflowY: 'auto', paddingRight: '4px' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSubserieFilter('all')}
+                                            style={{
+                                                padding: '5px 11px',
+                                                borderRadius: '16px',
+                                                border: subserieFilter === 'all' ? '2px solid #2e7d32' : '1px solid #c8e6c9',
+                                                backgroundColor: subserieFilter === 'all' ? '#2e7d32' : '#ffffff',
+                                                color: subserieFilter === 'all' ? '#ffffff' : '#2e7d32',
+                                                fontWeight: 'bold',
+                                                fontSize: '11px',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            Todas las Subseries ({depFilteredDocs.length} docs)
+                                        </button>
+                                        {subseriesSummaryList.map(subItem => {
+                                            const isSubSelected = subserieFilter === subItem.code;
+                                            return (
+                                                <button
+                                                    type="button"
+                                                    key={subItem.code}
+                                                    onClick={() => setSubserieFilter(isSubSelected ? 'all' : subItem.code)}
+                                                    title={`${subItem.code} — ${subItem.name} (${subItem.expIds.size} expediente(s), ${subItem.docCount} documento(s))`}
+                                                    style={{
+                                                        padding: '5px 10px',
+                                                        borderRadius: '16px',
+                                                        border: isSubSelected ? '2px solid #1b5e20' : '1px solid #c5e1a5',
+                                                        backgroundColor: isSubSelected ? '#c8e6c9' : '#ffffff',
+                                                        color: isSubSelected ? '#1b5e20' : '#33691e',
+                                                        fontWeight: isSubSelected ? 'bold' : '600',
+                                                        fontSize: '11px',
+                                                        cursor: 'pointer',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '5px'
+                                                    }}
+                                                >
+                                                    <span>📁 {subItem.code}</span>
+                                                    {subItem.name && (
+                                                        <span style={{ maxWidth: '170px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 'normal', opacity: 0.9 }}>
+                                                            · {subItem.name}
+                                                        </span>
+                                                    )}
+                                                    <span style={{
+                                                        padding: '1px 6px',
+                                                        borderRadius: '10px',
+                                                        fontSize: '10px',
+                                                        fontWeight: 'bold',
+                                                        backgroundColor: isSubSelected ? '#1b5e20' : '#e8f5e9',
+                                                        color: isSubSelected ? '#fff' : '#1b5e20'
+                                                    }}>
+                                                        {subItem.expIds.size} exp / {subItem.docCount} docs
+                                                    </span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
                             <div style={{ overflowX: 'auto' }}>
                                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                                     <thead>
@@ -1212,11 +2007,11 @@ function CargueAes() {
                                                 <input
                                                     type="checkbox"
                                                     onChange={(e) => {
-                                                        const pendingIds = filteredDocs.filter(d => d.status === 'Pendiente').map(d => d.id);
+                                                        const pendingIds = filteredDocs.filter(d => d.status === 'Pendiente' && !d.is_duplicate_typology).map(d => d.id);
                                                         if (e.target.checked) setSelectedDocs(pendingIds);
                                                         else setSelectedDocs([]);
                                                     }}
-                                                    checked={filteredDocs.filter(d => d.status === 'Pendiente').length > 0 && selectedDocs.length === filteredDocs.filter(d => d.status === 'Pendiente').length}
+                                                    checked={filteredDocs.filter(d => d.status === 'Pendiente' && !d.is_duplicate_typology).length > 0 && selectedDocs.length === filteredDocs.filter(d => d.status === 'Pendiente' && !d.is_duplicate_typology).length}
                                                     style={{ transform: 'scale(1.2)', cursor: 'pointer' }}
                                                 />
                                             </th>
@@ -1229,16 +2024,60 @@ function CargueAes() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {groupedExpedientes.length > 0 ? groupedExpedientes.map(exp => {
+                                        {groupedExpedientes.length > 0 ? groupedExpedientes.map((exp, expIdx) => {
                                             const isExpanded = expandedExpedientes.includes(exp.expediente_id);
                                             const firstDoc = exp.documents[0];
                                             const firstDocId = firstDoc?.id;
-                                            const pendingDocs = exp.documents.filter(d => d.status === 'Pendiente');
+                                            const pendingDocs = exp.documents.filter(d => d.status === 'Pendiente' && !d.is_duplicate_typology);
                                             const isAllSelected = pendingDocs.length > 0 && pendingDocs.every(d => selectedDocs.includes(d.id));
                                             const isSomeSelected = !isAllSelected && pendingDocs.some(d => selectedDocs.includes(d.id));
 
+                                            // Detectar si inicia una nueva Subcategoría de Subserie Documental TRD
+                                            const currentSubKey = exp.subserie || 'SIN-SUBSERIE';
+                                            const prevSubKey = expIdx > 0 ? (groupedExpedientes[expIdx - 1].subserie || 'SIN-SUBSERIE') : null;
+                                            const isFirstOfSubserie = expIdx === 0 || currentSubKey !== prevSubKey;
+
+                                            const subserieExps = isFirstOfSubserie
+                                                ? groupedExpedientes.filter(g => (g.subserie || 'SIN-SUBSERIE') === currentSubKey)
+                                                : [];
+                                            const subseriePendingDocIds = isFirstOfSubserie
+                                                ? subserieExps.flatMap(g => g.documents.filter(d => d.status === 'Pendiente' && !d.is_duplicate_typology).map(d => d.id))
+                                                : [];
+                                            const isSubAllSelected = subseriePendingDocIds.length > 0 && subseriePendingDocIds.every(id => selectedDocs.includes(id));
+                                            const maxWavesInSub = isFirstOfSubserie
+                                                ? subserieExps.reduce((mx, g) => Math.max(mx, g.documents.filter(d => !d.is_duplicate_typology).length), 0)
+                                                : 0;
+
                                             return (
                                                 <Fragment key={exp.expediente_id || Math.random()}>
+                                                    {/* Cabecera de Subcategoría por Subserie Documental TRD */}
+                                                    {isFirstOfSubserie && (
+                                                        <tr style={{ backgroundColor: '#e8f5e9', borderTop: '2px solid #2e7d32', borderBottom: '1px solid #a5d6a7' }}>
+                                                            <td colSpan="7" style={{ padding: '8px 14px' }}>
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={isSubAllSelected}
+                                                                            disabled={subseriePendingDocIds.length === 0}
+                                                                            onChange={(e) => handleSelectSubserieGroup(currentSubKey, e.target.checked)}
+                                                                            title="Seleccionar todos los expedientes pendientes de esta Subserie Documental"
+                                                                            style={{ transform: 'scale(1.2)', cursor: subseriePendingDocIds.length === 0 ? 'not-allowed' : 'pointer' }}
+                                                                        />
+                                                                        <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#1b5e20' }}>
+                                                                            🗂️ SUBSERIE DOCUMENTAL: {currentSubKey} {exp.subserie_name ? `— ${exp.subserie_name}` : ''}
+                                                                        </span>
+                                                                        <span style={{ fontSize: '11px', fontWeight: 'bold', backgroundColor: '#ffffff', color: '#2e7d32', padding: '2px 9px', borderRadius: '12px', border: '1px solid #81c784' }}>
+                                                                            📁 {subserieExps.length} expediente(s) · 🌊 {maxWavesInSub} oleada(s) de tipología
+                                                                        </span>
+                                                                    </div>
+                                                                    <span style={{ fontSize: '11px', color: '#004d40', fontWeight: '600' }}>
+                                                                        🔄 Orden continuo: Tipología #1 en los {subserieExps.length} exp. ➡️ Tipología #2 ➡️ Tipología #3... (Revisión en pestaña Verificador)
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )}
                                                     {/* Parent Row */}
                                                     <tr style={{ 
                                                         borderTop: '1px solid #c8e6c9', 
@@ -1346,57 +2185,106 @@ function CargueAes() {
                                                             })()}
                                                         </td>
                                                         <td style={{ padding: '12px', textAlign: 'center' }}>
-                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                                                <span style={{
-                                                                    padding: '4px 10px',
-                                                                    borderRadius: '10px',
-                                                                    fontSize: '11px',
-                                                                    fontWeight: 'bold',
-                                                                    backgroundColor: pendingDocs.length === 0 ? '#e8f5e9' : '#fff3e0',
-                                                                    color: pendingDocs.length === 0 ? '#2e7d32' : '#ef6c00',
-                                                                    border: `1px solid ${pendingDocs.length === 0 ? '#c8e6c9' : '#ffe0b2'}`
-                                                                }}>
-                                                                    {pendingDocs.length === 0 ? 'Completado' : `${pendingDocs.length} pendiente(s)`}
-                                                                </span>
-                                                                {pendingDocs.length > 0 && (
-                                                                    <button
-                                                                        onClick={() => handleMarkExpedienteAsCargado(exp)}
-                                                                        title="Marcar todos los documentos de este expediente como cargados en AES"
-                                                                        style={{ 
-                                                                            padding: '6px 10px', 
-                                                                            background: '#e8f5e9', 
-                                                                            border: '1px solid #a5d6a7', 
-                                                                            color: '#1b5e20',
-                                                                            borderRadius: '6px', 
-                                                                            cursor: 'pointer', 
-                                                                            fontSize: '12px', 
-                                                                            fontWeight: 'bold',
-                                                                            display: 'flex',
-                                                                            alignItems: 'center',
-                                                                            gap: '4px'
-                                                                        }}
-                                                                    >
-                                                                        <CheckCircle size={14} /> Marcar Cargado
-                                                                    </button>
-                                                                )}
-                                                                <button
-                                                                    onClick={() => toggleExpediente(exp.expediente_id)}
-                                                                    style={{ 
-                                                                        padding: '6px 12px', 
-                                                                        background: '#f5f5f5', 
-                                                                        border: '1px solid #ccc', 
-                                                                        borderRadius: '6px', 
-                                                                        cursor: 'pointer', 
-                                                                        fontSize: '12px', 
-                                                                        fontWeight: 'bold',
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        gap: '4px'
-                                                                    }}
-                                                                >
-                                                                    {isExpanded ? 'Ocultar' : 'Ver Documentos'}
-                                                                </button>
-                                                            </div>
+                                                            {(() => {
+                                                                const verified100Count = exp.documents.filter(d => Number(d.onbase_verified) === 2).length;
+                                                                const verified50Count = exp.documents.filter(d => Number(d.onbase_verified) === 1).length;
+                                                                const missingVerifiedCount = exp.documents.filter(d => Number(d.onbase_verified) === -1).length;
+                                                                const allVerified100 = exp.documents.length > 0 && verified100Count === exp.documents.length;
+                                                                const has50Checkpoint = verified50Count > 0 || verified100Count > 0;
+                                                                return (
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                                                            <span style={{
+                                                                                padding: '3px 9px',
+                                                                                borderRadius: '10px',
+                                                                                fontSize: '11px',
+                                                                                fontWeight: 'bold',
+                                                                                backgroundColor: pendingDocs.length === 0 ? '#e8f5e9' : '#fff3e0',
+                                                                                color: pendingDocs.length === 0 ? '#2e7d32' : '#ef6c00',
+                                                                                border: `1px solid ${pendingDocs.length === 0 ? '#c8e6c9' : '#ffe0b2'}`
+                                                                            }}>
+                                                                                {pendingDocs.length === 0 ? 'Cargado Local' : `${pendingDocs.length} pendiente(s)`}
+                                                                            </span>
+                                                                            {allVerified100 ? (
+                                                                                <span style={{ padding: '3px 8px', borderRadius: '10px', fontSize: '10px', fontWeight: 'bold', backgroundColor: '#e0f2f1', color: '#00695c', border: '1px solid #80cbc4' }} title="Verificado 100% en OnBase mediante Consulta Personalizada SGDEA Expediente">
+                                                                                    🛡️ Verificado 100% OnBase ({verified100Count}/{exp.documents.length})
+                                                                                </span>
+                                                                            ) : missingVerifiedCount > 0 ? (
+                                                                                <span style={{ padding: '3px 8px', borderRadius: '10px', fontSize: '10px', fontWeight: 'bold', backgroundColor: '#ffebee', color: '#c62828', border: '1px solid #ef9a9a' }}>
+                                                                                    ⚠️ {missingVerifiedCount} faltante(s) en OnBase
+                                                                                </span>
+                                                                            ) : has50Checkpoint ? (
+                                                                                <span style={{ padding: '3px 8px', borderRadius: '10px', fontSize: '10px', fontWeight: 'bold', backgroundColor: '#e3f2fd', color: '#0d47a1', border: '1px solid #90caf9' }}>
+                                                                                    ⏳ Verificado 50% ({verified100Count + verified50Count}/{exp.documents.length})
+                                                                                </span>
+                                                                            ) : null}
+                                                                        </div>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => openExpedienteInVerificador(exp)}
+                                                                                title="Abrir este expediente en la pestaña Verificador para revisar sus archivos y dar el OK"
+                                                                                style={{
+                                                                                    padding: '5px 9px',
+                                                                                    background: '#e0f7fa',
+                                                                                    border: '1px solid #4dd0e1',
+                                                                                    color: '#006064',
+                                                                                    borderRadius: '6px',
+                                                                                    cursor: 'pointer',
+                                                                                    fontSize: '11px',
+                                                                                    fontWeight: 'bold',
+                                                                                    display: 'flex',
+                                                                                    alignItems: 'center',
+                                                                                    gap: '4px'
+                                                                                }}
+                                                                            >
+                                                                                🔍 Ir a Verificador
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleManualVerifyAction({
+                                                                                    action: 'ok',
+                                                                                    expedienteIds: [exp.expediente_id],
+                                                                                    label: `Expediente ${exp.expediente_code || exp.title}`
+                                                                                })}
+                                                                                title="Dar OK a todos los documentos de este expediente (confirmar como Cargados)"
+                                                                                style={{ 
+                                                                                    padding: '5px 10px', 
+                                                                                    background: '#2e7d32', 
+                                                                                    border: '1px solid #1b5e20', 
+                                                                                    color: '#fff',
+                                                                                    borderRadius: '6px', 
+                                                                                    cursor: 'pointer', 
+                                                                                    fontSize: '11px', 
+                                                                                    fontWeight: 'bold',
+                                                                                    display: 'flex',
+                                                                                    alignItems: 'center',
+                                                                                    gap: '4px'
+                                                                                }}
+                                                                            >
+                                                                                <CheckCircle size={13} /> Dar OK
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => toggleExpediente(exp.expediente_id)}
+                                                                                style={{ 
+                                                                                    padding: '5px 10px', 
+                                                                                    background: '#f5f5f5', 
+                                                                                    border: '1px solid #ccc', 
+                                                                                    borderRadius: '6px', 
+                                                                                    cursor: 'pointer', 
+                                                                                    fontSize: '11px', 
+                                                                                    fontWeight: 'bold',
+                                                                                    display: 'flex',
+                                                                                    alignItems: 'center',
+                                                                                    gap: '4px'
+                                                                                }}
+                                                                            >
+                                                                                {isExpanded ? 'Ocultar' : 'Ver Documentos'}
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                         </td>
                                                     </tr>
 
@@ -1424,30 +2312,42 @@ function CargueAes() {
                                                                             </tr>
                                                                         </thead>
                                                                         <tbody>
-                                                                            {exp.documents.map(doc => {
+                                                                            {exp.documents.map((doc, docIdx) => {
                                                                                 const docBadge = getDepBadge(doc.dependency_code || exp.dependency_code, doc.target_onbase_user || exp.target_onbase_user);
+                                                                                const isDupTyp = !!doc.is_duplicate_typology;
                                                                                 return (
-                                                                                <tr key={doc.id} style={{ borderBottom: '1px solid #f0f0f0', backgroundColor: selectedDocs.includes(doc.id) ? '#f1f8e9' : 'transparent' }}>
+                                                                                <Fragment key={doc.id}>
+                                                                                <tr style={{ borderBottom: '1px solid #f0f0f0', backgroundColor: inlinePreviewDocIds.includes(doc.id) ? '#e3f2fd' : (selectedDocs.includes(doc.id) ? '#f1f8e9' : (isDupTyp ? '#fff8e1' : 'transparent')) }}>
                                                                                     <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                                                                                         <input
                                                                                             type="checkbox"
                                                                                             checked={selectedDocs.includes(doc.id)}
-                                                                                            disabled={doc.status === 'Cargado'}
+                                                                                            disabled={doc.status === 'Cargado' || isDupTyp}
                                                                                             onChange={(e) => {
                                                                                                 if (e.target.checked) setSelectedDocs(prev => [...prev, doc.id]);
                                                                                                 else setSelectedDocs(prev => prev.filter(id => id !== doc.id));
                                                                                             }}
-                                                                                            style={{ transform: 'scale(1.1)', cursor: doc.status === 'Cargado' ? 'not-allowed' : 'pointer' }}
+                                                                                            style={{ transform: 'scale(1.1)', cursor: (doc.status === 'Cargado' || isDupTyp) ? 'not-allowed' : 'pointer' }}
                                                                                         />
                                                                                     </td>
                                                                                     <td style={{ padding: '8px 12px' }}>
                                                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '500' }}>
                                                                                             <FileText size={14} color="#1976d2" />
-                                                                                            <span style={{ wordBreak: 'break-all' }}>{doc.filename}</span>
+                                                                                            <span onClick={() => handleView(doc)} title="Clic para ver/ocultar vista previa debajo" style={{ wordBreak: 'break-all', cursor: 'pointer', color: inlinePreviewDocIds.includes(doc.id) ? '#1565c0' : 'inherit', textDecoration: inlinePreviewDocIds.includes(doc.id) ? 'underline' : 'none' }}>{doc.filename}</span>
                                                                                         </div>
                                                                                     </td>
                                                                                     <td style={{ padding: '8px 12px', color: '#555' }}>
-                                                                                        {doc.typology_name}
+                                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                                                                            <span style={{ padding: '1px 6px', borderRadius: '8px', fontSize: '10px', fontWeight: 'bold', backgroundColor: '#e0f2f1', color: '#00695c', border: '1px solid #80cbc4' }}>
+                                                                                                🌊 Oleada #{docIdx + 1}
+                                                                                            </span>
+                                                                                            <span>{doc.typology_name}</span>
+                                                                                            {isDupTyp && (
+                                                                                                <span style={{ padding: '1px 6px', borderRadius: '8px', fontSize: '10px', fontWeight: 'bold', backgroundColor: '#ffecb3', color: '#e65100', border: '1px solid #ffb300' }} title="Tipología repetida dentro del mismo expediente: se bloquea automáticamente para evitar duplicados en OnBase">
+                                                                                                    🛡️ Duplicado omitido
+                                                                                                </span>
+                                                                                            )}
+                                                                                        </div>
                                                                                     </td>
                                                                                     <td style={{ padding: '8px 12px' }}>
                                                                                         <span style={{
@@ -1469,23 +2369,51 @@ function CargueAes() {
                                                                                         {new Date(doc.document_date).toLocaleDateString()}
                                                                                     </td>
                                                                                     <td style={{ padding: '8px 12px' }}>
-                                                                                        <span style={{
-                                                                                            padding: '2px 8px',
-                                                                                            borderRadius: '10px',
-                                                                                            fontSize: '11px',
-                                                                                            backgroundColor: doc.status === 'Cargado' ? '#e8f5e9' : '#fff3e0',
-                                                                                            color: doc.status === 'Cargado' ? '#2e7d32' : '#ef6c00',
-                                                                                            border: `1px solid ${doc.status === 'Cargado' ? '#c8e6c9' : '#ffe0b2'}`
-                                                                                        }}>
-                                                                                            {doc.status}
-                                                                                        </span>
+                                                                                        {(() => {
+                                                                                            const liveDoc = (liveVerification?.expedienteCode && String(liveVerification.expedienteCode).trim() === String(exp.expediente_code).trim() && Array.isArray(liveVerification.documents))
+                                                                                                ? liveVerification.documents.find(ld => Number(ld.id) === Number(doc.id))
+                                                                                                : null;
+                                                                                            const isVerifyingNow = (liveDoc && liveDoc.verifyState === 'verificando') || (verifyingExpCode === exp.expediente_code && liveVerification?.status === 'VERIFICANDO' && !liveDoc);
+                                                                                            const isVerifiedOk = (liveDoc && liveDoc.verifyState === 'cargado') || Number(doc.onbase_verified) > 0;
+                                                                                            const isVerifiedMissing = (liveDoc && liveDoc.verifyState === 'no_cargado') || Number(doc.onbase_verified) === -1;
+                                                                                            return (
+                                                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'flex-start' }}>
+                                                                                                    <span style={{
+                                                                                                        padding: '2px 8px',
+                                                                                                        borderRadius: '10px',
+                                                                                                        fontSize: '11px',
+                                                                                                        fontWeight: 'bold',
+                                                                                                        backgroundColor: (doc.status === 'Cargado' || isVerifiedOk) ? '#e8f5e9' : '#fff3e0',
+                                                                                                        color: (doc.status === 'Cargado' || isVerifiedOk) ? '#2e7d32' : '#ef6c00',
+                                                                                                        border: `1px solid ${(doc.status === 'Cargado' || isVerifiedOk) ? '#c8e6c9' : '#ffe0b2'}`
+                                                                                                    }}>
+                                                                                                        {(doc.status === 'Cargado' || isVerifiedOk) ? 'Cargado' : doc.status}
+                                                                                                    </span>
+                                                                                                    {isVerifyingNow && (
+                                                                                                        <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#006064', backgroundColor: '#e0f7fa', padding: '2px 7px', borderRadius: '8px', border: '1px solid #4dd0e1', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                                                                            🔄 Verificando en OnBase...
+                                                                                                        </span>
+                                                                                                    )}
+                                                                                                    {!isVerifyingNow && isVerifiedOk && (
+                                                                                                        <span title={liveDoc?.matchedRow || doc.onbase_verify_note || 'Confirmado en SGDEA Expediente'} style={{ fontSize: '10px', fontWeight: 'bold', color: '#00695c', backgroundColor: '#e0f2f1', padding: '2px 7px', borderRadius: '8px', border: '1px solid #80cbc4' }}>
+                                                                                                            ✅ SÍ CARGADO EN AES ({doc.onbase_verify_stage || 'OnBase OK'})
+                                                                                                        </span>
+                                                                                                    )}
+                                                                                                    {!isVerifyingNow && isVerifiedMissing && (
+                                                                                                        <span title={doc.onbase_verify_note || 'No aparece en Consultas personalizadas -> SGDEA Expediente'} style={{ fontSize: '10px', fontWeight: 'bold', color: '#c62828', backgroundColor: '#ffebee', padding: '2px 7px', borderRadius: '8px', border: '1px solid #ef9a9a' }}>
+                                                                                                            ❌ NO CARGADO EN AES
+                                                                                                        </span>
+                                                                                                    )}
+                                                                                                </div>
+                                                                                            );
+                                                                                        })()}
                                                                                     </td>
                                                                                     <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                                                                                         <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
                                                                                             <button
                                                                                                 onClick={() => handleView(doc)}
                                                                                                 title="Visualizar Archivo"
-                                                                                                style={{ padding: '5px', background: '#e8f5e9', border: '1px solid #c8e6c9', borderRadius: '4px', color: '#2e7d32', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                                                                                style={{ padding: '5px', background: inlinePreviewDocIds.includes(doc.id) ? '#2e7d32' : '#e8f5e9', border: '1px solid #2e7d32', borderRadius: '4px', color: inlinePreviewDocIds.includes(doc.id) ? '#fff' : '#2e7d32', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                                                                                             >
                                                                                                 <Eye size={13} />
                                                                                             </button>
@@ -1532,6 +2460,79 @@ function CargueAes() {
                                                                                         </div>
                                                                                     </td>
                                                                                 </tr>
+                                                                                {inlinePreviewDocIds.includes(doc.id) && (
+                                                                                    <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #90caf9' }}>
+                                                                                        <td colSpan="7" style={{ padding: '12px 16px' }}>
+                                                                                            <div style={{ border: '1px solid #90caf9', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#fff', boxShadow: '0 4px 12px rgba(25, 118, 210, 0.12)' }}>
+                                                                                                {/* Barra superior de Vista Previa y Edición Rápida de Tipología */}
+                                                                                                <div style={{ background: 'linear-gradient(90deg, #e3f2fd 0%, #f1f8e9 100%)', padding: '10px 14px', borderBottom: '1px solid #bbdefb', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', flex: 1 }}>
+                                                                                                        <span style={{ fontWeight: 'bold', color: '#0d47a1', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                                                                            <Eye size={15} /> Vista Previa: <span style={{ color: '#1b5e20' }}>{doc.filename}</span>
+                                                                                                        </span>
+                                                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginLeft: '8px', flex: 1, minWidth: '320px' }}>
+                                                                                                            <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#333' }}>Tipología TRD:</span>
+                                                                                                            <select
+                                                                                                                value=""
+                                                                                                                onChange={(e) => {
+                                                                                                                    if (e.target.value) {
+                                                                                                                        setEditingTypology(prev => ({ ...prev, [doc.id]: e.target.value }));
+                                                                                                                    }
+                                                                                                                }}
+                                                                                                                style={{ padding: '5px 8px', borderRadius: '5px', border: '1px solid #1976d2', fontSize: '11px', backgroundColor: '#fff', color: '#0d47a1', fontWeight: '600', maxWidth: '250px', cursor: 'pointer' }}
+                                                                                                            >
+                                                                                                                <option value="">📋 Elegir de lista TRD...</option>
+                                                                                                                {getTypologiesForDoc(doc).map(t => (
+                                                                                                                    <option key={t.id} value={t.name}>
+                                                                                                                        {t.trd_order ? `${String(t.trd_order).padStart(2, '0')}. ` : ''}{t.name}{t.stage ? ` (${t.stage})` : ''}
+                                                                                                                    </option>
+                                                                                                                ))}
+                                                                                                            </select>
+                                                                                                            <input
+                                                                                                                type="text"
+                                                                                                                value={editingTypology[doc.id] !== undefined ? editingTypology[doc.id] : (doc.typology_name || '')}
+                                                                                                                onChange={(e) => setEditingTypology(prev => ({ ...prev, [doc.id]: e.target.value }))}
+                                                                                                                placeholder="Escriba o seleccione la tipología..."
+                                                                                                                style={{ flex: 1, minWidth: '200px', padding: '5px 8px', borderRadius: '5px', border: '1px solid #39a900', fontSize: '11px', fontWeight: 'bold', color: '#1b5e20', backgroundColor: '#fff' }}
+                                                                                                            />
+                                                                                                            <button
+                                                                                                                onClick={() => saveDocTypology(doc.id)}
+                                                                                                                disabled={savingTypologyId === doc.id}
+                                                                                                                title="Guardar cambio de Tipología"
+                                                                                                                style={{ padding: '5px 10px', background: '#39a900', color: '#fff', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                                                                            >
+                                                                                                                <Save size={12} /> {savingTypologyId === doc.id ? 'Guardando...' : 'Guardar Tipología'}
+                                                                                                            </button>
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                                                        <button
+                                                                                                            onClick={() => window.open(`/api/ades/view/${doc.id}`, '_blank')}
+                                                                                                            title="Abrir documento en pestaña aparte"
+                                                                                                            style={{ padding: '4px 8px', background: '#fff', color: '#1976d2', border: '1px solid #90caf9', borderRadius: '5px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                                                                        >
+                                                                                                            <Maximize2 size={11} /> Pestaña
+                                                                                                        </button>
+                                                                                                        <button
+                                                                                                            onClick={() => handleView(doc)}
+                                                                                                            title="Cerrar vista previa"
+                                                                                                            style={{ padding: '4px 8px', background: '#ffebee', color: '#c62828', border: '1px solid #ffcdd2', borderRadius: '5px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                                                                        >
+                                                                                                            <X size={12} /> Cerrar Vista Previa
+                                                                                                        </button>
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                                {/* Visor PDF embebido debajo del documento */}
+                                                                                                <iframe
+                                                                                                    src={`/api/ades/view/${doc.id}#toolbar=1&navpanes=0&view=FitH`}
+                                                                                                    title={`Vista previa ${doc.filename}`}
+                                                                                                    style={{ width: '100%', height: '580px', border: 'none', display: 'block', backgroundColor: '#525659' }}
+                                                                                                />
+                                                                                            </div>
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                )}
+                                                                                </Fragment>
                                                                                 );
                                                                             })}
                                                                         </tbody>
@@ -1574,77 +2575,289 @@ function CargueAes() {
                             </div>
 
                             {filteredDocs.length > 0 && (() => {
-                                const selectedDocsList = documents.filter(d => selectedDocs.includes(d.id));
-                                const subCount = selectedDocsList.filter(d => d.dependency_code === '9224' || (!d.dependency_code && (!d.subserie || !d.subserie.includes('9224.')))).length;
-                                const formCount = selectedDocsList.filter(d => d.dependency_code === '9224.4' || (d.subserie && d.subserie.includes('9224.4'))).length;
-                                const adminCount = selectedDocsList.filter(d => d.dependency_code === '9224.2' || (d.subserie && d.subserie.includes('9224.2'))).length;
+                                const selectedDocsList = documents.filter(d => selectedDocs.includes(d.id) && d.status === 'Pendiente');
+                                const subCount = selectedDocsList.filter(d => getDocBotKey(d) === '9224').length;
+                                const formCount = selectedDocsList.filter(d => getDocBotKey(d) === '9224.4').length;
+                                const adminCount = selectedDocsList.filter(d => getDocBotKey(d) === '9224.2').length;
+
+                                const botCards = [
+                                    { key: '9224', icon: '🏢', title: 'Bot 1 · Subdirección', code: '9224', user: orgUsers['9224'] || 'TVILLAMIZARJ', count: subCount, bg: '#e3f2fd', border: '#90caf9', color: '#0d47a1', isVerifier: false },
+                                    { key: '9224.4', icon: '🎓', title: 'Bot 2 · Formación', code: '9224.4', user: orgUsers['9224.4'] || 'EDHERNANDEZM', count: formCount, bg: '#e8f5e9', border: '#a5d6a7', color: '#1b5e20', isVerifier: false },
+                                    { key: '9224.2', icon: '📚', title: 'Bot 3 · Adm. Educativa', code: '9224.2', user: orgUsers['9224.2'] || 'luepitar', count: adminCount, bg: '#f3e5f5', border: '#ce93d8', color: '#4a148c', isVerifier: false }
+                                ];
 
                                 return (
                                 <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                    {/* Selector de Usuario OnBase y Plan de Ejecución */}
-                                    <div style={{ backgroundColor: '#f5faf5', border: '1px solid #c8e6c9', borderRadius: '10px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#2e7d32' }}>
-                                                👤 Usuario OnBase para este Cargue:
+                                    {/* Acceso Rápido a la Pestaña Verificador Manual */}
+                                    <div style={{ backgroundColor: '#e8f5e9', border: '2px solid #2e7d32', borderRadius: '10px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                            <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#1b5e20' }}>
+                                                ✅ Verificación Manual de Expedientes y Documentos:
                                             </span>
-                                            <select
-                                                value={selectedOnBaseUser}
-                                                onChange={(e) => setSelectedOnBaseUser(e.target.value)}
-                                                style={{
-                                                    padding: '6px 12px',
-                                                    borderRadius: '6px',
-                                                    border: '2px solid #39a900',
-                                                    backgroundColor: '#fff',
-                                                    color: '#1b5e20',
-                                                    fontWeight: 'bold',
-                                                    fontSize: '12px',
-                                                    outline: 'none',
-                                                    cursor: 'pointer'
-                                                }}
-                                            >
-                                                <option value="auto">🤖 Automático por TRD (Subdirección, Formación, Adm. Educativa)</option>
-                                                <option value={orgUsers['9224'] || 'TVILLAMIZARJ'}>🏢 Subdirección de Centro ({orgUsers['9224'] || 'TVILLAMIZARJ'})</option>
-                                                <option value={orgUsers['9224.4'] || 'EDHERNANDEZM'}>🎓 Formación Profesional Integral ({orgUsers['9224.4'] || 'EDHERNANDEZM'})</option>
-                                                <option value={orgUsers['9224.2'] || 'luepitar'}>📚 Administración Educativa ({orgUsers['9224.2'] || 'luepitar'})</option>
-                                            </select>
+                                            <span style={{ fontSize: '12px', color: '#2e7d32' }}>
+                                                Los Bots cargan de forma continua sin interrupciones. Revise los archivos y dé el <strong>OK</strong> en la pestaña <strong>Verificador</strong>.
+                                            </span>
                                         </div>
-
-                                        {selectedDocs.length > 0 && (
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', fontSize: '11px' }}>
-                                                <span style={{ fontWeight: 'bold', color: '#555' }}>Plan de Lote ({selectedDocs.length}):</span>
-                                                {subCount > 0 && (
-                                                    <span style={{ backgroundColor: '#e3f2fd', color: '#0d47a1', border: '1px solid #90caf9', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>
-                                                        🏢 Subdirección ({orgUsers['9224'] || 'TVILLAMIZARJ'}): {subCount}
-                                                    </span>
-                                                )}
-                                                {formCount > 0 && (
-                                                    <span style={{ backgroundColor: '#e8f5e9', color: '#1b5e20', border: '1px solid #a5d6a7', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>
-                                                        🎓 Formación (EDHERNANDEZM): {formCount}
-                                                    </span>
-                                                )}
-                                                {adminCount > 0 && (
-                                                    <span style={{ backgroundColor: '#f3e5f5', color: '#4a148c', border: '1px solid #ce93d8', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>
-                                                        📚 Adm. Educativa (luepitar): {adminCount}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => setActiveTab('verificador')}
+                                            style={{
+                                                padding: '8px 16px',
+                                                backgroundColor: '#2e7d32',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '8px',
+                                                fontSize: '12px',
+                                                fontWeight: 'bold',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                boxShadow: '0 2px 6px rgba(46,125,50,0.25)'
+                                            }}
+                                        >
+                                            ✅ Abrir Pestaña Verificador ({groupedExpedientes.length} expedientes)
+                                        </button>
                                     </div>
 
-                                    <div style={{ display: 'flex', gap: '10px' }}>
+                                    {/* Panel de Control de 3 Bots Cargadores Independientes */}
+                                    <div style={{ backgroundColor: '#f5faf5', border: '1px solid #c8e6c9', borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                                <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#1b5e20' }}>
+                                                    🤖 Arquitectura 3 Bots Cargadores en Paralelo (Sin pausas automáticas):
+                                                </span>
+                                                <select
+                                                    value={selectedOnBaseUser}
+                                                    onChange={(e) => setSelectedOnBaseUser(e.target.value)}
+                                                    style={{
+                                                        padding: '6px 12px',
+                                                        borderRadius: '6px',
+                                                        border: '2px solid #39a900',
+                                                        backgroundColor: '#fff',
+                                                        color: '#1b5e20',
+                                                        fontWeight: 'bold',
+                                                        fontSize: '12px',
+                                                        outline: 'none',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    <option value="auto">⚡ Simultáneo Automático por Dependencia TRD (Continuo)</option>
+                                                    <option value={orgUsers['9224'] || 'TVILLAMIZARJ'}>🏢 Forzar todo por Bot 1 · Subdirección ({orgUsers['9224'] || 'TVILLAMIZARJ'})</option>
+                                                    <option value={orgUsers['9224.4'] || 'EDHERNANDEZM'}>🎓 Forzar todo por Bot 2 · Formación ({orgUsers['9224.4'] || 'EDHERNANDEZM'})</option>
+                                                    <option value={orgUsers['9224.2'] || 'luepitar'}>📚 Forzar todo por Bot 3 · Adm. Educativa ({orgUsers['9224.2'] || 'luepitar'})</option>
+                                                </select>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setMosaicView(true); setIsMonitorExpanded(true); }}
+                                                    style={{
+                                                        padding: '6px 12px',
+                                                        borderRadius: '6px',
+                                                        border: '1px solid #1976d2',
+                                                        backgroundColor: '#e3f2fd',
+                                                        color: '#0d47a1',
+                                                        fontWeight: 'bold',
+                                                        fontSize: '12px',
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '6px'
+                                                    }}
+                                                >
+                                                    <Monitor size={14} /> Ver Mosaico de Bots en Vivo
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Tarjetas de estado y lanzamiento individual por cada uno de los 4 Bots */}
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '10px' }}>
+                                            {botCards.map(b => {
+                                                const st = botsStatus[b.key] || {};
+                                                const isFocused = activeMonitorBot === b.key;
+                                                const stuckSec = st.stepStuckSeconds || 0;
+                                                return (
+                                                    <div
+                                                        key={b.key}
+                                                        onClick={() => setActiveMonitorBot(b.key)}
+                                                        style={{
+                                                            backgroundColor: st.isBlocked ? '#fff8f8' : '#fff',
+                                                            border: st.isBlocked ? '2px solid #d32f2f' : (isFocused ? `2px solid ${b.color}` : `1px solid ${b.border}`),
+                                                            borderRadius: '8px',
+                                                            padding: '10px 12px',
+                                                            cursor: 'pointer',
+                                                            boxShadow: isFocused ? '0 3px 10px rgba(0,0,0,0.08)' : 'none',
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            gap: '6px'
+                                                        }}
+                                                    >
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                                                            <span style={{ fontWeight: 'bold', fontSize: '12px', color: b.color }}>
+                                                                {b.icon} {b.title}
+                                                            </span>
+                                                            <span style={{
+                                                                fontSize: '10px',
+                                                                fontWeight: 'bold',
+                                                                padding: '2px 7px',
+                                                                borderRadius: '10px',
+                                                                backgroundColor: st.isBlocked ? '#ffcdd2' : (st.waitingForVerifier ? '#fff9c4' : (st.running ? '#c8e6c9' : (st.completed ? '#e3f2fd' : '#f5f5f5'))),
+                                                                color: st.isBlocked ? '#b71c1c' : (st.waitingForVerifier ? '#f57f17' : (st.running ? '#1b5e20' : (st.completed ? '#0d47a1' : '#666')))
+                                                            }}>
+                                                                {st.isBlocked
+                                                                    ? `🚨 Bloqueado (${stuckSec}s)`
+                                                                    : st.waitingForVerifier
+                                                                        ? `⏸️ Esperando Verificador`
+                                                                        : st.running
+                                                                            ? (b.isVerifier ? `🔍 Verificando (${st.processedDocs || 0}/${st.totalDocs || 0})` : `🟢 Activo (${st.processedDocs || 0}/${st.totalDocs || 0})`)
+                                                                            : (st.completed ? `✅ Listo (${st.processedDocs || 0}/${st.totalDocs || 0})` : '⏸️ En espera')}
+                                                            </span>
+                                                        </div>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#555' }}>
+                                                            <span>Usuario: <strong>{st.onbaseUser || b.user}</strong></span>
+                                                            <span style={{ backgroundColor: b.bg, color: b.color, padding: '1px 7px', borderRadius: '10px', fontWeight: 'bold' }}>
+                                                                {b.isVerifier ? `Expedientes: ${b.count}` : `Seleccionados: ${b.count}`}
+                                                            </span>
+                                                        </div>
+                                                        {(st.running || b.isVerifier) && st.currentStep && (
+                                                            <div style={{ fontSize: '10px', color: st.isBlocked ? '#c62828' : '#006064', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                ⚡ {st.currentStep}
+                                                            </div>
+                                                        )}
+                                                        <div style={{ display: 'flex', gap: '5px', marginTop: '2px', flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
+                                                            {b.isVerifier ? (
+                                                                st.running ? (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => killAutomation('VERIFICADOR')}
+                                                                        style={{ flex: 1, padding: '5px 8px', backgroundColor: '#ffebee', color: '#c62828', border: '1px solid #ef9a9a', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}
+                                                                    >
+                                                                        🛑 Detener Verificador
+                                                                    </button>
+                                                                ) : (
+                                                                    <button
+                                                                        type="button"
+                                                                        disabled={verifyingExpCode !== null}
+                                                                        onClick={() => handleVerifyExpedientesOnBase(null, true)}
+                                                                        style={{
+                                                                            flex: 1,
+                                                                            padding: '5px 8px',
+                                                                            backgroundColor: '#00838f',
+                                                                            color: '#fff',
+                                                                            border: 'none',
+                                                                            borderRadius: '6px',
+                                                                            fontSize: '11px',
+                                                                            fontWeight: 'bold',
+                                                                            cursor: 'pointer'
+                                                                        }}
+                                                                    >
+                                                                        🔍 Verificar en OnBase Ahora
+                                                                    </button>
+                                                                )
+                                                            ) : st.running ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => killAutomation(b.key)}
+                                                                    style={{ flex: 1, padding: '5px 8px', backgroundColor: '#ffebee', color: '#c62828', border: '1px solid #ef9a9a', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}
+                                                                >
+                                                                    🛑 Detener
+                                                                </button>
+                                                            ) : (
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={b.count === 0}
+                                                                    onClick={() => handleRunAutomation(null, b.key)}
+                                                                    style={{
+                                                                        flex: 1,
+                                                                        padding: '5px 8px',
+                                                                        backgroundColor: b.count > 0 ? b.color : '#e0e0e0',
+                                                                        color: b.count > 0 ? '#fff' : '#888',
+                                                                        border: 'none',
+                                                                        borderRadius: '6px',
+                                                                        fontSize: '11px',
+                                                                        fontWeight: 'bold',
+                                                                        cursor: b.count > 0 ? 'pointer' : 'not-allowed'
+                                                                    }}
+                                                                >
+                                                                    ▶️ Lanzar Bot ({b.count})
+                                                                </button>
+                                                            )}
+                                                            {st.waitingForVerifier && !b.isVerifier && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleSkipVerifierWait(b.key)}
+                                                                    title="Saltar la espera de 3 minutos de la oleada y verificar inmediatamente en OnBase"
+                                                                    style={{ padding: '5px 8px', backgroundColor: '#e0f7fa', color: '#006064', border: '1px solid #00acc1', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}
+                                                                >
+                                                                    ⚡ Verificar Ya (Saltar 3m)
+                                                                </button>
+                                                            )}
+                                                            {(st.running || st.isBlocked) && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleUnlockBot(b.key)}
+                                                                    disabled={unlockingBotKey === b.key}
+                                                                    title="Destrabar OnBase si se quedó pensando o bloqueado en un modal"
+                                                                    style={{ padding: '5px 7px', backgroundColor: '#fff3e0', color: '#e65100', border: '1px solid #ffb74d', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}
+                                                                >
+                                                                    🔓 {unlockingBotKey === b.key ? '...' : 'Destrabar'}
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => { setActiveMonitorBot(b.key); setMosaicView(false); }}
+                                                                style={{ padding: '5px 8px', backgroundColor: isFocused ? b.bg : '#f5f5f5', color: isFocused ? b.color : '#555', border: `1px solid ${isFocused ? b.border : '#ddd'}`, borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}
+                                                                title="Ver este Bot en el monitor lateral"
+                                                            >
+                                                                👁️ Monitor
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                        {selectedDocs.length > 0 && (
+                                            <button
+                                                className="btn"
+                                                onClick={() => setSelectedDocs([])}
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    padding: '12px 16px',
+                                                    backgroundColor: '#f5f5f5',
+                                                    color: '#555',
+                                                    border: '1px solid #ccc',
+                                                    borderRadius: '8px',
+                                                    fontWeight: 'bold',
+                                                    cursor: 'pointer',
+                                                    whiteSpace: 'nowrap'
+                                                }}
+                                                title="Deseleccionar todos los documentos"
+                                            >
+                                                <X size={16} /> Limpiar
+                                            </button>
+                                        )}
                                         <button
                                             className="btn btn-primary"
                                             onClick={() => handleRunAutomation()}
-                                            disabled={automationLoading}
-                                            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px' }}
+                                            disabled={selectedDocs.length === 0}
+                                            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', opacity: selectedDocs.length === 0 ? 0.65 : 1 }}
                                         >
-                                            {automationLoading ? 'Ejecutando proceso en OnBase...' : <><Play size={18} /> Iniciar Cargue AES ({selectedDocs.length} de {filteredDocs.filter(d => d.status === 'Pendiente').length} Docs seleccionados)</>}
+                                            <Play size={18} />
+                                            {selectedOnBaseUser === 'auto'
+                                                ? `🚀 Iniciar Cargue Simultáneo con los 3 Bots (${selectedDocs.length} Docs seleccionados)`
+                                                : `Iniciar Cargue AES (${selectedDocs.length} de ${filteredDocs.filter(d => d.status === 'Pendiente').length} Docs seleccionados)`}
                                         </button>
 
                                         <button
                                             className="btn"
                                             onClick={handleMarkSelectedAsCargado}
-                                            disabled={automationLoading || selectedDocs.length === 0}
+                                            disabled={selectedDocs.length === 0}
                                             style={{ 
                                                 display: 'flex', 
                                                 alignItems: 'center', 
@@ -1672,11 +2885,48 @@ function CargueAes() {
 
                     <div style={{ width: '480px' }}>
                         <div className="card" style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#fff', borderRadius: '12px', borderLeft: '4px solid #39a900' }}>
-                            <h3 style={{ marginTop: 0, fontSize: '16px', borderBottom: '1px solid #eee', paddingBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <h3 style={{ marginTop: 0, fontSize: '16px', borderBottom: '1px solid #eee', paddingBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', flexWrap: 'wrap' }}>
                                 <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Monitor size={18} /> Monitoreo en Vivo
+                                    <Monitor size={18} /> Monitoreo en Vivo (4 Bots)
                                 </span>
-                                {liveFrame && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    {(activeBotState.running || activeBotState.isBlocked) && (
+                                        <button
+                                            onClick={() => handleUnlockBot(activeMonitorBot)}
+                                            disabled={unlockingBotKey === activeMonitorBot}
+                                            style={{
+                                                background: '#ef6c00',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                padding: '4px 8px',
+                                                cursor: 'pointer',
+                                                fontSize: '11px',
+                                                fontWeight: 'bold'
+                                            }}
+                                            title="Destrabar OnBase en este Bot (cierra alertas/modales y reactiva)"
+                                        >
+                                            🔓 Destrabar
+                                        </button>
+                                    )}
+                                    {activeBotState.running && (
+                                        <button
+                                            onClick={() => killAutomation(activeMonitorBot)}
+                                            style={{
+                                                background: '#d32f2f',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                padding: '4px 8px',
+                                                cursor: 'pointer',
+                                                fontSize: '11px',
+                                                fontWeight: 'bold'
+                                            }}
+                                            title="Detener solo este Bot"
+                                        >
+                                            🛑 Detener Bot
+                                        </button>
+                                    )}
                                     <button 
                                         onClick={() => setIsMonitorExpanded(true)}
                                         style={{
@@ -1693,29 +2943,75 @@ function CargueAes() {
                                             fontWeight: '600'
                                         }}
                                     >
-                                        <Maximize2 size={13} /> Ampliar
+                                        <Maximize2 size={13} /> Ampliar / Mosaico
                                     </button>
-                                )}
+                                </div>
                             </h3>
+
+                            {/* Pestañas selectoras de los 4 Bots en el Monitor en Vivo */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px', marginBottom: '10px' }}>
+                                {[
+                                    { key: '9224', icon: '🏢', label: 'Bot 1 (9224)', user: orgUsers['9224'] || 'TVILLAMIZARJ', activeBg: '#0d47a1' },
+                                    { key: '9224.4', icon: '🎓', label: 'Bot 2 (9224.4)', user: orgUsers['9224.4'] || 'EDHERNANDEZM', activeBg: '#1b5e20' },
+                                    { key: '9224.2', icon: '📚', label: 'Bot 3 (9224.2)', user: orgUsers['9224.2'] || 'luepitar', activeBg: '#4a148c' },
+                                    { key: 'VERIFICADOR', icon: '🔍', label: 'Bot 4 (Verificador)', user: 'SGDEA Expediente', activeBg: '#006064' }
+                                ].map(tab => {
+                                    const bst = botsStatus[tab.key] || {};
+                                    const isSel = activeMonitorBot === tab.key;
+                                    return (
+                                        <button
+                                            key={tab.key}
+                                            type="button"
+                                            onClick={() => setActiveMonitorBot(tab.key)}
+                                            style={{
+                                                flex: 1,
+                                                padding: '6px 6px',
+                                                borderRadius: '6px',
+                                                border: isSel ? `2px solid ${tab.activeBg}` : '1px solid #ddd',
+                                                backgroundColor: isSel ? tab.activeBg : '#f8f9fa',
+                                                color: isSel ? '#fff' : '#333',
+                                                cursor: 'pointer',
+                                                fontSize: '11px',
+                                                fontWeight: 'bold',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                gap: '2px'
+                                            }}
+                                        >
+                                            <span>{bst.running ? '🟢' : (bst.completed ? '✅' : '⚪')} {tab.icon} {tab.label}</span>
+                                            <span style={{ fontSize: '9px', opacity: isSel ? 0.9 : 0.7 }}>
+                                                {bst.onbaseUser || tab.user} {bst.totalDocs > 0 ? `(${bst.processedDocs || 0}/${bst.totalDocs})` : ''}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
                             {liveFrame ? (
                                 <div style={{ border: '2px solid #000', borderRadius: '8px', overflow: 'hidden', background: '#000', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' }}>
                                     <img 
                                         src={liveFrame} 
                                         alt="Live Stream" 
-                                        onClick={() => setIsMonitorExpanded(true)}
+                                        onClick={() => { setMosaicView(false); setIsMonitorExpanded(true); }}
                                         style={{ width: '100%', display: 'block', maxHeight: '350px', objectFit: 'contain', cursor: 'pointer' }} 
-                                        title="Haz clic para ampliar pantalla"
+                                        title="Haz clic para ampliar pantalla e interactuar con este Bot"
                                     />
-                                    <div style={{ background: '#ff0000', color: '#fff', fontSize: '11px', padding: '4px 10px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{ width: '8px', height: '8px', background: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'blink 1s step-end infinite' }}></span>
-                                        CONEXIÓN LIVE — OnBase Web (Clic para ampliar)
+                                    <div style={{ background: activeBotState.running ? '#ff0000' : '#263238', color: '#fff', fontSize: '11px', padding: '4px 10px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <span style={{ width: '8px', height: '8px', background: '#fff', borderRadius: '50%', display: 'inline-block', animation: activeBotState.running ? 'blink 1s step-end infinite' : 'none' }}></span>
+                                            {activeBotState.label || `Bot ${activeMonitorBot}`} ({activeBotState.onbaseUser})
+                                        </span>
+                                        <span>{activeBotState.totalDocs > 0 ? `${activeBotState.processedDocs || 0}/${activeBotState.totalDocs} Docs` : ''}</span>
                                     </div>
                                 </div>
                             ) : (
                                 <div style={{ height: '300px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f0f0f0', border: '2px dashed #ccc', color: '#999', borderRadius: '8px' }}>
                                     <Monitor size={48} style={{ marginBottom: '12px', opacity: 0.4 }} />
-                                    <p style={{ fontSize: '13px', textAlign: 'center', padding: '0 20px', fontWeight: '500' }}>{automationLoading ? 'Conectando a OnBase... espere' : 'Sin actividad de automatización'}</p>
-                                    {automationLoading && <p style={{ fontSize: '11px', color: '#aaa', marginTop: '5px' }}>El video aparecerá cuando el robot abra OnBase</p>}
+                                    <p style={{ fontSize: '13px', textAlign: 'center', padding: '0 20px', fontWeight: '500' }}>
+                                        {activeBotState.running ? `Conectando ${activeBotState.label} (${activeBotState.onbaseUser})... espere` : `Sin actividad en ${activeBotState.label || `Bot ${activeMonitorBot}`}`}
+                                    </p>
+                                    {activeBotState.running && <p style={{ fontSize: '11px', color: '#aaa', marginTop: '5px' }}>El video aparecerá cuando este Bot abra OnBase</p>}
                                 </div>
                             )}
                         </div>
@@ -1791,6 +3087,719 @@ function CargueAes() {
                         </div>
                     </div>
                 </div>
+            ) : activeTab === 'verificador' ? (
+                (() => {
+                    const sourceDocs = verifierDocs.length > 0 ? verifierDocs : documents;
+                    const docsWithExpCode = sourceDocs.filter(d => d.expediente_code && String(d.expediente_code).trim() !== '');
+
+                    // Filtrar por Dependencia
+                    const depDocs = docsWithExpCode.filter(doc => {
+                        if (verifierDepFilter === 'all') return true;
+                        const docDep = doc.dependency_code || (doc.subserie && doc.subserie.includes('9224.4') ? '9224.4' : (doc.subserie && doc.subserie.includes('9224.2') ? '9224.2' : '9224'));
+                        return docDep === verifierDepFilter;
+                    });
+
+                    // Agrupar por Expediente
+                    const verifExpMap = {};
+                    const verifExpedientesAll = [];
+                    depDocs.forEach(doc => {
+                        const expId = doc.expediente_id || `CODE_${doc.expediente_code}`;
+                        if (!verifExpMap[expId]) {
+                            verifExpMap[expId] = {
+                                expediente_id: doc.expediente_id,
+                                expediente_code: String(doc.expediente_code || '').trim(),
+                                title: doc.title || 'Expediente Sin Título',
+                                subserie: String(doc.subserie || '').trim(),
+                                subserie_name: doc.subserie_name || doc.series_name || '',
+                                box_id: doc.box_id || '',
+                                opening_date: doc.opening_date || '',
+                                dependency_code: doc.dependency_code || (doc.subserie && doc.subserie.includes('9224.4') ? '9224.4' : (doc.subserie && doc.subserie.includes('9224.2') ? '9224.2' : '9224')),
+                                target_onbase_user: doc.target_onbase_user || (doc.subserie && doc.subserie.includes('9224.4') ? (orgUsers['9224.4'] || 'EDHERNANDEZM') : (doc.subserie && doc.subserie.includes('9224.2') ? (orgUsers['9224.2'] || 'luepitar') : (orgUsers['9224'] || 'TVILLAMIZARJ'))),
+                                documents: []
+                            };
+                            verifExpedientesAll.push(verifExpMap[expId]);
+                        }
+                        verifExpMap[expId].documents.push(doc);
+                    });
+
+                    verifExpedientesAll.forEach(exp => {
+                        exp.documents.sort((a, b) => {
+                            const ordA = Number(a.typology_order ?? 9999);
+                            const ordB = Number(b.typology_order ?? 9999);
+                            if (ordA !== ordB) return ordA - ordB;
+                            return (a.id || 0) - (b.id || 0);
+                        });
+                        exp.totalCount = exp.documents.length;
+                        exp.okCount = exp.documents.filter(d => Number(d.onbase_verified) === 2).length;
+                        exp.cargadoCount = exp.documents.filter(d => d.status === 'Cargado').length;
+                        exp.pendingCount = exp.documents.filter(d => d.status === 'Pendiente').length;
+                        exp.isAllOk = exp.totalCount > 0 && exp.okCount === exp.totalCount;
+                    });
+
+                    verifExpedientesAll.sort((a, b) => {
+                        const subA = a.subserie || 'ZZZZ';
+                        const subB = b.subserie || 'ZZZZ';
+                        if (subA !== subB) return subA.localeCompare(subB, undefined, { numeric: true });
+                        return String(a.expediente_code || '').localeCompare(String(b.expediente_code || ''), undefined, { numeric: true });
+                    });
+
+                    // Totales globales para las tarjetas de resumen
+                    const totalExpsCount = verifExpedientesAll.length;
+                    const totalExpsAllOk = verifExpedientesAll.filter(e => e.isAllOk).length;
+                    const totalExpsPendingReview = verifExpedientesAll.filter(e => !e.isAllOk).length;
+                    const totalDocsCount = depDocs.length;
+                    const totalDocsOk = depDocs.filter(d => Number(d.onbase_verified) === 2).length;
+                    const totalDocsWithoutOk = depDocs.filter(d => Number(d.onbase_verified) !== 2).length;
+                    const totalDocsPendingUpload = depDocs.filter(d => d.status === 'Pendiente').length;
+
+                    // Filtrar por pestaña de estado del Verificador y por texto de búsqueda
+                    const filteredVerifExps = verifExpedientesAll.filter(exp => {
+                        if (verifierFilter === 'PorRevisar' && exp.isAllOk) return false;
+                        if (verifierFilter === 'VerificadosOK' && !exp.isAllOk) return false;
+                        if (verifierFilter === 'ConPendientes' && exp.pendingCount === 0) return false;
+
+                        if (!verifierSearch.trim()) return true;
+                        const q = verifierSearch.toLowerCase().trim();
+                        const matchExp = `${exp.expediente_code} ${exp.title} ${exp.subserie} ${exp.subserie_name} ${exp.target_onbase_user}`.toLowerCase().includes(q);
+                        if (matchExp) return true;
+                        return exp.documents.some(d => `${d.filename || ''} ${d.typology_name || ''}`.toLowerCase().includes(q));
+                    });
+
+                    const visibleDocIds = filteredVerifExps.flatMap(e => e.documents.map(d => d.id));
+
+                    return (
+                        <div className="verificador-manual-container" style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+                            {verifierToast && (
+                                <div style={{
+                                    position: 'fixed',
+                                    bottom: '24px',
+                                    right: '24px',
+                                    zIndex: 9999,
+                                    backgroundColor: '#1b5e20',
+                                    color: '#fff',
+                                    padding: '12px 20px',
+                                    borderRadius: '10px',
+                                    fontWeight: 'bold',
+                                    fontSize: '14px',
+                                    boxShadow: '0 8px 20px rgba(0,0,0,0.25)',
+                                    border: '2px solid #81c784'
+                                }}>
+                                    {verifierToast}
+                                </div>
+                            )}
+
+                            {/* Tarjetas de Resumen del Verificador Manual */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+                                <div style={{ background: '#fff', borderRadius: '12px', padding: '14px 18px', borderLeft: '5px solid #1976d2', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
+                                    <div style={{ fontSize: '12px', color: '#555', fontWeight: 'bold' }}>📁 Total Carpetas con Código</div>
+                                    <div style={{ fontSize: '26px', fontWeight: '900', color: '#0d47a1', marginTop: '4px' }}>{totalExpsCount}</div>
+                                    <div style={{ fontSize: '11px', color: '#666' }}>{totalDocsCount} documentos en total</div>
+                                </div>
+                                <div style={{ background: '#fff', borderRadius: '12px', padding: '14px 18px', borderLeft: '5px solid #f57c00', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
+                                    <div style={{ fontSize: '12px', color: '#555', fontWeight: 'bold' }}>🔎 Carpetas por Revisar / Dar OK</div>
+                                    <div style={{ fontSize: '26px', fontWeight: '900', color: '#e65100', marginTop: '4px' }}>{totalExpsPendingReview}</div>
+                                    <div style={{ fontSize: '11px', color: '#666' }}>{totalDocsWithoutOk} documento(s) esperando tu OK</div>
+                                </div>
+                                <div style={{ background: '#fff', borderRadius: '12px', padding: '14px 18px', borderLeft: '5px solid #2e7d32', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
+                                    <div style={{ fontSize: '12px', color: '#555', fontWeight: 'bold' }}>✅ Confirmados con OK Manual</div>
+                                    <div style={{ fontSize: '26px', fontWeight: '900', color: '#1b5e20', marginTop: '4px' }}>{totalDocsOk} <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#2e7d32' }}>docs ({totalExpsAllOk} carpetas)</span></div>
+                                    <div style={{ fontSize: '11px', color: '#666' }}>Revisados y aprobados por ti</div>
+                                </div>
+                                <div style={{ background: '#fff', borderRadius: '12px', padding: '14px 18px', borderLeft: '5px solid #7b1fa2', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
+                                    <div style={{ fontSize: '12px', color: '#555', fontWeight: 'bold' }}>⏳ En Cola Pendientes de Cargue</div>
+                                    <div style={{ fontSize: '26px', fontWeight: '900', color: '#4a148c', marginTop: '4px' }}>{totalDocsPendingUpload}</div>
+                                    <div style={{ fontSize: '11px', color: '#666' }}>Listos para subir con los Bots</div>
+                                </div>
+                            </div>
+
+                            {/* Panel Principal de Revisión Manual */}
+                            <div className="card" style={{ padding: '18px', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '15px', paddingBottom: '12px', borderBottom: '1px solid #e0e0e0' }}>
+                                    <div>
+                                        <h2 style={{ margin: 0, fontSize: '19px', color: '#1b5e20', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            ✅ Verificador Manual de Expedientes y Documentos (Control Directo)
+                                        </h2>
+                                        <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#555' }}>
+                                            Copie el código del expediente, revise sus archivos PDF o en OnBase y presione <strong>"✅ Dar OK"</strong> por documento o por carpeta completa. Si falta algún archivo en OnBase, presione <strong>"↩️ Pasar a Pendiente"</strong> para que el Bot lo vuelva a cargar.
+                                        </p>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                        <a
+                                            href="https://onbase.sena.edu.co/AppNet/Login.aspx"
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            style={{
+                                                padding: '9px 14px',
+                                                backgroundColor: '#0d47a1',
+                                                color: '#fff',
+                                                borderRadius: '8px',
+                                                textDecoration: 'none',
+                                                fontWeight: 'bold',
+                                                fontSize: '12px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px'
+                                            }}
+                                        >
+                                            <Globe size={15} /> Abrir OnBase Web
+                                        </a>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (verifierExpandedExps.length === filteredVerifExps.length) {
+                                                    setVerifierExpandedExps([]);
+                                                } else {
+                                                    setVerifierExpandedExps(filteredVerifExps.map(e => e.expediente_id));
+                                                }
+                                            }}
+                                            style={{
+                                                padding: '9px 14px',
+                                                backgroundColor: '#e8f5e9',
+                                                color: '#1b5e20',
+                                                border: '1px solid #a5d6a7',
+                                                borderRadius: '8px',
+                                                fontWeight: 'bold',
+                                                fontSize: '12px',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            {verifierExpandedExps.length === filteredVerifExps.length && filteredVerifExps.length > 0
+                                                ? '📁 Contraer Todas las Carpetas'
+                                                : '📂 Desplegar Todos los Archivos'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={fetchVerifierDocuments}
+                                            disabled={verifierLoading}
+                                            style={{
+                                                padding: '9px 14px',
+                                                backgroundColor: '#f5f5f5',
+                                                color: '#333',
+                                                border: '1px solid #ccc',
+                                                borderRadius: '8px',
+                                                fontWeight: 'bold',
+                                                fontSize: '12px',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px'
+                                            }}
+                                        >
+                                            <RefreshCw size={15} className={verifierLoading ? 'spin' : ''} /> Actualizar Lista
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Buscador y Filtros de Estado del Verificador */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
+                                    <div style={{ position: 'relative', flex: 1, minWidth: '280px' }}>
+                                        <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#666' }} size={18} />
+                                        <input
+                                            type="text"
+                                            placeholder="Buscar en el Verificador por Código (2026EX-...), Nombre, Subserie o Tipología..."
+                                            value={verifierSearch}
+                                            onChange={e => setVerifierSearch(e.target.value)}
+                                            style={{ width: '100%', padding: '10px 12px 10px 40px', borderRadius: '8px', border: '2px solid #2e7d32', outline: 'none', fontSize: '14px', fontWeight: '500' }}
+                                        />
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '5px', background: '#f0f0f0', padding: '5px', borderRadius: '8px', flexWrap: 'wrap' }}>
+                                        {[
+                                            { id: 'PorRevisar', label: `🔎 Por Revisar / Sin OK (${totalExpsPendingReview})` },
+                                            { id: 'Todos', label: `📁 Todos (${totalExpsCount})` },
+                                            { id: 'VerificadosOK', label: `✅ Con OK Completo (${totalExpsAllOk})` },
+                                            { id: 'ConPendientes', label: `⏳ Con Pendientes de Subir (${verifExpedientesAll.filter(e => e.pendingCount > 0).length})` }
+                                        ].map(t => (
+                                            <button
+                                                key={t.id}
+                                                type="button"
+                                                onClick={() => setVerifierFilter(t.id)}
+                                                style={{
+                                                    padding: '7px 13px',
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    fontSize: '12px',
+                                                    fontWeight: 'bold',
+                                                    cursor: 'pointer',
+                                                    backgroundColor: verifierFilter === t.id ? '#2e7d32' : 'transparent',
+                                                    color: verifierFilter === t.id ? '#fff' : '#444'
+                                                }}
+                                            >
+                                                {t.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Filtro por Dependencia y Acciones Masivas en Lote */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '15px', padding: '10px 14px', backgroundColor: '#f9fbf9', borderRadius: '10px', border: '1px solid #e0ede0' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                        <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#2e7d32' }}>🏛️ Dependencia:</span>
+                                        {[
+                                            { id: 'all', label: 'Todas' },
+                                            { id: '9224', label: `🏢 Subdirección (9224)` },
+                                            { id: '9224.4', label: `🎓 Formación Profesional (9224.4)` },
+                                            { id: '9224.2', label: `📚 Adm. Educativa (9224.2)` }
+                                        ].map(dep => (
+                                            <button
+                                                key={dep.id}
+                                                type="button"
+                                                onClick={() => setVerifierDepFilter(dep.id)}
+                                                style={{
+                                                    padding: '5px 12px',
+                                                    borderRadius: '16px',
+                                                    border: verifierDepFilter === dep.id ? '2px solid #2e7d32' : '1px solid #ccc',
+                                                    backgroundColor: verifierDepFilter === dep.id ? '#e8f5e9' : '#fff',
+                                                    color: verifierDepFilter === dep.id ? '#1b5e20' : '#555',
+                                                    fontWeight: 'bold',
+                                                    fontSize: '11px',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                {dep.label}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {verifierSelectedDocs.length > 0 && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                            <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#1b5e20' }}>
+                                                {verifierSelectedDocs.length} documento(s) seleccionado(s):
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleManualVerifyAction({
+                                                    action: 'ok',
+                                                    documentIds: verifierSelectedDocs,
+                                                    label: `${verifierSelectedDocs.length} documento(s)`
+                                                })}
+                                                style={{
+                                                    padding: '6px 14px',
+                                                    backgroundColor: '#2e7d32',
+                                                    color: '#fff',
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    fontWeight: 'bold',
+                                                    fontSize: '12px',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '5px'
+                                                }}
+                                            >
+                                                <CheckCircle size={14} /> Dar OK a Seleccionados ({verifierSelectedDocs.length})
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleManualVerifyAction({
+                                                    action: 'pendiente',
+                                                    documentIds: verifierSelectedDocs,
+                                                    label: `${verifierSelectedDocs.length} documento(s)`
+                                                })}
+                                                style={{
+                                                    padding: '6px 14px',
+                                                    backgroundColor: '#fff3e0',
+                                                    color: '#e65100',
+                                                    border: '1px solid #ffb74d',
+                                                    borderRadius: '6px',
+                                                    fontWeight: 'bold',
+                                                    fontSize: '12px',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                ↩️ Pasar Seleccionados a Pendiente
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setVerifierSelectedDocs([])}
+                                                style={{
+                                                    padding: '6px 10px',
+                                                    backgroundColor: '#f5f5f5',
+                                                    color: '#555',
+                                                    border: '1px solid #ccc',
+                                                    borderRadius: '6px',
+                                                    fontSize: '11px',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                Limpiar
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Tabla Maestra de Expedientes y Documentos para Dar OK */}
+                                <div style={{ overflowX: 'auto' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                                        <thead>
+                                            <tr style={{ backgroundColor: '#e8f5e9', textAlign: 'left', borderBottom: '2px solid #2e7d32' }}>
+                                                <th style={{ padding: '12px', width: '65px', textAlign: 'center' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={visibleDocIds.length > 0 && visibleDocIds.every(id => verifierSelectedDocs.includes(id))}
+                                                        onChange={e => {
+                                                            if (e.target.checked) {
+                                                                setVerifierSelectedDocs(prev => [...new Set([...prev, ...visibleDocIds])]);
+                                                            } else {
+                                                                setVerifierSelectedDocs(prev => prev.filter(id => !visibleDocIds.includes(id)));
+                                                            }
+                                                        }}
+                                                        style={{ transform: 'scale(1.2)', cursor: 'pointer' }}
+                                                    />
+                                                </th>
+                                                <th style={{ padding: '12px', width: '190px' }}>Código Expediente</th>
+                                                <th style={{ padding: '12px' }}>Expediente / Aprendiz o Contratista</th>
+                                                <th style={{ padding: '12px', width: '160px' }}>Subserie TRD</th>
+                                                <th style={{ padding: '12px', width: '180px' }}>Progreso Revisión</th>
+                                                <th style={{ padding: '12px', width: '320px', textAlign: 'center' }}>Acción Manual (Dar OK / Revisar)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {filteredVerifExps.length > 0 ? filteredVerifExps.map(exp => {
+                                                const isExpOpen = verifierExpandedExps.includes(exp.expediente_id);
+                                                const expDocIds = exp.documents.map(d => d.id);
+                                                const isExpSelected = expDocIds.length > 0 && expDocIds.every(id => verifierSelectedDocs.includes(id));
+                                                const depBadge = getDepBadge(exp.dependency_code, exp.target_onbase_user);
+
+                                                return (
+                                                    <Fragment key={exp.expediente_id || exp.expediente_code}>
+                                                        <tr style={{
+                                                            borderTop: '1px solid #c8e6c9',
+                                                            backgroundColor: exp.isAllOk ? '#f1f8e9' : (isExpOpen ? '#fffde7' : '#ffffff')
+                                                        }}>
+                                                            <td style={{ padding: '12px', textAlign: 'center' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={isExpSelected}
+                                                                        onChange={e => {
+                                                                            if (e.target.checked) {
+                                                                                setVerifierSelectedDocs(prev => [...new Set([...prev, ...expDocIds])]);
+                                                                            } else {
+                                                                                setVerifierSelectedDocs(prev => prev.filter(id => !expDocIds.includes(id)));
+                                                                            }
+                                                                        }}
+                                                                        style={{ transform: 'scale(1.2)', cursor: 'pointer' }}
+                                                                    />
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setVerifierExpandedExps(prev => prev.includes(exp.expediente_id) ? prev.filter(i => i !== exp.expediente_id) : [...prev, exp.expediente_id])}
+                                                                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2e7d32', padding: '2px', display: 'flex', alignItems: 'center' }}
+                                                                    >
+                                                                        {isExpOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                            <td style={{ padding: '12px' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                                                    <span style={{
+                                                                        fontFamily: 'monospace',
+                                                                        fontWeight: 'bold',
+                                                                        fontSize: '13px',
+                                                                        color: '#1b5e20',
+                                                                        backgroundColor: '#e8f5e9',
+                                                                        padding: '4px 8px',
+                                                                        borderRadius: '6px',
+                                                                        border: '1px solid #81c784'
+                                                                    }}>
+                                                                        {exp.expediente_code}
+                                                                    </span>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleCopyExpCode(exp.expediente_code)}
+                                                                        title="Copiar código para buscarlo en OnBase"
+                                                                        style={{
+                                                                            padding: '3px 7px',
+                                                                            fontSize: '10px',
+                                                                            fontWeight: 'bold',
+                                                                            borderRadius: '5px',
+                                                                            border: '1px solid #90caf9',
+                                                                            backgroundColor: copiedExpCode === exp.expediente_code ? '#1976d2' : '#e3f2fd',
+                                                                            color: copiedExpCode === exp.expediente_code ? '#fff' : '#0d47a1',
+                                                                            cursor: 'pointer'
+                                                                        }}
+                                                                    >
+                                                                        {copiedExpCode === exp.expediente_code ? '✓ Copiado' : '📋 Copiar'}
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                            <td style={{ padding: '12px' }}>
+                                                                <div style={{ fontWeight: 'bold', color: '#1b5e20', fontSize: '14px' }}>{exp.title}</div>
+                                                                <div style={{ fontSize: '11px', color: '#666', marginTop: '3px', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                                                    <span>{depBadge.icon} {depBadge.shortLabel} ({exp.target_onbase_user})</span>
+                                                                    {exp.opening_date && <span>· Apertura: {new Date(exp.opening_date).toLocaleDateString()}</span>}
+                                                                </div>
+                                                            </td>
+                                                            <td style={{ padding: '12px', fontSize: '12px', color: '#333' }}>
+                                                                <div style={{ fontWeight: 'bold' }}>{exp.subserie || '-'}</div>
+                                                                {exp.subserie_name && <div style={{ fontSize: '11px', color: '#666' }}>{exp.subserie_name}</div>}
+                                                            </td>
+                                                            <td style={{ padding: '12px' }}>
+                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                                    <span style={{
+                                                                        padding: '3px 9px',
+                                                                        borderRadius: '10px',
+                                                                        fontSize: '11px',
+                                                                        fontWeight: 'bold',
+                                                                        width: 'fit-content',
+                                                                        backgroundColor: exp.isAllOk ? '#c8e6c9' : '#fff3e0',
+                                                                        color: exp.isAllOk ? '#1b5e20' : '#e65100',
+                                                                        border: `1px solid ${exp.isAllOk ? '#81c784' : '#ffcc80'}`
+                                                                    }}>
+                                                                        {exp.isAllOk
+                                                                            ? `✅ OK Completo (${exp.okCount}/${exp.totalCount})`
+                                                                            : `🔎 OK: ${exp.okCount}/${exp.totalCount} docs`}
+                                                                    </span>
+                                                                    <span style={{ fontSize: '11px', color: '#555' }}>
+                                                                        📤 Cargados: <strong>{exp.cargadoCount}</strong> · ⏳ Pendientes: <strong>{exp.pendingCount}</strong>
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+                                                            <td style={{ padding: '12px', textAlign: 'center' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleManualVerifyAction({
+                                                                            action: 'ok',
+                                                                            expedienteIds: [exp.expediente_id],
+                                                                            label: `Carpeta ${exp.expediente_code}`
+                                                                        })}
+                                                                        style={{
+                                                                            padding: '6px 12px',
+                                                                            backgroundColor: exp.isAllOk ? '#e8f5e9' : '#2e7d32',
+                                                                            color: exp.isAllOk ? '#1b5e20' : '#ffffff',
+                                                                            border: '1px solid #1b5e20',
+                                                                            borderRadius: '6px',
+                                                                            fontWeight: 'bold',
+                                                                            fontSize: '12px',
+                                                                            cursor: 'pointer',
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '5px'
+                                                                        }}
+                                                                        title="Confirmar y dar OK a todos los documentos de este expediente"
+                                                                    >
+                                                                        <CheckCircle size={14} /> {exp.isAllOk ? 'OK Confirmado ✓' : 'Dar OK a Carpeta'}
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setVerifierExpandedExps(prev => prev.includes(exp.expediente_id) ? prev.filter(i => i !== exp.expediente_id) : [...prev, exp.expediente_id])}
+                                                                        style={{
+                                                                            padding: '6px 10px',
+                                                                            backgroundColor: isExpOpen ? '#1976d2' : '#e3f2fd',
+                                                                            color: isExpOpen ? '#fff' : '#0d47a1',
+                                                                            border: '1px solid #90caf9',
+                                                                            borderRadius: '6px',
+                                                                            fontWeight: 'bold',
+                                                                            fontSize: '11px',
+                                                                            cursor: 'pointer'
+                                                                        }}
+                                                                    >
+                                                                        {isExpOpen ? '▲ Ocultar Archivos' : `📂 Revisar Archivos (${exp.totalCount})`}
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+
+                                                        {/* Subtabla de Documentos del Expediente en la Pestaña Verificador */}
+                                                        {isExpOpen && (
+                                                            <tr style={{ backgroundColor: '#f8faf8' }}>
+                                                                <td colSpan="6" style={{ padding: '12px 18px 16px 46px', borderBottom: '2px solid #c8e6c9' }}>
+                                                                    <div style={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #c8e6c9', overflow: 'hidden' }}>
+                                                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                                                                            <thead>
+                                                                                <tr style={{ backgroundColor: '#f1f8e9', color: '#1b5e20', textAlign: 'left', borderBottom: '1px solid #c8e6c9' }}>
+                                                                                    <th style={{ padding: '8px 10px', width: '40px', textAlign: 'center' }}>#</th>
+                                                                                    <th style={{ padding: '8px 10px' }}>Archivo PDF</th>
+                                                                                    <th style={{ padding: '8px 10px' }}>Tipología Documental TRD</th>
+                                                                                    <th style={{ padding: '8px 10px', width: '110px' }}>Fecha</th>
+                                                                                    <th style={{ padding: '8px 10px', width: '190px' }}>Estado de Verificación</th>
+                                                                                    <th style={{ padding: '8px 10px', width: '290px', textAlign: 'center' }}>Tu Decisión (OK / Ver PDF / Re-cargar)</th>
+                                                                                </tr>
+                                                                            </thead>
+                                                                            <tbody>
+                                                                                {exp.documents.map((doc, dIdx) => {
+                                                                                    const isDocOk = Number(doc.onbase_verified) === 2;
+                                                                                    const isDocCargado = doc.status === 'Cargado';
+                                                                                    const isPreviewOpen = verifierPreviewDocIds.includes(doc.id);
+                                                                                    return (
+                                                                                        <Fragment key={doc.id}>
+                                                                                            <tr style={{
+                                                                                                borderBottom: '1px solid #eee',
+                                                                                                backgroundColor: isDocOk ? '#f1f8e9' : (isDocCargado ? '#ffffff' : '#fff8e1')
+                                                                                            }}>
+                                                                                                <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 'bold', color: '#555' }}>
+                                                                                                    <input
+                                                                                                        type="checkbox"
+                                                                                                        checked={verifierSelectedDocs.includes(doc.id)}
+                                                                                                        onChange={e => {
+                                                                                                            if (e.target.checked) setVerifierSelectedDocs(prev => [...prev, doc.id]);
+                                                                                                            else setVerifierSelectedDocs(prev => prev.filter(id => id !== doc.id));
+                                                                                                        }}
+                                                                                                        style={{ marginRight: '6px', cursor: 'pointer' }}
+                                                                                                    />
+                                                                                                    {dIdx + 1}
+                                                                                                </td>
+                                                                                                <td style={{ padding: '8px 10px' }}>
+                                                                                                    <div
+                                                                                                        onClick={() => setVerifierPreviewDocIds(prev => prev.includes(doc.id) ? prev.filter(id => id !== doc.id) : [...prev, doc.id])}
+                                                                                                        style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: '600', color: '#1565c0' }}
+                                                                                                        title="Haz clic para abrir/cerrar el visor PDF de este archivo"
+                                                                                                    >
+                                                                                                        <FileText size={14} />
+                                                                                                        <span style={{ textDecoration: 'underline' }}>{doc.filename}</span>
+                                                                                                    </div>
+                                                                                                </td>
+                                                                                                <td style={{ padding: '8px 10px', color: '#333', fontWeight: '500' }}>
+                                                                                                    {doc.typology_name}
+                                                                                                </td>
+                                                                                                <td style={{ padding: '8px 10px', color: '#666' }}>
+                                                                                                    {doc.document_date ? new Date(doc.document_date).toLocaleDateString() : '-'}
+                                                                                                </td>
+                                                                                                <td style={{ padding: '8px 10px' }}>
+                                                                                                    {isDocOk ? (
+                                                                                                        <span style={{ padding: '3px 9px', borderRadius: '10px', backgroundColor: '#c8e6c9', color: '#1b5e20', fontWeight: 'bold', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                                                                            ✅ OK Confirmado
+                                                                                                        </span>
+                                                                                                    ) : isDocCargado ? (
+                                                                                                        <span style={{ padding: '3px 9px', borderRadius: '10px', backgroundColor: '#e3f2fd', color: '#0d47a1', fontWeight: 'bold', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                                                                            📤 Cargado (Falta dar OK)
+                                                                                                        </span>
+                                                                                                    ) : (
+                                                                                                        <span style={{ padding: '3px 9px', borderRadius: '10px', backgroundColor: '#fff3e0', color: '#e65100', fontWeight: 'bold', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                                                                            ⏳ Pendiente de Cargue
+                                                                                                        </span>
+                                                                                                    )}
+                                                                                                </td>
+                                                                                                <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                                                                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                                                                                        <button
+                                                                                                            type="button"
+                                                                                                            onClick={() => setVerifierPreviewDocIds(prev => prev.includes(doc.id) ? prev.filter(id => id !== doc.id) : [...prev, doc.id])}
+                                                                                                            style={{
+                                                                                                                padding: '4px 9px',
+                                                                                                                backgroundColor: isPreviewOpen ? '#1565c0' : '#e3f2fd',
+                                                                                                                color: isPreviewOpen ? '#fff' : '#0d47a1',
+                                                                                                                border: '1px solid #90caf9',
+                                                                                                                borderRadius: '5px',
+                                                                                                                fontWeight: 'bold',
+                                                                                                                fontSize: '11px',
+                                                                                                                cursor: 'pointer',
+                                                                                                                display: 'flex',
+                                                                                                                alignItems: 'center',
+                                                                                                                gap: '4px'
+                                                                                                            }}
+                                                                                                        >
+                                                                                                            <Eye size={12} /> {isPreviewOpen ? 'Ocultar PDF' : 'Ver PDF'}
+                                                                                                        </button>
+                                                                                                        <button
+                                                                                                            type="button"
+                                                                                                            onClick={() => handleManualVerifyAction({
+                                                                                                                action: 'ok',
+                                                                                                                documentIds: [doc.id],
+                                                                                                                label: doc.filename
+                                                                                                            })}
+                                                                                                            style={{
+                                                                                                                padding: '4px 10px',
+                                                                                                                backgroundColor: isDocOk ? '#c8e6c9' : '#2e7d32',
+                                                                                                                color: isDocOk ? '#1b5e20' : '#fff',
+                                                                                                                border: '1px solid #1b5e20',
+                                                                                                                borderRadius: '5px',
+                                                                                                                fontWeight: 'bold',
+                                                                                                                fontSize: '11px',
+                                                                                                                cursor: 'pointer',
+                                                                                                                display: 'flex',
+                                                                                                                alignItems: 'center',
+                                                                                                                gap: '4px'
+                                                                                                            }}
+                                                                                                            title="Confirmar que este documento está OK en OnBase"
+                                                                                                        >
+                                                                                                            <CheckCircle size={12} /> {isDocOk ? 'OK ✓' : 'Dar OK'}
+                                                                                                        </button>
+                                                                                                        {(isDocCargado || isDocOk) && (
+                                                                                                            <button
+                                                                                                                type="button"
+                                                                                                                onClick={() => handleManualVerifyAction({
+                                                                                                                    action: 'pendiente',
+                                                                                                                    documentIds: [doc.id],
+                                                                                                                    label: doc.filename
+                                                                                                                })}
+                                                                                                                style={{
+                                                                                                                    padding: '4px 8px',
+                                                                                                                    backgroundColor: '#fff3e0',
+                                                                                                                    color: '#e65100',
+                                                                                                                    border: '1px solid #ffb74d',
+                                                                                                                    borderRadius: '5px',
+                                                                                                                    fontWeight: 'bold',
+                                                                                                                    fontSize: '11px',
+                                                                                                                    cursor: 'pointer'
+                                                                                                                }}
+                                                                                                                title="Devolver a estado Pendiente para que el Bot lo vuelva a cargar en OnBase"
+                                                                                                            >
+                                                                                                                ↩️ Falta (Pendiente)
+                                                                                                            </button>
+                                                                                                        )}
+                                                                                                    </div>
+                                                                                                </td>
+                                                                                            </tr>
+                                                                                            {isPreviewOpen && (
+                                                                                                <tr style={{ backgroundColor: '#f0f4f8' }}>
+                                                                                                    <td colSpan="6" style={{ padding: '10px 14px' }}>
+                                                                                                        <div style={{ border: '1px solid #90caf9', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#fff' }}>
+                                                                                                            <div style={{ padding: '6px 12px', backgroundColor: '#e3f2fd', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                                                                <span style={{ fontWeight: 'bold', fontSize: '12px', color: '#0d47a1' }}>
+                                                                                                                    📄 Vista Previa PDF: {doc.filename} ({doc.typology_name})
+                                                                                                                </span>
+                                                                                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                                                                                    <button
+                                                                                                                        type="button"
+                                                                                                                        onClick={() => window.open(`/api/ades/view/${doc.id}`, '_blank')}
+                                                                                                                        style={{ padding: '3px 8px', background: '#fff', color: '#0d47a1', border: '1px solid #90caf9', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}
+                                                                                                                    >
+                                                                                                                        Abrir en pestaña nueva ↗
+                                                                                                                    </button>
+                                                                                                                    <button
+                                                                                                                        type="button"
+                                                                                                                        onClick={() => setVerifierPreviewDocIds(prev => prev.filter(id => id !== doc.id))}
+                                                                                                                        style={{ padding: '3px 8px', background: '#ffebee', color: '#c62828', border: '1px solid #ef9a9a', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}
+                                                                                                                    >
+                                                                                                                        ✕ Cerrar
+                                                                                                                    </button>
+                                                                                                                </div>
+                                                                                                            </div>
+                                                                                                            <iframe
+                                                                                                                src={`/api/ades/view/${doc.id}#toolbar=1&navpanes=0&view=FitH`}
+                                                                                                                title={`Verificador PDF ${doc.filename}`}
+                                                                                                                style={{ width: '100%', height: '520px', border: 'none', display: 'block' }}
+                                                                                                            />
+                                                                                                        </div>
+                                                                                                    </td>
+                                                                                                </tr>
+                                                                                            )}
+                                                                                        </Fragment>
+                                                                                    );
+                                                                                })}
+                                                                            </tbody>
+                                                                        </table>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                    </Fragment>
+                                                );
+                                            }) : (
+                                                <tr>
+                                                    <td colSpan="6" style={{ padding: '45px', textAlign: 'center', color: '#777', fontSize: '14px' }}>
+                                                        {verifierLoading ? 'Cargando expedientes y documentos para verificar...' : 'No hay expedientes en este filtro.'}
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()
             ) : (
                 <div className="mass-creation-container">
                     <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
@@ -2024,7 +4033,7 @@ function CargueAes() {
             {/* MODAL CONFIGURACIÓN AES */}
             {configDoc && (
                 <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-                    <div className="modal-content" style={{ background: '#white', borderRadius: '12px', width: '100%', maxWidth: '500px', backgroundColor: '#fff', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', overflow: 'hidden', maxHeight: '90vh', overflowY: 'auto' }}>
+                    <div className="modal-content" style={{ background: '#white', borderRadius: '12px', width: '100%', maxWidth: showModalPreview ? '920px' : '620px', backgroundColor: '#fff', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', overflow: 'hidden', maxHeight: '92vh', overflowY: 'auto', transition: 'max-width 0.2s ease' }}>
                         <div style={{ background: editingModal ? '#e65100' : '#1976d2', color: '#fff', padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <SettingsIcon size={20} />
@@ -2091,13 +4100,69 @@ function CargueAes() {
                                         </span>
                                     )}
                                 </div>
-                                <input
-                                    type="text"
-                                    value={editingModal ? (modalEditFields.typology_name ?? configDoc.typology_name ?? '') : (configDoc.typology_name || '')}
-                                    readOnly={!editingModal}
-                                    onChange={(e) => setModalEditFields(f => ({ ...f, typology_name: e.target.value }))}
-                                    style={{ width: '100%', padding: '10px', border: editingModal ? '2px solid #e65100' : '1px solid #ddd', borderRadius: '6px', backgroundColor: editingModal ? '#fff3e0' : '#f9f9f9' }}
-                                />
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    <select
+                                        value=""
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (val) {
+                                                setEditingTypology(prev => ({ ...prev, [configDoc.id]: val }));
+                                                setModalEditFields(f => ({ ...f, typology_name: val }));
+                                            }
+                                        }}
+                                        style={{ width: '100%', padding: '9px 10px', border: '1px solid #1976d2', borderRadius: '6px', backgroundColor: '#e3f2fd', color: '#0d47a1', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer' }}
+                                    >
+                                        <option value="">📋 Seleccionar Tipología Oficial de la TRD ({getTypologiesForDoc(configDoc).length} disponibles)...</option>
+                                        {getTypologiesForDoc(configDoc).map(t => (
+                                            <option key={t.id} value={t.name}>
+                                                {t.trd_order ? `${String(t.trd_order).padStart(2, '0')}. ` : ''}{t.name}{t.stage ? ` — [${t.stage}]` : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <div style={{ display: 'flex', gap: '6px' }}>
+                                        <input
+                                            type="text"
+                                            value={editingModal ? (modalEditFields.typology_name ?? editingTypology[configDoc.id] ?? configDoc.typology_name ?? '') : (editingTypology[configDoc.id] ?? configDoc.typology_name ?? '')}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setEditingTypology(prev => ({ ...prev, [configDoc.id]: val }));
+                                                if (editingModal) setModalEditFields(f => ({ ...f, typology_name: val }));
+                                            }}
+                                            placeholder="Escriba o seleccione la tipología documental..."
+                                            style={{ flex: 1, padding: '10px', border: '2px solid #39a900', borderRadius: '6px', backgroundColor: '#fff', fontWeight: 'bold', color: '#1b5e20' }}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const valToSave = editingModal
+                                                    ? (modalEditFields.typology_name ?? editingTypology[configDoc.id] ?? configDoc.typology_name)
+                                                    : (editingTypology[configDoc.id] ?? configDoc.typology_name);
+                                                saveDocTypology(configDoc.id, valToSave);
+                                            }}
+                                            disabled={savingTypologyId === configDoc.id}
+                                            title="Guardar cambio de Tipología Documental"
+                                            style={{ padding: '10px 14px', background: '#39a900', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
+                                        >
+                                            <Save size={16} /> {savingTypologyId === configDoc.id ? 'Guardando...' : 'Guardar Tipología'}
+                                        </button>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowModalPreview(prev => !prev)}
+                                        style={{ marginTop: '2px', padding: '8px 12px', background: showModalPreview ? '#1565c0' : '#e8f5e9', color: showModalPreview ? '#fff' : '#2e7d32', border: `1px solid ${showModalPreview ? '#0d47a1' : '#a5d6a7'}`, borderRadius: '6px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                                    >
+                                        <Eye size={15} /> {showModalPreview ? 'Ocultar Vista Previa del Documento' : `Ver Vista Previa del Documento (${configDoc.filename}) aquí debajo`}
+                                    </button>
+                                    {showModalPreview && (
+                                        <div style={{ marginTop: '6px', border: '1px solid #90caf9', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#525659' }}>
+                                            <iframe
+                                                src={`/api/ades/view/${configDoc.id}#toolbar=1&navpanes=0&view=FitH`}
+                                                title={`Vista previa ${configDoc.filename}`}
+                                                style={{ width: '100%', height: '480px', border: 'none', display: 'block' }}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="form-group">
@@ -2176,6 +4241,7 @@ function CargueAes() {
                                     readOnly={!editingModal}
                                     onChange={(e) => setModalEditFields(f => ({ ...f, document_date: e.target.value }))}
                                     style={{ width: '100%', padding: '10px', border: editingModal ? '2px solid #e65100' : '1px solid #ddd', borderRadius: '6px', backgroundColor: editingModal ? '#fff3e0' : '#f9f9f9' }}
+
                                 />
                             </div>
 
@@ -2206,12 +4272,15 @@ function CargueAes() {
                                             onClick={async () => {
                                                 try {
                                                     const authHeaders = { Authorization: `Bearer ${localStorage.getItem('token')}` };
-                                                    const { description, ...restFields } = modalEditFields;
+                                                    const { description, filename: _ignoredJoinedName, ...restFields } = modalEditFields;
+                                                    const resolvedTypology = modalEditFields.typology_name ?? editingTypology[configDoc.id] ?? configDoc.typology_name;
                                                     const payload = {
                                                         ...restFields,
+                                                        typology_name: resolvedTypology,
                                                         metadata_values: JSON.stringify({ description: description || '' })
                                                     };
                                                     await axios.put(`/api/documents/${configDoc.id}`, payload, { headers: authHeaders });
+                                                    setEditingTypology(prev => ({ ...prev, [configDoc.id]: resolvedTypology }));
                                                     // Actualizar configDoc localmente
                                                     setConfigDoc(prev => {
                                                         const updatedDoc = {
@@ -2587,7 +4656,7 @@ function CargueAes() {
                 </div>
             )}
 
-            {/* Modal de Monitoreo Ampliado */}
+            {/* Modal de Monitoreo Ampliado (Individual o Mosaico 3 Bots) */}
             {isMonitorExpanded && (
                 <div style={{
                     position: 'fixed',
@@ -2595,18 +4664,18 @@ function CargueAes() {
                     left: 0,
                     width: '100vw',
                     height: '100vh',
-                    backgroundColor: 'rgba(0,0,0,0.85)',
+                    backgroundColor: 'rgba(0,0,0,0.88)',
                     zIndex: 9999,
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    padding: '20px'
+                    padding: '15px'
                 }}>
                     <div style={{
                         position: 'relative',
-                        width: '90%',
-                        maxWidth: '1200px',
+                        width: '96%',
+                        maxWidth: mosaicView ? '1550px' : '1250px',
                         backgroundColor: '#000',
                         borderRadius: '12px',
                         overflow: 'hidden',
@@ -2615,16 +4684,67 @@ function CargueAes() {
                     }}>
                         <div style={{
                             padding: '12px 20px',
-                            background: '#222',
+                            background: '#1e293b',
                             color: '#fff',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: '10px',
                             borderBottom: '1px solid #444'
                         }}>
-                            <span style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Monitor size={18} color="#39a900" /> Monitoreo Ampliado en Vivo (OnBase Web Client)
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                <span style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
+                                    <Monitor size={18} color="#39a900" /> Monitoreo OnBase Multi-Bot en Vivo
+                                </span>
+                                {/* Selector de los 4 Bots */}
+                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                    {[
+                                        { key: '9224', icon: '🏢', title: 'Bot 1 · Subdirección', color: '#1565c0' },
+                                        { key: '9224.4', icon: '🎓', title: 'Bot 2 · Formación', color: '#2e7d32' },
+                                        { key: '9224.2', icon: '📚', title: 'Bot 3 · Adm. Educativa', color: '#6a1b9a' },
+                                        { key: 'VERIFICADOR', icon: '🔍', title: 'Bot 4 · Verificador SGDEA', color: '#00838f' }
+                                    ].map(b => {
+                                        const st = botsStatus[b.key] || {};
+                                        const active = !mosaicView && activeMonitorBot === b.key;
+                                        return (
+                                            <button
+                                                key={b.key}
+                                                type="button"
+                                                onClick={() => { setActiveMonitorBot(b.key); setMosaicView(false); }}
+                                                style={{
+                                                    padding: '5px 10px',
+                                                    borderRadius: '6px',
+                                                    border: active ? '2px solid #fff' : '1px solid #555',
+                                                    backgroundColor: active ? b.color : '#334155',
+                                                    color: '#fff',
+                                                    fontSize: '12px',
+                                                    fontWeight: 'bold',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                {st.running ? '🟢' : (st.completed ? '✅' : '⚪')} {b.icon} {b.title} ({st.onbaseUser || orgUsers[b.key]}) {st.totalDocs > 0 ? `[${st.processedDocs || 0}/${st.totalDocs}]` : ''}
+                                            </button>
+                                        );
+                                    })}
+                                    <button
+                                        type="button"
+                                        onClick={() => setMosaicView(prev => !prev)}
+                                        style={{
+                                            padding: '5px 12px',
+                                            borderRadius: '6px',
+                                            border: mosaicView ? '2px solid #ffeb3b' : '1px solid #90caf9',
+                                            backgroundColor: mosaicView ? '#f57f17' : '#0d47a1',
+                                            color: '#fff',
+                                            fontSize: '12px',
+                                            fontWeight: 'bold',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        🎛️ {mosaicView ? 'Viendo Mosaico 3 Bots (Clic para Individual)' : 'Vista Mosaico 3 Bots Simultáneos'}
+                                    </button>
+                                </div>
+                            </div>
                             <button 
                                 onClick={() => setIsMonitorExpanded(false)}
                                 style={{
@@ -2644,7 +4764,72 @@ function CargueAes() {
                                 <X size={15} /> Cerrar Pantalla
                             </button>
                         </div>
-                        {liveFrame ? (
+
+                        {mosaicView ? (
+                            <div style={{ padding: '14px', backgroundColor: '#0f172a', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', maxHeight: '80vh', overflowY: 'auto' }}>
+                                {[
+                                    { key: '9224', icon: '🏢', title: 'Bot 1 · Subdirección (9224)', color: '#1e88e5' },
+                                    { key: '9224.4', icon: '🎓', title: 'Bot 2 · Formación (9224.4)', color: '#43a047' },
+                                    { key: '9224.2', icon: '📚', title: 'Bot 3 · Adm. Educativa (9224.2)', color: '#8e24aa' },
+                                    { key: 'VERIFICADOR', icon: '🔍', title: 'Bot 4 · Verificador OnBase (SGDEA Expediente)', color: '#00838f' }
+                                ].map(b => {
+                                    const st = botsStatus[b.key] || {};
+                                    const token = localStorage.getItem('token');
+                                    const frameUrl = st.hasFrame ? `/api/automation/frame?bot=${encodeURIComponent(b.key)}&t=${frameTick}&token=${token}` : null;
+                                    const lastLogLine = (st.logs && st.logs.length > 0) ? st.logs[st.logs.length - 1] : 'Sin actividad reciente';
+                                    return (
+                                        <div key={b.key} style={{ backgroundColor: '#1e293b', border: `2px solid ${st.running ? b.color : '#334155'}`, borderRadius: '10px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                            <div style={{ padding: '8px 12px', backgroundColor: b.color, color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', fontWeight: 'bold' }}>
+                                                <span>{b.icon} {b.title} — {st.onbaseUser || orgUsers[b.key]}</span>
+                                                <span>{st.running ? `🟢 ${st.processedDocs || 0}/${st.totalDocs || 0}` : (st.completed ? `✅ ${st.processedDocs || 0}/${st.totalDocs || 0}` : '⚪ Inactivo')}</span>
+                                            </div>
+                                            <div style={{ height: '280px', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                                                {frameUrl ? (
+                                                    <img
+                                                        src={frameUrl}
+                                                        alt={b.title}
+                                                        onClick={() => { setActiveMonitorBot(b.key); setMosaicView(false); }}
+                                                        style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'pointer' }}
+                                                        title="Clic para ampliar y controlar este Bot"
+                                                    />
+                                                ) : (
+                                                    <div style={{ color: '#64748b', fontSize: '12px', textAlign: 'center', padding: '15px' }}>
+                                                        <Monitor size={32} style={{ opacity: 0.4, marginBottom: '6px' }} />
+                                                        <div>{st.running ? 'Iniciando navegador OnBase...' : 'Bot en espera de lote'}</div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div style={{ padding: '8px 10px', fontSize: '11px', color: '#cbd5e1', backgroundColor: '#0f172a', borderTop: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                <div style={{ color: '#38bdf8', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    Paso: {st.currentStep || 'En espera'}
+                                                </div>
+                                                <div style={{ fontFamily: 'monospace', fontSize: '10px', color: '#4ade80', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    &gt; {lastLogLine}
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setActiveMonitorBot(b.key); setMosaicView(false); }}
+                                                        style={{ flex: 1, padding: '5px', backgroundColor: '#334155', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}
+                                                    >
+                                                        🔍 Controlar este Bot
+                                                    </button>
+                                                    {st.running && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => killAutomation(b.key)}
+                                                            style={{ padding: '5px 8px', backgroundColor: '#dc2626', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}
+                                                        >
+                                                            🛑 Detener
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : liveFrame ? (
                             <div style={{ position: 'relative' }}>
                                 <img 
                                     src={liveFrame} 
@@ -2692,7 +4877,7 @@ function CargueAes() {
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1', minWidth: '300px' }}>
                                         <input 
                                             type="text" 
-                                            placeholder="Escribe texto para enviar al navegador..." 
+                                            placeholder={`Escribir en ${activeBotState.label || `Bot ${activeMonitorBot}`} (${activeBotState.onbaseUser || ''})...`}
                                             value={manualText}
                                             onChange={e => setManualText(e.target.value)}
                                             onKeyDown={e => { if (e.key === 'Enter') sendManualText(); }}
@@ -2750,32 +4935,164 @@ function CargueAes() {
                                         ))}
                                     </div>
 
-                                    {/* Botón de cierre forzado de sesión */}
-                                    <div>
+                                    {/* Botones de desbloqueo y cierre forzado de sesión (individual o todos) */}
+                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                                         <button
-                                            onClick={killAutomation}
+                                            onClick={() => handleUnlockBot(activeMonitorBot)}
+                                            disabled={isInteracting || unlockingBotKey === activeMonitorBot}
+                                            style={{
+                                                background: '#ef6c00',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '6px',
+                                                padding: '8px 14px',
+                                                fontWeight: 'bold',
+                                                fontSize: '12px',
+                                                cursor: isInteracting ? 'not-allowed' : 'pointer'
+                                            }}
+                                        >
+                                            🔓 Destrabar OnBase ({activeMonitorBot})
+                                        </button>
+                                        <button
+                                            onClick={() => killAutomation(activeMonitorBot)}
                                             disabled={isInteracting}
                                             style={{
                                                 background: '#d32f2f',
                                                 color: '#fff',
                                                 border: 'none',
                                                 borderRadius: '6px',
-                                                padding: '8px 16px',
+                                                padding: '8px 14px',
                                                 fontWeight: 'bold',
-                                                fontSize: '13px',
+                                                fontSize: '12px',
                                                 cursor: isInteracting ? 'not-allowed' : 'pointer'
                                             }}
                                         >
-                                            Forzar Cierre Navegador
+                                            🛑 Detener Bot ({activeMonitorBot})
+                                        </button>
+                                        <button
+                                            onClick={() => killAutomation('all')}
+                                            disabled={isInteracting}
+                                            style={{
+                                                background: '#7f1d1d',
+                                                color: '#fff',
+                                                border: '1px solid #ef4444',
+                                                borderRadius: '6px',
+                                                padding: '8px 14px',
+                                                fontWeight: 'bold',
+                                                fontSize: '12px',
+                                                cursor: isInteracting ? 'not-allowed' : 'pointer'
+                                            }}
+                                        >
+                                            🛑 Detener los 3 Bots
                                         </button>
                                     </div>
                                 </div>
                             </div>
                         ) : (
                             <div style={{ height: '50vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa' }}>
-                                Sin transmisión activa
+                                Sin transmisión activa en {activeBotState.label || `Bot ${activeMonitorBot}`}
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Configuración de Alertas a Móvil y Equipo (Watchdog Anti-Bloqueo y Verificador OnBase) */}
+            {alertModalOpen && (
+                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', zIndex: 9998, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+                    <div style={{ backgroundColor: '#fff', borderRadius: '12px', maxWidth: '560px', width: '100%', overflow: 'hidden', boxShadow: '0 15px 35px rgba(0,0,0,0.25)' }}>
+                        <div style={{ background: 'linear-gradient(135deg, #006064 0%, #00838f 100%)', color: '#fff', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ margin: 0, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                📱 Alertas a Móvil / PC y Watchdog Anti-Bloqueo OnBase
+                            </h3>
+                            <button onClick={() => setAlertModalOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <form onSubmit={handleSaveAlertSettings} style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '12px' }}>
+                            <div style={{ backgroundColor: '#e0f7fa', border: '1px solid #80deea', borderRadius: '8px', padding: '10px 12px', color: '#006064', lineHeight: 1.4 }}>
+                                <strong>¿Cómo funciona?</strong> Cuando cualquiera de los Bots se quede pensando o bloqueado en OnBase o cuando un expediente complete su verificación al <strong>50% y 100%</strong>, el sistema intentará destrabarlo automáticamente y enviará una notificación instantánea a su celular y correo.
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', fontWeight: 'bold', color: '#333', marginBottom: '4px' }}>
+                                    📲 Canal Push para Celular (App gratuita Ntfy.sh — Android / iPhone)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={alertSettingsForm.onbase_alert_ntfy_topic || ''}
+                                    onChange={e => setAlertSettingsForm(f => ({ ...f, onbase_alert_ntfy_topic: e.target.value }))}
+                                    placeholder="sena-cimi-onbase-alertas"
+                                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #ccc', fontWeight: 'bold', color: '#006064' }}
+                                />
+                                <div style={{ fontSize: '10px', color: '#666', marginTop: '3px' }}>
+                                    Descargue la app <strong>ntfy</strong> en su celular y suscríbase al tema: <code>{alertSettingsForm.onbase_alert_ntfy_topic || 'sena-cimi-onbase-alertas'}</code> (o abra <code>https://ntfy.sh/{alertSettingsForm.onbase_alert_ntfy_topic || 'sena-cimi-onbase-alertas'}</code>).
+                                </div>
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', fontWeight: 'bold', color: '#333', marginBottom: '4px' }}>
+                                    📧 Correo(s) Electrónico(s) de Alerta (recibe captura de pantalla del bloqueo)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={alertSettingsForm.onbase_alert_email || ''}
+                                    onChange={e => setAlertSettingsForm(f => ({ ...f, onbase_alert_email: e.target.value }))}
+                                    placeholder="ejemplo@sena.edu.co, soporte@sena.edu.co"
+                                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #ccc' }}
+                                />
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontWeight: 'bold', color: '#333', marginBottom: '4px' }}>
+                                        🤖 Telegram Bot Token (Opcional)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={alertSettingsForm.onbase_alert_telegram_token || ''}
+                                        onChange={e => setAlertSettingsForm(f => ({ ...f, onbase_alert_telegram_token: e.target.value }))}
+                                        placeholder="123456:ABC-DEF..."
+                                        style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #ccc' }}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontWeight: 'bold', color: '#333', marginBottom: '4px' }}>
+                                        💬 Telegram Chat ID (Opcional)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={alertSettingsForm.onbase_alert_telegram_chat_id || ''}
+                                        onChange={e => setAlertSettingsForm(f => ({ ...f, onbase_alert_telegram_chat_id: e.target.value }))}
+                                        placeholder="987654321"
+                                        style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #ccc' }}
+                                    />
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginTop: '8px', pt: '10px', borderTop: '1px solid #eee' }}>
+                                <button
+                                    type="button"
+                                    onClick={handleSendTestAlert}
+                                    disabled={testingAlert}
+                                    style={{ padding: '9px 14px', borderRadius: '6px', border: '1px solid #ef6c00', backgroundColor: '#fff3e0', color: '#e65100', fontWeight: 'bold', cursor: 'pointer' }}
+                                >
+                                    📲 {testingAlert ? 'Enviando Prueba...' : 'Enviar Alerta de Prueba al Móvil/PC'}
+                                </button>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setAlertModalOpen(false)}
+                                        style={{ padding: '9px 14px', borderRadius: '6px', border: '1px solid #ccc', backgroundColor: '#f5f5f5', color: '#555', fontWeight: 'bold', cursor: 'pointer' }}
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={savingAlertSettings}
+                                        style={{ padding: '9px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#00838f', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
+                                    >
+                                        💾 {savingAlertSettings ? 'Guardando...' : 'Guardar Configuración'}
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

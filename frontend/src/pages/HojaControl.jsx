@@ -3,6 +3,37 @@ import axios from 'axios';
 import html2pdf from 'html2pdf.js';
 import { Search, FileText, Download, Check, Briefcase, Save, CheckCircle2, AlertCircle } from 'lucide-react';
 
+const INTERNAL_HOJA_KEYS = new Set([
+    'hoja_control_documentos', 'responsable_hoja_control',
+    'regional_code', 'center_code', 'section_code',
+    'regional_name', 'center_name', 'section_name'
+]);
+
+const formatIdentificacionExpediente = (exp) => {
+    if (!exp) return '';
+    const cleanTitle = String(exp.title || '').trim();
+    const normTitle = cleanTitle.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const hasRealTitle = Boolean(cleanTitle) && normTitle !== 'sin titulo';
+    const metaObj = exp.metadata_values && typeof exp.metadata_values === 'object' ? exp.metadata_values : {};
+    const orderedKeys = [
+        'valor1', 'valor2', 'valor3', 'valor4', 'valor5', 'valor6', 'valor7', 'valor8',
+        ...Object.keys(metaObj).filter(k => !/^valor[1-8]$/.test(k))
+    ];
+    const seen = new Set();
+    const vals = [];
+    for (const k of orderedKeys) {
+        if (seen.has(k) || INTERNAL_HOJA_KEYS.has(k)) continue;
+        seen.add(k);
+        const v = metaObj[k];
+        if ((typeof v === 'string' || typeof v === 'number') && String(v).trim() !== '') {
+            vals.push(String(v).trim());
+        }
+    }
+    const metaJoined = vals.join(', ');
+    if (hasRealTitle && metaJoined) return `${cleanTitle} - ${metaJoined}`;
+    return hasRealTitle ? cleanTitle : metaJoined;
+};
+
 function HojaControl() {
     const [searchTerm, setSearchTerm] = useState('');
     const [searchResults, setSearchResults] = useState([]);
@@ -371,7 +402,7 @@ function HojaControl() {
 
                                     <div className="md:col-span-12">
                                         <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">Identificación del Expediente (Nombre/Título)</label>
-                                        <input type="text" value={`${selectedExp.title || ''} - ${Object.values(selectedExp.metadata_values || {}).filter(v=>v).join(', ')}`} readOnly className="w-full border border-blue-200 rounded p-2 text-sm font-semibold text-blue-800 bg-blue-50 outline-none" />
+                                        <input type="text" value={formatIdentificacionExpediente(selectedExp)} readOnly className="w-full border border-blue-200 rounded p-2 text-sm font-semibold text-blue-800 bg-blue-50 outline-none" />
                                     </div>
                                 </div>
                             </div>
@@ -512,7 +543,7 @@ function HojaControl() {
                         </tr>
                         <tr style={{ height: '35px' }}>
                             <td className="pdf-bold">IDENTIFICACIÓN DEL<br/>EXPEDIENTE</td>
-                            <td colSpan="5" style={{ verticalAlign: 'middle' }}><span className="pdf-bold">{`${selectedExp?.title || ''} - ${Object.values(selectedExp?.metadata_values || {}).filter(v=>v).join(', ')}`}</span></td>
+                            <td colSpan="5" style={{ verticalAlign: 'middle' }}><span className="pdf-bold">{formatIdentificacionExpediente(selectedExp)}</span></td>
                         </tr>
 
                         {/* ENCABEZADO DE TABLA GRILLA */}

@@ -5,26 +5,58 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('[SERVER CRASH GUARD] Unhandled Rejection:', reason);
 });
 
-// Auto-cleanup leftover Puppeteer profiles on startup
-try {
-    if (process.platform === 'linux') {
+// Auto-cleanup leftover Puppeteer profiles, redirect TMPDIR to /mnt/almacen, and cap PM2 logs so root (/) never fills up
+const runLinuxDiskAndBrowserGuard = (isExit = false) => {
+    try {
+        if (process.platform !== 'linux') return;
+        const fsLocal = require('fs');
+        const pathLocal = require('path');
         const { execSync } = require('child_process');
-        execSync('rm -rf /tmp/puppeteer_dev_chrome_profile-* /tmp/.org.chromium.Chromium.* 2>/dev/null');
-        console.log('[STARTUP CLEANUP] Deleted old Puppeteer profile folders in /tmp');
+
+        if (fsLocal.existsSync('/mnt/almacen')) {
+            const safeTmp = '/mnt/almacen/.puppeteer_tmp';
+            try {
+                fsLocal.mkdirSync(safeTmp, { recursive: true });
+                fsLocal.chmodSync(safeTmp, 0o777);
+                process.env.TMPDIR = safeTmp;
+                process.env.TMP = safeTmp;
+                process.env.TEMP = safeTmp;
+            } catch {}
+        }
+
+        execSync('rm -rf /tmp/puppeteer_dev_chrome_profile-* /tmp/puppeteer_aes_bot_* /tmp/.org.chromium.Chromium.* 2>/dev/null || true');
+
+        if (!isExit) {
+            const pm2LogDirs = ['/home/cimi/.pm2/logs', '/root/.pm2/logs'];
+            const MAX_LOG_BYTES = 20 * 1024 * 1024;
+            for (const dir of pm2LogDirs) {
+                try {
+                    if (!fsLocal.existsSync(dir)) continue;
+                    for (const f of fsLocal.readdirSync(dir)) {
+                        if (!f.endsWith('.log')) continue;
+                        const fp = pathLocal.join(dir, f);
+                        const st = fsLocal.statSync(fp);
+                        if (st.size > MAX_LOG_BYTES) {
+                            fsLocal.truncateSync(fp, 0);
+                            console.log('[DISK GUARD] Truncated oversized PM2 log:', fp);
+                        }
+                    }
+                } catch {}
+            }
+        }
+        console.log('[' + (isExit ? 'EXIT' : 'STARTUP') + ' CLEANUP] Puppeteer temp profiles & root disk guard verified.');
+    } catch (e) {
+        console.error('[DISK GUARD] Cleanup warning:', e.message);
     }
-} catch (e) {
-    console.error('[STARTUP CLEANUP] Failed to cleanup old Puppeteer profiles:', e.message);
+};
+
+runLinuxDiskAndBrowserGuard(false);
+if (process.platform === 'linux') {
+    setInterval(() => runLinuxDiskAndBrowserGuard(false), 30 * 60 * 1000);
 }
 
-// Clean on graceful exit
 const cleanExit = () => {
-    try {
-        if (process.platform === 'linux') {
-            const { execSync } = require('child_process');
-            execSync('rm -rf /tmp/puppeteer_dev_chrome_profile-* /tmp/.org.chromium.Chromium.* 2>/dev/null');
-            console.log('[EXIT CLEANUP] Cleaned Puppeteer profiles.');
-        }
-    } catch (e) {}
+    runLinuxDiskAndBrowserGuard(true);
     process.exit(0);
 };
 process.on('SIGINT', cleanExit);
@@ -96,9 +128,9 @@ app.use((req, res, next) => {
     const token = req.headers['authorization']?.split(' ')[1];
     if (token) {
         try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            const decoded = jwt.verify(token, SECRET_KEY);
             req.user = decoded;
-            
+
             // Actualizar last_activity en segundo plano con throttling (máximo una vez cada 60 segundos por usuario)
             const now = Date.now();
             const lastUpdate = lastActivityCache.get(decoded.id) || 0;
@@ -120,6 +152,8 @@ const ensureSchema = async () => {
     try {
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_activity TIMESTAMP');
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1');
+        await pool.query('ALTER TABLE trd_typologies ADD COLUMN IF NOT EXISTS stage TEXT');
+        await pool.query('ALTER TABLE user_trd_permissions ADD COLUMN IF NOT EXISTS allowed_stages TEXT');
         await pool.query(`
             CREATE TABLE IF NOT EXISTS audit_logs (
                 id SERIAL PRIMARY KEY,
@@ -140,11 +174,38 @@ const ensureSchema = async () => {
             )
         `);
         // Indexes for performance optimization
-        await pool.query('CREATE INDEX IF NOT EXISTS idx_deserciones_casos_status ON deserciones_casos (status)').catch(() => {});
-        await pool.query('CREATE INDEX IF NOT EXISTS idx_documents_status ON documents (status)').catch(() => {});
-        await pool.query('CREATE INDEX IF NOT EXISTS idx_documents_expediente_id ON documents (expediente_id)').catch(() => {});
-        await pool.query('CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs (created_at)').catch(() => {});
-        console.log('[AUTO-SCHEMA] Database schema verified, missing columns & performance indexes added.');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_deserciones_casos_status ON deserciones_casos (status)').catch(() => { });
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_documents_status ON documents (status)').catch(() => { });
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_documents_expediente_id ON documents (expediente_id)').catch(() => { });
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs (created_at)').catch(() => { });
+
+        // Auto-assign stages for HISTORIAS ACADEMICAS typologies if not yet assigned
+        const histSeries = await pool.query(`
+            SELECT id FROM trd_series 
+            WHERE UPPER(series_name) LIKE '%HISTORIA%ACADEMICA%' OR series_code LIKE '%-37'
+        `);
+        for (const sRow of histSeries.rows) {
+            const typsRes = await pool.query(
+                'SELECT id, typology_name, stage FROM trd_typologies WHERE series_id = $1 ORDER BY id ASC',
+                [sRow.id]
+            );
+            let currentStage = '1. Ingreso';
+            for (const t of typsRes.rows) {
+                const norm = String(t.typology_name || '')
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                    .toUpperCase().trim();
+                if (norm.includes('CONSTANCIA DE RECONOCIMIENTO PARA PENSION DE SOBREVIVIENTES')) {
+                    currentStage = '2. Ejecución';
+                } else if (norm.includes('DOCUMENTO DE IDENTIDAD') && norm.includes('CAMBIO DEL MISMO')) {
+                    currentStage = '3. Certificación';
+                }
+                if (!t.stage) {
+                    await pool.query('UPDATE trd_typologies SET stage = $1 WHERE id = $2', [currentStage, t.id]);
+                }
+            }
+        }
+
+        console.log('[AUTO-SCHEMA] Database schema verified, missing columns, TRD stages & performance indexes added.');
     } catch (err) {
         console.error('[AUTO-SCHEMA] Schema check warning:', err.message);
     }
@@ -155,7 +216,12 @@ ensureSchema();
 const patchDatabaseMetadata = async () => {
     try {
         console.log('[AUTO-PATCH] Checking for metadata records that need TÉCNICO -> TECNÓLOGO correction...');
-        const queryRes = await pool.query('SELECT id, metadata_values FROM expedientes');
+        const queryRes = await pool.query(`
+            SELECT id, metadata_values FROM expedientes
+            WHERE metadata_values IS NOT NULL
+              AND metadata_values::text ILIKE '%tecnico%'
+              AND metadata_values::text ILIKE '%tecnol%'
+        `);
         const rows = queryRes.rows;
         let count = 0;
         for (const row of rows) {
@@ -189,40 +255,25 @@ const patchDatabaseMetadata = async () => {
     }
 };
 
-// Crear tabla system_settings al inicio (asegura que siempre exista)
+// Crear tabla system_settings e inicializar Licencia Criptográfica Ed25519 al inicio
+const { initLicenseSystem, enforceLicense, licenseRouter } = require('./middleware/licenseGuard');
 pool.query(`
     CREATE TABLE IF NOT EXISTS system_settings (
         key TEXT PRIMARY KEY NOT NULL,
         value TEXT,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
-`).then(() => {
+`).then(async () => {
+    await initLicenseSystem();
     // Run the metadata auto-patch on startup
     patchDatabaseMetadata();
 }).catch(e => console.warn('[Server] system_settings:', e.message));
 
-// System Expiration Middleware
-app.use((req, res, next) => {
-    // Skip expiration check for auth and superuser login
-    if (req.path.startsWith('/api/auth')) return next();
-    
-    pool.query("SELECT value FROM system_settings WHERE key = 'system_expiration_date'", [])
-        .then(result => {
-            const setting = result.rows[0];
-            if (setting && setting.value) {
-                const expDate = new Date(setting.value);
-                const now = new Date();
-                if (now > expDate && (!req.user || req.user.role !== 'superadmin')) {
-                    return res.status(403).json({ 
-                        error: 'El sistema ha caducado. Contacte al administrador.',
-                        expired: true 
-                    });
-                }
-            }
-            next();
-        })
-        .catch(() => next()); // Si la tabla no existe aún, continuar sin bloquear
-});
+// Endpoints públicos de verificación y activación criptográfica de licencia (Estrategia 180)
+app.use('/api/license', licenseRouter);
+
+// System Cryptographic License Middleware (Ed25519)
+app.use(enforceLicense);
 
 // Setup multer for file upload
 const upload = multer({ dest: 'uploads/' });
@@ -310,7 +361,7 @@ app.post('/api/generate-letters', requireAuth, upload.fields([{ name: 'file', ma
 
     const letterType = req.body.letterType || 'initial';
     const filenameColumn = req.body.filenameColumn || '';
-    
+
     // Default templates
     const templatePath = letterType === 'final' ? templateFinal : templateInitial;
 
@@ -333,7 +384,7 @@ app.post('/api/generate-letters', requireAuth, upload.fields([{ name: 'file', ma
             const sheet = workbook.Sheets[sheetName];
             localData = xlsx.utils.sheet_to_json(sheet);
         } else {
-             return res.status(400).send('No Excel file or data provided.');
+            return res.status(400).send('No Excel file or data provided.');
         }
 
         if (localData.length === 0) {
@@ -347,8 +398,8 @@ app.post('/api/generate-letters', requireAuth, upload.fields([{ name: 'file', ma
                 const mammoth = require('mammoth');
                 const result = await mammoth.convertToHtml({ path: templateFile.path });
                 templateHtml = result.value;
-                 // Add basic styling to converted HTML
-                 templateHtml = `
+                // Add basic styling to converted HTML
+                templateHtml = `
                     <!DOCTYPE html>
                     <html lang="es">
                     <head>
@@ -373,7 +424,7 @@ app.post('/api/generate-letters', requireAuth, upload.fields([{ name: 'file', ma
         }
 
         // Initialize Puppeteer
-        const browser = await puppeteer.launch({ 
+        const browser = await puppeteer.launch({
             headless: 'new',
             args: ['--no-sandbox', '--disable-setuid-sandbox']
         });
@@ -484,11 +535,11 @@ app.post('/api/generate-letters', requireAuth, upload.fields([{ name: 'file', ma
 
         // Determine filename logic
         let filename = 'Cartas_SENA.pdf';
-        
+
         // Priority 1: User selected filename column
         if (filenameColumn && localData[0] && localData[0][filenameColumn]) {
-             filename = `${localData[0][filenameColumn]}_Cartas.pdf`;
-        } 
+            filename = `${localData[0][filenameColumn]}_Cartas.pdf`;
+        }
         // Priority 2: Legacy logic
         else if (letterType === 'final' && localData[0]?.['RADICADO FINAL']) {
             filename = `Cartas_${localData[0]['RADICADO FINAL']}.pdf`;
@@ -497,8 +548,8 @@ app.post('/api/generate-letters', requireAuth, upload.fields([{ name: 'file', ma
         }
 
         // Clean up uploaded files
-        try { fs.unlinkSync(excelFile.path); } catch (e) {}
-        if (templateFile) { try { fs.unlinkSync(templateFile.path); } catch (e) {} }
+        try { fs.unlinkSync(excelFile.path); } catch (e) { }
+        if (templateFile) { try { fs.unlinkSync(templateFile.path); } catch (e) { } }
 
         // Send unified PDF
         res.setHeader('Content-Type', 'application/pdf');
@@ -509,8 +560,8 @@ app.post('/api/generate-letters', requireAuth, upload.fields([{ name: 'file', ma
         console.error('Error generating letters:', error);
         res.status(500).send('Error generating letters.');
         // Cleanup on error
-        try { if (excelFile) fs.unlinkSync(excelFile.path); } catch (e) {}
-        try { if (templateFile) fs.unlinkSync(templateFile.path); } catch (e) {}
+        try { if (excelFile) fs.unlinkSync(excelFile.path); } catch (e) { }
+        try { if (templateFile) fs.unlinkSync(templateFile.path); } catch (e) { }
     }
 });
 

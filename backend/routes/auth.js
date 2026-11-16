@@ -4,6 +4,7 @@ const db = require('../database');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { requireAuth, requireAdmin } = require('../middleware/authMiddleware');
+const { getCurrentLicenseStatus } = require('../middleware/licenseGuard');
 
 const SECRET_KEY = process.env.JWT_SECRET || 'Aut0m4t1z4d0r2026%*SecretKeySuperSeguraSena2026!#';
 
@@ -16,7 +17,7 @@ router.post('/login', (req, res) => {
 
     const cleanDoc = String(document_no || '').trim();
 
-    db.get("SELECT * FROM users WHERE document_no::text = ?", [cleanDoc], (err, user) => {
+    db.get("SELECT * FROM users WHERE document_no::text = ?", [cleanDoc], async (err, user) => {
         if (err) {
             console.error('[AUTH] DB Error:', err);
             return res.status(500).json({ error: `Error de base de datos: ${err.message}` });
@@ -41,12 +42,38 @@ router.post('/login', (req, res) => {
             return res.status(401).json({ error: 'Contraseña incorrecta' });
         }
 
+        // Verificar licencia criptográfica: si está vencida, solo puede ingresar el Superusuario para activarla
+        try {
+            const licStatus = await getCurrentLicenseStatus();
+            if (!licStatus.valid && user.role !== 'superadmin') {
+                return res.status(403).json({
+                    error: 'Licencia del sistema vencida. Debe ingresar con el Superusuario para activarlo.',
+                    licenseExpired: true
+                });
+            }
+        } catch (licErr) {
+            console.error('[AUTH] Error checking license on login:', licErr.message);
+        }
+
         console.log('[AUTH] Login successful');
-        const token = jwt.sign({ id: user.id, role: user.role, name: user.full_name }, SECRET_KEY, { expiresIn: '8h' });
+        const token = jwt.sign(
+            { id: user.id, role: user.role, name: user.full_name, organization_id: user.organization_id || null },
+            SECRET_KEY,
+            { expiresIn: '8h' }
+        );
 
         try { logActivity(user.id, user.full_name, user.role, 'LOGIN_EXITOSO', `Inicio de sesión exitoso`, req.ip); } catch (e) {}
 
-        res.json({ token, user: { id: user.id, name: user.full_name, role: user.role, mustChangePassword: user.must_change_password === 1 || user.must_change_password === true } });
+        res.json({
+            token,
+            user: {
+                id: user.id,
+                name: user.full_name,
+                role: user.role,
+                organization_id: user.organization_id || null,
+                mustChangePassword: user.must_change_password === 1 || user.must_change_password === true
+            }
+        });
     });
 });
 

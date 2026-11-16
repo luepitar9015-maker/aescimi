@@ -49,10 +49,17 @@ const auditMiddleware = (req, res, next) => {
             const userRole = req.user?.role;
             const action = `${req.method} ${req.originalUrl || req.path}`;
             
-            // Censurar información sensible de los logs si existe
+            // Censurar información sensible y resumir arreglos masivos (ej. 4000+ expedientes / 26000 documentIds) para no llenar disco raíz
             let bodyCopy = { ...req.body };
             if (bodyCopy.password) bodyCopy.password = '***censored***';
             if (bodyCopy.password_hash) bodyCopy.password_hash = '***censored***';
+            for (const [k, v] of Object.entries(bodyCopy)) {
+                if (Array.isArray(v) && v.length > 25) {
+                    bodyCopy[k] = `[Array(${v.length}): ${v.slice(0, 10).join(', ')} ...]`;
+                } else if (typeof v === 'string' && v.length > 1000) {
+                    bodyCopy[k] = v.slice(0, 1000) + `... (${v.length} chars)`;
+                }
+            }
 
             logActivity(userId, userName, userRole, action, bodyCopy, req.ip);
         }

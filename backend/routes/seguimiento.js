@@ -69,157 +69,242 @@ pool.query(`
 `).catch(e => console.warn('[SEGUIMIENTO] paquete_items table error:', e.message));
 
 // ────────────────�// ──────────────────────────────────────────────────────────────
+// Helper: garantiza permisos TRD (can_view=1, can_upload=1) cuando se asignan expedientes o paquetes
+async function ensureUserTrdPermsOnAssign(client, userId, expedienteIds) {
+    const uId = Number(userId);
+    const cleanExps = [...new Set((expedienteIds || []).map(Number).filter(Boolean))];
+    if (!uId || cleanExps.length === 0) return;
+
+    const uRes = await client.query(
+        `SELECT id FROM users WHERE id = $1 AND role NOT IN ('admin', 'superadmin')`,
+        [uId]
+    );
+    if (uRes.rowCount === 0) return;
+
+    const trdRes = await client.query(`
+        SELECT DISTINCT
+            sub.id AS subseries_id,
+            CASE WHEN sub.id IS NULL THEN ser.id ELSE NULL END AS series_id
+        FROM expedientes e
+        LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie LIKE '%-' || sub.subseries_code)
+        LEFT JOIN trd_series ser ON (sub.series_id = ser.id OR e.subserie = ser.series_code OR e.subserie LIKE '%-' || ser.series_code)
+        WHERE e.id = ANY($1::int[])
+          AND (sub.id IS NOT NULL OR ser.id IS NOT NULL)
+    `, [cleanExps]);
+
+    for (const row of trdRes.rows) {
+        const existing = await client.query(
+            `SELECT id FROM user_trd_permissions
+             WHERE user_id = $1
+               AND series_id IS NOT DISTINCT FROM $2
+               AND subseries_id IS NOT DISTINCT FROM $3
+             LIMIT 1`,
+            [uId, row.series_id, row.subseries_id]
+        );
+        if (existing.rowCount > 0) {
+            await client.query(
+                `UPDATE user_trd_permissions SET can_view = 1, can_upload = 1 WHERE id = $1`,
+                [existing.rows[0].id]
+            );
+        } else {
+            await client.query(
+                `INSERT INTO user_trd_permissions (user_id, series_id, subseries_id, can_view, can_upload)
+                 VALUES ($1, $2, $3, 1, 1)`,
+                [uId, row.series_id, row.subseries_id]
+            );
+        }
+    }
+}
+
 router.get('/estadisticas', requireAuth, async (req, res) => {
     try {
-        // 1. Avance real por dependencia basado en tipologías requeridas
-        const depStats = await pool.query(`
-            WITH expediente_avance AS (
-                SELECT 
-                    e.id,
-                    e.dependencia,
-                    COUNT(DISTINCT tt.id) as total_requeridos,
-                    COUNT(DISTINCT CASE WHEN d.id IS NOT NULL THEN tt.id END) as cargados
-                FROM expedientes e
-                LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie ILIKE '%-' || sub.subseries_code)
-                LEFT JOIN trd_series ser ON (sub.series_id = ser.id OR e.subserie = ser.series_code)
-                LEFT JOIN trd_typologies tt ON (tt.subseries_id = sub.id OR (tt.subseries_id IS NULL AND tt.series_id = ser.id))
-                LEFT JOIN documents d ON d.expediente_id = e.id AND UPPER(UNACCENT(d.typology_name)) = UPPER(UNACCENT(tt.typology_name))
-                GROUP BY e.id, e.dependencia
-            )
-            SELECT 
-                COALESCE(dependencia, 'Sin dependencia') AS dependencia,
-                COUNT(id) AS total_expedientes,
-                SUM(CASE WHEN cargados > 0 THEN 1 ELSE 0 END) AS expedientes_con_docs,
-                ROUND(
-                    CASE WHEN SUM(total_requeridos) > 0
-                         THEN SUM(cargados)::NUMERIC / SUM(total_requeridos) * 100
-                         ELSE 0
-                    END, 2
-                ) AS porcentaje_cargue,
-                COALESCE((SELECT COUNT(*) FROM documents doc WHERE doc.expediente_id IN (SELECT id FROM expedientes exp WHERE COALESCE(exp.dependencia, 'Sin dependencia') = COALESCE(expediente_avance.dependencia, 'Sin dependencia'))), 0) AS total_documentos
-            FROM expediente_avance
-            GROUP BY dependencia
-            ORDER BY total_expedientes DESC
-        `);
-
-        // 2. Avance real por usuario basado en tipologías completadas de sus expedientes asignados
-        const userStats = await pool.query(`
-            WITH expediente_avance AS (
-                SELECT 
-                    e.id,
-                    COUNT(DISTINCT tt.id) as total_requeridos,
-                    COUNT(DISTINCT CASE WHEN d.id IS NOT NULL THEN tt.id END) as cargados
-                FROM expedientes e
-                LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie ILIKE '%-' || sub.subseries_code)
-                LEFT JOIN trd_series ser ON (sub.series_id = ser.id OR e.subserie = ser.series_code)
-                LEFT JOIN trd_typologies tt ON (tt.subseries_id = sub.id OR (tt.subseries_id IS NULL AND tt.series_id = ser.id))
-                LEFT JOIN documents d ON d.expediente_id = e.id AND UPPER(UNACCENT(d.typology_name)) = UPPER(UNACCENT(tt.typology_name))
-                GROUP BY e.id
-            )
-            SELECT
-                u.id            AS user_id,
-                u.full_name     AS usuario,
-                u.area,
-                COUNT(DISTINCT ea.expediente_id)            AS expedientes_asignados,
-                COUNT(DISTINCT CASE WHEN ea_av.cargados > 0 THEN ea.expediente_id END) AS expedientes_con_docs,
-                ROUND(
-                    CASE WHEN COUNT(DISTINCT ea.expediente_id) > 0
-                         THEN COUNT(DISTINCT CASE WHEN ea_av.cargados > 0 THEN ea.expediente_id END)::NUMERIC 
-                               / COUNT(DISTINCT ea.expediente_id) * 100
-                         ELSE 0
-                    END, 1
-                ) AS porcentaje_cargue,
-                COALESCE((
-                    SELECT COUNT(*) 
-                    FROM documents doc 
-                    WHERE doc.user_id = u.id 
-                       OR (doc.user_id IS NULL AND doc.expediente_id IN (SELECT expediente_id FROM expediente_assignments WHERE user_id = u.id))
-                ), 0) AS total_documentos,
-                COALESCE((
-                    SELECT COUNT(*) 
-                    FROM documents doc 
-                    WHERE (doc.user_id = u.id OR doc.expediente_id IN (SELECT expediente_id FROM expediente_assignments WHERE user_id = u.id))
-                      AND DATE(doc.created_at) = CURRENT_DATE
-                ), 0) AS docs_hoy
-            FROM users u
-            LEFT JOIN expediente_assignments ea ON ea.user_id = u.id
-            LEFT JOIN expediente_avance ea_av ON ea_av.id = ea.expediente_id
-            WHERE u.is_active = 1
-            GROUP BY u.id, u.full_name, u.area
-            ORDER BY expedientes_asignados DESC
-        `);
-
-        // 3. Avance individual por expediente
+        // 1. Avance individual por expediente (pre-agregado sin producto cartesiano)
         const expAvance = await pool.query(`
+            WITH doc_typs AS (
+                SELECT expediente_id, UPPER(UNACCENT(typology_name)) AS norm_typ
+                FROM documents
+                WHERE expediente_id IS NOT NULL AND typology_name IS NOT NULL
+                GROUP BY expediente_id, UPPER(UNACCENT(typology_name))
+            ),
+            doc_counts AS (
+                SELECT
+                    expediente_id,
+                    COUNT(*) AS total_docs,
+                    COUNT(*) FILTER (WHERE status = 'Cargado') AS docs_cargados_aes
+                FROM documents
+                WHERE expediente_id IS NOT NULL
+                GROUP BY expediente_id
+            ),
+            tt_norm AS (
+                SELECT id, subseries_id, series_id, UPPER(UNACCENT(typology_name)) AS norm_typ
+                FROM trd_typologies
+            )
             SELECT 
                 e.id, 
                 e.expediente_code, 
                 e.title, 
-                e.dependencia, 
+                COALESCE(
+                    NULLIF(TRIM(org.subsection_name), ''),
+                    NULLIF(TRIM(org.section_name), ''),
+                    NULLIF(TRIM(e.dependencia), ''),
+                    'Sin dependencia'
+                ) as dependencia, 
                 e.subserie,
                 COUNT(DISTINCT tt.id) as total_requeridos,
-                COUNT(DISTINCT CASE WHEN d.id IS NOT NULL THEN tt.id END) as cargados,
+                COUNT(DISTINCT CASE WHEN dt.norm_typ IS NOT NULL THEN tt.id END) as cargados,
+                COALESCE(dc.docs_cargados_aes, 0) as docs_cargados_aes,
+                COALESCE(dc.total_docs, 0) as total_docs,
                 ROUND(
                     CASE WHEN COUNT(DISTINCT tt.id) > 0
-                         THEN COUNT(DISTINCT CASE WHEN d.id IS NOT NULL THEN tt.id END)::NUMERIC / COUNT(DISTINCT tt.id) * 100
+                         THEN COUNT(DISTINCT CASE WHEN dt.norm_typ IS NOT NULL THEN tt.id END)::NUMERIC / COUNT(DISTINCT tt.id) * 100
                          ELSE 0
                     END, 2
                 ) as avance
             FROM expedientes e
             LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie ILIKE '%-' || sub.subseries_code)
             LEFT JOIN trd_series ser ON (sub.series_id = ser.id OR e.subserie = ser.series_code)
-            LEFT JOIN trd_typologies tt ON (tt.subseries_id = sub.id OR (tt.subseries_id IS NULL AND tt.series_id = ser.id))
-            LEFT JOIN documents d ON d.expediente_id = e.id AND UPPER(UNACCENT(d.typology_name)) = UPPER(UNACCENT(tt.typology_name))
-            GROUP BY e.id
+            LEFT JOIN organization_structure org ON ser.dependency_id = org.id
+            LEFT JOIN tt_norm tt ON (tt.subseries_id = sub.id OR (tt.subseries_id IS NULL AND tt.series_id = ser.id))
+            LEFT JOIN doc_typs dt ON dt.expediente_id = e.id AND dt.norm_typ = tt.norm_typ
+            LEFT JOIN doc_counts dc ON dc.expediente_id = e.id
+            GROUP BY e.id, org.subsection_name, org.section_name, dc.docs_cargados_aes, dc.total_docs
             ORDER BY e.created_at DESC
-            LIMIT 500
         `);
 
-        // 4. Resumen global basado en tipologías requeridas vs cargadas
-        const globalStats = await pool.query(`
-            WITH expediente_avance AS (
-                SELECT 
-                    e.id,
-                    COUNT(DISTINCT tt.id) as total_requeridos,
-                    COUNT(DISTINCT CASE WHEN d.id IS NOT NULL THEN tt.id END) as cargados
-                FROM expedientes e
-                LEFT JOIN trd_subseries sub ON (e.subserie = sub.subseries_code OR e.subserie ILIKE '%-' || sub.subseries_code)
-                LEFT JOIN trd_series ser ON (sub.series_id = ser.id OR e.subserie = ser.series_code)
-                LEFT JOIN trd_typologies tt ON (tt.subseries_id = sub.id OR (tt.subseries_id IS NULL AND tt.series_id = ser.id))
-                LEFT JOIN documents d ON d.expediente_id = e.id AND UPPER(UNACCENT(d.typology_name)) = UPPER(UNACCENT(tt.typology_name))
-                GROUP BY e.id
-            )
-            SELECT
-                (SELECT COUNT(*) FROM expedientes)                      AS total_expedientes,
-                (SELECT COUNT(DISTINCT expediente_id) FROM documents)   AS expedientes_con_docs,
-                (SELECT COUNT(*) FROM documents)                        AS total_documentos,
-                (SELECT COUNT(*) FROM expediente_assignments)           AS total_asignaciones,
-                (SELECT COUNT(DISTINCT user_id) FROM expediente_assignments) AS usuarios_con_asignacion,
-                ROUND(
-                    CASE WHEN SUM(total_requeridos) > 0
-                         THEN SUM(cargados)::NUMERIC / SUM(total_requeridos) * 100
-                         ELSE 0
-                    END, 2
-                ) AS porcentaje_global
-            FROM expediente_avance
-        `);
+        // Derivar avance por dependencia y suma global de tipologías desde expAvance (sin recalcular 3 veces en BD)
+        const depMap = new Map();
+        let sumTotalReqGlobal = 0;
+        let sumCargadosGlobal = 0;
+        const expCargadosMap = new Map();
 
-        // 5. Tendencia de cargue por mes (últimos 6 meses)
-        const tendencia = await pool.query(`
-            SELECT
-                TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') AS mes,
-                COUNT(*) AS documentos_cargados
-            FROM documents
-            WHERE created_at >= NOW() - INTERVAL '6 months'
-            GROUP BY DATE_TRUNC('month', created_at)
-            ORDER BY mes ASC
-        `);
+        for (const row of expAvance.rows) {
+            const dep = row.dependencia || 'Sin dependencia';
+            const reqCount = Number(row.total_requeridos) || 0;
+            const cargCount = Number(row.cargados) || 0;
+            const totDocs = Number(row.total_docs) || 0;
+            const aesDocs = Number(row.docs_cargados_aes) || 0;
+
+            sumTotalReqGlobal += reqCount;
+            sumCargadosGlobal += cargCount;
+            expCargadosMap.set(row.id, cargCount);
+
+            if (!depMap.has(dep)) {
+                depMap.set(dep, {
+                    dependencia: dep,
+                    total_expedientes: 0,
+                    expedientes_con_docs: 0,
+                    sum_req: 0,
+                    sum_carg: 0,
+                    total_documentos: 0,
+                    expedientes_cargados_aes: 0,
+                    documentos_cargados_aes: 0
+                });
+            }
+            const d = depMap.get(dep);
+            d.total_expedientes += 1;
+            if (totDocs > 0) d.expedientes_con_docs += 1;
+            d.sum_req += reqCount;
+            d.sum_carg += cargCount;
+            d.total_documentos += totDocs;
+            if (aesDocs > 0) d.expedientes_cargados_aes += 1;
+            d.documentos_cargados_aes += aesDocs;
+        }
+
+        const depStatsRows = Array.from(depMap.values())
+            .sort((a, b) => b.total_expedientes - a.total_expedientes)
+            .map(d => ({
+                dependencia: d.dependencia,
+                total_expedientes: String(d.total_expedientes),
+                expedientes_con_docs: String(d.expedientes_con_docs),
+                porcentaje_cargue: d.sum_req > 0 ? (d.sum_carg / d.sum_req * 100).toFixed(2) : '0.00',
+                total_documentos: String(d.total_documentos),
+                expedientes_cargados_aes: String(d.expedientes_cargados_aes),
+                documentos_cargados_aes: String(d.documentos_cargados_aes)
+            }));
+
+        // 2. Avance real por usuario, resumen global y tendencia en paralelo
+        const [userStats, globalCounts, tendencia] = await Promise.all([
+            pool.query(`
+                WITH doc_exp AS (
+                    SELECT DISTINCT expediente_id FROM documents WHERE expediente_id IS NOT NULL
+                )
+                SELECT
+                    u.id            AS user_id,
+                    u.full_name     AS usuario,
+                    u.area,
+                    COUNT(DISTINCT ea.expediente_id) AS expedientes_asignados,
+                    COUNT(DISTINCT CASE WHEN de.expediente_id IS NOT NULL THEN ea.expediente_id END) AS expedientes_con_docs,
+                    ROUND(
+                        CASE WHEN COUNT(DISTINCT ea.expediente_id) > 0
+                             THEN COUNT(DISTINCT CASE WHEN de.expediente_id IS NOT NULL THEN ea.expediente_id END)::NUMERIC
+                                   / COUNT(DISTINCT ea.expediente_id) * 100
+                             ELSE 0
+                        END, 1
+                    ) AS porcentaje_cargue,
+                    COALESCE((
+                        SELECT COUNT(*) 
+                        FROM documents doc 
+                        WHERE doc.user_id = u.id 
+                           OR (doc.user_id IS NULL AND doc.expediente_id IN (SELECT expediente_id FROM expediente_assignments WHERE user_id = u.id))
+                    ), 0) AS total_documentos,
+                    COALESCE((
+                        SELECT COUNT(DISTINCT doc.expediente_id) 
+                        FROM documents doc 
+                        WHERE (doc.user_id = u.id OR doc.expediente_id IN (SELECT expediente_id FROM expediente_assignments WHERE user_id = u.id))
+                          AND doc.status = 'Cargado'
+                          AND doc.expediente_id IS NOT NULL
+                    ), 0) AS expedientes_cargados_aes,
+                    COALESCE((
+                        SELECT COUNT(*) 
+                        FROM documents doc 
+                        WHERE (doc.user_id = u.id OR doc.expediente_id IN (SELECT expediente_id FROM expediente_assignments WHERE user_id = u.id))
+                          AND doc.status = 'Cargado'
+                    ), 0) AS documentos_cargados_aes,
+                    COALESCE((
+                        SELECT COUNT(*) 
+                        FROM documents doc 
+                        WHERE (doc.user_id = u.id OR doc.expediente_id IN (SELECT expediente_id FROM expediente_assignments WHERE user_id = u.id))
+                          AND DATE(doc.created_at) = CURRENT_DATE
+                    ), 0) AS docs_hoy
+                FROM users u
+                LEFT JOIN expediente_assignments ea ON ea.user_id = u.id
+                LEFT JOIN doc_exp de ON de.expediente_id = ea.expediente_id
+                WHERE u.is_active = 1
+                GROUP BY u.id, u.full_name, u.area
+                ORDER BY expedientes_asignados DESC
+            `),
+            pool.query(`
+                SELECT
+                    (SELECT COUNT(*) FROM expedientes) AS total_expedientes,
+                    (SELECT COUNT(DISTINCT expediente_id) FROM documents WHERE expediente_id IS NOT NULL) AS expedientes_con_docs,
+                    (SELECT COUNT(*) FROM documents) AS total_documentos,
+                    (SELECT COUNT(*) FROM expediente_assignments) AS total_asignaciones,
+                    (SELECT COUNT(DISTINCT user_id) FROM expediente_assignments) AS usuarios_con_asignacion,
+                    (SELECT COUNT(DISTINCT expediente_id) FROM documents WHERE status = 'Cargado' AND expediente_id IS NOT NULL) AS expedientes_cargados_aes,
+                    (SELECT COUNT(*) FROM documents WHERE status = 'Cargado') AS documentos_cargados_aes,
+                    (SELECT COUNT(*) FROM documents WHERE status = 'Pendiente' OR status IS NULL) AS documentos_pendientes_aes
+            `),
+            pool.query(`
+                SELECT
+                    TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') AS mes,
+                    COUNT(*) AS documentos_cargados
+                FROM documents
+                WHERE created_at >= NOW() - INTERVAL '6 months'
+                GROUP BY DATE_TRUNC('month', created_at)
+                ORDER BY mes ASC
+            `)
+        ]);
+
+        const globalRow = {
+            ...globalCounts.rows[0],
+            porcentaje_global: sumTotalReqGlobal > 0 ? (sumCargadosGlobal / sumTotalReqGlobal * 100).toFixed(2) : '0.00'
+        };
 
         res.json({
-            dependencias: depStats.rows,
+            dependencias: depStatsRows,
             usuarios: userStats.rows,
             expedientes: expAvance.rows,
-            global: globalStats.rows[0],
+            global: globalRow,
             tendencia: tendencia.rows
         });
     } catch (err) {
@@ -471,9 +556,9 @@ router.get('/asignaciones', requireAuth, async (req, res) => {
                 ea.assigned_at,
                 ea.estado,
                 ea.observaciones,
-                e.title              AS expediente_titulo,
+                COALESCE(NULLIF(TRIM(e.title), ''), trd_meta.trd_name, e.subserie) AS expediente_titulo,
                 e.expediente_code,
-                e.dependencia,
+                COALESCE(NULLIF(TRIM(e.dependencia), ''), trd_meta.dep_name) AS dependencia,
                 e.subserie,
                 e.opening_date,
                 u.full_name          AS usuario_nombre,
@@ -484,6 +569,17 @@ router.get('/asignaciones', requireAuth, async (req, res) => {
             JOIN expedientes e ON e.id = ea.expediente_id
             JOIN users u ON u.id = ea.user_id
             LEFT JOIN users ab ON ab.id = ea.assigned_by
+            LEFT JOIN LATERAL (
+                SELECT
+                    COALESCE(sub.subseries_name, ser.series_name) AS trd_name,
+                    COALESCE(NULLIF(TRIM(org.subsection_name), ''), NULLIF(TRIM(org.section_name), '')) AS dep_name
+                FROM trd_series ser
+                LEFT JOIN trd_subseries sub ON sub.series_id = ser.id AND (e.subserie = sub.subseries_code OR e.subserie LIKE '%-' || sub.subseries_code)
+                LEFT JOIN organization_structure org ON ser.dependency_id = org.id
+                WHERE sub.id IS NOT NULL OR e.subserie = ser.series_code OR e.subserie LIKE '%-' || ser.series_code
+                ORDER BY sub.id NULLS LAST
+                LIMIT 1
+            ) trd_meta ON TRUE
             ${where}
             ORDER BY ea.assigned_at DESC
         `, params);
@@ -508,9 +604,9 @@ router.get('/mis-asignaciones', requireAuth, async (req, res) => {
                 ea.assigned_at,
                 ea.estado,
                 ea.observaciones,
-                e.title              AS expediente_titulo,
+                COALESCE(NULLIF(TRIM(e.title), ''), trd_min.trd_name, e.subserie) AS expediente_titulo,
                 e.expediente_code,
-                e.dependencia,
+                COALESCE(NULLIF(TRIM(e.dependencia), ''), trd_min.dep_name) AS dependencia,
                 e.subserie,
                 e.opening_date,
                 ab.full_name         AS asignado_por,
@@ -518,6 +614,17 @@ router.get('/mis-asignaciones', requireAuth, async (req, res) => {
             FROM expediente_assignments ea
             JOIN expedientes e ON e.id = ea.expediente_id
             LEFT JOIN users ab ON ab.id = ea.assigned_by
+            LEFT JOIN LATERAL (
+                SELECT
+                    COALESCE(sub.subseries_name, ser.series_name) AS trd_name,
+                    COALESCE(NULLIF(TRIM(org.subsection_name), ''), NULLIF(TRIM(org.section_name), '')) AS dep_name
+                FROM trd_series ser
+                LEFT JOIN trd_subseries sub ON sub.series_id = ser.id AND (e.subserie = sub.subseries_code OR e.subserie LIKE '%-' || sub.subseries_code)
+                LEFT JOIN organization_structure org ON ser.dependency_id = org.id
+                WHERE sub.id IS NOT NULL OR e.subserie = ser.series_code OR e.subserie LIKE '%-' || ser.series_code
+                ORDER BY sub.id NULLS LAST
+                LIMIT 1
+            ) trd_min ON TRUE
             WHERE ea.user_id = $1
             ORDER BY ea.assigned_at DESC
         `, [req.user.id]);
@@ -567,6 +674,7 @@ router.post('/asignar', requireAuth, requireAdmin, async (req, res) => {
                 skipped++;
             }
         }
+        await ensureUserTrdPermsOnAssign(client, user_id, ids);
         await client.query('COMMIT');
         res.json({ message: `${assigned} asignado(s), ${skipped} omitido(s).`, assigned, skipped, errors });
     } catch (err) {
@@ -671,13 +779,27 @@ router.get('/paquetes', requireAuth, async (req, res) => {
 router.get('/paquetes/:id/expedientes', requireAuth, async (req, res) => {
     try {
         const result = await pool.query(`
-            SELECT e.id, e.expediente_code, e.title, e.dependencia, e.subserie,
+            SELECT e.id, e.expediente_code,
+                   COALESCE(NULLIF(TRIM(e.title), ''), trd_paq.trd_name, e.subserie) AS title,
+                   COALESCE(NULLIF(TRIM(e.dependencia), ''), trd_paq.dep_name) AS dependencia,
+                   e.subserie,
                    ea.estado AS estado_asignacion,
                    (SELECT COUNT(*) FROM documents d WHERE d.expediente_id = e.id) AS doc_count,
                    (SELECT COUNT(*) FROM documents d WHERE d.expediente_id = e.id AND d.status = 'Cargado') AS docs_cargados
             FROM paquete_items pi
             JOIN expedientes e ON e.id = pi.expediente_id
             LEFT JOIN expediente_assignments ea ON ea.expediente_id = e.id AND ea.paquete_id = $1
+            LEFT JOIN LATERAL (
+                SELECT
+                    COALESCE(sub.subseries_name, ser.series_name) AS trd_name,
+                    COALESCE(NULLIF(TRIM(org.subsection_name), ''), NULLIF(TRIM(org.section_name), '')) AS dep_name
+                FROM trd_series ser
+                LEFT JOIN trd_subseries sub ON sub.series_id = ser.id AND (e.subserie = sub.subseries_code OR e.subserie LIKE '%-' || sub.subseries_code)
+                LEFT JOIN organization_structure org ON ser.dependency_id = org.id
+                WHERE sub.id IS NOT NULL OR e.subserie = ser.series_code OR e.subserie LIKE '%-' || ser.series_code
+                ORDER BY sub.id NULLS LAST
+                LIMIT 1
+            ) trd_paq ON TRUE
             WHERE pi.paquete_id = $1
             ORDER BY e.expediente_code
         `, [req.params.id]);
@@ -711,6 +833,7 @@ router.post('/paquetes', requireAuth, requireAdmin, async (req, res) => {
                     SET paquete_id = EXCLUDED.paquete_id, assigned_by = EXCLUDED.assigned_by, assigned_at = CURRENT_TIMESTAMP
             `, [expId, user_id, req.user.id, paqueteId, `Paquete: ${nombre}`]);
         }
+        await ensureUserTrdPermsOnAssign(client, user_id, expediente_ids);
         await client.query('COMMIT');
         res.json({ message: `Paquete "${nombre}" creado con ${expediente_ids.length} expedientes.`, paquete_id: paqueteId });
     } catch (err) {

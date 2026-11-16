@@ -24,5 +24,16 @@ router.post('/type', requireAuth, requireAdmin, automationController.typeActiveP
 router.post('/press-key', requireAuth, requireAdmin, automationController.pressKeyActivePage);
 router.post('/kill', requireAuth, requireAdmin, automationController.killActiveAutomation);
 
+// Rutas del Bot Verificador Independiente OnBase + Desbloqueo Remoto + Alertas Móvil/PC
+router.post('/verify-expedientes', requireAuth, setLongTimeout, automationController.verifyExpedientesOnBase);
+router.get('/verification-report', requireAuth, automationController.getVerificationReport);
+router.post('/toggle-auto-verify', requireAuth, automationController.toggleAutoVerify);
+router.post('/unlock-bot', requireAuth, automationController.unlockBotSession);
+router.post('/skip-verifier-wait', requireAuth, automationController.skipVerifierWait);
+router.get('/alert-settings', requireAuth, automationController.getAlertSettings);
+router.post('/alert-settings', requireAuth, automationController.saveAlertSettings);
+router.post('/test-alert', requireAuth, automationController.sendTestAlert);
+router.post('/clear-alerts', requireAuth, automationController.clearSystemAlerts);
+
 module.exports = router;
 

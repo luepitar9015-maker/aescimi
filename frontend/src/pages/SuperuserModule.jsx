@@ -17,6 +17,11 @@ const SuperuserModule = () => {
   const [editingRow, setEditingRow] = useState(null);
   const [editValues, setEditValues] = useState({});
   const [expirationDate, setExpirationDate] = useState('');
+  const [licenseDaysRemaining, setLicenseDaysRemaining] = useState(null);
+  const [masterKeyModal, setMasterKeyModal] = useState(false);
+  const [masterKeyValue, setMasterKeyValue] = useState('');
+  const [tokenValue, setTokenValue] = useState('');
+  const [authMode, setAuthMode] = useState('master');
   const [message, setMessage] = useState({ type: '', text: '' });
 
   // ── Monitoreo de Servidor y Sistema ─────────────────
@@ -127,12 +132,13 @@ const SuperuserModule = () => {
 
   const fetchExpirationDate = async () => {
     try {
-      const res = await axios.get('/api/settings/system_expiration_date', { headers });
-      if (res.data && res.data.value) {
-        setExpirationDate(res.data.value);
+      const res = await axios.get('/api/license/status', { headers });
+      if (res.data && res.data.exp) {
+        setExpirationDate(res.data.exp);
+        setLicenseDaysRemaining(res.data.daysRemaining);
       }
     } catch (err) {
-      console.error("Error fetching expiration date:", err);
+      console.error("Error fetching license status:", err);
     }
   };
 
@@ -236,12 +242,23 @@ const SuperuserModule = () => {
     }
   };
 
-  const updateExpiration = async () => {
+  const updateExpiration = async (e) => {
+    if (e) e.preventDefault();
     try {
-      await axios.post(`${API_URL}/set-expiration`, { date: expirationDate }, { headers });
-      showSuccess('Fecha de caducidad actualizada');
+      const payload = authMode === 'token'
+        ? { token: tokenValue.trim() }
+        : { masterKey: masterKeyValue.trim(), expirationDate };
+      const res = await axios.post('/api/license/activate', payload, { headers });
+      if (res.data?.status?.exp) {
+        setExpirationDate(res.data.status.exp);
+        setLicenseDaysRemaining(res.data.status.daysRemaining);
+      }
+      setMasterKeyValue('');
+      setTokenValue('');
+      setMasterKeyModal(false);
+      showSuccess(res.data?.message || 'Licencia criptográfica Ed25519 actualizada con éxito');
     } catch (err) {
-      showError('Error al actualizar caducidad');
+      showError(err.response?.data?.error || 'Clave Maestra o Token inválido');
     }
   };
 
@@ -340,23 +357,114 @@ const SuperuserModule = () => {
             <h1 className="text-2xl font-bold text-gray-800">Módulo de Gestión Superadmin</h1>
           </div>
 
-          <div className="flex items-center gap-4 bg-white p-3 rounded-xl shadow-sm border border-gray-100">
-            <Calendar size={20} className="text-purple-600" />
-            <span className="text-sm font-medium text-gray-600">Caducidad del Sistema:</span>
-            <input
-              type="date"
-              className="border rounded px-2 py-1 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
-              value={expirationDate}
-              onChange={(e) => setExpirationDate(e.target.value)}
-            />
+          <div className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm border border-purple-200">
+            <ShieldCheck size={20} className="text-purple-600" />
+            <div className="text-xs">
+              <div className="font-bold text-gray-800">Licencia Criptográfica (Estrategia 180)</div>
+              <div className="text-gray-500">
+                Vence: <strong className="text-purple-700">{expirationDate || '2027-01-31'}</strong>
+                {licenseDaysRemaining !== null ? ` (${licenseDaysRemaining} días)` : ''}
+              </div>
+            </div>
             <button
-              onClick={updateExpiration}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm transition-colors"
+              onClick={() => setMasterKeyModal(true)}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
             >
-              Establecer
+              Firmar / Renovar
             </button>
           </div>
         </header>
+
+        {masterKeyModal && (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-purple-100">
+              <div className="flex justify-between items-center mb-3">
+                <span className="bg-purple-100 text-purple-800 text-xs font-bold px-2.5 py-1 rounded-full">
+                  PROTOCOLO Ed25519 • ESTRATEGIA 180
+                </span>
+                <button onClick={() => setMasterKeyModal(false)} className="text-gray-400 hover:text-gray-600">
+                  <X size={18} />
+                </button>
+              </div>
+              <h3 className="text-lg font-bold text-gray-800 mb-1">Autorización de Licencia del Sistema</h3>
+              <p className="text-xs text-gray-500 mb-4">
+                Protegido contra modificaciones por consola o base de datos. Solo la Clave Maestra o un Token firmado por Estrategia 180 puede modificar la vigencia.
+              </p>
+
+              <div className="flex gap-2 mb-4">
+                <button
+                  type="button"
+                  onClick={() => setAuthMode('master')}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold border ${authMode === 'master' ? 'bg-purple-50 border-purple-600 text-purple-700' : 'border-gray-200 text-gray-600'}`}
+                >
+                  Con Clave Maestra
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAuthMode('token')}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold border ${authMode === 'token' ? 'bg-purple-50 border-purple-600 text-purple-700' : 'border-gray-200 text-gray-600'}`}
+                >
+                  Pegar Token (OneDrive)
+                </button>
+              </div>
+
+              <form onSubmit={updateExpiration} className="space-y-3">
+                {authMode === 'master' ? (
+                  <>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Nueva Fecha de Expiración</label>
+                      <input
+                        type="date"
+                        value={expirationDate}
+                        onChange={(e) => setExpirationDate(e.target.value)}
+                        required
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Clave Maestra de Autor (Estrategia 180)</label>
+                      <input
+                        type="password"
+                        value={masterKeyValue}
+                        onChange={(e) => setMasterKeyValue(e.target.value)}
+                        placeholder="Ingrese su Clave Maestra privada"
+                        required
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Token Criptográfico (EST180...)</label>
+                    <textarea
+                      rows={3}
+                      value={tokenValue}
+                      onChange={(e) => setTokenValue(e.target.value)}
+                      placeholder="Pegue el código EST180... desde su carpeta de OneDrive"
+                      required
+                      className="w-full border rounded-lg px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-purple-500 outline-none"
+                    />
+                  </div>
+                )}
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setMasterKeyModal(false)}
+                    className="px-4 py-2 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-lg text-xs font-bold bg-purple-600 text-white hover:bg-purple-700"
+                  >
+                    Firmar y Aplicar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {message.text && (
           <div className={`mb-4 p-4 rounded-lg flex items-center gap-3 ${message.type === 'error' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-green-100 text-green-700 border border-green-200'

@@ -66,10 +66,8 @@ router.post('/', requireAuth, async (req, res) => {
     if (!key) return res.status(400).json({ error: 'Key is required' });
 
     // Block modifying system expiration date unless the user is a superadmin
-    if (key === 'system_expiration_date') {
-        if (!req.user || req.user.role !== 'superadmin') {
-            return res.status(403).json({ error: 'Acceso denegado. Solo el superusuario puede modificar la licencia del sistema.' });
-        }
+    if (key === 'system_expiration_date' || key === 'system_license_token') {
+        return res.status(403).json({ error: 'Acceso denegado. La licencia del sistema solo puede modificarse mediante firma criptográfica Ed25519 (Estrategia 180).' });
     }
 
     const isAesKey = ['ades_url', 'ades_username', 'ades_password'].includes(key);

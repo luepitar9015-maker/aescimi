@@ -287,10 +287,13 @@ function ExpedienteCreation() {
         setLoading(true);
         setStatus('Guardando...');
 
+        const expedientesSnapshot = [...expedientes];
+        const responsiblesSnapshot = [...selectedResponsibles];
+
         try {
             const res = await axios.post('/api/expedientes/mass', {
-                expedientes,
-                assigned_user_ids: selectedResponsibles.map(u => u.id)
+                expedientes: expedientesSnapshot,
+                assigned_user_ids: responsiblesSnapshot.map(u => u.id)
             });
             const { message, errors, created_ids } = res.data;
             
@@ -309,27 +312,63 @@ function ExpedienteCreation() {
                 if (autoLote && created_ids && created_ids.length > 0) {
                     try {
                         const token = localStorage.getItem('token');
-                        
-                        // Necesitamos el ID del usuario actual para asignarlo. Lo sacamos de /api/users o /api/auth/me
-                        // Como atajo seguro, llamamos a un endpoint especial o usamos el paquete endpoint modificado.
-                        // Usaremos un nombre dinámico para el lote
-                        const nombreLote = `Lote Excel - ${new Date().toLocaleString('es-CO')}`;
-                        
-                        // Obtener user_id (podemos intentar descodificar el token, pero mejor enviarlo si es posible)
-                        let userId = 1; // Fallback
-                        try {
-                           const payload = JSON.parse(atob(token.split('.')[1]));
-                           userId = payload.id;
-                        } catch(e) {}
+                        const nombreBase = `Lote Excel - ${new Date().toLocaleString('es-CO')}`;
 
-                        await axios.post('/api/seguimiento/paquetes', {
-                            nombre: nombreLote,
-                            descripcion: 'Lote creado automáticamente desde importación masiva',
-                            user_id: userId,
-                            expediente_ids: created_ids
-                        }, { headers: { Authorization: `Bearer ${token}` } });
+                        let fallbackUserId = null;
+                        try {
+                            const payload = JSON.parse(atob(token.split('.')[1]));
+                            if (payload.role !== 'superadmin') {
+                                fallbackUserId = payload.id;
+                            }
+                        } catch (e) {}
+
+                        // Agrupar paquetes por el responsable seleccionado/asignado sin anclar por defecto al superadmin
+                        const packagesToCreate = [];
+                        if (responsiblesSnapshot.length > 0) {
+                            for (const resp of responsiblesSnapshot) {
+                                packagesToCreate.push({
+                                    nombre: responsiblesSnapshot.length > 1 ? `${nombreBase} (${resp.full_name})` : nombreBase,
+                                    user_id: resp.id,
+                                    expediente_ids: created_ids
+                                });
+                            }
+                        } else {
+                            const byAssignedUser = new Map();
+                            expedientesSnapshot.forEach((exp, idx) => {
+                                const expId = created_ids[idx];
+                                if (!expId) return;
+                                const targetUid = Number(exp.assigned_user_id) || fallbackUserId;
+                                if (!targetUid) return;
+                                if (!byAssignedUser.has(targetUid)) byAssignedUser.set(targetUid, []);
+                                byAssignedUser.get(targetUid).push(expId);
+                            });
+                            if (byAssignedUser.size === 0 && fallbackUserId) {
+                                packagesToCreate.push({ nombre: nombreBase, user_id: fallbackUserId, expediente_ids: created_ids });
+                            } else {
+                                for (const [uid, idsForUser] of byAssignedUser.entries()) {
+                                    packagesToCreate.push({
+                                        nombre: nombreBase,
+                                        user_id: uid,
+                                        expediente_ids: idsForUser
+                                    });
+                                }
+                            }
+                        }
+
+                        for (const pkg of packagesToCreate) {
+                            await axios.post('/api/seguimiento/paquetes', {
+                                nombre: pkg.nombre,
+                                descripcion: 'Lote creado automáticamente desde importación masiva',
+                                user_id: pkg.user_id,
+                                expediente_ids: pkg.expediente_ids
+                            }, { headers: { Authorization: `Bearer ${token}` } });
+                        }
                         
-                        alert(`✅ ¡Guardado exitoso!\nSe creó automáticamente el paquete de seguimiento "${nombreLote}".`);
+                        if (packagesToCreate.length > 0) {
+                            alert(`✅ ¡Guardado exitoso!\nSe creó automáticamente el paquete de seguimiento "${nombreBase}".`);
+                        } else {
+                            alert('✅ ¡Guardado exitoso en base de datos!');
+                        }
                     } catch (loteErr) {
                         console.error('Error creando lote automático:', loteErr);
                         alert(`Los expedientes se guardaron, pero hubo un error al crear el lote de seguimiento: ${loteErr.response?.data?.error || loteErr.message}`);

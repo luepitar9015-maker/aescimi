@@ -12,19 +12,19 @@ router.get('/template', (req, res) => {
     const wb = xlsx.utils.book_new();
 
     // Sheet 1: TRD_Datos
-    const headers = ['Codigo_Serie', 'Nombre_Serie', 'Codigo_Subserie', 'Nombre_Subserie', 'Nombre_Tipologia'];
+    const headers = ['Codigo_Serie', 'Nombre_Serie', 'Codigo_Subserie', 'Nombre_Subserie', 'Nombre_Tipologia', 'Etapa'];
     const examples = [
-        ['100', 'ADMINISTRACION Y PLANEACION', '', '', 'Acta de Comité'],
-        ['100', 'ADMINISTRACION Y PLANEACION', '', '', 'Informe de Gestión'],
-        ['200', 'GESTION DOCUMENTAL', '200.1', 'ARCHIVO DE GESTION', 'Expediente de Personal'],
-        ['200', 'GESTION DOCUMENTAL', '200.1', 'ARCHIVO DE GESTION', 'Carpeta de Contrato'],
-        ['200', 'GESTION DOCUMENTAL', '200.2', 'CORRESPONDENCIA', 'Memorando'],
-        ['200', 'GESTION DOCUMENTAL', '200.2', 'CORRESPONDENCIA', 'Oficio'],
-        ['300', 'TALENTO HUMANO', '', '', 'Hoja de Vida'],
-        ['300', 'TALENTO HUMANO', '', '', 'Contrato Laboral'],
+        ['100', 'ADMINISTRACION Y PLANEACION', '', '', 'Acta de Comité', ''],
+        ['100', 'ADMINISTRACION Y PLANEACION', '', '', 'Informe de Gestión', ''],
+        ['37', 'HISTORIAS ACADEMICAS', '', '', 'DOCUMENTO DE IDENTIDAD VIGENTE', '1. Ingreso'],
+        ['37', 'HISTORIAS ACADEMICAS', '', '', 'CONSTANCIA DE RECONOCIMIENTO PARA PENSION DE SOBREVIVIENTES', '2. Ejecución'],
+        ['37', 'HISTORIAS ACADEMICAS', '', '', 'DOCUMENTO DE IDENTIDAD EN CASO DE CAMBIO DEL MISMO', '3. Certificación'],
+        ['200', 'GESTION DOCUMENTAL', '200.1', 'ARCHIVO DE GESTION', 'Expediente de Personal', ''],
+        ['200', 'GESTION DOCUMENTAL', '200.2', 'CORRESPONDENCIA', 'Memorando', ''],
+        ['300', 'TALENTO HUMANO', '', '', 'Hoja de Vida', ''],
     ];
     const ws = xlsx.utils.aoa_to_sheet([headers, ...examples]);
-    ws['!cols'] = [{ wch: 18 }, { wch: 42 }, { wch: 18 }, { wch: 42 }, { wch: 45 }];
+    ws['!cols'] = [{ wch: 18 }, { wch: 42 }, { wch: 18 }, { wch: 42 }, { wch: 45 }, { wch: 22 }];
     xlsx.utils.book_append_sheet(wb, ws, 'TRD_Datos');
 
     // Sheet 2: Instrucciones
@@ -37,6 +37,7 @@ router.get('/template', (req, res) => {
         ['Codigo_Subserie', 'Código de Subserie. DEJAR EN BLANCO si la Serie es Simple', 'NO', '200.1'],
         ['Nombre_Subserie', 'Nombre de Subserie. DEJAR EN BLANCO si la Serie es Simple', 'NO', 'ARCHIVO DE GESTION'],
         ['Nombre_Tipologia', 'Nombre de la Tipología Documental', 'SI', 'Acta de Reunión'],
+        ['Etapa', 'Etapa documental a la que pertenece la tipología (ej. 1. Ingreso, 2. Ejecución, 3. Certificación)', 'NO', '1. Ingreso'],
         [''],
         ['REGLAS:'],
         ['1. Cada fila = una Tipología Documental.'],
@@ -83,6 +84,7 @@ router.post('/upload', upload.single('file'), (req, res) => {
                 const rawSubseriesCode = row['Codigo_Subserie'];
                 const subseriesName = row['Nombre_Subserie'];
                 const typologyName = row['Nombre_Tipologia'];
+                const stageName = row['Etapa'] || row['stage'] || null;
 
                 if (!rawSeriesCode || !seriesName) return;
 
@@ -107,8 +109,8 @@ router.post('/upload', upload.single('file'), (req, res) => {
 
                                     const handleTypology = (subId) => {
                                         if (typologyName) {
-                                            db.run("INSERT INTO trd_typologies (series_id, subseries_id, typology_name) VALUES (?, ?, ?)",
-                                                [null, subId, typologyName], (err) => {
+                                            db.run("INSERT INTO trd_typologies (series_id, subseries_id, typology_name, stage) VALUES (?, ?, ?, ?)",
+                                                [null, subId, typologyName, stageName], (err) => {
                                                     if (err) console.error("Error inserting typology:", err);
                                                     resolve();
                                                 });
@@ -130,8 +132,8 @@ router.post('/upload', upload.single('file'), (req, res) => {
                             } else {
                                 // 3. Handle Simple Series Typology
                                 if (typologyName) {
-                                    db.run("INSERT INTO trd_typologies (series_id, subseries_id, typology_name) VALUES (?, ?, ?)",
-                                        [seriesId, null, typologyName], (err) => {
+                                    db.run("INSERT INTO trd_typologies (series_id, subseries_id, typology_name, stage) VALUES (?, ?, ?, ?)",
+                                        [seriesId, null, typologyName, stageName], (err) => {
                                             if (err) console.error("Error inserting typology:", err);
                                             resolve();
                                         });
@@ -206,6 +208,7 @@ router.post('/update-upload', upload.single('file'), (req, res) => {
                         const rawSubseriesCode = row['Codigo_Subserie'];
                         const subseriesName = row['Nombre_Subserie'];
                         const typologyName = row['Nombre_Tipologia'];
+                        const stageName = row['Etapa'] || row['stage'] || null;
                         if (!rawSeriesCode || !seriesName) return;
 
                         const depPrefix = `${regCode}.${depCode}-`;
@@ -221,8 +224,8 @@ router.post('/update-upload', upload.single('file'), (req, res) => {
                                             if (err) return reject(err);
                                             const handleTypology = (subId) => {
                                                 if (typologyName) {
-                                                    db.run("INSERT INTO trd_typologies (series_id, subseries_id, typology_name) VALUES (?, ?, ?)",
-                                                        [null, subId, typologyName], () => resolve());
+                                                    db.run("INSERT INTO trd_typologies (series_id, subseries_id, typology_name, stage) VALUES (?, ?, ?, ?)",
+                                                        [null, subId, typologyName, stageName], () => resolve());
                                                 } else { resolve(); }
                                             };
                                             if (sRow) { handleTypology(sRow.id); }
@@ -236,8 +239,8 @@ router.post('/update-upload', upload.single('file'), (req, res) => {
                                         });
                                     } else {
                                         if (typologyName) {
-                                            db.run("INSERT INTO trd_typologies (series_id, subseries_id, typology_name) VALUES (?, ?, ?)",
-                                                [sId, null, typologyName], () => resolve());
+                                            db.run("INSERT INTO trd_typologies (series_id, subseries_id, typology_name, stage) VALUES (?, ?, ?, ?)",
+                                                [sId, null, typologyName, stageName], () => resolve());
                                         } else { resolve(); }
                                     }
                                 };
@@ -273,21 +276,23 @@ router.get('/by-subseries', (req, res) => {
 
     // Search typologies attached to matching SUBSERIES
     const q1 = `
-        SELECT t.id, t.typology_name as name, t.series_id, t.subseries_id,
+        SELECT t.id, t.typology_name as name, t.stage, t.series_id, t.subseries_id,
                s.subseries_name as subseries_name, sr.series_name as series_name
         FROM trd_typologies t
         LEFT JOIN trd_subseries s ON t.subseries_id = s.id
         LEFT JOIN trd_series sr ON (t.series_id = sr.id OR s.series_id = sr.id)
         WHERE s.subseries_name ILIKE ? OR s.subseries_code ILIKE ?
+        ORDER BY t.id ASC
     `;
     // Search typologies attached DIRECTLY to series (simple series, no subserie)
     const q2 = `
-        SELECT t.id, t.typology_name as name, t.series_id, t.subseries_id,
+        SELECT t.id, t.typology_name as name, t.stage, t.series_id, t.subseries_id,
                NULL as subseries_name, sr.series_name as series_name
         FROM trd_typologies t
         JOIN trd_series sr ON t.series_id = sr.id
         WHERE t.subseries_id IS NULL
           AND (sr.series_name ILIKE ? OR sr.series_code ILIKE ?)
+        ORDER BY t.id ASC
     `;
 
     db.all(q1, [like, like], (err, rows1) => {
@@ -378,48 +383,69 @@ router.get('/subseries/all', (req, res) => {
     }
 
     const handleRows = (rows) => {
-        const processed = rows.map(r => {
-            let meta = null;
-            try {
-                meta = r.metadata_labels ? JSON.parse(r.metadata_labels) : (r.series_labels ? JSON.parse(r.series_labels) : null);
-            } catch (e) {
-                console.error("Error parsing metadata_labels:", e, r.id);
+        db.all("SELECT series_id, subseries_id, stage FROM trd_typologies WHERE stage IS NOT NULL AND TRIM(stage) != '' ORDER BY id ASC", [], (stageErr, stageRows) => {
+            const stagesBySer = {};
+            const stagesBySub = {};
+            if (!stageErr && stageRows) {
+                stageRows.forEach(sr => {
+                    if (sr.subseries_id) {
+                        if (!stagesBySub[sr.subseries_id]) stagesBySub[sr.subseries_id] = [];
+                        if (!stagesBySub[sr.subseries_id].includes(sr.stage)) stagesBySub[sr.subseries_id].push(sr.stage);
+                    } else if (sr.series_id) {
+                        if (!stagesBySer[sr.series_id]) stagesBySer[sr.series_id] = [];
+                        if (!stagesBySer[sr.series_id].includes(sr.stage)) stagesBySer[sr.series_id].push(sr.stage);
+                    }
+                });
             }
 
-            const trd_code = r.type === 'subseries' ? (r.subseries_code || '') : (r.series_code || '');
+            const processed = rows.map(r => {
+                let meta = null;
+                try {
+                    meta = r.metadata_labels ? JSON.parse(r.metadata_labels) : (r.series_labels ? JSON.parse(r.series_labels) : null);
+                } catch (e) {
+                    console.error("Error parsing metadata_labels:", e, r.id);
+                }
 
-            let concat = '';
-            if (trd_code.includes('.')) {
-                concat = trd_code;
-            } else {
-                const reg = r.regional_code || '';
-                const ctr = r.center_code || '';
-                const sec = r.section_code || '';
-                const sub = r.subsection_code ? `.${r.subsection_code}` : '';
-                const prefixParts = [reg, ctr, sec].filter(Boolean);
-                const prefix = prefixParts.join('.');
-                if (prefix) concat = `${prefix}${sub}-${trd_code}`;
-                else concat = trd_code;
-            }
+                const trd_code = r.type === 'subseries' ? (r.subseries_code || '') : (r.series_code || '');
 
-            let bare = trd_code;
-            if (bare.indexOf('-') !== -1) {
-                const parts = bare.split('-');
-                bare = parts[parts.length - 1];
-            }
-            if (bare.indexOf('.') !== -1) {
-                const parts = bare.split('.');
-                bare = parts[parts.length - 1];
-            }
+                let concat = '';
+                if (trd_code.includes('.')) {
+                    concat = trd_code;
+                } else {
+                    const reg = r.regional_code || '';
+                    const ctr = r.center_code || '';
+                    const sec = r.section_code || '';
+                    const sub = r.subsection_code ? `.${r.subsection_code}` : '';
+                    const prefixParts = [reg, ctr, sec].filter(Boolean);
+                    const prefix = prefixParts.join('.');
+                    if (prefix) concat = `${prefix}${sub}-${trd_code}`;
+                    else concat = trd_code;
+                }
 
-            return {
-                ...r,
-                metadata_labels: meta,
-                concatenated_code: concat,
-                bare_code: bare
-            };
+                let bare = trd_code;
+                if (bare.indexOf('-') !== -1) {
+                    const parts = bare.split('-');
+                    bare = parts[parts.length - 1];
+                }
+                if (bare.indexOf('.') !== -1) {
+                    const parts = bare.split('.');
+                    bare = parts[parts.length - 1];
+                }
+
+                const available_stages = r.type === 'subseries'
+                    ? (stagesBySub[r.id] || [])
+                    : (stagesBySer[r.id] || []);
+
+                return {
+                    ...r,
+                    metadata_labels: meta,
+                    concatenated_code: concat,
+                    bare_code: bare,
+                    available_stages
+                };
+            });
+            res.json({ data: processed });
         });
-        res.json({ data: processed });
     };
 
     db.all(query, [], (err, rows) => {
@@ -433,7 +459,63 @@ router.get('/typologies-for-expediente', (req, res) => {
     const { subserie, series } = req.query;
     const results = [];
 
-    const sendResult = () => res.json({ data: results });
+    const sendResult = () => {
+        // Attach 1-based consecutive TRD order within each series/subseries
+        const groupCounters = {};
+        results.forEach(item => {
+            const key = item.subseries_id ? `sub_${item.subseries_id}` : `ser_${item.series_id}`;
+            groupCounters[key] = (groupCounters[key] || 0) + 1;
+            item.trd_order = groupCounters[key];
+        });
+
+        // If non-admin user, check user_trd_permissions for allowed_stages
+        if (req.user && req.user.role !== 'admin' && req.user.role !== 'superadmin' && results.length > 0) {
+            const seriesIds = [...new Set(results.map(r => r.series_id).filter(Boolean))];
+            const subseriesIds = [...new Set(results.map(r => r.subseries_id).filter(Boolean))];
+            db.all(
+                `SELECT series_id, subseries_id, allowed_stages 
+                 FROM user_trd_permissions 
+                 WHERE user_id = ? AND can_view = 1`,
+                [req.user.id],
+                (permErr, permRows) => {
+                    let userAllowedStages = null;
+                    if (!permErr && permRows && permRows.length > 0) {
+                        const matchingPerms = permRows.filter(p =>
+                            (p.series_id && seriesIds.includes(p.series_id)) ||
+                            (p.subseries_id && subseriesIds.includes(p.subseries_id))
+                        );
+                        if (matchingPerms.length > 0) {
+                            const stagesSet = new Set();
+                            let hasUnrestricted = false;
+                            matchingPerms.forEach(p => {
+                                if (!p.allowed_stages) {
+                                    hasUnrestricted = true;
+                                } else {
+                                    try {
+                                        const parsed = JSON.parse(p.allowed_stages);
+                                        if (Array.isArray(parsed) && parsed.length > 0) {
+                                            parsed.forEach(st => stagesSet.add(st));
+                                        } else {
+                                            hasUnrestricted = true;
+                                        }
+                                    } catch {
+                                        stagesSet.add(p.allowed_stages);
+                                    }
+                                }
+                            });
+                            if (!hasUnrestricted && stagesSet.size > 0) {
+                                userAllowedStages = Array.from(stagesSet);
+                            }
+                        }
+                    }
+                    res.json({ data: results, allowed_stages: userAllowedStages });
+                }
+            );
+            return;
+        }
+
+        res.json({ data: results, allowed_stages: null });
+    };
 
     // Query 1: match by subserie code or name
     if (subserie) {
@@ -443,12 +525,13 @@ router.get('/typologies-for-expediente', (req, res) => {
         const endsWithDot = `%.${subserie}`;
 
         db.all(`
-            SELECT t.id, t.typology_name as name, t.onbase_name, t.series_id, t.subseries_id
+            SELECT t.id, t.typology_name as name, t.stage, t.onbase_name, t.series_id, t.subseries_id
             FROM trd_typologies t
             LEFT JOIN trd_subseries sub ON t.subseries_id = sub.id
             LEFT JOIN trd_series sr ON (sub.series_id = sr.id OR t.series_id = sr.id)
             WHERE sub.subseries_code = ? OR sub.subseries_code ILIKE ? OR sub.subseries_code ILIKE ? OR sub.subseries_name ILIKE ?
                OR sr.series_code = ? OR sr.series_code ILIKE ? OR sr.series_code ILIKE ? OR sr.series_name ILIKE ?
+            ORDER BY t.id ASC
         `, [exact, endsWith, endsWithDot, like, exact, endsWith, endsWithDot, like], (err, rows) => {
             if (!err && rows) rows.forEach(r => { if (!results.find(x => x.id === r.id)) results.push(r); });
             sendResult();
@@ -457,10 +540,11 @@ router.get('/typologies-for-expediente', (req, res) => {
         const exact = series;
         const like = `%${series}%`;
         db.all(`
-            SELECT t.id, t.typology_name as name, t.onbase_name, t.series_id, t.subseries_id
+            SELECT t.id, t.typology_name as name, t.stage, t.onbase_name, t.series_id, t.subseries_id
             FROM trd_typologies t
             LEFT JOIN trd_series sr ON t.series_id = sr.id
             WHERE sr.series_code = ? OR sr.series_name ILIKE ?
+            ORDER BY t.id ASC
         `, [exact, like], (err, rows) => {
             if (!err && rows) rows.forEach(r => results.push(r));
             sendResult();
@@ -474,14 +558,20 @@ router.get('/typologies-for-expediente', (req, res) => {
 // GET all typologies (fallback for unmatched expedientes)
 router.get('/all-typologies', (req, res) => {
     db.all(`
-        SELECT t.id, t.typology_name as name, t.onbase_name, t.series_id, t.subseries_id,
+        SELECT t.id, t.typology_name as name, t.stage, t.onbase_name, t.series_id, t.subseries_id,
                sr.series_code, sr.series_name, sub.subseries_code, sub.subseries_name
         FROM trd_typologies t
         LEFT JOIN trd_series sr ON (t.series_id = sr.id)
         LEFT JOIN trd_subseries sub ON (t.subseries_id = sub.id)
-        ORDER BY sr.series_code, sub.subseries_code, t.typology_name
+        ORDER BY sr.series_code, sub.subseries_code, t.id ASC
     `, [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
+        const groupCounters = {};
+        (rows || []).forEach(item => {
+            const key = item.subseries_id ? `sub_${item.subseries_id}` : `ser_${item.series_id}`;
+            groupCounters[key] = (groupCounters[key] || 0) + 1;
+            item.trd_order = groupCounters[key];
+        });
         res.json({ data: rows });
     });
 });
@@ -499,7 +589,7 @@ router.get('/:dependencyId', (req, res) => {
         SELECT 
             s.id as series_id, s.series_code, s.series_name, s.folder_hierarchy as series_hierarchy, s.metadata_labels as series_labels,
             sub.id as subseries_id, sub.subseries_code, sub.subseries_name, sub.folder_hierarchy as subseries_hierarchy, sub.metadata_labels as subseries_labels,
-            t.id as typology_id, t.typology_name, t.subseries_id as typ_sub_id, t.series_id as typ_ser_id
+            t.id as typology_id, t.typology_name, t.stage as typology_stage, t.subseries_id as typ_sub_id, t.series_id as typ_ser_id
         FROM trd_series s
         LEFT JOIN trd_subseries sub ON s.id = sub.series_id
         LEFT JOIN trd_typologies t ON (t.series_id = s.id OR t.subseries_id = sub.id)
@@ -544,7 +634,8 @@ router.get('/:dependencyId', (req, res) => {
                 if (row.typology_id && row.typ_sub_id === row.subseries_id) {
                     trdTree[row.series_id].subseries[row.subseries_id].typologies.push({
                         id: row.typology_id,
-                        name: row.typology_name
+                        name: row.typology_name,
+                        stage: row.typology_stage || null
                     });
                 }
             } else {
@@ -552,7 +643,8 @@ router.get('/:dependencyId', (req, res) => {
                 if (row.typology_id && row.typ_ser_id === row.series_id) {
                     trdTree[row.series_id].typologies.push({
                         id: row.typology_id,
-                        name: row.typology_name
+                        name: row.typology_name,
+                        stage: row.typology_stage || null
                     });
                 }
             }
@@ -621,11 +713,11 @@ router.post('/subseries', (req, res) => {
 
 // POST Create Typology
 router.post('/typology', (req, res) => {
-    const { series_id, subseries_id, name } = req.body;
+    const { series_id, subseries_id, name, stage } = req.body;
 
     db.run(
-        "INSERT INTO trd_typologies (series_id, subseries_id, typology_name) VALUES (?, ?, ?)",
-        [series_id || null, subseries_id || null, name],
+        "INSERT INTO trd_typologies (series_id, subseries_id, typology_name, stage) VALUES (?, ?, ?, ?)",
+        [series_id || null, subseries_id || null, name, stage || null],
         function (err) {
             if (err) return res.status(500).json({ error: err.message });
             res.json({ id: this.lastID, message: "Typology Created" });
@@ -682,10 +774,16 @@ router.delete('/subseries/:id', (req, res) => {
 
 // PUT Edit Typology
 router.put('/typology/:id', (req, res) => {
-    const { name, onbase_name } = req.body;
+    const { name, onbase_name, stage } = req.body;
     db.run(
-        "UPDATE trd_typologies SET typology_name = COALESCE(?, typology_name), onbase_name = COALESCE(?, onbase_name) WHERE id = ?",
-        [name !== undefined ? name : null, onbase_name !== undefined ? onbase_name : null, req.params.id],
+        "UPDATE trd_typologies SET typology_name = COALESCE(?, typology_name), onbase_name = COALESCE(?, onbase_name), stage = CASE WHEN ?::boolean THEN ? ELSE stage END WHERE id = ?",
+        [
+            name !== undefined ? name : null,
+            onbase_name !== undefined ? onbase_name : null,
+            stage !== undefined,
+            stage || null,
+            req.params.id
+        ],
         function (err) {
             if (err) return res.status(500).json({ error: err.message });
             res.json({ message: 'Tipología actualizada' });

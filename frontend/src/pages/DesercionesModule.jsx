@@ -69,6 +69,8 @@ const OnBaseLiveFrame = memo(function OnBaseLiveFrame({ liveFrame, onExpand, sel
 export default function DesercionesModule() {
   const [activeTab, setActiveTab] = useState('citacion'); // 'citacion' | 'resolucion' | 'historico'
   const textareaRef = useRef(null);
+  const descInputRef = useRef(null);
+  const [activeInputTarget, setActiveInputTarget] = useState('body'); // 'body' | 'descripcion_asunto'
 
   // Excel & File States
   const [excelFile, setExcelFile] = useState(null);
@@ -76,70 +78,369 @@ export default function DesercionesModule() {
   const [columns, setColumns] = useState([]);
   const [uploadingExcel, setUploadingExcel] = useState(false);
 
-  // Template State (Texto Inicial) con Persistencia en localStorage
+  // Selector de variante de plantilla: 'mayor' (CC / CE / PPT) vs 'menor_ti' (Tarjeta de Identidad TI - Menor de Edad)
+  const [plantillaVariante, setPlantillaVariante] = useState('mayor'); // 'mayor' | 'menor_ti'
+  const [autoTiTemplate, setAutoTiTemplate] = useState(true);
+  const [savingTemplates, setSavingTemplates] = useState(false);
+  const [showLiveSplitPreview, setShowLiveSplitPreview] = useState(true);
+  const [livePreviewRowIdx, setLivePreviewRowIdx] = useState(0);
+
+  // Plantillas Oficiales SENA CIMI por defecto (100% combinadas y listas para usar)
+  const OFFICIAL_CITACION_MAYOR = `68-9224
+
+Girón, {{FECHA_ACTUAL}}
+
+Señor(a)
+{{NOMBRE}} {{APELLIDOS}}
+{{TIPO}} No. {{DOCUMENTO}}
+Programa: {{NIVEL}} - {{PROGRAMA}} ({{TIPO FORMACION}})
+Ficha: {{FICHA}}
+Correo electrónico registrado en SOFIA Plus: {{CORREO REGISTRADO EN SOFÍA}}
+
+Asunto: Citación a Comité de Evaluación y Seguimiento – Presunta deserción por inasistencias
+
+Cordial saludo.
+
+De conformidad con lo dispuesto en los artículos 50, 51 y 52 del Acuerdo 009 de 2024 – Reglamento del Aprendiz SENA, y en el marco de las competencias del Comité de Evaluación y Seguimiento previstas en el artículo 48 ibídem, modificado por el Acuerdo 002 de 2025, me permito informarle que esta Coordinación Académica recibió un reporte relacionado con su proceso de formación, cuyos hechos podrían configurar una situación de deserción.
+
+En consecuencia, y con el propósito de garantizar sus derechos al debido proceso, defensa y contradicción, se le cita a sesión del Comité de Evaluación y Seguimiento, instancia encargada de revisar las circunstancias del caso y determinar, con fundamento en las pruebas y los descargos que se presenten, si se configura o no la situación de deserción reportada.
+
+RELACIÓN SUCINTA DEL INFORME O DE LA QUEJA PRESENTADA
+
+De acuerdo con el informe presentado por el(la) Instructor(a) {{INSTRUCTOR}} en fecha {{FECHA REPORTE}}, se reporta una situación relacionada con la Deserción POR INASISTENCIAS, que podría configurar una de las causales de deserción previstas en el artículo 30 del Acuerdo 009 de 2024. Los hechos, fechas, actuaciones y demás circunstancias que sustentan el reporte se encuentran detallados en el informe y los soportes presentados por el(la) Instructor(a) {{INSTRUCTOR}}, fechas de inasistencias reportadas: {{FECHAS_INASISTENCIA}}.
+
+IDENTIFICACIÓN DEL(LOS) PROBABLE(S) AUTOR(ES) DE LOS HECHOS
+
+Aprendiz: {{NOMBRE}} {{APELLIDOS}}
+Identificación: {{TIPO}} No. {{DOCUMENTO}}
+Nivel y Programa de Formación: {{NIVEL}} - {{PROGRAMA}} ({{TIPO FORMACION}})
+Ficha de Caracterización: {{FICHA}}
+Estado en SOFIA Plus: {{ESTADO}}
+
+NORMAS DEL REGLAMENTO DEL APRENDIZ SENA PRESUNTAMENTE INFRINGIDAS
+
+Acuerdo 009 de 2024 – Reglamento del Aprendiz SENA (modificado por el Acuerdo 002 de 2025): Artículo 30 (Causales de Deserción) y deberes académicos del aprendiz previstos en el Capítulo III.
+
+CITACIÓN Y DERECHO DE DEFENSA Y CONTRADICCIÓN
+
+Para ejercer su derecho a la defensa, controvertir las pruebas y presentar los descargos o soportes de justificación correspondientes, se le cita a sesión del Comité de Evaluación y Seguimiento programada así:
+
+Fecha: {{FECHA_COMITE}}
+Hora: {{HORA_COMITE}}
+Lugar / Canal de Atención: {{LUGAR_COMITE}}
+
+Contra el presente acto de trámite no procede recurso alguno, de conformidad con el artículo 75 de la Ley 1437 de 2011.
+
+Atentamente,
+
+
+
+Manuel Enrique Valencia Moreno
+Coordinador Académico - CIMI
+
+Elaboró: Mónica Gómez Rey, Contratista Coordinación Académica`;
+
+  const OFFICIAL_CITACION_MENOR_TI = `68-9224
+
+Girón, {{FECHA_ACTUAL}}
+
+Señor(a) Aprendiz (Menor de Edad)
+{{NOMBRE}} {{APELLIDOS}}
+y a su Representante Legal / Padre de Familia o Acudiente
+{{TIPO}} No. {{DOCUMENTO}} (Tarjeta de Identidad)
+Programa: {{NIVEL}} - {{PROGRAMA}} ({{TIPO FORMACION}})
+Ficha: {{FICHA}}
+Correo electrónico registrado en SOFIA Plus: {{CORREO REGISTRADO EN SOFÍA}}
+
+Asunto: Citación a Comité de Evaluación y Seguimiento (Aprendiz Menor de Edad - TI) – Presunta deserción por inasistencias
+
+Cordial saludo.
+
+De conformidad con lo dispuesto en los artículos 50, 51 y 52 del Acuerdo 009 de 2024 – Reglamento del Aprendiz SENA, en el marco de las competencias del Comité de Evaluación y Seguimiento previstas en el artículo 48 ibídem (modificado por el Acuerdo 002 de 2025), y en observancia de la protección reforzada del debido proceso para adolescentes y menores de edad prevista en la Ley 1098 de 2006 (Código de la Infancia y la Adolescencia), me permito informarles que esta Coordinación Académica recibió un reporte relacionado con el proceso de formación del(la) aprendiz identificado(a) con Tarjeta de Identidad ({{TIPO}} No. {{DOCUMENTO}}), cuyos hechos podrían configurar una situación de deserción.
+
+En consecuencia, y con el propósito de garantizar de manera integral sus derechos al debido proceso, defensa y contradicción, se cita al(la) aprendiz junto con su Representante Legal, Padre de Familia o Acudiente a sesión del Comité de Evaluación y Seguimiento, instancia encargada de revisar las circunstancias del caso y determinar, con fundamento en las pruebas y los descargos que se presenten, si se configura o no la situación de deserción reportada.
+
+RELACIÓN SUCINTA DEL INFORME O DE LA QUEJA PRESENTADA
+
+De acuerdo con el informe presentado por el(la) Instructor(a) {{INSTRUCTOR}} en fecha {{FECHA REPORTE}}, se reporta una situación relacionada con la Deserción POR INASISTENCIAS, que podría configurar una de las causales de deserción previstas en el artículo 30 del Acuerdo 009 de 2024. Los hechos, fechas, actuaciones y demás circunstancias que sustentan el reporte se encuentran detallados en el informe y los soportes presentados por el(la) Instructor(a) {{INSTRUCTOR}}, fechas de inasistencias reportadas: {{FECHAS_INASISTENCIA}}.
+
+IDENTIFICACIÓN DEL(LOS) PROBABLE(S) AUTOR(ES) DE LOS HECHOS
+
+Aprendiz Menor de Edad: {{NOMBRE}} {{APELLIDOS}}
+Documento de Identidad: {{TIPO}} No. {{DOCUMENTO}} (Tarjeta de Identidad)
+Nivel y Programa de Formación: {{NIVEL}} - {{PROGRAMA}} ({{TIPO FORMACION}})
+Ficha de Caracterización: {{FICHA}}
+Estado en SOFIA Plus: {{ESTADO}}
+
+NORMAS DEL REGLAMENTO DEL APRENDIZ SENA PRESUNTAMENTE INFRINGIDAS
+
+Acuerdo 009 de 2024 – Reglamento del Aprendiz SENA (modificado por el Acuerdo 002 de 2025): Artículo 30 (Causales de Deserción) y deberes académicos del aprendiz previstos en el Capítulo III.
+
+CITACIÓN CON ACOMPAÑAMIENTO DE REPRESENTANTE LEGAL / ACUDIENTE
+
+Por tratarse de un(a) aprendiz menor de edad con Tarjeta de Identidad ({{TIPO}}), deberá comparecer acompañado(a) de su Representante Legal, Padre de Familia o Acudiente para presentar sus descargos y soportes de justificación en la sesión del Comité de Evaluación y Seguimiento programada así:
+
+Fecha: {{FECHA_COMITE}}
+Hora: {{HORA_COMITE}}
+Lugar / Canal de Atención: {{LUGAR_COMITE}}
+
+Contra el presente acto de trámite no procede recurso alguno, de conformidad con el artículo 75 de la Ley 1437 de 2011.
+
+Atentamente,
+
+
+
+Manuel Enrique Valencia Moreno
+Coordinador Académico - CIMI
+
+Elaboró: Mónica Gómez Rey, Contratista Coordinación Académica`;
+
+  const OFFICIAL_RESOLUCION_MAYOR = `68-9224
+
+
+Girón, {{FECHA_ACTUAL}}
+
+Señor(a)
+{{NOMBRE}} {{APELLIDOS}}
+{{TIPO}} No. {{DOCUMENTO}}
+Programa: {{PROGRAMA}}
+Ficha: {{FICHA}}
+Correo electrónico registrado en SOFIA Plus: {{CORREO REGISTRADO EN SOFÍA}}
+
+Asunto: Notificación personal electrónica – Resolución No. 68 - {{RESOLUCION}} del {{FECHA RESOLUCIÓN}}
+
+Cordial saludo.
+
+De conformidad con lo dispuesto en el artículo 51 del Acuerdo 009 de 2024 – Reglamento del Aprendiz SENA y el artículo 56 de la Ley 1437 de 2011, y teniendo en cuenta la autorización expresa otorgada por usted mediante la suscripción del formato GFPI-F-015 “Mi compromiso como Aprendiz SENA”, para recibir a través del correo electrónico registrado en SOFIA Plus las notificaciones de los actos académicos y administrativos que profiera la Entidad, por medio de la presente comunicación se efectúa la notificación personal electrónica de la Resolución No. 68 - {{RESOLUCION}} del {{FECHA RESOLUCIÓN}}, expedida por la Subdirección del Centro Industrial de Mantenimiento Integral, mediante la cual se declara la deserción y se ordena la cancelación de su matrícula en el programa de formación {{PROGRAMA}}, ficha {{FICHA}}.
+
+Para su conocimiento, se transcribe la parte resolutiva del citado acto administrativo:
+
+“RESUELVE:
+
+Artículo 1º. DECLARAR LA DESERCION en el proceso de formación del aprendiz mencionado.
+
+Artículo 2º. ORDENAR LA CANCELACION DEL REGISTRO DE MATRICULA al aprendiz referido en el Artículo 1 de la Resolución, quien no podrá participar en procesos de ingreso a la institución en programas de formación titulada dentro de los seis (06) meses siguientes contados a partir del momento en que el acto administrativo suscrito por el Subdirector quede en firme, ni a programas de formación complementaria hasta por tres (03) meses siguientes, contados a partir del registro de la novedad en el Sistema de Gestión Académica, artículo 47 Acuerdo 009 de 2024.”
+
+Para efectos de la presente notificación, se adjunta copia íntegra, auténtica y gratuita del citado acto administrativo.
+
+Recursos: Contra la referida resolución procede el recurso de reposición ante la Subdirección del Centro Industrial de Mantenimiento Integral y, en subsidio, el recurso de apelación ante la Dirección Regional Santander, los cuales deberán interponerse por escrito dentro de los diez (10) días siguientes a la notificación, de conformidad con el artículo 51 del Acuerdo 009 de 2024 y los artículos 74 y siguientes de la Ley 1437 de 2011.
+
+El recurso podrá presentarse mediante comunicación radicada dirigida a la Subdirección del Centro Industrial de Mantenimiento Integral, a través del correo electrónico deserciones9224@sena.edu.co o por los demás canales institucionales habilitados para la radicación de comunicaciones.
+
+De conformidad con el artículo 56 de la Ley 1437 de 2011, la presente notificación se entenderá surtida a partir de la fecha y hora en que usted acceda a la notificación del acto administrativo, circunstancia que deberá quedar certificada por la Administración e incorporada al respectivo expediente.
+
+Atentamente,
+
+
+
+TATIANA ANDREA VILLAMIZAR JAIMES
+Subdirectora (E)
+Centro Industrial de Mantenimiento Integral
+
+
+
+Vo. Bo. Manuel Enrique Valencia Moreno, Coordinador Académico
+Elaboró. Mónica Gómez Rey, Contratista Coordinación Académica`;
+
+  const OFFICIAL_RESOLUCION_MENOR_TI = `68-9224
+
+
+Girón, {{FECHA_ACTUAL}}
+
+Señor(a) Aprendiz (Menor de Edad)
+{{NOMBRE}} {{APELLIDOS}}
+y a su Representante Legal / Padre de Familia o Acudiente
+{{TIPO}} No. {{DOCUMENTO}} (Tarjeta de Identidad)
+Programa: {{PROGRAMA}}
+Ficha: {{FICHA}}
+Correo electrónico registrado en SOFIA Plus: {{CORREO REGISTRADO EN SOFÍA}}
+
+Asunto: Notificación personal electrónica (Menor de Edad - TI) – Resolución No. 68 - {{RESOLUCION}} del {{FECHA RESOLUCIÓN}}
+
+Cordial saludo.
+
+De conformidad con lo dispuesto en el artículo 51 del Acuerdo 009 de 2024 – Reglamento del Aprendiz SENA, el artículo 56 de la Ley 1437 de 2011 y la Ley 1098 de 2006, y teniendo en cuenta la autorización expresa otorgada mediante la suscripción del formato GFPI-F-015 “Mi compromiso como Aprendiz SENA”, por medio de la presente comunicación se efectúa la notificación personal electrónica al(la) aprendiz identificado(a) con Tarjeta de Identidad ({{TIPO}} No. {{DOCUMENTO}}) y a su Representante Legal / Acudiente, respecto de la Resolución No. 68 - {{RESOLUCION}} del {{FECHA RESOLUCIÓN}}, expedida por la Subdirección del Centro Industrial de Mantenimiento Integral, mediante la cual se declara la deserción y se ordena la cancelación de su matrícula en el programa de formación {{PROGRAMA}}, ficha {{FICHA}}.
+
+Para su conocimiento, se transcribe la parte resolutiva del citado acto administrativo:
+
+“RESUELVE:
+
+Artículo 1º. DECLARAR LA DESERCION en el proceso de formación del aprendiz mencionado.
+
+Artículo 2º. ORDENAR LA CANCELACION DEL REGISTRO DE MATRICULA al aprendiz referido en el Artículo 1 de la Resolución, quien no podrá participar en procesos de ingreso a la institución en programas de formación titulada dentro de los seis (06) meses siguientes contados a partir del momento en que el acto administrativo suscrito por el Subdirector quede en firme, ni a programas de formación complementaria hasta por tres (03) meses siguientes, contados a partir del registro de la novedad en el Sistema de Gestión Académica, artículo 47 Acuerdo 009 de 2024.”
+
+Para efectos de la presente notificación, se adjunta copia íntegra, auténtica y gratuita del citado acto administrativo.
+
+Recursos: Contra la referida resolución procede el recurso de reposición ante la Subdirección del Centro Industrial de Mantenimiento Integral y, en subsidio, el recurso de apelación ante la Dirección Regional Santander, los cuales podrán ser interpuestos por el(la) aprendiz y/o su Representante Legal o Acudiente dentro de los diez (10) días siguientes a la notificación, a través del correo electrónico deserciones9224@sena.edu.co o por los canales institucionales habilitados.
+
+Atentamente,
+
+
+
+TATIANA ANDREA VILLAMIZAR JAIMES
+Subdirectora (E)
+Centro Industrial de Mantenimiento Integral
+
+
+
+Vo. Bo. Manuel Enrique Valencia Moreno, Coordinador Académico
+Elaboró. Mónica Gómez Rey, Contratista Coordinación Académica`;
+
+  const OFFICIAL_NOTIFICACION_APRENDIZ_MAYOR = `68-9224
+
+Girón, {{FECHA_ACTUAL}}
+
+Señor(a)
+{{NOMBRE}} {{APELLIDOS}}
+{{TIPO}} No. {{DOCUMENTO}}
+Programa: {{NIVEL}} - {{PROGRAMA}} ({{TIPO FORMACION}})
+Ficha: {{FICHA}}
+Correo electrónico registrado en SOFIA Plus: {{CORREO REGISTRADO EN SOFÍA}}
+
+Asunto: Notificación al Aprendiz – Proceso de Deserción – Ficha {{FICHA}}
+
+Cordial saludo.
+
+De conformidad con lo dispuesto en el Acuerdo 009 de 2024 – Reglamento del Aprendiz SENA (modificado por el Acuerdo 002 de 2025), me permito notificarle la novedad académica reportada en su proceso de formación por el(la) Instructor(a) {{INSTRUCTOR}} en fecha {{FECHA REPORTE}}, relacionada con las fechas de inasistencia: {{FECHAS_INASISTENCIA}}.
+
+Aprendiz: {{NOMBRE}} {{APELLIDOS}}
+Identificación: {{TIPO}} No. {{DOCUMENTO}}
+Programa de Formación: {{NIVEL}} - {{PROGRAMA}} ({{TIPO FORMACION}})
+Ficha de Caracterización: {{FICHA}}
+
+Atentamente,
+
+
+
+Manuel Enrique Valencia Moreno
+Coordinador Académico - CIMI
+
+Elaboró: Mónica Gómez Rey, Contratista Coordinación Académica`;
+
+  const OFFICIAL_NOTIFICACION_APRENDIZ_MENOR_TI = `68-9224
+
+Girón, {{FECHA_ACTUAL}}
+
+Señor(a) Aprendiz (Menor de Edad)
+{{NOMBRE}} {{APELLIDOS}}
+y a su Representante Legal / Padre de Familia o Acudiente: {{NOMBRE_ACUDIENTE}}
+{{TIPO}} No. {{DOCUMENTO}} (Tarjeta de Identidad)
+Programa: {{NIVEL}} - {{PROGRAMA}} ({{TIPO FORMACION}})
+Ficha: {{FICHA}}
+Correo electrónico registrado en SOFIA Plus: {{CORREO REGISTRADO EN SOFÍA}}
+
+Asunto: Notificación al Aprendiz (Menor de Edad - TI) – Proceso de Deserción – Ficha {{FICHA}}
+
+Cordial saludo.
+
+De conformidad con lo dispuesto en el Acuerdo 009 de 2024 – Reglamento del Aprendiz SENA (modificado por el Acuerdo 002 de 2025) y la Ley 1098 de 2006 (Código de la Infancia y la Adolescencia), me permito notificarles la novedad académica reportada en el proceso de formación por el(la) Instructor(a) {{INSTRUCTOR}} en fecha {{FECHA REPORTE}}, relacionada con las fechas de inasistencia: {{FECHAS_INASISTENCIA}}.
+
+Aprendiz Menor de Edad: {{NOMBRE}} {{APELLIDOS}}
+Identificación: {{TIPO}} No. {{DOCUMENTO}} (Tarjeta de Identidad)
+Programa de Formación: {{NIVEL}} - {{PROGRAMA}} ({{TIPO FORMACION}})
+Ficha de Caracterización: {{FICHA}}
+
+Atentamente,
+
+
+
+Manuel Enrique Valencia Moreno
+Coordinador Académico - CIMI
+
+Elaboró: Mónica Gómez Rey, Contratista Coordinación Académica`;
+
+  // Estados de Plantillas (Mayor de Edad CC y Menor de Edad TI) sincronizados con PostgreSQL y localStorage v2
   const [textoInicialCitacion, setTextoInicialCitacion] = useState(() => {
-    return localStorage.getItem('sena_deserciones_citacion_text') || 
-`Por medio de la presente, se le cita a Comité de Evaluación y Seguimiento de acuerdo con el Reglamento del Aprendiz SENA.
-
-Ficha de Formación: {{ficha}}
-Programa: {{programa}}
-Causal de Deserción: {{causal_desercion}}
-
-Fecha de la Cita: {{fecha_comite}}
-Hora: {{hora_comite}}
-Lugar / Enlace: {{lugar_comite}}
-
-Es indispensable su asistencia para ejercer su derecho a la defensa y presentar los descargos correspondientes.`;
+    return localStorage.getItem('sena_deserciones_citacion_mayor_v2') || OFFICIAL_CITACION_MAYOR;
+  });
+  const [textoInicialCitacionTi, setTextoInicialCitacionTi] = useState(() => {
+    return localStorage.getItem('sena_deserciones_citacion_ti_v2') || OFFICIAL_CITACION_MENOR_TI;
   });
 
   const [textoInicialResolucion, setTextoInicialResolucion] = useState(() => {
-    return localStorage.getItem('sena_deserciones_resolucion_text') || 
-`Por medio de la presente, se le notifica formalmente la emisión de la Resolución de Cancelación de Matrícula por causa de deserción del programa de formación {{programa}} correspondiente a la Ficha No. {{ficha}}.
-
-Se adjunta de manera explícita la Resolución correspondiente a su trámite para su conocimiento y fines legales.
-
-Usted cuenta con los recursos de ley de conformidad con la normatividad institucional SENA.`;
+    return localStorage.getItem('sena_deserciones_resolucion_mayor_v2') || OFFICIAL_RESOLUCION_MAYOR;
+  });
+  const [textoInicialResolucionTi, setTextoInicialResolucionTi] = useState(() => {
+    return localStorage.getItem('sena_deserciones_resolucion_ti_v2') || OFFICIAL_RESOLUCION_MENOR_TI;
   });
 
-  // Estados de Asunto y Descripción del Asunto con Persistencia en localStorage
+  // Estados de la nueva pestaña "Notificación Aprendiz" (guardado predeterminado automático al pegar/editar)
+  const [textoInicialNotifAprendiz, setTextoInicialNotifAprendiz] = useState(() => {
+    return localStorage.getItem('sena_deserciones_notif_aprendiz_mayor_v2') || OFFICIAL_NOTIFICACION_APRENDIZ_MAYOR;
+  });
+  const [textoInicialNotifAprendizTi, setTextoInicialNotifAprendizTi] = useState(() => {
+    return localStorage.getItem('sena_deserciones_notif_aprendiz_ti_v2') || OFFICIAL_NOTIFICACION_APRENDIZ_MENOR_TI;
+  });
+  const [syncNotifAprendizUnicaCarta, setSyncNotifAprendizUnicaCarta] = useState(() => {
+    const saved = localStorage.getItem('sena_deserciones_notif_aprendiz_sync_unica');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [autoSaveBadge, setAutoSaveBadge] = useState('');
+  const templatesLoadedFromServerRef = useRef(false);
+
+  // Estados de Asunto y Descripción del Asunto (Mayor CC y Menor TI)
   const [asuntoCitacion, setAsuntoCitacion] = useState(() => {
-    return localStorage.getItem('sena_deserciones_citacion_asunto') || 'NOVEDADES DE ALUMNOS';
+    return localStorage.getItem('sena_deserciones_citacion_asunto_v2') || 'NOVEDADES DE ALUMNOS';
   });
   const [descripcionAsuntoCitacion, setDescripcionAsuntoCitacion] = useState(() => {
-    return localStorage.getItem('sena_deserciones_citacion_desc_asunto') || 'Citación a Comité';
+    return localStorage.getItem('sena_deserciones_citacion_desc_mayor_v2') || 'Citación a Comité de Evaluación y Seguimiento – Presunta deserción por inasistencias – Ficha {{FICHA}}';
+  });
+  const [descripcionAsuntoCitacionTi, setDescripcionAsuntoCitacionTi] = useState(() => {
+    return localStorage.getItem('sena_deserciones_citacion_desc_ti_v2') || 'Citación a Comité de Evaluación y Seguimiento (Menor de Edad TI) – Presunta deserción – Ficha {{FICHA}}';
   });
 
   const [asuntoResolucion, setAsuntoResolucion] = useState(() => {
-    return localStorage.getItem('sena_deserciones_resolucion_asunto') || 'NOVEDADES DE ALUMNOS';
+    return localStorage.getItem('sena_deserciones_resolucion_asunto_v2') || 'NOVEDADES DE ALUMNOS';
   });
   const [descripcionAsuntoResolucion, setDescripcionAsuntoResolucion] = useState(() => {
-    return localStorage.getItem('sena_deserciones_resolucion_desc_asunto') || 'Notificación';
+    return localStorage.getItem('sena_deserciones_resolucion_desc_mayor_v2') || 'Notificación personal electrónica – Resolución No. 68 - {{RESOLUCION}} del {{FECHA RESOLUCIÓN}}';
+  });
+  const [descripcionAsuntoResolucionTi, setDescripcionAsuntoResolucionTi] = useState(() => {
+    return localStorage.getItem('sena_deserciones_resolucion_desc_ti_v2') || 'Notificación personal electrónica (Menor de Edad TI) – Resolución No. 68 - {{RESOLUCION}} del {{FECHA RESOLUCIÓN}}';
   });
 
-  // Persistir plantillas de texto y asuntos en localStorage cuando cambian
-  useEffect(() => {
-    localStorage.setItem('sena_deserciones_citacion_text', textoInicialCitacion);
-  }, [textoInicialCitacion]);
+  const [asuntoNotifAprendiz, setAsuntoNotifAprendiz] = useState(() => {
+    return localStorage.getItem('sena_deserciones_notif_aprendiz_asunto_v2') || 'NOVEDADES DE ALUMNOS';
+  });
+  const [descripcionAsuntoNotifAprendiz, setDescripcionAsuntoNotifAprendiz] = useState(() => {
+    return localStorage.getItem('sena_deserciones_notif_aprendiz_desc_mayor_v2') || 'Notificación al Aprendiz – Proceso de Deserción – Ficha {{FICHA}}';
+  });
+  const [descripcionAsuntoNotifAprendizTi, setDescripcionAsuntoNotifAprendizTi] = useState(() => {
+    return localStorage.getItem('sena_deserciones_notif_aprendiz_desc_ti_v2') || 'Notificación al Aprendiz (Menor de Edad TI) – Proceso de Deserción – Ficha {{FICHA}}';
+  });
 
-  useEffect(() => {
-    localStorage.setItem('sena_deserciones_resolucion_text', textoInicialResolucion);
-  }, [textoInicialResolucion]);
+  // Parámetros rápidos del Comité (se inyectan automáticamente en {{FECHA_COMITE}}, {{HORA_COMITE}}, {{LUGAR_COMITE}})
+  const [comiteDefaults, setComiteDefaults] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('sena_deserciones_comite_defaults_v2') || 'null');
+      if (saved && saved.fecha_comite) return saved;
+    } catch (e) {}
+    return {
+      fecha_comite: 'Dentro de los cinco (5) días hábiles siguientes al envío de la presente citación',
+      hora_comite: '8:00 a.m. a 12:00 m. / 2:00 p.m. a 4:00 p.m.',
+      lugar_comite: 'Coordinación Académica - Edificio D, Centro Industrial de Mantenimiento Integral CIMI (Km 7 vía Palenque - Rincón de Girón) o al correo deserciones9224@sena.edu.co',
+      causal_desercion: 'POR INASISTENCIAS'
+    };
+  });
 
-  useEffect(() => {
-    localStorage.setItem('sena_deserciones_citacion_asunto', asuntoCitacion);
-  }, [asuntoCitacion]);
-
-  useEffect(() => {
-    localStorage.setItem('sena_deserciones_citacion_desc_asunto', descripcionAsuntoCitacion);
-  }, [descripcionAsuntoCitacion]);
-
-  useEffect(() => {
-    localStorage.setItem('sena_deserciones_resolucion_asunto', asuntoResolucion);
-  }, [asuntoResolucion]);
-
-  useEffect(() => {
-    localStorage.setItem('sena_deserciones_resolucion_desc_asunto', descripcionAsuntoResolucion);
-  }, [descripcionAsuntoResolucion]);
+  // Persistir plantillas v2 en localStorage automáticamente
+  useEffect(() => { localStorage.setItem('sena_deserciones_citacion_mayor_v2', textoInicialCitacion); }, [textoInicialCitacion]);
+  useEffect(() => { localStorage.setItem('sena_deserciones_citacion_ti_v2', textoInicialCitacionTi); }, [textoInicialCitacionTi]);
+  useEffect(() => { localStorage.setItem('sena_deserciones_resolucion_mayor_v2', textoInicialResolucion); }, [textoInicialResolucion]);
+  useEffect(() => { localStorage.setItem('sena_deserciones_resolucion_ti_v2', textoInicialResolucionTi); }, [textoInicialResolucionTi]);
+  useEffect(() => { localStorage.setItem('sena_deserciones_notif_aprendiz_mayor_v2', textoInicialNotifAprendiz); }, [textoInicialNotifAprendiz]);
+  useEffect(() => { localStorage.setItem('sena_deserciones_notif_aprendiz_ti_v2', textoInicialNotifAprendizTi); }, [textoInicialNotifAprendizTi]);
+  useEffect(() => { localStorage.setItem('sena_deserciones_notif_aprendiz_sync_unica', String(syncNotifAprendizUnicaCarta)); }, [syncNotifAprendizUnicaCarta]);
+  useEffect(() => { localStorage.setItem('sena_deserciones_citacion_asunto_v2', asuntoCitacion); }, [asuntoCitacion]);
+  useEffect(() => { localStorage.setItem('sena_deserciones_citacion_desc_mayor_v2', descripcionAsuntoCitacion); }, [descripcionAsuntoCitacion]);
+  useEffect(() => { localStorage.setItem('sena_deserciones_citacion_desc_ti_v2', descripcionAsuntoCitacionTi); }, [descripcionAsuntoCitacionTi]);
+  useEffect(() => { localStorage.setItem('sena_deserciones_resolucion_asunto_v2', asuntoResolucion); }, [asuntoResolucion]);
+  useEffect(() => { localStorage.setItem('sena_deserciones_resolucion_desc_mayor_v2', descripcionAsuntoResolucion); }, [descripcionAsuntoResolucion]);
+  useEffect(() => { localStorage.setItem('sena_deserciones_resolucion_desc_ti_v2', descripcionAsuntoResolucionTi); }, [descripcionAsuntoResolucionTi]);
+  useEffect(() => { localStorage.setItem('sena_deserciones_notif_aprendiz_asunto_v2', asuntoNotifAprendiz); }, [asuntoNotifAprendiz]);
+  useEffect(() => { localStorage.setItem('sena_deserciones_notif_aprendiz_desc_mayor_v2', descripcionAsuntoNotifAprendiz); }, [descripcionAsuntoNotifAprendiz]);
+  useEffect(() => { localStorage.setItem('sena_deserciones_notif_aprendiz_desc_ti_v2', descripcionAsuntoNotifAprendizTi); }, [descripcionAsuntoNotifAprendizTi]);
+  useEffect(() => { localStorage.setItem('sena_deserciones_comite_defaults_v2', JSON.stringify(comiteDefaults)); }, [comiteDefaults]);
 
   // OnBase User & Password Credential States con Persistencia en localStorage & system_settings
   const [onbaseUserCredential, setOnbaseUserCredential] = useState(() => {
@@ -155,27 +456,42 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
   const [selectedOnbaseUser, setSelectedOnbaseUser] = useState(() => {
     return localStorage.getItem('sena_deserciones_default_onbase_user') || 'luepitar';
   });
+  const frequentCimiContacts = [
+    { name: 'Manuel Valencia', email: 'mevalencia@sena.edu.co', roleLabel: 'Coordinador Académico' },
+    { name: 'Monica Gomez', email: 'mlgomez@sena.edu.co', roleLabel: 'Contratista Deserciones' },
+    { name: 'Luis Ernesto Parada Moreno', email: 'leparadam@sena.edu.co', roleLabel: 'Apoyo Gestión Documental' },
+    { name: 'Buzón Deserciones CIMI', email: 'deserciones9224@sena.edu.co', roleLabel: 'Canal Oficial Recursos' }
+  ];
+
   const [ccEmails, setCcEmails] = useState(() => {
     const saved = localStorage.getItem('sena_deserciones_cc_emails');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0 && !parsed.some(p => p.email === 'subdireccion_centro@sena.edu.co')) {
+          return parsed;
+        }
       } catch (e) {
         console.error('Error parseando correos CC de localStorage:', e);
       }
     }
     return [
-      { name: 'Subdirección Centro', email: 'subdireccion_centro@sena.edu.co' },
-      { name: 'Coordinación Académica', email: 'coordinacion_academica@sena.edu.co' }
+      { name: 'Manuel Valencia', email: 'mevalencia@sena.edu.co' },
+      { name: 'Monica Gomez', email: 'mlgomez@sena.edu.co' },
+      { name: 'Luis Ernesto Parada Moreno', email: 'leparadam@sena.edu.co' }
     ];
   });
   const [newCcName, setNewCcName] = useState('');
   const [newCcEmail, setNewCcEmail] = useState('');
 
-  // Estados de Consola en Vivo y Automatización OnBase Web
+  // Estados de Consola en Vivo y Robot Independiente de Deserciones (aislado de Cargue AES)
   const [liveFrame, setLiveFrame] = useState(null);
   const [automationLoading, setAutomationLoading] = useState(false);
+  const [botHasBrowserOpen, setBotHasBrowserOpen] = useState(false);
+  const [botProgress, setBotProgress] = useState({ total: 0, processed: 0, success: 0, errors: 0 });
+  const [useCustomPassword, setUseCustomPassword] = useState(false);
+  const [historicoSearch, setHistoricoSearch] = useState('');
+  const [linkingHistorias, setLinkingHistorias] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [automationError, setAutomationError] = useState(false);
   const [logs, setLogs] = useState([]);
@@ -205,21 +521,28 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
     }
   ];
 
-  // Polling de la Consola en Vivo OnBase Web cuando está ejecutando
+  // Polling del Robot Independiente de Deserciones (/api/deserciones/bot/status — 100% separado de Cargue AES)
   useEffect(() => {
     let interval = null;
-    if (automationLoading) {
+    if (automationLoading || botHasBrowserOpen) {
       interval = setInterval(async () => {
         try {
           const token = localStorage.getItem('token');
           const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
-          const statusRes = await axios.get('/api/automation/status', { headers: authHeaders });
+          const statusRes = await axios.get('/api/deserciones/bot/status', { headers: authHeaders });
           const st = statusRes.data;
+
+          setBotHasBrowserOpen(Boolean(st.hasBrowserOpen));
+          setBotProgress({
+            total: st.totalCasos || 0,
+            processed: st.processedCasos || 0,
+            success: st.successCasos || 0,
+            errors: st.errorCasos || 0
+          });
 
           if (st.logs && st.logs.length > 0) {
             setLogs(st.logs);
 
-            // Calcular el número del paso actual según los logs de OnBase Web
             const logsTxt = st.logs.join(' ');
             if (logsTxt.includes('[PASO 4]')) {
               setCurrentStepIndex(3);
@@ -233,31 +556,34 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
           }
 
           if (st.hasFrame) {
-            const nextSrc = `/api/automation/frame?t=${Date.now()}&token=${token}`;
+            const nextSrc = `/api/deserciones/bot/frame?t=${Date.now()}&token=${token}`;
             const preloadImg = new Image();
             preloadImg.onload = () => {
               setLiveFrame(nextSrc);
             };
             preloadImg.src = nextSrc;
+          } else if (!st.running && !st.hasBrowserOpen) {
+            setLiveFrame(null);
           }
 
-          if (st.completed || st.running === false) {
+          if (automationLoading && (st.completed || st.running === false)) {
             setAutomationLoading(false);
+            fetchHistorico();
           }
-          
+
           if (st.error) {
             setAutomationLoading(false);
             setAutomationError(true);
           }
         } catch (e) {
-          console.error('Error en sondeo de consola en vivo:', e);
+          console.error('Error en sondeo del Robot de Deserciones:', e);
         }
       }, 800);
     }
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [automationLoading]);
+  }, [automationLoading, botHasBrowserOpen]);
 
   // Row Selection & Explicit Attachments per Row
   const [selectedRows, setSelectedRows] = useState({});
@@ -271,54 +597,98 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [detailCaso, setDetailCaso] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [editingAcudienteCasoId, setEditingAcudienteCasoId] = useState(null);
+  const [editAcudienteNombre, setEditAcudienteNombre] = useState('');
+  const [editAcudienteCorreo, setEditAcudienteCorreo] = useState('');
+  const [editAcudienteDocTipo, setEditAcudienteDocTipo] = useState('TI');
+  const [savingAcudienteId, setSavingAcudienteId] = useState(null);
 
-  // Historico & Actions State
+  // Historico, Lotes Masivos & Sincronización de Radicados por Correo State
   const [historico, setHistorico] = useState([]);
+  const [lotes, setLotes] = useState([]);
+  const [selectedLoteId, setSelectedLoteId] = useState('Todos');
   const [statusFilter, setStatusFilter] = useState('Pendiente'); // 'Pendiente' | 'Cargado' | 'Todos'
+  const [historicoDocTypeFilter, setHistoricoDocTypeFilter] = useState('Todos'); // 'Todos' | 'TI' | 'MAYORES' | 'TI_SIN_ACUDIENTE'
+  const [excelDocTypeFilter, setExcelDocTypeFilter] = useState('Todos'); // 'Todos' | 'TI' | 'MAYORES' | 'TI_SIN_ACUDIENTE'
+  const [excelSearch, setExcelSearch] = useState('');
   const [selectedHistoricoRows, setSelectedHistoricoRows] = useState({}); // { [casoId]: boolean }
   const [loadingHistorico, setLoadingHistorico] = useState(false);
   const [processingSave, setProcessingSave] = useState(false);
   const [processingOnBase, setProcessingOnBase] = useState(false);
   const [statusMessage, setStatusMessage] = useState({ type: '', text: '' });
 
-  // Variables estándar SENA por defecto
+  // Estados del Sincronizador de Radicados desde Correo (leparadam@sena.edu.co -> Producidas)
+  const [showEmailSyncModal, setShowEmailSyncModal] = useState(false);
+  const [emailSyncTab, setEmailSyncTab] = useState('robot'); // 'robot' | 'manual'
+  const [emailSyncUser, setEmailSyncUser] = useState('leparadam@sena.edu.co');
+  const [emailSyncPass, setEmailSyncPass] = useState('');
+  const [emailSyncFolder, setEmailSyncFolder] = useState('Producidas');
+  const [emailSyncRunning, setEmailSyncRunning] = useState(false);
+  const [emailSyncStateData, setEmailSyncStateData] = useState({
+    status: 'idle',
+    mfaNumber: null,
+    authPrompt: null,
+    logs: [],
+    stats: { emailsScanned: 0, cpeFound: 0, matchedUpdated: 0, alreadyUpdated: 0, unmatchedCount: 0 },
+    updatedRecords: []
+  });
+  const [emailSyncFrame, setEmailSyncFrame] = useState(null);
+  const [emailSyncBrowserInput, setEmailSyncBrowserInput] = useState('');
+  const [manualEmailText, setManualEmailText] = useState('');
+  const [importingManualEmail, setImportingManualEmail] = useState(false);
+
+  // Variables estándar SENA CIMI listas para insertar con 1 clic
   const standardChips = [
-    '{{aprendiz_nombre}}',
-    '{{aprendiz_doc_tipo}}',
-    '{{aprendiz_doc_numero}}',
-    '{{ficha}}',
-    '{{programa}}',
-    '{{aprendiz_correo}}',
-    '{{causal_desercion}}',
-    '{{fecha_comite}}',
-    '{{hora_comite}}',
-    '{{lugar_comite}}'
+    '{{NOMBRE}}',
+    '{{APELLIDOS}}',
+    '{{TIPO}}',
+    '{{DOCUMENTO}}',
+    '{{CORREO REGISTRADO EN SOFÍA}}',
+    '{{NOMBRE_ACUDIENTE}}',
+    '{{CORREO_ACUDIENTE}}',
+    '{{FICHA}}',
+    '{{NIVEL}}',
+    '{{PROGRAMA}}',
+    '{{TIPO FORMACION}}',
+    '{{INSTRUCTOR}}',
+    '{{FECHA REPORTE}}',
+    '{{FECHAS_INASISTENCIA}}',
+    '{{INASISTENCIA DESDE}}',
+    '{{HASTA}}',
+    '{{ESTADO}}',
+    '{{FECHA_COMITE}}',
+    '{{HORA_COMITE}}',
+    '{{LUGAR_COMITE}}',
+    '{{RESOLUCION}}',
+    '{{FECHA RESOLUCIÓN}}'
   ];
 
-  // Variables disponibles para combinar: dinámicas desde los títulos de columna del Excel cargado
-  const availableChips = columns && columns.length > 0
-    ? Array.from(new Set([...columns.map(col => `{{${col.trim()}}}`), ...standardChips]))
+  // Variables disponibles para combinar: dinámicas desde el Excel cargado (filtrando columnas vacías __EMPTY)
+  const cleanExcelChips = (columns || [])
+    .map(c => String(c || '').trim())
+    .filter(c => c && !/^__EMPTY/i.test(c))
+    .map(c => `{{${c}}}`);
+
+  const availableChips = cleanExcelChips.length > 0
+    ? Array.from(new Set([...cleanExcelChips, ...standardChips]))
     : standardChips;
 
-  // Las 3 opciones de usuarios de OnBase Web para selección directa del robot
+  // Cuentas oficiales OnBase Web (se sincronizan dinámicamente desde organization_structure en el servidor)
   const defaultOnbaseUserOptions = [
     {
       id: 'EDHERNANDEZM',
       username: 'EDHERNANDEZM',
-      full_name: 'EDHERNANDEZM — Formación Profesional & Relaciones (9224.4)',
-      pass: 'Automatizador2026*'
-    },
-    {
-      id: 'JRROZO',
-      username: 'JRROZO',
-      full_name: 'JRROZO — Subdirección de Centro (9224)',
-      pass: 'Colombia2026**'
+      full_name: 'EDHERNANDEZM — Formación Profesional Integral (9224.4)'
     },
     {
       id: 'luepitar',
       username: 'luepitar',
-      full_name: 'luepitar — Administración Educativa (9224.2)',
-      pass: 'Automatizador2026*'
+      full_name: 'luepitar — Administración Educativa (9224.2)'
+    },
+    {
+      id: 'TVILLAMIZARJ',
+      username: 'TVILLAMIZARJ',
+      full_name: 'TVILLAMIZARJ — Subdirección de Centro (9224)'
     }
   ];
 
@@ -327,11 +697,209 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
     return token ? { Authorization: `Bearer ${token}` } : {};
   };
 
-  // Fetch active users for OnBase assignment, Historico & CC Emails on mount
+  const fetchSavedTemplates = async () => {
+    try {
+      const res = await axios.get('/api/deserciones/templates', { headers: getAuthHeaders() });
+      const tpl = res.data?.templates;
+      if (tpl) {
+        if (tpl.citacion_mayor) setTextoInicialCitacion(tpl.citacion_mayor);
+        if (tpl.citacion_menor_ti) setTextoInicialCitacionTi(tpl.citacion_menor_ti);
+        if (tpl.resolucion_mayor) setTextoInicialResolucion(tpl.resolucion_mayor);
+        if (tpl.resolucion_menor_ti) setTextoInicialResolucionTi(tpl.resolucion_menor_ti);
+        if (tpl.notificacion_aprendiz_mayor) setTextoInicialNotifAprendiz(tpl.notificacion_aprendiz_mayor);
+        if (tpl.notificacion_aprendiz_menor_ti) setTextoInicialNotifAprendizTi(tpl.notificacion_aprendiz_menor_ti);
+        if (tpl.asunto_citacion) setAsuntoCitacion(tpl.asunto_citacion);
+        if (tpl.descripcion_asunto_citacion_mayor) setDescripcionAsuntoCitacion(tpl.descripcion_asunto_citacion_mayor);
+        if (tpl.descripcion_asunto_citacion_ti) setDescripcionAsuntoCitacionTi(tpl.descripcion_asunto_citacion_ti);
+        if (tpl.asunto_resolucion) setAsuntoResolucion(tpl.asunto_resolucion);
+        if (tpl.descripcion_asunto_resolucion_mayor) setDescripcionAsuntoResolucion(tpl.descripcion_asunto_resolucion_mayor);
+        if (tpl.descripcion_asunto_resolucion_ti) setDescripcionAsuntoResolucionTi(tpl.descripcion_asunto_resolucion_ti);
+        if (tpl.asunto_notificacion_aprendiz) setAsuntoNotifAprendiz(tpl.asunto_notificacion_aprendiz);
+        if (tpl.descripcion_asunto_notificacion_aprendiz_mayor) setDescripcionAsuntoNotifAprendiz(tpl.descripcion_asunto_notificacion_aprendiz_mayor);
+        if (tpl.descripcion_asunto_notificacion_aprendiz_ti) setDescripcionAsuntoNotifAprendizTi(tpl.descripcion_asunto_notificacion_aprendiz_ti);
+        if (tpl.comite_defaults) setComiteDefaults(prev => ({ ...prev, ...tpl.comite_defaults }));
+      }
+    } catch (e) {
+      console.warn('[DESERCIONES] Usando plantillas locales por defecto:', e.message);
+    } finally {
+      setTimeout(() => { templatesLoadedFromServerRef.current = true; }, 350);
+    }
+  };
+
+  const handleSaveTemplatesToServer = async (silent = false) => {
+    if (!silent) setSavingTemplates(true);
+    try {
+      const payload = {
+        asunto_citacion: asuntoCitacion,
+        descripcion_asunto_citacion_mayor: descripcionAsuntoCitacion,
+        descripcion_asunto_citacion_ti: descripcionAsuntoCitacionTi,
+        citacion_mayor: textoInicialCitacion,
+        citacion_menor_ti: textoInicialCitacionTi,
+        asunto_resolucion: asuntoResolucion,
+        descripcion_asunto_resolucion_mayor: descripcionAsuntoResolucion,
+        descripcion_asunto_resolucion_ti: descripcionAsuntoResolucionTi,
+        resolucion_mayor: textoInicialResolucion,
+        resolucion_menor_ti: textoInicialResolucionTi,
+        asunto_notificacion_aprendiz: asuntoNotifAprendiz,
+        descripcion_asunto_notificacion_aprendiz_mayor: descripcionAsuntoNotifAprendiz,
+        descripcion_asunto_notificacion_aprendiz_ti: descripcionAsuntoNotifAprendizTi,
+        notificacion_aprendiz_mayor: textoInicialNotifAprendiz,
+        notificacion_aprendiz_menor_ti: syncNotifAprendizUnicaCarta ? textoInicialNotifAprendiz : textoInicialNotifAprendizTi,
+        comite_defaults: comiteDefaults
+      };
+      await axios.post('/api/deserciones/templates', { templates: payload }, { headers: getAuthHeaders() });
+      setAutoSaveBadge('✓ Guardada predeterminadamente en el servidor');
+      if (!silent) {
+        setStatusMessage({
+          type: 'success',
+          text: '✅ Plantillas de Citación, Notificación Aprendiz y Resolución guardadas permanentemente como predeterminadas en el servidor.'
+        });
+      }
+    } catch (e) {
+      if (!silent) {
+        setStatusMessage({
+          type: 'error',
+          text: e.response?.data?.error || 'Error al guardar las plantillas en el servidor.'
+        });
+      }
+    } finally {
+      if (!silent) setSavingTemplates(false);
+    }
+  };
+
+  // Auto-guardado automático en servidor cada vez que el usuario pega o edita la carta en "Notificación Aprendiz" (o cualquier plantilla)
+  useEffect(() => {
+    if (!templatesLoadedFromServerRef.current) return;
+    setAutoSaveBadge('⏳ Guardando carta predeterminada...');
+    const timer = setTimeout(() => {
+      handleSaveTemplatesToServer(true);
+    }, 650);
+    return () => clearTimeout(timer);
+  }, [
+    textoInicialNotifAprendiz,
+    textoInicialNotifAprendizTi,
+    asuntoNotifAprendiz,
+    descripcionAsuntoNotifAprendiz,
+    descripcionAsuntoNotifAprendizTi,
+    syncNotifAprendizUnicaCarta,
+    textoInicialCitacion,
+    textoInicialCitacionTi,
+    textoInicialResolucion,
+    textoInicialResolucionTi
+  ]);
+
+  const handleLoadLatestExcel = async (silent = false) => {
+    if (!silent) setUploadingExcel(true);
+    try {
+      const res = await axios.get('/api/deserciones/latest-excel', { headers: getAuthHeaders() });
+      const rows = res.data?.rows || [];
+      if (rows.length > 0) {
+        setExcelData(rows);
+        setColumns(res.data?.columns || []);
+        setExcelFile({
+          name: res.data?.filename || '45 aprendices.xlsx',
+          filepath: res.data?.filepath || ''
+        });
+        const selMap = {};
+        rows.forEach(r => { selMap[r.id_temp] = true; });
+        setSelectedRows(selMap);
+        if (!silent) {
+          setStatusMessage({
+            type: 'success',
+            text: `✅ Excel recargado automáticamente (${rows.length} aprendices: ${res.data.total_mayores || 0} Mayores CC/PPT y ${res.data.total_ti || 0} Menores con Tarjeta de Identidad TI).`
+          });
+        }
+      }
+    } catch (e) {
+      if (!silent) {
+        setStatusMessage({
+          type: 'warning',
+          text: e.response?.data?.error || 'No se encontró un Excel previo en el servidor.'
+        });
+      }
+    } finally {
+      if (!silent) setUploadingExcel(false);
+    }
+  };
+
+  //Combinación en vivo lado a lado en el navegador (instantánea mientras el usuario edita)
+  const computeClientLiveMerge = (tpl, row) => {
+    if (!tpl) return '';
+    if (!row) return tpl;
+    let out = tpl;
+    const rawInasDesde = row.inasistencia_desde || row.raw_row?.['INASISTENCIA DESDE'] || '';
+    const rawInasHasta = row.hasta || row.raw_row?.['HASTA'] || '';
+    const fechasInas = row.fechas_inasistencia || (rawInasDesde && rawInasHasta ? `${rawInasDesde} — ${rawInasHasta}` : (rawInasDesde || rawInasHasta || 'Según reporte adjunto del instructor'));
+
+    const map = {
+      'NOMBRE': row.aprendiz_nombres || row.raw_row?.['NOMBRE'] || row.aprendiz_nombre || '',
+      'NOMBRES': row.aprendiz_nombres || row.raw_row?.['NOMBRE'] || row.aprendiz_nombre || '',
+      'APELLIDOS': row.aprendiz_apellidos || row.raw_row?.['APELLIDOS'] || '',
+      'APRENDIZ_NOMBRE': row.aprendiz_nombre || '',
+      'TIPO': row.aprendiz_doc_tipo || row.raw_row?.['TIPO'] || 'CC',
+      'APRENDIZ_DOC_TIPO': row.aprendiz_doc_tipo || row.raw_row?.['TIPO'] || 'CC',
+      'DOCUMENTO': row.aprendiz_doc_numero || row.raw_row?.['DOCUMENTO'] || '',
+      'APRENDIZ_DOC_NUMERO': row.aprendiz_doc_numero || row.raw_row?.['DOCUMENTO'] || '',
+      'FICHA': row.ficha || row.raw_row?.['FICHA'] || '',
+      'NIVEL': row.nivel || row.raw_row?.['NIVEL'] || 'FORMACIÓN TITULADA',
+      'PROGRAMA': row.programa || row.raw_row?.['PROGRAMA'] || '',
+      'TIPO FORMACION': row.tipo_formacion || row.raw_row?.['TIPO FORMACION'] || 'PRESENCIAL',
+      'CORREO REGISTRADO EN SOFÍA': row.aprendiz_correo || row.raw_row?.['CORREO REGISTRADO EN SOFÍA'] || row.raw_row?.['CORREO REGISTRADO EN SOFIA'] || '',
+      'CORREO REGISTRADO EN SOFIA': row.aprendiz_correo || row.raw_row?.['CORREO REGISTRADO EN SOFÍA'] || row.raw_row?.['CORREO REGISTRADO EN SOFIA'] || '',
+      'APRENDIZ_CORREO': row.aprendiz_correo || '',
+      'ACUDIENTE': row.acudiente_nombre || row.raw_row?.['NOMBRE ACUDIENTE'] || row.raw_row?.['ACUDIENTE'] || 'Representante Legal / Padre de Familia o Acudiente',
+      'NOMBRE_ACUDIENTE': row.acudiente_nombre || row.raw_row?.['NOMBRE ACUDIENTE'] || row.raw_row?.['ACUDIENTE'] || 'Representante Legal / Padre de Familia o Acudiente',
+      'NOMBRE ACUDIENTE': row.acudiente_nombre || row.raw_row?.['NOMBRE ACUDIENTE'] || row.raw_row?.['ACUDIENTE'] || 'Representante Legal / Padre de Familia o Acudiente',
+      'CORREO_ACUDIENTE': row.acudiente_correo || row.raw_row?.['CORREO ACUDIENTE'] || row.raw_row?.['EMAIL ACUDIENTE'] || '',
+      'CORREO ACUDIENTE': row.acudiente_correo || row.raw_row?.['CORREO ACUDIENTE'] || row.raw_row?.['EMAIL ACUDIENTE'] || '',
+      'INSTRUCTOR': row.instructor || row.raw_row?.['INSTRUCTOR'] || 'Instructor de la Ficha',
+      'FECHA REPORTE': row.fecha_reporte || row.raw_row?.['FECHA REPORTE'] || new Date().toLocaleDateString('es-CO'),
+      'ESTADO': row.estado || row.raw_row?.['ESTADO'] || 'MATRICULADO',
+      'INASISTENCIA DESDE': rawInasDesde,
+      'HASTA': rawInasHasta,
+      'FECHAS_INASISTENCIA': fechasInas,
+      'CAUSAL_DESERCION': row.causal_desercion || comiteDefaults.causal_desercion || 'POR INASISTENCIAS',
+      'FECHA_COMITE': row.fecha_comite || comiteDefaults.fecha_comite || '',
+      'HORA_COMITE': row.hora_comite || comiteDefaults.hora_comite || '',
+      'LUGAR_COMITE': row.lugar_comite || comiteDefaults.lugar_comite || '',
+      'RESOLUCION': row.resolucion || row.raw_row?.['RESOLUCION'] || row.raw_row?.['RESOLUCIÓN'] || '',
+      'RESOLUCIÓN': row.resolucion || row.raw_row?.['RESOLUCION'] || row.raw_row?.['RESOLUCIÓN'] || '',
+      'FECHA_ACTUAL': new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })
+    };
+    if (row.raw_row && typeof row.raw_row === 'object') {
+      Object.keys(row.raw_row).forEach(k => {
+        if (map[k.toUpperCase()] === undefined) {
+          map[k.toUpperCase()] = String(row.raw_row[k] ?? '');
+        }
+      });
+    }
+    const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[._-]+/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
+    const normMap = {};
+    Object.keys(map).forEach(k => { normMap[norm(k)] = map[k]; });
+
+    out = out.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (full, tok) => {
+      const nk = norm(tok);
+      return Object.prototype.hasOwnProperty.call(normMap, nk) ? normMap[nk] : full;
+    });
+    return out;
+  };
+
+  // Fetch active users for OnBase assignment, Historico, CC Emails, Saved Templates & Latest Excel on mount
   useEffect(() => {
     fetchUsers();
     fetchHistorico();
     fetchCcEmails();
+    fetchSavedTemplates();
+    handleLoadLatestExcel(true);
+    // Reconectar automáticamente si el Robot de Deserciones ya estaba ejecutando en segundo plano
+    axios.get('/api/deserciones/bot/status', { headers: getAuthHeaders() })
+      .then(res => {
+        const st = res.data || {};
+        if (st.running) setAutomationLoading(true);
+        if (st.hasBrowserOpen) setBotHasBrowserOpen(true);
+        if (Array.isArray(st.logs) && st.logs.length > 0) setLogs(st.logs);
+      })
+      .catch(() => {});
   }, []);
 
   const fetchCcEmails = async () => {
@@ -357,43 +925,40 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
   };
 
   const fetchUsers = async () => {
-    const updatedOptions = defaultOnbaseUserOptions.map(opt => {
-      const customPass = localStorage.getItem(`sena_deserciones_onbase_pass_${opt.username}`);
-      return customPass ? { ...opt, pass: customPass } : opt;
-    });
-    setOnbaseUsers(updatedOptions);
+    let baseOptions = defaultOnbaseUserOptions;
+    try {
+      const res = await axios.get('/api/deserciones/onbase-accounts', { headers: getAuthHeaders() });
+      if (res.data?.accounts?.length > 0) {
+        baseOptions = res.data.accounts;
+      }
+    } catch (e) {}
 
-    const savedUser = localStorage.getItem('sena_deserciones_default_onbase_user') || 'EDHERNANDEZM';
+    setOnbaseUsers(baseOptions);
+
+    let savedUser = localStorage.getItem('sena_deserciones_default_onbase_user') || 'EDHERNANDEZM';
+    if (savedUser.toUpperCase() === 'JRROZO') {
+      const subAcc = baseOptions.find(a => a.depCode === '9224');
+      if (subAcc) savedUser = subAcc.username;
+    }
+
     setSelectedOnbaseUser(savedUser);
     setOnbaseUserCredential(savedUser);
-
-    const foundOpt = updatedOptions.find(u => u.username === savedUser);
-    const savedPass = localStorage.getItem(`sena_deserciones_onbase_pass_${savedUser}`) || 
-                      localStorage.getItem('sena_deserciones_onbase_pass') || 
-                      (foundOpt ? foundOpt.pass : '');
-    if (savedPass) {
-      setOnbasePasswordCredential(savedPass);
-    }
+    setUseCustomPassword(false);
+    setOnbasePasswordCredential('••••••••••••');
   };
 
-  // Guardado de usuario OnBase por defecto
+  // Guardado de usuario OnBase por defecto (usa la credencial oficial de Configuración AES salvo que el usuario guarde una clave personalizada)
   const handleSelectOnbaseUser = (userValue) => {
     setSelectedOnbaseUser(userValue);
     setOnbaseUserCredential(userValue);
-    
-    const foundOpt = onbaseUsers.find(u => u.username === userValue || u.full_name === userValue);
-    const savedPass = localStorage.getItem(`sena_deserciones_onbase_pass_${userValue}`) || 
-                      localStorage.getItem('sena_deserciones_onbase_pass') || 
-                      (foundOpt ? foundOpt.pass : '');
-    if (savedPass) {
-      setOnbasePasswordCredential(savedPass);
-    }
+    setUseCustomPassword(false);
+    setOnbasePasswordCredential('••••••••••••');
 
     localStorage.setItem('sena_deserciones_default_onbase_user', userValue);
     localStorage.setItem('sena_deserciones_onbase_user', userValue);
     setStatusMessage({
       type: 'success',
-      text: `Usuario de OnBase '${userValue}' seleccionado por defecto.`
+      text: `Cuenta oficial de OnBase '${userValue}' seleccionada (credenciales sincronizadas con Configuración AES).`
     });
   };
 
@@ -424,6 +989,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
       ]).catch(e => console.warn('Advertencia guardando en BD settings:', e));
 
       setSelectedOnbaseUser(u);
+      setUseCustomPassword(p !== '••••••••••••');
       setStatusMessage({
         type: 'success',
         text: `Credenciales de OnBase Web para '${u}' guardadas exitosamente para los cargues.`
@@ -436,37 +1002,97 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
     }
   };
 
-  // Iniciar sesión en Vivo en OnBase Web con monitoreo de consola
+  // Detener de verdad el Robot Independiente de Deserciones en el servidor (sin tocar Cargue AES)
+  const handleStopDesercionesBot = async () => {
+    try {
+      await axios.post('/api/deserciones/bot/kill', {}, { headers: getAuthHeaders() });
+      setAutomationLoading(false);
+      setBotHasBrowserOpen(false);
+      setLiveFrame(null);
+      setLogs(prev => [...prev, '[DETENIDO] 🛑 Robot de Deserciones detenido y sesión cerrada limpiamente.']);
+      setStatusMessage({
+        type: 'info',
+        text: 'Robot de Deserciones detenido y sesión de OnBase cerrada correctamente.'
+      });
+      fetchHistorico();
+    } catch (err) {
+      setAutomationLoading(false);
+      setStatusMessage({
+        type: 'error',
+        text: err.response?.data?.error || 'Error al detener el Robot de Deserciones.'
+      });
+    }
+  };
+
+  // Exportar Acta / Reporte Excel de Evidencia de Notificaciones
+  const handleExportarReporteExcel = async () => {
+    try {
+      const res = await axios.get(`/api/deserciones/exportar-reporte?status=${encodeURIComponent(statusFilter)}`, {
+        headers: getAuthHeaders(),
+        responseType: 'blob'
+      });
+      const blobUrl = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.setAttribute('download', `Acta_Evidencia_Deserciones_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Error al descargar el reporte Excel de evidencias.');
+    }
+  };
+
+  // Vincular casos cargados con el Expediente de Historia Académica (68.9224.4-37) para Cargue AES
+  const handleVincularHistorias = async (customIds = null) => {
+    setLinkingHistorias(true);
+    try {
+      const ids = customIds || Object.keys(selectedHistoricoRows).filter(id => selectedHistoricoRows[id]).map(id => parseInt(id, 10));
+      const res = await axios.post('/api/deserciones/vincular-historias', {
+        caso_ids: ids.length > 0 ? ids : undefined
+      }, { headers: getAuthHeaders() });
+      setStatusMessage({
+        type: 'success',
+        text: res.data.message
+      });
+      fetchHistorico();
+    } catch (err) {
+      setStatusMessage({
+        type: 'error',
+        text: err.response?.data?.error || 'Error al vincular con Historias Académicas.'
+      });
+    } finally {
+      setLinkingHistorias(false);
+    }
+  };
+
+  // Iniciar sesión en Vivo en el Robot Independiente de Deserciones (/api/deserciones/bot/execute)
   const handleStartOnBaseLiveSession = async (casoIds = null, opts = null) => {
     setAutomationLoading(true);
     setAutomationError(false);
     setLiveFrame(null);
     setCurrentStepIndex(0);
+    const activeUser = onbaseUserCredential.trim() || selectedOnbaseUser || 'EDHERNANDEZM';
     setLogs([
-      `[ONBASE WEB LIVE] Reiniciando consola y conectando en directo...`,
-      `[CONFIG] Usuario seleccionado por defecto: ${selectedOnbaseUser}`,
-      `[PASO 1] Iniciando navegador y autenticación en OnBase Web...`
+      `[BOT DESERCIONES] 🚀 Conectando al motor independiente de Deserciones (aislado de Cargue AES)...`,
+      `[CONFIG] Cuenta OnBase seleccionada: ${activeUser}`,
+      `[PASO 1] Iniciando navegador dedicado y autenticación en OnBase Web...`
     ]);
 
     try {
       const authHeaders = getAuthHeaders();
-
-      const activeUser = onbaseUserCredential.trim() || selectedOnbaseUser || 'EDHERNANDEZM';
-      const activePass = onbasePasswordCredential.trim() || 'Automatizador2026*';
-
-      const selectedCasosData = (Array.isArray(casoIds) && casoIds.length > 0)
-        ? casoIds.map(id => excelData.find(r => r.id_temp === id || r.id === id)).filter(Boolean)
-        : (excelData && excelData.length > 0 ? excelData : []);
+      const rawPass = onbasePasswordCredential.trim();
+      const isCustomPass = useCustomPassword && rawPass && rawPass !== '••••••••••••';
 
       const payload = {
         url: 'https://onbase.sena.edu.co/AppNet/NavPanel.aspx',
         username: activeUser,
-        password: activePass,
-        action: 'deserciones_onbase_cargue',
+        password: isCustomPass ? rawPass : undefined,
+        use_custom_password: Boolean(isCustomPass),
         target_user: activeUser,
-        caso_ids: casoIds,
-        casos_data: selectedCasosData,
-        force_restart: true
+        caso_ids: Array.isArray(casoIds) && casoIds.length > 0 ? casoIds : undefined,
+        force_restart: false
       };
 
       if (typeof opts === 'number') {
@@ -474,71 +1100,209 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
       } else if (opts && typeof opts === 'object') {
         if (opts.stop_at_step) payload.stop_at_step = opts.stop_at_step;
         if (opts.solo_diligenciar) payload.solo_diligenciar = true;
+        if (opts.retry_errors) payload.retry_errors = true;
+        if (opts.force_restart) payload.force_restart = true;
       }
 
-      await axios.post('/api/automation/execute', payload, { headers: authHeaders });
+      await axios.post('/api/deserciones/bot/execute', payload, { headers: authHeaders });
 
       setStatusMessage({
         type: 'info',
-        text: payload.solo_diligenciar ? 'Consola en vivo conectada. Diligenciando formulario en OnBase sin enviar para inspección...' : 'Consola en vivo conectada. Ejecutando cargue automático completo (Pasos 1 a 4)...'
+        text: payload.solo_diligenciar
+          ? 'Robot de Deserciones conectado. Diligenciando formulario en OnBase SIN enviar para inspección...'
+          : payload.stop_at_step === 3
+          ? 'Robot de Deserciones abriendo formulario en blanco hasta el Paso 3...'
+          : 'Robot independiente de Deserciones iniciado. Ejecutando cargue automático completo (Pasos 1 a 4)...'
       });
     } catch (err) {
-      console.warn('Iniciando simulador interactivo de consola OnBase Web:', err);
-      setTimeout(() => {
-        setCurrentStepIndex(1);
-        setLogs(prev => [...prev, `[PASO 1 OK] Autenticado exitosamente en OnBase Web con el usuario '${selectedOnbaseUser}'`]);
-      }, 2000);
+      setAutomationLoading(false);
+      setAutomationError(true);
+      const errMsg = err.response?.data?.error || err.message || 'Error al iniciar el Robot de Deserciones.';
 
-      setTimeout(() => {
-        setCurrentStepIndex(2);
-        setLogs(prev => [
-          ...prev, 
-          `[PASO 2 OK] Menú Principal / NavPanel cargado en OnBase Web.`
-        ]);
-      }, 4000);
-
-      setTimeout(() => {
-        setCurrentStepIndex(3);
-        setLogs(prev => [
-          ...prev, 
-          `[PASO 3 OK] Clic en icono de cuadrícula (::: / Nuevo formulario) ejecutado.`,
-          `[PASO 3 OK] Categoría "COMUNICACIONES PRODUCIDAS" desplegada.`,
-          `[PASO 3 OK] Clic en "UForm Comunicacion Electronica" completado.`,
-          `[PASO 3 OK] Formulario "SENA - Comunicación Electrónica" abierto y listo para diligenciar.`
-        ]);
-        if (stopAtStep === 3) {
-          setLogs(prev => [...prev, `[EN ESPERA] Robot listo en Paso 3. Formulario preparado para inspección manual.`]);
-          setAutomationLoading(false);
+      // Si el robot ya estaba ocupado (HTTP 409), ofrecer reiniciarlo explícitamente
+      if (err.response?.status === 409) {
+        if (window.confirm(`${errMsg}\n\n¿Desea detener la sesión actual de Deserciones e iniciar este nuevo cargue?`)) {
+          return handleStartOnBaseLiveSession(casoIds, {
+            ...(typeof opts === 'object' && opts ? opts : typeof opts === 'number' ? { stop_at_step: opts } : {}),
+            force_restart: true
+          });
         }
-      }, 6500);
-
-      if (!stopAtStep) {
-        setTimeout(() => {
-          setCurrentStepIndex(4);
-          setLogs(prev => [
-            ...prev,
-            `[PASO 4 OK] 1/8 Nombre Destinatario (Aprendiz Nombres y Apellidos) insertado.`,
-            `[PASO 4 OK] 2/8 Email Destinatario (Correo registrado en Sofía) insertado.`,
-            `[PASO 4 OK] 3/8 Asunto ("NOVEDADES DE ALUMNOS") seleccionado.`,
-            `[PASO 4 OK] 4/8 Descripción del Asunto ("Notificación") ingresada.`,
-            `[PASO 4 OK] 5/8 Texto (Carta Combinada) completado en el cuerpo.`,
-            `[PASO 4 OK] 6/8 Anexo PDF (Resolución) adjuntado.`,
-            `[PASO 4 OK] 7/8 Copias Externas (CC) registradas con Nombre y Correo.`,
-            `[PASO 4 OK] 8/8 Clic en botón "Enviar" ejecutado exitosamente.`,
-            `[DESERCIONES OK] ✅ Caso de deserción radicado y procesado completamente en OnBase Web.`
-          ]);
-          setAutomationLoading(false);
-        }, 10000);
       }
+
+      setLogs(prev => [...prev, `[ERROR] ❌ ${errMsg}`]);
+      setStatusMessage({
+        type: 'error',
+        text: errMsg
+      });
+    }
+  };
+
+  // Sondeo en vivo del Sincronizador de Correo (leparadam@sena.edu.co -> Producidas)
+  useEffect(() => {
+    let timer = null;
+    if (showEmailSyncModal || emailSyncRunning) {
+      const pollEmailSync = async () => {
+        try {
+          const authHeaders = getAuthHeaders();
+          const stRes = await axios.get('/api/deserciones/email-sync/status', { headers: authHeaders });
+          const st = stRes.data || {};
+          setEmailSyncRunning(Boolean(st.isRunning));
+          setEmailSyncStateData({
+            status: st.status || 'idle',
+            hasBrowserOpen: Boolean(st.hasBrowserOpen),
+            hasSavedPassword: Boolean(st.hasSavedPassword),
+            currentUrl: st.currentUrl || '',
+            mfaNumber: st.mfaNumber || null,
+            authPrompt: st.authPrompt || null,
+            logs: Array.isArray(st.logs) ? st.logs : [],
+            stats: st.stats || { emailsScanned: 0, cpeFound: 0, matchedUpdated: 0, alreadyUpdated: 0, unmatchedCount: 0 },
+            updatedRecords: Array.isArray(st.updatedRecords) ? st.updatedRecords : []
+          });
+
+          if (st.isRunning || st.status === 'waiting_auth' || st.hasBrowserOpen) {
+            const frRes = await axios.get('/api/deserciones/email-sync/frame', { headers: authHeaders });
+            if (frRes.data?.frame) setEmailSyncFrame(frRes.data.frame);
+          }
+
+          if (emailSyncRunning && !st.isRunning && (st.status === 'completed' || st.status === 'error')) {
+            setEmailSyncRunning(false);
+            fetchHistorico();
+          }
+        } catch (_) {}
+      };
+      pollEmailSync();
+      timer = setInterval(pollEmailSync, 1200);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [showEmailSyncModal, emailSyncRunning]);
+
+  // Iniciar robot de extracción de Radicados y Fechas desde Outlook 365 (Carpeta Producidas)
+  const handleStartEmailSync = async () => {
+    try {
+      setEmailSyncRunning(true);
+      await axios.post('/api/deserciones/email-sync/execute', {
+        email_user: emailSyncUser.trim() || 'leparadam@sena.edu.co',
+        email_password: emailSyncPass.trim(),
+        folder_name: emailSyncFolder.trim() || 'Producidas',
+        max_emails: 80,
+        force_restart: true
+      }, { headers: getAuthHeaders() });
+    } catch (err) {
+      setEmailSyncRunning(false);
+      alert(err.response?.data?.error || 'Error iniciando sincronización con el correo.');
+    }
+  };
+
+  const handleStopEmailSync = async (closeBrowser = false) => {
+    try {
+      await axios.post('/api/deserciones/email-sync/kill', { close_browser: closeBrowser }, { headers: getAuthHeaders() });
+      setEmailSyncRunning(false);
+      if (closeBrowser) setEmailSyncFrame(null);
+      fetchHistorico();
+    } catch (_) {}
+  };
+
+  const handleSwitchEmailAuthMethod = async (actionType) => {
+    try {
+      const res = await axios.post('/api/deserciones/email-sync/click', { action: actionType }, { headers: getAuthHeaders() });
+      if (res.data?.frame) setEmailSyncFrame(res.data.frame);
+    } catch (_) {}
+  };
+
+  const handleSendTextToEmailBrowser = async () => {
+    if (!emailSyncBrowserInput.trim()) return;
+    try {
+      const res = await axios.post('/api/deserciones/email-sync/send-text', {
+        text: emailSyncBrowserInput.trim(),
+        submit: true,
+        saveAsPassword: true
+      }, { headers: getAuthHeaders() });
+      if (res.data?.frame) setEmailSyncFrame(res.data.frame);
+      setEmailSyncBrowserInput('');
+    } catch (err) {
+      alert(err.response?.data?.error || 'Error enviando texto al navegador de correo.');
+    }
+  };
+
+  const handleEmailBrowserClick = async (e) => {
+    if (!emailSyncRunning && !emailSyncStateData.hasBrowserOpen) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const scaleX = 1366 / rect.width;
+    const scaleY = 860 / rect.height;
+    const x = Math.round((e.clientX - rect.left) * scaleX);
+    const y = Math.round((e.clientY - rect.top) * scaleY);
+    try {
+      const res = await axios.post('/api/deserciones/email-sync/click', { x, y }, { headers: getAuthHeaders() });
+      if (res.data?.frame) setEmailSyncFrame(res.data.frame);
+    } catch (_) {}
+  };
+
+  const handleImportManualEmailText = async () => {
+    if (!manualEmailText.trim()) {
+      alert('Pegue el contenido o tabla de uno o varios correos CPE para extraer los radicados.');
+      return;
+    }
+    setImportingManualEmail(true);
+    try {
+      const res = await axios.post('/api/deserciones/email-sync/import-manual', {
+        raw_text: manualEmailText,
+        overwrite_existing: true
+      }, { headers: getAuthHeaders() });
+      setStatusMessage({ type: 'success', text: res.data.message });
+      setManualEmailText('');
+      fetchHistorico();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Error procesando el texto de los correos.');
+    } finally {
+      setImportingManualEmail(false);
+    }
+  };
+
+  // Exportar Excel IDÉNTICO al archivo subido por cada carga masiva (con Radicado, N.I.S. y Fecha de Notificación)
+  const handleExportarExcelLote = async (loteIdParam = null, modoParam = 'original_completo') => {
+    try {
+      const targetLote = loteIdParam || (selectedLoteId !== 'Todos' ? selectedLoteId : 'ULTIMO');
+      const res = await axios.get(
+        `/api/deserciones/exportar-excel-lote?lote_id=${encodeURIComponent(targetLote)}&modo=${encodeURIComponent(modoParam)}`,
+        {
+          headers: getAuthHeaders(),
+          responseType: 'blob'
+        }
+      );
+      const matchedLote = lotes.find(l => l.lote_id === targetLote) || lotes[0];
+      const baseFileName = matchedLote?.archivo_excel || '45_aprendices.xlsx';
+      const downloadName = `RADICADOS_${baseFileName.replace(/\s+/g, '_')}`;
+
+      const blobUrl = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.setAttribute('download', downloadName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+      setStatusMessage({
+        type: 'success',
+        text: `✅ Archivo Excel "${downloadName}" descargado con la misma estructura del Excel cargado + Radicado, N.I.S. y Fecha.`
+      });
+    } catch (err) {
+      alert(err.response?.data?.error || 'Error al descargar el Excel de la carga masiva.');
     }
   };
 
   const fetchHistorico = async () => {
     setLoadingHistorico(true);
     try {
-      const res = await axios.get('/api/deserciones/casos', { headers: getAuthHeaders() });
+      const [res, lotesRes] = await Promise.all([
+        axios.get('/api/deserciones/casos', { headers: getAuthHeaders() }),
+        axios.get('/api/deserciones/lotes', { headers: getAuthHeaders() }).catch(() => ({ data: { lotes: [] } }))
+      ]);
       const data = res.data?.data || [];
       setHistorico(data);
+      const fetchedLotes = lotesRes.data?.lotes || [];
+      setLotes(fetchedLotes);
       
       // Pre-seleccionar por defecto los casos que están en estado 'Pendiente'
       const initialSel = {};
@@ -574,6 +1338,10 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
 
       setExcelData(res.data.rows || []);
       setColumns(res.data.columns || []);
+      setExcelFile({
+        name: res.data.filename || file.name,
+        filepath: res.data.filepath || ''
+      });
 
       // Seleccionar todas las filas por defecto
       const selMap = {};
@@ -649,73 +1417,76 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
       const uploadedFiles = res.data.files || [];
       const newAttachments = { ...rowAttachments };
       let matchedCount = 0;
+      const unmatchedFiles = [];
+      const ambiguousFiles = [];
+
+      // Emparejamiento estricto con delimitadores exactos para evitar cruzar resoluciones entre aprendices
+      const hasExactToken = (fileBase, token) => {
+        const cleanTok = String(token || '').trim();
+        if (!cleanTok) return false;
+        const escaped = cleanTok.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        // Si es numérico (documento o número de resolución), exigir bordes no numéricos (que '387' NO coincida con '3875' ni '2026' con otro)
+        if (/^\d+$/.test(cleanTok)) {
+          const withoutLeadingZeros = cleanTok.replace(/^0+/, '');
+          const rx = new RegExp(`(?:^|\\D)0*${withoutLeadingZeros || cleanTok}(?:\\D|$)`, 'i');
+          return rx.test(fileBase);
+        }
+        return new RegExp(`(?:^|[^a-z0-9])${escaped}(?:[^a-z0-9]|$)`, 'i').test(fileBase);
+      };
 
       uploadedFiles.forEach(file => {
         const originalFileName = (file.originalName || '').trim();
-        const baseFileName = originalFileName.substring(0, originalFileName.lastIndexOf('.')) || originalFileName;
-        const cleanFileName = baseFileName.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const lastDot = originalFileName.lastIndexOf('.');
+        const baseFileName = lastDot > 0 ? originalFileName.substring(0, lastDot) : originalFileName;
 
-        // Buscar en excelData la fila que coincida por resolución, documento, ficha, nombre o cualquier casilla de la fila
-        const matchedRow = excelData.find(row => {
-          // 1. Verificar coincidencia con cualquier celda del raw_row (ej. Resolución, No. Resolución, etc.)
-          if (row.raw_row && typeof row.raw_row === 'object') {
-            for (const [colKey, cellVal] of Object.entries(row.raw_row)) {
-              if (cellVal === undefined || cellVal === null) continue;
-              const strVal = String(cellVal).trim();
-              if (!strVal || strVal.length < 3) continue;
-
-              const cleanVal = strVal.toLowerCase().replace(/[^a-z0-9]/g, '');
-              if (!cleanVal || cleanVal.length < 3) continue;
-
-              // Coincidencia limpia si el archivo contiene el valor de la celda de resolución o viceversa
-              if (cleanFileName.includes(cleanVal) || cleanVal.includes(cleanFileName)) {
-                return true;
-              }
-
-              // Coincidencia directa insensible a mayúsculas
-              if (baseFileName.toLowerCase().includes(strVal.toLowerCase()) || strVal.toLowerCase().includes(baseFileName.toLowerCase())) {
-                return true;
-              }
-            }
-          }
-
-          // 2. Verificar coincidencia con campos mapeados principales
-          const candidates = [
-            row.resolucion,
-            row.aprendiz_doc_numero,
-            row.ficha,
-            row.aprendiz_nombre
-          ];
-
-          for (const cand of candidates) {
-            if (!cand) continue;
-            const strCand = String(cand).trim();
-            if (!strCand || strCand.length < 3) continue;
-
-            const cleanCand = strCand.toLowerCase().replace(/[^a-z0-9]/g, '');
-            if (cleanCand && cleanCand.length >= 3) {
-              if (cleanFileName.includes(cleanCand) || cleanCand.includes(cleanFileName)) {
-                return true;
-              }
-            }
-          }
-
-          return false;
+        // Prioridad 1: Coincidencia exacta por Número de Documento del Aprendiz (>= 5 dígitos)
+        const docMatches = excelData.filter(row => {
+          const doc = String(row.aprendiz_doc_numero || '').replace(/\D/g, '');
+          return doc.length >= 5 && hasExactToken(baseFileName, doc);
         });
 
-        if (matchedRow) {
-          newAttachments[matchedRow.id_temp] = {
-            name: file.originalName,
-            path: file.path
-          };
+        if (docMatches.length === 1) {
+          newAttachments[docMatches[0].id_temp] = { name: file.originalName, path: file.path };
           matchedCount++;
+          return;
         }
+        if (docMatches.length > 1) {
+          docMatches.forEach(r => {
+            newAttachments[r.id_temp] = { name: file.originalName, path: file.path };
+          });
+          matchedCount++;
+          return;
+        }
+
+        // Prioridad 2: Coincidencia única y exacta por Número de Resolución explícito (>= 3 caracteres, excluyendo años solos como 2025/2026)
+        const resMatches = excelData.filter(row => {
+          const resVal = String(row.resolucion || '').trim();
+          if (!resVal || resVal.length < 3 || /^20\d{2}$/.test(resVal)) return false;
+          return hasExactToken(baseFileName, resVal);
+        });
+
+        if (resMatches.length === 1) {
+          newAttachments[resMatches[0].id_temp] = { name: file.originalName, path: file.path };
+          matchedCount++;
+          return;
+        }
+        if (resMatches.length > 1) {
+          ambiguousFiles.push(originalFileName);
+          return;
+        }
+
+        unmatchedFiles.push(originalFileName);
       });
 
       setRowAttachments(newAttachments);
+      const extraWarn = [
+        unmatchedFiles.length > 0 ? `Sin coincidencia (${unmatchedFiles.length}): ${unmatchedFiles.slice(0, 5).join(', ')}${unmatchedFiles.length > 5 ? '...' : ''}` : '',
+        ambiguousFiles.length > 0 ? `Ambiguos por resolución repetida (${ambiguousFiles.length}): ${ambiguousFiles.slice(0, 4).join(', ')}` : ''
+      ].filter(Boolean).join(' | ');
+
       setStatusMessage({
-        type: 'success',
-        text: `Carga masiva completada: ${uploadedFiles.length} archivos subidos. ${matchedCount} anexos reconocidos y emparejados automáticamente con sus oficios.`
+        type: unmatchedFiles.length > 0 || ambiguousFiles.length > 0 ? 'warning' : 'success',
+        text: `Carga masiva completada: ${matchedCount} de ${uploadedFiles.length} PDF(s) emparejados exactamente por Documento/Resolución.${extraWarn ? ' ⚠️ ' + extraWarn : ''}`
       });
     } catch (err) {
       console.error('Error en carga masiva de anexos:', err);
@@ -728,63 +1499,157 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
     }
   };
 
-  // 3. Insertar Chip de Variable en el Editor de Texto (en la posición actual del cursor)
-  const insertChip = (chipText) => {
-    const textarea = textareaRef.current;
-    const currentText = activeTab === 'citacion' ? textoInicialCitacion : textoInicialResolucion;
+  // Helpers para leer/escribir la plantilla activa según pestaña ('citacion'|'resolucion'|'notificacion_aprendiz') y variante ('mayor'|'menor_ti')
+  const getActiveBodyText = () => {
+    if (activeTab === 'citacion') {
+      return plantillaVariante === 'menor_ti' ? textoInicialCitacionTi : textoInicialCitacion;
+    }
+    if (activeTab === 'notificacion_aprendiz') {
+      if (syncNotifAprendizUnicaCarta) return textoInicialNotifAprendiz;
+      return plantillaVariante === 'menor_ti' ? textoInicialNotifAprendizTi : textoInicialNotifAprendiz;
+    }
+    return plantillaVariante === 'menor_ti' ? textoInicialResolucionTi : textoInicialResolucion;
+  };
 
-    if (!textarea) {
-      if (activeTab === 'citacion') {
-        setTextoInicialCitacion(prev => prev + ' ' + chipText);
+  const setActiveBodyText = (val) => {
+    if (activeTab === 'citacion') {
+      if (plantillaVariante === 'menor_ti') setTextoInicialCitacionTi(val);
+      else setTextoInicialCitacion(val);
+    } else if (activeTab === 'notificacion_aprendiz') {
+      if (syncNotifAprendizUnicaCarta) {
+        setTextoInicialNotifAprendiz(val);
+        setTextoInicialNotifAprendizTi(val);
+      } else if (plantillaVariante === 'menor_ti') {
+        setTextoInicialNotifAprendizTi(val);
       } else {
-        setTextoInicialResolucion(prev => prev + ' ' + chipText);
+        setTextoInicialNotifAprendiz(val);
       }
+    } else {
+      if (plantillaVariante === 'menor_ti') setTextoInicialResolucionTi(val);
+      else setTextoInicialResolucion(val);
+    }
+  };
+
+  const getActiveAsunto = () => {
+    if (activeTab === 'citacion') return asuntoCitacion;
+    if (activeTab === 'notificacion_aprendiz') return asuntoNotifAprendiz;
+    return asuntoResolucion;
+  };
+
+  const setActiveAsunto = (val) => {
+    if (activeTab === 'citacion') setAsuntoCitacion(val);
+    else if (activeTab === 'notificacion_aprendiz') setAsuntoNotifAprendiz(val);
+    else setAsuntoResolucion(val);
+  };
+
+  const getActiveDescAsunto = () => {
+    if (activeTab === 'citacion') {
+      return plantillaVariante === 'menor_ti' ? descripcionAsuntoCitacionTi : descripcionAsuntoCitacion;
+    }
+    if (activeTab === 'notificacion_aprendiz') {
+      if (syncNotifAprendizUnicaCarta) return descripcionAsuntoNotifAprendiz;
+      return plantillaVariante === 'menor_ti' ? descripcionAsuntoNotifAprendizTi : descripcionAsuntoNotifAprendiz;
+    }
+    return plantillaVariante === 'menor_ti' ? descripcionAsuntoResolucionTi : descripcionAsuntoResolucion;
+  };
+
+  const setActiveDescAsunto = (val) => {
+    if (activeTab === 'citacion') {
+      if (plantillaVariante === 'menor_ti') setDescripcionAsuntoCitacionTi(val);
+      else setDescripcionAsuntoCitacion(val);
+    } else if (activeTab === 'notificacion_aprendiz') {
+      if (syncNotifAprendizUnicaCarta) {
+        setDescripcionAsuntoNotifAprendiz(val);
+        setDescripcionAsuntoNotifAprendizTi(val);
+      } else if (plantillaVariante === 'menor_ti') {
+        setDescripcionAsuntoNotifAprendizTi(val);
+      } else {
+        setDescripcionAsuntoNotifAprendiz(val);
+      }
+    } else {
+      if (plantillaVariante === 'menor_ti') setDescripcionAsuntoResolucionTi(val);
+      else setDescripcionAsuntoResolucion(val);
+    }
+  };
+
+  // 3. Insertar Chip de Variable SIN SALTO DE SCROLL (preserva scrollTop exacto y foco en Textarea o Descripción del Asunto)
+  const insertChip = (chipText) => {
+    const isDescTarget = activeInputTarget === 'descripcion_asunto' && descInputRef.current;
+    const targetEl = isDescTarget ? descInputRef.current : textareaRef.current;
+    const currentText = isDescTarget ? getActiveDescAsunto() : getActiveBodyText();
+
+    if (!targetEl) {
+      if (isDescTarget) setActiveDescAsunto(`${currentText} ${chipText}`);
+      else setActiveBodyText(`${currentText} ${chipText}`);
       return;
     }
 
-    const start = textarea.selectionStart !== undefined ? textarea.selectionStart : currentText.length;
-    const end = textarea.selectionEnd !== undefined ? textarea.selectionEnd : currentText.length;
+    const savedScrollTop = targetEl.scrollTop;
+    const savedScrollLeft = targetEl.scrollLeft;
+    const savedWinX = window.scrollX;
+    const savedWinY = window.scrollY;
+
+    const start = typeof targetEl.selectionStart === 'number' ? targetEl.selectionStart : currentText.length;
+    const end = typeof targetEl.selectionEnd === 'number' ? targetEl.selectionEnd : currentText.length;
 
     const newText = currentText.substring(0, start) + chipText + currentText.substring(end);
+    const nextPos = start + chipText.length;
 
-    if (activeTab === 'citacion') {
-      setTextoInicialCitacion(newText);
+    if (isDescTarget) {
+      setActiveDescAsunto(newText);
     } else {
-      setTextoInicialResolucion(newText);
+      setActiveBodyText(newText);
     }
 
-    // Mantener enfoque y mover cursor justo después de la variable insertada
-    setTimeout(() => {
-      textarea.focus();
-      const nextPos = start + chipText.length;
-      textarea.setSelectionRange(nextPos, nextPos);
-    }, 0);
+    requestAnimationFrame(() => {
+      try {
+        targetEl.focus({ preventScroll: true });
+        targetEl.setSelectionRange(nextPos, nextPos);
+        targetEl.scrollTop = savedScrollTop;
+        targetEl.scrollLeft = savedScrollLeft;
+        window.scrollTo(savedWinX, savedWinY);
+      } catch (e) {}
+    });
   };
 
-  // 4. Agregar / Eliminar / Restablecer Correos CC Persistentes
+  // 4. Selección rápida de Correos CC con 1 Clic (sin tener que llenar formulario) + Agregar / Eliminar / Restablecer
+  const handleToggleQuickCc = async (contact) => {
+    const cleanEmail = contact.email.toLowerCase();
+    const exists = ccEmails.some(item => item.email.toLowerCase() === cleanEmail);
+    const updated = exists
+      ? ccEmails.filter(item => item.email.toLowerCase() !== cleanEmail)
+      : [...ccEmails, { name: contact.name, email: contact.email }];
+    await persistCcEmails(updated);
+  };
+
   const handleAddCcEmail = async () => {
     if (!newCcEmail.trim()) {
       setStatusMessage({ type: 'warning', text: 'Por favor ingrese un correo electrónico para la copia CC.' });
       return;
     }
-    const cleanEmail = newCcEmail.trim().toLowerCase();
-    const cleanName = newCcName.trim() || cleanEmail.split('@')[0];
+    const rawParts = newCcEmail.split(/[;,]+/).map(s => s.trim()).filter(Boolean);
+    let updated = [...ccEmails];
+    let addedCount = 0;
 
-    if (!cleanEmail.includes('@') || !cleanEmail.includes('.')) {
-      setStatusMessage({ type: 'warning', text: 'La dirección de correo electrónico no tiene un formato válido.' });
+    for (const part of rawParts) {
+      const cleanEmail = part.toLowerCase();
+      if (!cleanEmail.includes('@') || !cleanEmail.includes('.')) continue;
+      if (updated.some(item => item.email.toLowerCase() === cleanEmail)) continue;
+      const known = frequentCimiContacts.find(c => c.email.toLowerCase() === cleanEmail);
+      const cleanName = newCcName.trim() || known?.name || cleanEmail.split('@')[0].replace(/[._-]+/g, ' ');
+      updated.push({ name: cleanName, email: cleanEmail });
+      addedCount++;
+    }
+
+    if (addedCount === 0) {
+      setStatusMessage({ type: 'warning', text: 'El correo ingresado no es válido o ya está activo en la lista de copias CC.' });
       return;
     }
 
-    if (ccEmails.some(item => item.email.toLowerCase() === cleanEmail)) {
-      setStatusMessage({ type: 'warning', text: 'Este correo electrónico ya se encuentra registrado en la lista de CC.' });
-      return;
-    }
-
-    const updated = [...ccEmails, { name: cleanName, email: cleanEmail }];
     await persistCcEmails(updated);
     setNewCcName('');
     setNewCcEmail('');
-    setStatusMessage({ type: 'success', text: 'Correo en copia (CC) guardado y almacenado correctamente en el sistema.' });
+    setStatusMessage({ type: 'success', text: `✅ ${addedCount} correo(s) en copia (CC) guardado(s) en el sistema.` });
   };
 
   const handleRemoveCcEmail = async (idx) => {
@@ -795,26 +1660,102 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
 
   const handleResetCcEmails = async () => {
     const defaultCc = [
-      { name: 'Subdirección Centro', email: 'subdireccion_centro@sena.edu.co' },
-      { name: 'Coordinación Académica', email: 'coordinacion_academica@sena.edu.co' }
+      { name: 'Manuel Valencia', email: 'mevalencia@sena.edu.co' },
+      { name: 'Monica Gomez', email: 'mlgomez@sena.edu.co' },
+      { name: 'Luis Ernesto Parada Moreno', email: 'leparadam@sena.edu.co' }
     ];
     await persistCcEmails(defaultCc);
-    setStatusMessage({ type: 'info', text: 'Correos CC restablecidos a los valores por defecto del SENA.' });
+    setStatusMessage({ type: 'success', text: '✅ Correos CC restablecidos a los destinatarios oficiales de Deserciones CIMI.' });
   };
 
-  // 5. Vista Previa de Correspondencia Combinada
+  // 5. Vista Previa de Correspondencia Combinada (aplica automáticamente plantilla Mayor CC o Menor TI según documento del aprendiz)
   const handleOpenPreview = async (item) => {
     setPreviewItem(item);
-    const template = activeTab === 'citacion' ? textoInicialCitacion : textoInicialResolucion;
+    const templateMayor = activeTab === 'citacion'
+      ? textoInicialCitacion
+      : activeTab === 'notificacion_aprendiz'
+        ? textoInicialNotifAprendiz
+        : textoInicialResolucion;
+    const templateTi = activeTab === 'citacion'
+      ? textoInicialCitacionTi
+      : activeTab === 'notificacion_aprendiz'
+        ? (syncNotifAprendizUnicaCarta ? textoInicialNotifAprendiz : textoInicialNotifAprendizTi)
+        : textoInicialResolucionTi;
+    const asuntoTpl = activeTab === 'citacion'
+      ? asuntoCitacion
+      : activeTab === 'notificacion_aprendiz'
+        ? asuntoNotifAprendiz
+        : asuntoResolucion;
+    const descMayor = activeTab === 'citacion'
+      ? descripcionAsuntoCitacion
+      : activeTab === 'notificacion_aprendiz'
+        ? descripcionAsuntoNotifAprendiz
+        : descripcionAsuntoResolucion;
+    const descTi = activeTab === 'citacion'
+      ? descripcionAsuntoCitacionTi
+      : activeTab === 'notificacion_aprendiz'
+        ? (syncNotifAprendizUnicaCarta ? descripcionAsuntoNotifAprendiz : descripcionAsuntoNotifAprendizTi)
+        : descripcionAsuntoResolucionTi;
     try {
       const res = await axios.post('/api/deserciones/preview-merge', {
-        template: template,
+        template: templateMayor,
+        template_ti: templateTi,
+        asunto: asuntoTpl,
+        descripcion_asunto: descMayor,
+        descripcion_asunto_ti: descTi,
+        auto_ti_template: autoTiTemplate,
+        comite_defaults: comiteDefaults,
         row: item
       }, { headers: getAuthHeaders() });
-      setPreviewText(res.data.mergedText);
+      const tplLabel = res.data.appliedTemplateType === 'MENOR_TI'
+        ? '👦 PLANTILLA MENOR DE EDAD / TARJETA DE IDENTIDAD (TI)'
+        : '🧑 PLANTILLA MAYOR DE EDAD (CC / CE / PPT)';
+      const headerPreview = `Plantilla Aplicada: ${tplLabel}\nAsunto OnBase: ${res.data.mergedAsunto || asuntoTpl}\nDescripción del Asunto: ${res.data.mergedDescripcionAsunto || descMayor}\n${'─'.repeat(65)}\n\n`;
+      setPreviewText(headerPreview + (res.data.mergedText || ''));
       setShowPreviewModal(true);
     } catch (e) {
       console.error('Error obteniendo vista previa:', e);
+    }
+  };
+
+  // Actualizar en línea datos de Acudiente o Tipo Doc (CC/TI) en la tabla previa del Excel
+  const handleUpdateExcelRowField = (rowIdTemp, field, value) => {
+    setExcelData(prev => prev.map(r => {
+      if (r.id_temp !== rowIdTemp) return r;
+      const updatedRaw = { ...(r.raw_row || {}) };
+      if (field === 'acudiente_nombre') updatedRaw['NOMBRE ACUDIENTE'] = value;
+      if (field === 'acudiente_correo') updatedRaw['CORREO ACUDIENTE'] = value;
+      if (field === 'aprendiz_doc_tipo') updatedRaw['TIPO'] = value;
+      return {
+        ...r,
+        [field]: value,
+        es_menor_ti: field === 'aprendiz_doc_tipo' ? String(value).toUpperCase() === 'TI' : r.es_menor_ti,
+        raw_row: updatedRaw
+      };
+    }));
+  };
+
+  // Guardar Acudiente (y copia independiente en OnBase) en un caso ya existente del Histórico
+  const handleSaveCasoAcudiente = async (casoId) => {
+    setSavingAcudienteId(casoId);
+    try {
+      const res = await axios.put(`/api/deserciones/casos/${casoId}/acudiente`, {
+        acudiente_nombre: editAcudienteNombre,
+        acudiente_correo: editAcudienteCorreo,
+        aprendiz_doc_tipo: editAcudienteDocTipo
+      }, { headers: getAuthHeaders() });
+      if (res.data?.caso) {
+        setHistorico(prev => prev.map(c => c.id === casoId ? res.data.caso : c));
+      }
+      setStatusMessage({
+        type: 'success',
+        text: res.data?.message || 'Acudiente actualizado correctamente para este aprendiz.'
+      });
+      setEditingAcudienteCasoId(null);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Error al guardar los datos del acudiente.');
+    } finally {
+      setSavingAcudienteId(null);
     }
   };
 
@@ -827,14 +1768,103 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
       return;
     }
 
+    const etapaCheck = activeTab === 'citacion'
+      ? 'CITACION_COMITE'
+      : activeTab === 'notificacion_aprendiz'
+        ? 'NOTIFICACION_APRENDIZ'
+        : 'NOTIFICACION_RESOLUCION';
+
+    // Validación Pre-Vuelo 1: Correos inválidos o vacíos
+    const rowsInvalidEmail = rowsToProcess.filter(r => !r.aprendiz_correo || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(r.aprendiz_correo).trim()));
+    if (rowsInvalidEmail.length > 0) {
+      const sampleNames = rowsInvalidEmail.slice(0, 4).map(r => `${r.aprendiz_nombre} (${r.aprendiz_correo || 'SIN CORREO'})`).join(', ');
+      if (!window.confirm(`⚠️ Se detectaron ${rowsInvalidEmail.length} aprendiz(ces) sin correo válido en Sofía Plus:\n${sampleNames}${rowsInvalidEmail.length > 4 ? '...' : ''}\n\n¿Desea guardarlos de todas formas (quedarán retenidos en validación antes de enviar a OnBase)?`)) {
+        return;
+      }
+    }
+
+    // Validación Pre-Vuelo 2: En Notificación de Resolución es obligatorio el PDF adjunto de la resolución
+    if (etapaCheck === 'NOTIFICACION_RESOLUCION') {
+      const missingPdfRows = rowsToProcess.filter(r => !rowAttachments[r.id_temp]?.path);
+      if (missingPdfRows.length > 0) {
+        const sampleMissing = missingPdfRows.slice(0, 4).map(r => `${r.aprendiz_nombre} (${r.aprendiz_doc_numero})`).join(', ');
+        if (!window.confirm(`⚠️ Atención: ${missingPdfRows.length} de ${rowsToProcess.length} aprendiz(ces) en Notificación de Resolución NO tienen PDF de Resolución adjunto:\n${sampleMissing}${missingPdfRows.length > 4 ? '...' : ''}\n\nEl Robot de Deserciones bloqueará el envío de notificaciones sin PDF adjunto. ¿Desea continuar?`)) {
+          return;
+        }
+      }
+    }
+
+    // Validación Pre-Vuelo 3: Alerta de duplicados ya cargados en Histórico (mismo documento + ficha + etapa)
+    const alreadyLoaded = rowsToProcess.filter(r =>
+      historico.some(h =>
+        h.status === 'Cargado' &&
+        h.etapa === etapaCheck &&
+        String(h.aprendiz_doc_numero || '').trim() === String(r.aprendiz_doc_numero || '').trim() &&
+        String(h.ficha || '').trim() === String(r.ficha || '').trim()
+      )
+    );
+    if (alreadyLoaded.length > 0) {
+      const dupList = alreadyLoaded.slice(0, 4).map(r => `${r.aprendiz_nombre} (${r.aprendiz_doc_numero} - Ficha ${r.ficha})`).join('\n');
+      if (!window.confirm(`⚠️ Posible duplicado: ${alreadyLoaded.length} aprendiz(ces) seleccionados YA aparecen como "Cargado" en esta misma etapa y ficha:\n\n${dupList}${alreadyLoaded.length > 4 ? '\n...' : ''}\n\n¿Confirma que desea registrar una nueva comunicación para ellos?`)) {
+        return;
+      }
+    }
+
     setProcessingSave(true);
     setStatusMessage({ 
       type: 'info', 
       text: opts.generatePdf ? 'Generando correspondencias combinadas en PDF...' : 'Guardando campos de formulario y anexos para el Robot OnBase...' 
     });
 
-    const etapa = activeTab === 'citacion' ? 'CITACION_COMITE' : 'NOTIFICACION_RESOLUCION';
-    const textoInicial = activeTab === 'citacion' ? textoInicialCitacion : textoInicialResolucion;
+    // Si el usuario escribió un correo en la casilla de CC pero no oprimió '+ Guardar', incluirlo y guardarlo automáticamente
+    let finalCcEmails = [...ccEmails];
+    if (newCcEmail.trim() && newCcEmail.includes('@')) {
+      const pendingParts = newCcEmail.split(/[;,]+/).map(s => s.trim()).filter(Boolean);
+      for (const p of pendingParts) {
+        const cleanE = p.toLowerCase();
+        if (cleanE.includes('@') && !finalCcEmails.some(item => item.email.toLowerCase() === cleanE)) {
+          const cleanN = newCcName.trim() || cleanE.split('@')[0].replace(/[._-]+/g, ' ');
+          finalCcEmails.push({ name: cleanN, email: cleanE });
+        }
+      }
+      setNewCcName('');
+      setNewCcEmail('');
+      await persistCcEmails(finalCcEmails);
+    }
+
+    // Guardar automáticamente las plantillas (Mayor CC y Menor TI) en el servidor PostgreSQL para que nunca se pierdan
+    await handleSaveTemplatesToServer(true);
+
+    const etapa = activeTab === 'citacion'
+      ? 'CITACION_COMITE'
+      : activeTab === 'notificacion_aprendiz'
+        ? 'NOTIFICACION_APRENDIZ'
+        : 'NOTIFICACION_RESOLUCION';
+    const textoInicialMayor = activeTab === 'citacion'
+      ? textoInicialCitacion
+      : activeTab === 'notificacion_aprendiz'
+        ? textoInicialNotifAprendiz
+        : textoInicialResolucion;
+    const textoInicialMenorTi = activeTab === 'citacion'
+      ? textoInicialCitacionTi
+      : activeTab === 'notificacion_aprendiz'
+        ? (syncNotifAprendizUnicaCarta ? textoInicialNotifAprendiz : textoInicialNotifAprendizTi)
+        : textoInicialResolucionTi;
+    const asuntoForSave = activeTab === 'citacion'
+      ? asuntoCitacion
+      : activeTab === 'notificacion_aprendiz'
+        ? asuntoNotifAprendiz
+        : asuntoResolucion;
+    const descMayor = activeTab === 'citacion'
+      ? descripcionAsuntoCitacion
+      : activeTab === 'notificacion_aprendiz'
+        ? descripcionAsuntoNotifAprendiz
+        : descripcionAsuntoResolucion;
+    const descMenorTi = activeTab === 'citacion'
+      ? descripcionAsuntoCitacionTi
+      : activeTab === 'notificacion_aprendiz'
+        ? (syncNotifAprendizUnicaCarta ? descripcionAsuntoNotifAprendiz : descripcionAsuntoNotifAprendizTi)
+        : descripcionAsuntoResolucionTi;
 
     // Adjuntar las rutas de los anexos explícitos asignados por fila
     const casosConAnexos = rowsToProcess.map(row => ({
@@ -845,13 +1875,20 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
     try {
       const res = await axios.post('/api/deserciones/guardar-casos', {
         etapa: etapa,
-        texto_inicial: textoInicial,
-        asunto: activeTab === 'citacion' ? asuntoCitacion : asuntoResolucion,
-        descripcion_asunto: activeTab === 'citacion' ? descripcionAsuntoCitacion : descripcionAsuntoResolucion,
+        texto_inicial: textoInicialMayor,
+        texto_inicial_ti: textoInicialMenorTi,
+        asunto: asuntoForSave,
+        descripcion_asunto: descMayor,
+        descripcion_asunto_ti: descMenorTi,
+        auto_ti_template: autoTiTemplate,
+        comite_defaults: comiteDefaults,
         casos: casosConAnexos,
         onbase_target_user: selectedOnbaseUser,
-        copy_emails: ccEmails,
-        generate_pdf: opts.generatePdf
+        copy_emails: finalCcEmails,
+        generate_pdf: opts.generatePdf,
+        archivo_excel: excelFile?.name || 'Carga_Masiva.xlsx',
+        archivo_excel_path: excelFile?.filepath || '',
+        excel_columns: columns
       }, { headers: getAuthHeaders() });
 
       setStatusMessage({
@@ -976,24 +2013,46 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
             Gestión masiva de Citaciones a Comité y Notificación de Resoluciones con correspondencia combinada y envío de anexos a OnBase.
           </p>
         </div>
-        <button 
-          onClick={fetchHistorico}
-          style={{ 
-            background: 'rgba(255,255,255,0.2)', 
-            border: '1px solid rgba(255,255,255,0.4)', 
-            color: 'white', 
-            padding: '10px 16px', 
-            borderRadius: '8px', 
-            cursor: 'pointer', 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px',
-            fontWeight: '600',
-            backdropFilter: 'blur(4px)'
-          }}
-        >
-          <RefreshCw size={16} /> Actualizar Datos
-        </button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setShowEmailSyncModal(true)}
+            style={{
+              background: '#fff',
+              border: '2px solid #86efac',
+              color: '#00324d',
+              padding: '10px 18px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontWeight: '800',
+              fontSize: '13.5px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.18)'
+            }}
+          >
+            <Mail size={17} color="#39a900" />
+            Abrir Correo SENA / Extraer Radicados (Producidas)
+          </button>
+          <button 
+            onClick={fetchHistorico}
+            style={{ 
+              background: 'rgba(255,255,255,0.2)', 
+              border: '1px solid rgba(255,255,255,0.4)', 
+              color: 'white', 
+              padding: '10px 16px', 
+              borderRadius: '8px', 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              fontWeight: '600',
+              backdropFilter: 'blur(4px)'
+            }}
+          >
+            <RefreshCw size={16} /> Actualizar Datos
+          </button>
+        </div>
       </div>
 
       {/* Alerta de Estado / Mensajes */}
@@ -1016,7 +2075,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
       )}
 
       {/* Tabs Switcher */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '2px solid #e2e8f0', paddingBottom: '2px' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '2px solid #e2e8f0', paddingBottom: '2px', flexWrap: 'wrap' }}>
         <button 
           onClick={() => setActiveTab('citacion')}
           style={{
@@ -1056,6 +2115,26 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
           <FileText size={18} /> 2. Notificación de Resoluciones
         </button>
         <button 
+          onClick={() => setActiveTab('notificacion_aprendiz')}
+          style={{
+            padding: '12px 24px',
+            borderRadius: '10px 10px 0 0',
+            border: 'none',
+            fontWeight: '700',
+            fontSize: '15px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            background: activeTab === 'notificacion_aprendiz' ? '#39a900' : '#f0fdf4',
+            color: activeTab === 'notificacion_aprendiz' ? '#fff' : '#15803d',
+            borderTop: activeTab === 'notificacion_aprendiz' ? 'none' : '2px solid #86efac',
+            transition: 'all 0.2s'
+          }}
+        >
+          <Mail size={18} /> 3. Notificación Aprendiz
+        </button>
+        <button 
           onClick={() => setActiveTab('historico')}
           style={{
             padding: '12px 24px',
@@ -1072,24 +2151,46 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
             transition: 'all 0.2s'
           }}
         >
-          <Send size={18} /> 3. Histórico y Cargue OnBase ({historico.length})
+          <Send size={18} /> 4. Histórico y Cargue OnBase ({historico.length})
         </button>
       </div>
 
-      {/* PESTAÑA 1 Y 2: VISTA PRINCIPAL DE TRÁMITE */}
-      {(activeTab === 'citacion' || activeTab === 'resolucion') && (
+      {/* PESTAÑA 1, 2 Y 3: VISTA PRINCIPAL DE TRÁMITE */}
+      {(activeTab === 'citacion' || activeTab === 'resolucion' || activeTab === 'notificacion_aprendiz') && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '24px' }}>
           
           {/* Panel Izquierdo: Excel, Editor y Tabla */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             
-            {/* Box 1: Carga de Excel */}
+            {/* Box 1: Carga de Excel con Detección Automática CC vs TI */}
             <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-              <h3 style={{ margin: '0 0 12px 0', color: '#0f172a', fontSize: '17px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Upload size={20} color="#39a900" />
-                1. Cargar Base de Datos desde Excel (.xlsx / .xls)
-              </h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                <h3 style={{ margin: 0, color: '#0f172a', fontSize: '17px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Upload size={20} color="#39a900" />
+                  1. Cargar Base de Datos desde Excel (.xlsx / .xls)
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => handleLoadLatestExcel(false)}
+                  style={{
+                    background: '#f0fdf4',
+                    color: '#15803d',
+                    border: '1px solid #86efac',
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                  title="Recarga automáticamente el último archivo Excel subido al servidor sin tener que buscarlo de nuevo"
+                >
+                  <RefreshCw size={14} /> Recargar último Excel subido
+                </button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                 <input 
                   type="file" 
                   accept=".xlsx, .xls"
@@ -1103,116 +2204,478 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                     background: '#f8fafc',
                     border: '2px dashed #cbd5e1',
                     borderRadius: '10px',
-                    padding: '16px 24px',
+                    padding: '14px 20px',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '12px',
                     flex: 1,
+                    minWidth: '260px',
                     justifyContent: 'center',
                     color: '#475569',
-                    fontWeight: '500'
+                    fontWeight: '600'
                   }}
                 >
                   <FileSpreadsheet size={24} color="#00324d" />
                   {excelFile ? excelFile.name : 'Haz clic aquí para examinar y cargar tu archivo Excel'}
                 </label>
-                {excelData.length > 0 && (
-                  <div style={{ background: '#ecfdf5', color: '#047857', padding: '12px 18px', borderRadius: '8px', fontWeight: '600' }}>
-                    ✓ {excelData.length} Aprendices
-                  </div>
-                )}
+                {excelData.length > 0 && (() => {
+                  const tiCount = excelData.filter(r => String(r.aprendiz_doc_tipo || r.raw_row?.['TIPO'] || 'CC').trim().toUpperCase() === 'TI').length;
+                  const mayorCount = excelData.length - tiCount;
+                  return (
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <div style={{ background: '#ecfdf5', color: '#047857', padding: '10px 14px', borderRadius: '8px', fontWeight: '700', fontSize: '13px', border: '1px solid #a7f3d0' }}>
+                        ✓ {excelData.length} Aprendices
+                      </div>
+                      <div style={{ background: '#eff6ff', color: '#1d4ed8', padding: '10px 12px', borderRadius: '8px', fontWeight: '700', fontSize: '12px', border: '1px solid #bfdbfe' }}>
+                        🧑 {mayorCount} Mayores (CC/PPT)
+                      </div>
+                      <div style={{ background: '#f5f3ff', color: '#6d28d9', padding: '10px 12px', borderRadius: '8px', fontWeight: '700', fontSize: '12px', border: '1px solid #ddd6fe' }}>
+                        👦 {tiCount} Menores T.I. (TI)
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
-            {/* Box 2: Editor de Texto Inicial y Combinación de Campos */}
+            {/* Box 2: Editor Inteligente de Plantillas (Mayor de Edad CC vs Menor de Edad / Tarjeta de Identidad TI) */}
             <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
                 <h3 style={{ margin: 0, color: '#0f172a', fontSize: '17px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <FileText size={20} color="#39a900" />
-                  2. Redactar Texto Inicial y Combinar Campos
+                  2. Plantillas Oficiales Pre-Combinadas (Mayor de Edad CC y Menor de Edad / Tarjeta de Identidad TI)
                 </h3>
-                <span style={{ fontSize: '12px', background: '#ecfdf5', color: '#047857', padding: '4px 10px', borderRadius: '6px', fontWeight: '600', border: '1px solid #a7f3d0' }}>
-                  ✓ Plantilla Almacenada
-                </span>
-              </div>
-              
-              <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#64748b' }}>
-                Haz clic en cualquier etiqueta/chip para insertar la variable {columns.length > 0 ? 'extraída del Excel cargado' : 'estándar SENA'} en la plantilla:
-              </p>
-
-              {/* Chips de variables (Campos de Excel de los títulos de cada columna) */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px', maxHeight: '120px', overflowY: 'auto', padding: '6px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                {availableChips.map(chip => (
-                  <button 
-                    key={chip}
-                    onClick={() => insertChip(chip)}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowLiveSplitPreview(prev => !prev)}
                     style={{
-                      background: '#e0f2fe',
-                      color: '#0369a1',
+                      background: showLiveSplitPreview ? '#0284c7' : '#f1f5f9',
+                      color: showLiveSplitPreview ? '#fff' : '#334155',
                       border: '1px solid #bae6fd',
-                      padding: '5px 12px',
-                      borderRadius: '6px',
+                      padding: '6px 12px',
+                      borderRadius: '8px',
                       fontSize: '12px',
-                      fontWeight: '600',
+                      fontWeight: '700',
                       cursor: 'pointer',
-                      transition: 'all 0.15s ease'
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px'
                     }}
-                    title={`Haga clic para insertar la variable ${chip}`}
                   >
-                    + {chip}
+                    <Eye size={14} /> {showLiveSplitPreview ? 'Ocultar Vista Previa en Vivo' : 'Ver Carta Combinada en Vivo'}
                   </button>
-                ))}
+
+                  <button
+                    type="button"
+                    onClick={() => handleSaveTemplatesToServer(false)}
+                    disabled={savingTemplates}
+                    style={{
+                      background: '#39a900',
+                      color: '#fff',
+                      border: 'none',
+                      padding: '6px 14px',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      boxShadow: '0 2px 6px rgba(57,169,0,0.25)'
+                    }}
+                  >
+                    <CheckCircle2 size={14} /> {savingTemplates ? 'Guardando...' : '💾 Guardar Plantillas en el Sistema'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!window.confirm('¿Desea restaurar la plantilla actual al texto oficial SENA CIMI pre-combinado por defecto?')) return;
+                      if (activeTab === 'citacion') {
+                        if (plantillaVariante === 'menor_ti') {
+                          setTextoInicialCitacionTi(OFFICIAL_CITACION_MENOR_TI);
+                          setDescripcionAsuntoCitacionTi('Citación a Comité de Evaluación y Seguimiento (Menor de Edad TI) – Presunta deserción – Ficha {{FICHA}}');
+                        } else {
+                          setTextoInicialCitacion(OFFICIAL_CITACION_MAYOR);
+                          setDescripcionAsuntoCitacion('Citación a Comité de Evaluación y Seguimiento – Presunta deserción por inasistencias – Ficha {{FICHA}}');
+                        }
+                      } else if (activeTab === 'notificacion_aprendiz') {
+                        if (syncNotifAprendizUnicaCarta) {
+                          setTextoInicialNotifAprendiz(OFFICIAL_NOTIFICACION_APRENDIZ_MAYOR);
+                          setTextoInicialNotifAprendizTi(OFFICIAL_NOTIFICACION_APRENDIZ_MAYOR);
+                          setDescripcionAsuntoNotifAprendiz('Notificación al Aprendiz – Proceso de Deserción – Ficha {{FICHA}}');
+                          setDescripcionAsuntoNotifAprendizTi('Notificación al Aprendiz – Proceso de Deserción – Ficha {{FICHA}}');
+                        } else if (plantillaVariante === 'menor_ti') {
+                          setTextoInicialNotifAprendizTi(OFFICIAL_NOTIFICACION_APRENDIZ_MENOR_TI);
+                          setDescripcionAsuntoNotifAprendizTi('Notificación al Aprendiz (Menor de Edad TI) – Proceso de Deserción – Ficha {{FICHA}}');
+                        } else {
+                          setTextoInicialNotifAprendiz(OFFICIAL_NOTIFICACION_APRENDIZ_MAYOR);
+                          setDescripcionAsuntoNotifAprendiz('Notificación al Aprendiz – Proceso de Deserción – Ficha {{FICHA}}');
+                        }
+                      } else {
+                        if (plantillaVariante === 'menor_ti') {
+                          setTextoInicialResolucionTi(OFFICIAL_RESOLUCION_MENOR_TI);
+                        } else {
+                          setTextoInicialResolucion(OFFICIAL_RESOLUCION_MAYOR);
+                        }
+                      }
+                    }}
+                    style={{
+                      background: '#f8fafc',
+                      color: '#475569',
+                      border: '1px solid #cbd5e1',
+                      padding: '6px 10px',
+                      borderRadius: '8px',
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                    title="Restaura el texto oficial SENA con todas las etiquetas ya combinadas"
+                  >
+                    ↺ Restaurar Oficial
+                  </button>
+                </div>
               </div>
+
+              {activeTab === 'notificacion_aprendiz' && (
+                <div style={{
+                  background: '#ecfdf5',
+                  border: '1px solid #86efac',
+                  borderRadius: '10px',
+                  padding: '10px 14px',
+                  marginBottom: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '10px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#166534', fontWeight: '700' }}>
+                    <CheckCircle2 size={16} color="#15803d" />
+                    <span>
+                      <strong>Notificación Aprendiz (Envíos de Deserción):</strong> Cualquier carta que pegue o edite aquí se guarda <strong>automáticamente como predeterminada</strong> en el servidor.
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '700', color: '#0f172a', cursor: 'pointer', background: '#fff', padding: '5px 10px', borderRadius: '6px', border: '1px solid #86efac' }}>
+                      <input
+                        type="checkbox"
+                        checked={syncNotifAprendizUnicaCarta}
+                        onChange={(e) => setSyncNotifAprendizUnicaCarta(e.target.checked)}
+                        style={{ accentColor: '#39a900', width: '15px', height: '15px' }}
+                      />
+                      <span>Usar la misma carta pegada para todos (CC y TI)</span>
+                    </label>
+                    {autoSaveBadge && (
+                      <span style={{ fontSize: '11.5px', fontWeight: '800', color: '#15803d', background: '#dcfce7', padding: '4px 10px', borderRadius: '999px', border: '1px solid #86efac' }}>
+                        {autoSaveBadge}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Selector de Variante: Mayor de Edad (CC) vs Menor de Edad / Tarjeta de Identidad (TI) + Switch Automático */}
+              <div style={{
+                background: 'linear-gradient(90deg, #f0fdf4 0%, #f5f3ff 100%)',
+                border: '1px solid #cbd5e1',
+                borderRadius: '10px',
+                padding: '12px 14px',
+                marginBottom: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '10px'
+              }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPlantillaVariante('mayor');
+                      const firstMayorIdx = excelData.findIndex(r => String(r.aprendiz_doc_tipo || r.raw_row?.['TIPO'] || 'CC').trim().toUpperCase() !== 'TI');
+                      if (firstMayorIdx >= 0) setLivePreviewRowIdx(firstMayorIdx);
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      border: plantillaVariante === 'mayor' ? '2px solid #00324d' : '1px solid #cbd5e1',
+                      background: plantillaVariante === 'mayor' ? '#00324d' : '#fff',
+                      color: plantillaVariante === 'mayor' ? '#fff' : '#334155',
+                      fontWeight: '700',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    🧑 Texto Mayor de Edad (CC / CE / PPT)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPlantillaVariante('menor_ti');
+                      const firstTiIdx = excelData.findIndex(r => String(r.aprendiz_doc_tipo || r.raw_row?.['TIPO'] || 'CC').trim().toUpperCase() === 'TI');
+                      if (firstTiIdx >= 0) setLivePreviewRowIdx(firstTiIdx);
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      border: plantillaVariante === 'menor_ti' ? '2px solid #6d28d9' : '1px solid #cbd5e1',
+                      background: plantillaVariante === 'menor_ti' ? '#6d28d9' : '#fff',
+                      color: plantillaVariante === 'menor_ti' ? '#fff' : '#334155',
+                      fontWeight: '700',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    👦 Texto Menor de Edad / Tarjeta de Identidad (TI)
+                  </button>
+                </div>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: '700', color: '#0f172a', cursor: 'pointer', background: '#fff', padding: '6px 12px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                  <input
+                    type="checkbox"
+                    checked={autoTiTemplate}
+                    onChange={(e) => setAutoTiTemplate(e.target.checked)}
+                    style={{ width: '16px', height: '16px', accentColor: '#39a900' }}
+                  />
+                  <span>⚡ Aplicar automáticamente según <strong>TIPO</strong> del Excel (<strong>CC</strong> → Mayor | <strong>TI</strong> → Menor de Edad)</span>
+                </label>
+              </div>
+
+              {/* Parámetros Rápidos de Citación a Comité / Notificación Aprendiz (Sin tener que buscar dentro del texto largo) */}
+              {(activeTab === 'citacion' || activeTab === 'notificacion_aprendiz') && (
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px 14px', marginBottom: '14px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: '700', color: '#00324d', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Calendar size={14} color="#39a900" />
+                    Datos Rápidos de la Citación a Comité (Se combinan solos en todas las cartas si el Excel no trae estas columnas):
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.4fr', gap: '10px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#475569', marginBottom: '3px' }}>
+                        Fecha de Comité / Plazo ({'{{FECHA_COMITE}}'}):
+                      </label>
+                      <input
+                        type="text"
+                        value={comiteDefaults.fecha_comite}
+                        onChange={(e) => setComiteDefaults(prev => ({ ...prev, fecha_comite: e.target.value }))}
+                        style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#475569', marginBottom: '3px' }}>
+                        Hora de Atención / Comité ({'{{HORA_COMITE}}'}):
+                      </label>
+                      <input
+                        type="text"
+                        value={comiteDefaults.hora_comite}
+                        onChange={(e) => setComiteDefaults(prev => ({ ...prev, hora_comite: e.target.value }))}
+                        style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#475569', marginBottom: '3px' }}>
+                        Lugar / Canal de Descargos ({'{{LUGAR_COMITE}}'}):
+                      </label>
+                      <input
+                        type="text"
+                        value={comiteDefaults.lugar_comite}
+                        onChange={(e) => setComiteDefaults(prev => ({ ...prev, lugar_comite: e.target.value }))}
+                        style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Casillas de Asunto y Descripción del Asunto (Campos de OnBase Web) */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px', background: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '14px', marginBottom: '12px', background: '#f8fafc', padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0f172a', marginBottom: '6px' }}>
-                    Asunto: <span style={{ color: '#ef4444' }}>*</span>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#0f172a', marginBottom: '4px' }}>
+                    Asunto OnBase: <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input 
                     type="text" 
-                    value={activeTab === 'citacion' ? asuntoCitacion : asuntoResolucion}
-                    onChange={(e) => activeTab === 'citacion' ? setAsuntoCitacion(e.target.value) : setAsuntoResolucion(e.target.value)}
+                    value={getActiveAsunto()}
+                    onChange={(e) => setActiveAsunto(e.target.value)}
                     placeholder="NOVEDADES DE ALUMNOS"
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: '600', color: '#00324d', background: '#fff', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: '600', color: '#00324d', background: '#fff', boxSizing: 'border-box' }}
                   />
-                  <span style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', display: 'block' }}>Selección / Asunto para el formulario OnBase Web</span>
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#0f172a', marginBottom: '6px' }}>
-                    Descripción del Asunto: <span style={{ color: '#ef4444' }}>*</span>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#0f172a', marginBottom: '4px' }}>
+                    Descripción del Asunto ({plantillaVariante === 'menor_ti' ? 'Menor T.I.' : 'Mayor CC'}): <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input 
+                    ref={descInputRef}
                     type="text" 
-                    value={activeTab === 'citacion' ? descripcionAsuntoCitacion : descripcionAsuntoResolucion}
-                    onChange={(e) => activeTab === 'citacion' ? setDescripcionAsuntoCitacion(e.target.value) : setDescripcionAsuntoResolucion(e.target.value)}
-                    placeholder="Notificación"
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: '600', color: '#00324d', background: '#fff', boxSizing: 'border-box' }}
+                    value={getActiveDescAsunto()}
+                    onFocus={() => setActiveInputTarget('descripcion_asunto')}
+                    onChange={(e) => setActiveDescAsunto(e.target.value)}
+                    placeholder="Citación a Comité de Evaluación y Seguimiento"
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: '600', color: '#00324d', background: '#fff', boxSizing: 'border-box' }}
                   />
-                  <span style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', display: 'block' }}>Texto para la casilla "Descripción del Asunto" en OnBase Web</span>
                 </div>
               </div>
 
-              <textarea 
-                ref={textareaRef}
-                rows={8}
-                value={activeTab === 'citacion' ? textoInicialCitacion : textoInicialResolucion}
-                onChange={(e) => activeTab === 'citacion' ? setTextoInicialCitacion(e.target.value) : setTextoInicialResolucion(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '14px',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '14px',
-                  lineHeight: '1.6',
-                  fontFamily: 'inherit',
-                  boxSizing: 'border-box'
-                }}
-                placeholder="Escriba aquí el texto inicial de la comunicación..."
-              />
+              {/* Barra Fija (Sticky) de Chips de Variables — con onMouseDown preventDefault para que NUNCA salte el scroll */}
+              <div style={{
+                position: 'sticky',
+                top: '6px',
+                zIndex: 15,
+                background: '#ffffff',
+                padding: '8px 10px',
+                borderRadius: '8px',
+                border: '1px solid #bae6fd',
+                boxShadow: '0 2px 8px rgba(2,132,199,0.08)',
+                marginBottom: '12px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: '#0369a1' }}>
+                    📌 Insertar Variable en {activeInputTarget === 'descripcion_asunto' ? '"Descripción del Asunto"' : 'el Cuerpo de la Carta'} (No mueve la pantalla):
+                  </span>
+                  <span style={{ fontSize: '11px', color: '#047857', fontWeight: '600' }}>
+                    ✓ Las variables ya vienen combinadas en la plantilla oficial
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', maxHeight: '86px', overflowY: 'auto' }}>
+                  {availableChips.map(chip => (
+                    <button 
+                      key={chip}
+                      type="button"
+                      onMouseDown={(e) => {
+                        // CRÍTICO: Evita que el textarea pierda el foco y evita que el navegador salte hacia arriba al insertar
+                        e.preventDefault();
+                      }}
+                      onClick={() => insertChip(chip)}
+                      style={{
+                        background: '#e0f2fe',
+                        color: '#0369a1',
+                        border: '1px solid #bae6fd',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                      title={`Insertar ${chip} exactamente donde está el cursor sin mover el texto`}
+                    >
+                      + {chip}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Área Principal: Editor de Plantilla (Izquierda) + Vista Previa Combinada en Vivo (Derecha) */}
+              <div style={{ display: 'grid', gridTemplateColumns: showLiveSplitPreview ? '1fr 1fr' : '1fr', gap: '14px', alignItems: ' stretch' }}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ fontSize: '12px', fontWeight: '700', color: plantillaVariante === 'menor_ti' ? '#6d28d9' : '#00324d', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>
+                      ✏️ Editando Plantilla: {plantillaVariante === 'menor_ti' ? '👦 MENOR DE EDAD / TARJETA DE IDENTIDAD (TI)' : '🧑 MAYOR DE EDAD (CC / CE / PPT)'}
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#64748b' }}>Scroll fijo garantizado</span>
+                  </div>
+                  <textarea 
+                    ref={textareaRef}
+                    rows={18}
+                    value={getActiveBodyText()}
+                    onFocus={() => setActiveInputTarget('body')}
+                    onChange={(e) => setActiveBodyText(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '14px',
+                      borderRadius: '8px',
+                      border: plantillaVariante === 'menor_ti' ? '2px solid #c4b5fd' : '2px solid #cbd5e1',
+                      fontSize: '13px',
+                      lineHeight: '1.55',
+                      fontFamily: 'inherit',
+                      boxSizing: 'border-box',
+                      resize: 'vertical',
+                      minHeight: '390px'
+                    }}
+                    placeholder="Escriba aquí el texto inicial de la comunicación..."
+                  />
+                </div>
+
+                {showLiveSplitPreview && (
+                  <div style={{ display: 'flex', flexDirection: 'column', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '12px', fontWeight: '700', color: '#15803d' }}>
+                        👁️ Vista Previa Combinada en Vivo:
+                      </span>
+                      {excelData.length > 0 && (
+                        <select
+                          value={livePreviewRowIdx}
+                          onChange={(e) => {
+                            const idx = Number(e.target.value);
+                            setLivePreviewRowIdx(idx);
+                            const r = excelData[idx];
+                            if (r && autoTiTemplate) {
+                              const isTi = String(r.aprendiz_doc_tipo || r.raw_row?.['TIPO'] || 'CC').trim().toUpperCase() === 'TI';
+                              setPlantillaVariante(isTi ? 'menor_ti' : 'mayor');
+                            }
+                          }}
+                          style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '11px', fontWeight: '700', maxWidth: '240px', background: '#fff' }}
+                        >
+                          {excelData.map((r, idx) => {
+                            const td = String(r.aprendiz_doc_tipo || r.raw_row?.['TIPO'] || 'CC').trim().toUpperCase();
+                            return (
+                              <option key={r.id_temp || idx} value={idx}>
+                                #{idx + 1} [{td}] {r.aprendiz_nombre}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      )}
+                    </div>
+                    <div style={{
+                      flex: 1,
+                      background: '#fff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      padding: '12px',
+                      fontSize: '12.5px',
+                      lineHeight: '1.55',
+                      color: '#1e293b',
+                      whiteSpace: 'pre-wrap',
+                      overflowY: 'auto',
+                      maxHeight: '390px'
+                    }}>
+                      {(() => {
+                        const sampleRow = excelData[livePreviewRowIdx] || excelData[0] || {
+                          aprendiz_nombres: 'ROBINSON SANTIAGO',
+                          aprendiz_apellidos: 'BAEZ ARDILA',
+                          aprendiz_nombre: 'ROBINSON SANTIAGO BAEZ ARDILA',
+                          aprendiz_doc_tipo: plantillaVariante === 'menor_ti' ? 'TI' : 'CC',
+                          aprendiz_doc_numero: '1095792219',
+                          ficha: '3491175',
+                          nivel: 'TÉCNICO',
+                          programa: 'MANTENIMIENTO DE LOS MOTORES DIESEL',
+                          tipo_formacion: 'PRESENCIAL',
+                          aprendiz_correo: 'santiagobaez797@gmail.com',
+                          instructor: 'Orlando Santos Serrano',
+                          fecha_reporte: '06/10/2026',
+                          fechas_inasistencia: '22/07/2026 al 29 de julio — 3 al 31 de agosto',
+                          estado: 'MATRICULADO',
+                          resolucion: '03875'
+                        };
+                        const mergedDesc = computeClientLiveMerge(getActiveDescAsunto(), sampleRow);
+                        const mergedBody = computeClientLiveMerge(getActiveBodyText(), sampleRow);
+                        return `📌 Descripción Asunto OnBase:\n${mergedDesc}\n${'─'.repeat(48)}\n\n${mergedBody}`;
+                      })()}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Box 3: Tabla de Aprendices y Anexos Explícitos / Masivos */}
@@ -1220,7 +2683,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
                 <h3 style={{ margin: 0, color: '#0f172a', fontSize: '17px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Paperclip size={20} color="#39a900" />
-                  3. Tabla Combinada y Anexo Explícito por Aprendiz ({activeTab === 'citacion' ? 'Anexo del Comité' : 'Anexo de Resolución'})
+                  3. Tabla Combinada y Anexo Explícito por Aprendiz ({activeTab === 'citacion' ? 'Anexo del Comité' : activeTab === 'notificacion_aprendiz' ? 'Notificación Aprendiz' : 'Anexo de Resolución'})
                 </h3>
 
                 {/* Botón de Cargue Masivo de Paquete de Anexos */}
@@ -1259,6 +2722,23 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
               ) : (
                 <div style={{ overflowX: 'auto' }}>
                   {(() => {
+                    const isRowTi = (r) => ['TI', 'T.I.', 'TARJETA DE IDENTIDAD'].includes(String(r.aprendiz_doc_tipo || r.raw_row?.['TIPO'] || r.raw_row?.['TIPO_DOC'] || '').trim().toUpperCase());
+                    const countExcelTi = excelData.filter(isRowTi).length;
+                    const countExcelMayores = excelData.length - countExcelTi;
+                    const countExcelTiSinAcudiente = excelData.filter(r => isRowTi(r) && !String(r.acudiente_correo || '').trim()).length;
+
+                    const filteredExcelRows = excelData.filter(r => {
+                      if (excelDocTypeFilter === 'TI' && !isRowTi(r)) return false;
+                      if (excelDocTypeFilter === 'MAYORES' && isRowTi(r)) return false;
+                      if (excelDocTypeFilter === 'TI_SIN_ACUDIENTE' && (!isRowTi(r) || String(r.acudiente_correo || '').trim())) return false;
+                      if (excelSearch.trim()) {
+                        const q = excelSearch.trim().toLowerCase();
+                        const hay = `${r.aprendiz_nombre || ''} ${r.aprendiz_doc_tipo || ''} ${r.aprendiz_doc_numero || ''} ${r.ficha || ''} ${r.aprendiz_correo || ''} ${r.acudiente_nombre || ''} ${r.acudiente_correo || ''} ${r.programa || ''}`.toLowerCase();
+                        if (!hay.includes(q)) return false;
+                      }
+                      return true;
+                    });
+
                     const incompleteCount = excelData.filter(r => {
                       const fn = (r.aprendiz_nombre || '').trim();
                       const doc = (r.aprendiz_doc_numero || '').trim();
@@ -1266,72 +2746,223 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                       return !fn || fn === 'N/A' || !doc || !mail || mail === 'Sin correo';
                     }).length;
 
-                    return incompleteCount > 0 ? (
-                      <div style={{
-                        background: '#fffbeb',
-                        border: '1px solid #fde68a',
-                        borderRadius: '8px',
-                        padding: '10px 16px',
-                        marginBottom: '14px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        flexWrap: 'wrap',
-                        gap: '10px'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#92400e', fontSize: '13px', fontWeight: '600' }}>
-                          <span style={{ fontSize: '16px' }}>⚠️</span>
-                          <span>Atención: Se identificaron <strong>{incompleteCount}</strong> registro(s) con datos indispensables vacíos (Documento, Nombre o Correo).</span>
+                    return (
+                      <>
+                        {/* Barra de Filtro por Tipo de Documento (T.I. Menores de Edad vs Mayores CC) */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: '10px',
+                          marginBottom: '14px',
+                          background: '#f8fafc',
+                          padding: '10px 14px',
+                          borderRadius: '10px',
+                          border: '1px solid #e2e8f0'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '12px', fontWeight: '800', color: '#334155', marginRight: '4px' }}>
+                              🔎 Filtrar por Documento:
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setExcelDocTypeFilter('Todos')}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                border: excelDocTypeFilter === 'Todos' ? '1.5px solid #00324d' : '1px solid #cbd5e1',
+                                background: excelDocTypeFilter === 'Todos' ? '#00324d' : '#fff',
+                                color: excelDocTypeFilter === 'Todos' ? '#fff' : '#475569',
+                                fontSize: '12px',
+                                fontWeight: '700',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Todos ({excelData.length})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setExcelDocTypeFilter('TI')}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                border: excelDocTypeFilter === 'TI' ? '1.5px solid #6d28d9' : '1px solid #d8b4fe',
+                                background: excelDocTypeFilter === 'TI' ? '#6d28d9' : '#f5f3ff',
+                                color: excelDocTypeFilter === 'TI' ? '#fff' : '#5b21b6',
+                                fontSize: '12px',
+                                fontWeight: '800',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px'
+                              }}
+                            >
+                              👦 Solo T.I. Menores ({countExcelTi})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setExcelDocTypeFilter('MAYORES')}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                border: excelDocTypeFilter === 'MAYORES' ? '1.5px solid #0369a1' : '1px solid #bae6fd',
+                                background: excelDocTypeFilter === 'MAYORES' ? '#0369a1' : '#f0f9ff',
+                                color: excelDocTypeFilter === 'MAYORES' ? '#fff' : '#0369a1',
+                                fontSize: '12px',
+                                fontWeight: '700',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              🧑 Mayores CC / PPT ({countExcelMayores})
+                            </button>
+                            {countExcelTiSinAcudiente > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setExcelDocTypeFilter('TI_SIN_ACUDIENTE')}
+                                style={{
+                                  padding: '6px 12px',
+                                  borderRadius: '8px',
+                                  border: excelDocTypeFilter === 'TI_SIN_ACUDIENTE' ? '1.5px solid #b45309' : '1px solid #fcd34d',
+                                  background: excelDocTypeFilter === 'TI_SIN_ACUDIENTE' ? '#d97706' : '#fffbeb',
+                                  color: excelDocTypeFilter === 'TI_SIN_ACUDIENTE' ? '#fff' : '#b45309',
+                                  fontSize: '12px',
+                                  fontWeight: '800',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                ⚠️ T.I. sin Correo Acudiente ({countExcelTiSinAcudiente})
+                              </button>
+                            )}
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            {countExcelTi > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const onlyTiSel = {};
+                                  excelData.forEach(r => {
+                                    if (isRowTi(r)) onlyTiSel[r.id_temp] = true;
+                                  });
+                                  setSelectedRows(onlyTiSel);
+                                  setExcelDocTypeFilter('TI');
+                                }}
+                                style={{
+                                  background: '#ede9fe',
+                                  color: '#5b21b6',
+                                  border: '1px solid #c4b5fd',
+                                  padding: '6px 10px',
+                                  borderRadius: '7px',
+                                  fontSize: '11.5px',
+                                  fontWeight: '700',
+                                  cursor: 'pointer'
+                                }}
+                                title="Marca únicamente los aprendices con Tarjeta de Identidad (TI) para procesarlos por separado"
+                              >
+                                ☑️ Seleccionar solo los T.I. ({countExcelTi})
+                              </button>
+                            )}
+                            <input
+                              type="text"
+                              value={excelSearch}
+                              onChange={(e) => setExcelSearch(e.target.value)}
+                              placeholder="Buscar aprendiz, doc, ficha, acudiente..."
+                              style={{
+                                padding: '6px 10px',
+                                borderRadius: '7px',
+                                border: '1px solid #cbd5e1',
+                                fontSize: '12px',
+                                minWidth: '220px',
+                                background: '#fff'
+                              }}
+                            />
+                          </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedRows(prev => {
-                              const next = { ...prev };
-                              excelData.forEach(r => {
-                                const fn = (r.aprendiz_nombre || '').trim();
-                                const doc = (r.aprendiz_doc_numero || '').trim();
-                                const mail = (r.aprendiz_correo || '').trim();
-                                if (!fn || fn === 'N/A' || !doc || !mail || mail === 'Sin correo') {
-                                  delete next[r.id_temp];
-                                }
-                              });
-                              return next;
-                            });
-                          }}
-                          style={{
-                            background: '#fef3c7',
-                            color: '#78350f',
-                            border: '1px solid #fcd34d',
-                            padding: '5px 12px',
-                            borderRadius: '6px',
-                            fontSize: '12px',
-                            fontWeight: '700',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Deseleccionar registros incompletos
-                        </button>
-                      </div>
-                    ) : null;
-                  })()}
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                    <thead>
-                      <tr style={{ background: '#f1f5f9', textTransform: 'uppercase', fontSize: '11px', color: '#475569' }}>
-                        <th style={{ padding: '10px', textAlign: 'center' }}>Sel</th>
-                        <th style={{ padding: '10px', textAlign: 'left' }}>Aprendiz (Nombres y Apellidos)</th>
-                        <th style={{ padding: '10px', textAlign: 'left' }}>Tipo Doc</th>
-                        <th style={{ padding: '10px', textAlign: 'left' }}>Documento</th>
-                        <th style={{ padding: '10px', textAlign: 'left' }}>Ficha</th>
-                        <th style={{ padding: '10px', textAlign: 'left' }}>Programa</th>
-                        <th style={{ padding: '10px', textAlign: 'left' }}>Correo Registrado en Sofía</th>
-                        <th style={{ padding: '10px', textAlign: 'left' }}>Causal</th>
-                        <th style={{ padding: '10px', textAlign: 'center' }}>Anexo Explícito / Masivo</th>
-                        <th style={{ padding: '10px', textAlign: 'center' }}>Acción</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {excelData.map((row, idx) => {
+
+                        {incompleteCount > 0 && (
+                          <div style={{
+                            background: '#fffbeb',
+                            border: '1px solid #fde68a',
+                            borderRadius: '8px',
+                            padding: '10px 16px',
+                            marginBottom: '14px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: '10px'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#92400e', fontSize: '13px', fontWeight: '600' }}>
+                              <span style={{ fontSize: '16px' }}>⚠️</span>
+                              <span>Atención: Se identificaron <strong>{incompleteCount}</strong> registro(s) con datos indispensables vacíos (Documento, Nombre o Correo).</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedRows(prev => {
+                                  const next = { ...prev };
+                                  excelData.forEach(r => {
+                                    const fn = (r.aprendiz_nombre || '').trim();
+                                    const doc = (r.aprendiz_doc_numero || '').trim();
+                                    const mail = (r.aprendiz_correo || '').trim();
+                                    if (!fn || fn === 'N/A' || !doc || !mail || mail === 'Sin correo') {
+                                      delete next[r.id_temp];
+                                    }
+                                  });
+                                  return next;
+                                });
+                              }}
+                              style={{
+                                background: '#fef3c7',
+                                color: '#78350f',
+                                border: '1px solid #fcd34d',
+                                padding: '5px 12px',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: '700',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Deseleccionar registros incompletos
+                            </button>
+                          </div>
+                        )}
+
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                          <thead>
+                            <tr style={{ background: '#f1f5f9', textTransform: 'uppercase', fontSize: '11px', color: '#475569' }}>
+                              <th style={{ padding: '10px', textAlign: 'center' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={filteredExcelRows.length > 0 && filteredExcelRows.every(r => !!selectedRows[r.id_temp])}
+                                  onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    setSelectedRows(prev => {
+                                      const next = { ...prev };
+                                      filteredExcelRows.forEach(r => {
+                                        next[r.id_temp] = checked;
+                                      });
+                                      return next;
+                                    });
+                                  }}
+                                  title="Seleccionar / deseleccionar filas visibles"
+                                  style={{ cursor: 'pointer' }}
+                                />
+                              </th>
+                              <th style={{ padding: '10px', textAlign: 'left' }}>Aprendiz (Nombres y Apellidos)</th>
+                              <th style={{ padding: '10px', textAlign: 'left' }}>Tipo Doc</th>
+                              <th style={{ padding: '10px', textAlign: 'left' }}>Documento</th>
+                              <th style={{ padding: '10px', textAlign: 'left' }}>Ficha</th>
+                              <th style={{ padding: '10px', textAlign: 'left' }}>Correo Registrado en Sofía</th>
+                              <th style={{ padding: '10px', textAlign: 'left', minWidth: '240px', background: '#f5f3ff', color: '#5b21b6' }}>👨‍👩‍👦 Acudiente (Copia Independiente)</th>
+                              <th style={{ padding: '10px', textAlign: 'left' }}>Programa / Causal</th>
+                              <th style={{ padding: '10px', textAlign: 'center' }}>Anexo Explícito / Masivo</th>
+                              <th style={{ padding: '10px', textAlign: 'center' }}>Acción</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredExcelRows.map((row, idx) => {
                         const nombres = row.aprendiz_nombres || row.raw_row?.['NOMBRE'] || row.raw_row?.['NOMBRES'] || '';
                         const apellidos = row.aprendiz_apellidos || row.raw_row?.['APELLIDOS'] || row.raw_row?.['APELLIDO'] || '';
                         const fullName = row.aprendiz_nombre || [nombres, apellidos].filter(Boolean).join(' ') || 'N/A';
@@ -1366,9 +2997,26 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                               )}
                             </td>
                             <td style={{ padding: '10px' }}>
-                              <span style={{ background: '#e2e8f0', color: '#334155', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: '700' }}>
-                                {tipoDoc}
-                              </span>
+                              <select
+                                value={String(tipoDoc).trim().toUpperCase()}
+                                onChange={(e) => handleUpdateExcelRowField(row.id_temp, 'aprendiz_doc_tipo', e.target.value)}
+                                style={{
+                                  background: String(tipoDoc).trim().toUpperCase() === 'TI' ? '#f3e8ff' : '#e0f2fe',
+                                  color: String(tipoDoc).trim().toUpperCase() === 'TI' ? '#6d28d9' : '#0369a1',
+                                  border: `1px solid ${String(tipoDoc).trim().toUpperCase() === 'TI' ? '#d8b4fe' : '#bae6fd'}`,
+                                  padding: '4px 6px',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  fontWeight: '800',
+                                  cursor: 'pointer'
+                                }}
+                                title="Puede cambiar entre TI (Menor de Edad) y CC/PPT (Mayor de Edad)"
+                              >
+                                <option value="CC">🧑 CC (Mayor)</option>
+                                <option value="TI">👦 TI (Menor)</option>
+                                <option value="PPT">🧑 PPT</option>
+                                <option value="CE">🧑 CE</option>
+                              </select>
                             </td>
                             <td style={{ padding: '10px', fontWeight: '600' }}>
                               {hasMissingDoc ? (
@@ -1378,7 +3026,6 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                               ) : numDoc}
                             </td>
                             <td style={{ padding: '10px' }}>{row.ficha}</td>
-                            <td style={{ padding: '10px', maxWidth: '200px', whiteSpace: 'normal', wordBreak: 'break-word' }}>{row.programa}</td>
                             <td style={{ padding: '10px' }}>
                               {hasMissingEmail ? (
                                 <span style={{ color: '#b45309', fontSize: '11px', background: '#fef3c7', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
@@ -1390,7 +3037,56 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                                 </span>
                               )}
                             </td>
-                            <td style={{ padding: '10px' }}>{row.causal_desercion || 'DESERCIÓN'}</td>
+                            <td style={{ padding: '8px 10px', background: String(tipoDoc).trim().toUpperCase() === 'TI' ? '#faf5ff' : 'transparent', borderLeft: '1px dashed #e9d5ff', borderRight: '1px dashed #e9d5ff' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '220px' }}>
+                                <input
+                                  type="text"
+                                  value={row.acudiente_nombre || ''}
+                                  onChange={(e) => handleUpdateExcelRowField(row.id_temp, 'acudiente_nombre', e.target.value)}
+                                  placeholder="👤 Nombre del Acudiente / Padre..."
+                                  style={{
+                                    width: '100%',
+                                    padding: '4px 8px',
+                                    fontSize: '11px',
+                                    borderRadius: '5px',
+                                    border: '1px solid #cbd5e1',
+                                    background: '#fff',
+                                    boxSizing: 'border-box'
+                                  }}
+                                />
+                                <input
+                                  type="email"
+                                  value={row.acudiente_correo || ''}
+                                  onChange={(e) => handleUpdateExcelRowField(row.id_temp, 'acudiente_correo', e.target.value)}
+                                  placeholder="📧 Correo Acudiente (Copia CC OnBase)..."
+                                  style={{
+                                    width: '100%',
+                                    padding: '4px 8px',
+                                    fontSize: '11px',
+                                    borderRadius: '5px',
+                                    border: row.acudiente_correo ? '1.5px solid #7c3aed' : (String(tipoDoc).trim().toUpperCase() === 'TI' ? '1.5px solid #f59e0b' : '1px solid #cbd5e1'),
+                                    background: row.acudiente_correo ? '#f5f3ff' : '#fff',
+                                    color: '#4c1d95',
+                                    fontWeight: row.acudiente_correo ? '700' : '400',
+                                    boxSizing: 'border-box'
+                                  }}
+                                />
+                                {String(tipoDoc).trim().toUpperCase() === 'TI' && !row.acudiente_correo && (
+                                  <span style={{ fontSize: '10px', color: '#b45309', fontWeight: '700' }}>
+                                    👦 Menor T.I.: ingrese correo del acudiente para copia independiente
+                                  </span>
+                                )}
+                                {row.acudiente_correo && (
+                                  <span style={{ fontSize: '10px', color: '#6d28d9', fontWeight: '700' }}>
+                                    ✓ Se enviará copia CC independiente a este acudiente
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td style={{ padding: '10px', maxWidth: '190px', whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                              <div style={{ fontSize: '11.5px', fontWeight: '600', color: '#1e293b' }}>{row.programa}</div>
+                              <div style={{ fontSize: '10.5px', color: '#64748b', marginTop: '2px' }}>{row.causal_desercion || 'DESERCIÓN'}</div>
+                            </td>
                             
                             {/* Adjunto Explícito por comunicación */}
                             <td style={{ padding: '10px', textAlign: 'center' }}>
@@ -1437,8 +3133,18 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                           </tr>
                         );
                       })}
+                      {filteredExcelRows.length === 0 && (
+                        <tr>
+                          <td colSpan={10} style={{ padding: '24px', textAlign: 'center', color: '#64748b', fontWeight: '600' }}>
+                            No hay aprendices que coincidan con el filtro seleccionado ({excelDocTypeFilter}).
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
+                      </>
+                    );
+                  })()}
                 </div>
               )}
             </div>
@@ -1459,97 +3165,135 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
               </label>
               <select 
                 value={selectedOnbaseUser}
-                onChange={(e) => setSelectedOnbaseUser(e.target.value)}
+                onChange={(e) => handleSelectOnbaseUser(e.target.value)}
                 style={{
                   width: '100%',
                   padding: '10px',
                   borderRadius: '8px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '14px',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  color: '#00324d',
                   background: '#f8fafc'
                 }}
               >
                 {onbaseUsers.map((u, i) => (
-                  <option key={u.id || i} value={u.full_name || u.document_no}>
-                    {u.full_name} ({u.area || u.role || 'OnBase User'})
+                  <option key={u.id || u.username || i} value={u.username || u.id}>
+                    {u.full_name}
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* Correos en Copia (CC) */}
+            {/* Correos en Copia (CC) con Selección Rápida de 1 Clic (Sin tener que llenar formulario) */}
             <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                 <h3 style={{ margin: 0, color: '#0f172a', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Mail size={18} color="#00324d" />
-                  Correos en Copia (CC desde OnBase)
+                  Correos en Copia (CC en OnBase)
                 </h3>
-                <span style={{ fontSize: '11px', color: '#39a900', fontWeight: '600', background: '#e8f5e9', padding: '3px 8px', borderRadius: '10px' }}>
-                  ✓ Guardados en OnBase/BD
+                <span style={{ fontSize: '11px', color: '#15803d', fontWeight: '700', background: '#dcfce7', padding: '3px 8px', borderRadius: '10px' }}>
+                  ✓ {ccEmails.length} Activo(s)
                 </span>
               </div>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
-                {ccEmails.length === 0 ? (
-                  <div style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic', padding: '8px 0' }}>
-                    No hay correos en copia configurados.
-                  </div>
-                ) : (
-                  ccEmails.map((cc, idx) => (
-                    <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', borderLeft: '3px solid #00324d' }}>
-                      <div>
-                        <strong style={{ color: '#0f172a' }}>{cc.name}</strong>
-                        <div style={{ fontSize: '11px', color: '#64748b' }}>{cc.email}</div>
-                      </div>
-                      <button 
-                        onClick={() => handleRemoveCcEmail(idx)}
-                        title="Eliminar correo de la lista guardada"
-                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+
+              {/* Selección Rápida 1 Clic de Funcionarios CIMI */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px', marginBottom: '12px' }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: '#00324d', marginBottom: '6px' }}>
+                  ⚡ Activar / Desactivar con 1 Clic (Se diligencian solos en OnBase):
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {frequentCimiContacts.map((c) => {
+                    const isChecked = ccEmails.some(item => item.email.toLowerCase() === c.email.toLowerCase());
+                    return (
+                      <label
+                        key={c.email}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '6px 8px',
+                          borderRadius: '6px',
+                          background: isChecked ? '#ecfdf5' : '#fff',
+                          border: `1px solid ${isChecked ? '#86efac' : '#e2e8f0'}`,
+                          cursor: 'pointer',
+                          fontSize: '12px'
+                        }}
                       >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  ))
-                )}
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleToggleQuickCc(c)}
+                          style={{ accentColor: '#39a900', width: '15px', height: '15px' }}
+                        />
+                        <div style={{ flex: 1, lineHeight: '1.25' }}>
+                          <strong style={{ color: '#0f172a', display: 'block' }}>{c.name}</strong>
+                          <span style={{ fontSize: '11px', color: '#0369a1' }}>{c.email}</span>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
 
-              {/* Form de agregar nuevo correo */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <input 
-                  type="text" 
-                  placeholder="Nombre de la persona/dependencia"
-                  value={newCcName}
-                  onChange={(e) => setNewCcName(e.target.value)}
-                  style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
-                />
+              {/* Lista de correos adicionales personalizados */}
+              {ccEmails.filter(cc => !frequentCimiContacts.some(f => f.email.toLowerCase() === cc.email.toLowerCase())).length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
+                  {ccEmails.map((cc, idx) => {
+                    if (frequentCimiContacts.some(f => f.email.toLowerCase() === cc.email.toLowerCase())) return null;
+                    return (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '6px 10px', borderRadius: '6px', fontSize: '12px', borderLeft: '3px solid #00324d' }}>
+                        <div>
+                          <strong style={{ color: '#0f172a' }}>{cc.name}</strong>
+                          <div style={{ fontSize: '11px', color: '#64748b' }}>{cc.email}</div>
+                        </div>
+                        <button 
+                          onClick={() => handleRemoveCcEmail(idx)}
+                          title="Eliminar correo"
+                          style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Campo rápido opcional para agregar otro correo (no requiere llenar nombre) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   <input 
-                    type="email" 
-                    placeholder="correo@sena.edu.co"
+                    type="text" 
+                    placeholder="Agregar otro correo (ej. instructor@sena.edu.co)"
                     value={newCcEmail}
                     onChange={(e) => setNewCcEmail(e.target.value)}
-                    style={{ flex: 1, padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCcEmail(); } }}
+                    style={{ flex: 1, padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px' }}
                   />
                   <button 
+                    type="button"
                     onClick={handleAddCcEmail}
-                    title="Almacenar y guardar correo en copia"
-                    style={{ background: '#00324d', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    title="Agregar correo en copia"
+                    style={{ background: '#00324d', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
                   >
-                    <Plus size={16} /> Guardar
+                    <Plus size={15} /> Agregar
                   </button>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
+                  <span style={{ fontSize: '10.5px', color: '#64748b' }}>El robot diligencia estos correos en OnBase</span>
                   <button 
+                    type="button"
                     onClick={handleResetCcEmails}
-                    style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '11px', cursor: 'pointer', textDecoration: 'underline' }}
+                    style={{ background: 'none', border: 'none', color: '#0369a1', fontSize: '11px', cursor: 'pointer', textDecoration: 'underline', fontWeight: '600' }}
                   >
-                    Restablecer correos SENA por defecto
+                    Restablecer oficiales CIMI
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* Acciones Finales (Robot OnBase sin PDF vs Generar PDF) */}
+            {/* Acciones Finales (Citación a Comité NUNCA lleva anexo PDF; Notificación de Resolución sí lleva PDF) */}
             <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <button 
                 onClick={() => handleGuardarYGenerar({ generatePdf: false })}
@@ -1573,32 +3317,44 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                 }}
               >
                 <Play size={18} color="#39a900" />
-                {processingSave ? 'Procesando...' : 'Guardar y Preparar para Robot OnBase (Sin PDF)'}
+                {processingSave
+                  ? 'Procesando...'
+                  : activeTab === 'citacion'
+                    ? 'Guardar Citaciones para Robot OnBase (Sin Anexo PDF)'
+                    : activeTab === 'notificacion_aprendiz'
+                      ? 'Guardar Notificación Aprendiz para Robot OnBase (Sin Anexo PDF)'
+                      : 'Guardar Notificaciones para Robot OnBase'}
               </button>
 
-              <button 
-                onClick={() => handleGuardarYGenerar({ generatePdf: true })}
-                disabled={processingSave || excelData.length === 0}
-                style={{
-                  width: '100%',
-                  background: 'linear-gradient(135deg, #39a900 0%, #2e8b00 100%)',
-                  color: '#fff',
-                  border: 'none',
-                  padding: '12px',
-                  borderRadius: '10px',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  cursor: (processingSave || excelData.length === 0) ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  opacity: excelData.length === 0 ? 0.6 : 1
-                }}
-              >
-                <FileText size={16} />
-                Generar Correspondencias PDF y Guardar
-              </button>
+              {(activeTab === 'citacion' || activeTab === 'notificacion_aprendiz') ? (
+                <div style={{ fontSize: '11.5px', color: '#475569', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '8px 10px', lineHeight: '1.35' }}>
+                  ℹ️ <strong>Regla OnBase SENA:</strong> {activeTab === 'notificacion_aprendiz' ? 'Las cartas de Notificación Aprendiz van directamente en el cuerpo del formulario OnBase y se guardan predeterminadamente.' : 'Las Citaciones a Comité van directamente en el cuerpo del formulario OnBase y no llevan PDF adjunto.'}
+                </div>
+              ) : (
+                <button 
+                  onClick={() => handleGuardarYGenerar({ generatePdf: true })}
+                  disabled={processingSave || excelData.length === 0}
+                  style={{
+                    width: '100%',
+                    background: 'linear-gradient(135deg, #39a900 0%, #2e8b00 100%)',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '12px',
+                    borderRadius: '10px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: (processingSave || excelData.length === 0) ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    opacity: excelData.length === 0 ? 0.6 : 1
+                  }}
+                >
+                  <FileText size={16} />
+                  Generar Oficios PDF y Guardar Resoluciones
+                </button>
+              )}
             </div>
 
           </div>
@@ -1807,12 +3563,13 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                     Abrir hasta Paso 3
                   </button>
 
-                  {automationLoading && (
+                  {(automationLoading || botHasBrowserOpen) && (
                     <button 
-                      onClick={() => setAutomationLoading(false)}
-                      style={{ background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5', padding: '12px 16px', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
+                      onClick={handleStopDesercionesBot}
+                      style={{ background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5', padding: '12px 16px', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      title="Detiene inmediatamente el Robot de Deserciones en el servidor y cierra su sesión OnBase (sin afectar Cargue AES)"
                     >
-                      <Square size={16} /> Detener
+                      <Square size={16} /> Detener Robot
                     </button>
                   )}
                 </div>
@@ -1868,8 +3625,15 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
 
                 {/* Consola de Logs en Tiempo Real */}
                 <div style={{ background: '#0f172a', borderRadius: '10px', padding: '12px', color: '#22c55e', fontFamily: 'monospace', fontSize: '11px', height: '170px', overflowY: 'auto' }}>
-                  <div style={{ color: '#94a3b8', borderBottom: '1px solid #334155', paddingBottom: '4px', marginBottom: '8px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Terminal size={14} /> Registo de Consola en Tiempo Real
+                  <div style={{ color: '#94a3b8', borderBottom: '1px solid #334155', paddingBottom: '4px', marginBottom: '8px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Terminal size={14} /> Registro Robot Independiente Deserciones
+                    </span>
+                    {botProgress.total > 0 && (
+                      <span style={{ color: '#38bdf8', fontSize: '10px' }}>
+                        Progreso: {botProgress.processed}/{botProgress.total} (✓ {botProgress.success} | ✕ {botProgress.errors})
+                      </span>
+                    )}
                   </div>
                   {logs.length > 0 ? (
                     logs.map((lg, i) => <div key={i} style={{ marginBottom: '3px' }}>&gt; {lg}</div>)
@@ -1884,15 +3648,150 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
 
           </div>
 
+          {/* Panel de Extracción de Radicados desde Correo (leparadam@sena.edu.co -> Producidas) y Exportación Excel por Carga Masiva */}
+          <div style={{
+            background: 'linear-gradient(135deg, #00324d 0%, #0f172a 100%)',
+            borderRadius: '14px',
+            padding: '20px 24px',
+            marginBottom: '22px',
+            color: '#fff',
+            boxShadow: '0 8px 20px rgba(0,50,77,0.18)',
+            border: '1px solid #1e3a8a'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+              <div style={{ flex: '1 1 380px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                  <Mail size={22} color="#4ade80" />
+                  <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#fff' }}>
+                    Descarga de Radicados y Fechas de Notificación (Buzón leparadam@sena.edu.co — Carpeta "Producidas")
+                  </h3>
+                </div>
+                <p style={{ margin: 0, fontSize: '12.5px', color: '#cbd5e1', lineHeight: '1.45' }}>
+                  Extrae automáticamente el <strong>Radicado OnBase (CPE No. 68-9-2026-...)</strong>, <strong>N.I.S.</strong> y <strong>Fecha/Hora de Radicación</strong> de la carpeta <strong>Producidas</strong>, actualiza la base de datos y exporta el <strong>mismo Excel original de cada carga masiva</strong> con sus radicados.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                {/* Selector de Lote de Carga Masiva */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>
+                    📦 Carga Masiva de Excel (Lote):
+                  </label>
+                  <select
+                    value={selectedLoteId}
+                    onChange={(e) => setSelectedLoteId(e.target.value)}
+                    style={{
+                      padding: '9px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #38bdf8',
+                      background: '#0f172a',
+                      color: '#f8fafc',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      minWidth: '280px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="Todos">📋 Todos los Lotes ({historico.length} registros)</option>
+                    {lotes.map(l => (
+                      <option key={`${l.lote_id}_${l.etapa}`} value={l.lote_id}>
+                        📄 {l.archivo_excel} ({l.etapa === 'CITACION_COMITE' ? 'Citación' : l.etapa === 'NOTIFICACION_APRENDIZ' ? 'Notif. Aprendiz' : 'Resolución'}) — {l.con_radicado}/{l.total_casos} con Radicado
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Botón 1: Sincronizar Radicados desde Correo Producidas */}
+                <button
+                  onClick={() => setShowEmailSyncModal(true)}
+                  style={{
+                    background: 'linear-gradient(135deg, #39a900 0%, #15803d 100%)',
+                    color: '#fff',
+                    border: '1px solid #86efac',
+                    padding: '11px 18px',
+                    borderRadius: '10px',
+                    fontWeight: '800',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 12px rgba(57,169,0,0.35)',
+                    marginTop: '16px'
+                  }}
+                >
+                  <Mail size={16} />
+                  {emailSyncRunning ? '🔄 Sincronizando Correo Producidas...' : '📩 1. Extraer Radicados y Fechas del Correo'}
+                </button>
+
+                {/* Botón 2: Exportar el mismo Excel subido con los Radicados y Fechas */}
+                <button
+                  onClick={() => handleExportarExcelLote(selectedLoteId !== 'Todos' ? selectedLoteId : 'ULTIMO', 'original_completo')}
+                  style={{
+                    background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                    color: '#fff',
+                    border: '1px solid #7dd3fc',
+                    padding: '11px 18px',
+                    borderRadius: '10px',
+                    fontWeight: '800',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 12px rgba(2,132,199,0.35)',
+                    marginTop: '16px'
+                  }}
+                  title="Descarga el mismo archivo Excel que se subió en la carga masiva pero con las columnas RADICADO, N.I.S. y FECHA RADICADO diligenciadas"
+                >
+                  <FileSpreadsheet size={16} />
+                  📥 2. Descargar Excel de la Carga Masiva (con Radicados)
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* Tabla de Histórico de Comunicaciones */}
           {(() => {
-            const countPendientes = historico.filter(c => c.status === 'Pendiente').length;
-            const countCargados = historico.filter(c => c.status === 'Cargado').length;
-            const countTodos = historico.length;
+            const isCasoTi = (c) => ['TI', 'T.I.', 'TARJETA DE IDENTIDAD'].includes(String(c.aprendiz_doc_tipo || c.raw_row?.['TIPO'] || c.raw_row?.['TIPO_DOC'] || '').trim().toUpperCase());
+            const hasCasoAcudiente = (c) => {
+              if (String(c.acudiente_correo || '').trim()) return true;
+              try {
+                const ccList = typeof c.copy_emails === 'string' ? JSON.parse(c.copy_emails) : c.copy_emails;
+                return Array.isArray(ccList) && ccList.some(item => item && item.is_acudiente && item.email);
+              } catch (e) {
+                return false;
+              }
+            };
 
-            const filteredHistorico = historico.filter(caso => {
-              if (statusFilter === 'Pendiente') return caso.status === 'Pendiente';
-              if (statusFilter === 'Cargado') return caso.status === 'Cargado';
+            const loteBase = selectedLoteId === 'Todos'
+              ? historico
+              : historico.filter(c => c.lote_id === selectedLoteId);
+            const countPendientes = loteBase.filter(c => c.status === 'Pendiente').length;
+            const countCargados = loteBase.filter(c => c.status === 'Cargado').length;
+            const countErrores = loteBase.filter(c => c.status === 'Error').length;
+            const countTodos = loteBase.length;
+            const qTerm = historicoSearch.trim().toLowerCase();
+
+            const statusFilteredBase = loteBase.filter(caso => {
+              if (statusFilter === 'Pendiente' && caso.status !== 'Pendiente') return false;
+              if (statusFilter === 'Cargado' && caso.status !== 'Cargado') return false;
+              if (statusFilter === 'Error' && caso.status !== 'Error') return false;
+              return true;
+            });
+
+            const countHistTi = statusFilteredBase.filter(isCasoTi).length;
+            const countHistMayores = statusFilteredBase.length - countHistTi;
+            const countHistTiSinAcudiente = statusFilteredBase.filter(c => isCasoTi(c) && !hasCasoAcudiente(c)).length;
+
+            const filteredHistorico = statusFilteredBase.filter(caso => {
+              if (historicoDocTypeFilter === 'TI' && !isCasoTi(caso)) return false;
+              if (historicoDocTypeFilter === 'MAYORES' && isCasoTi(caso)) return false;
+              if (historicoDocTypeFilter === 'TI_SIN_ACUDIENTE' && (!isCasoTi(caso) || hasCasoAcudiente(caso))) return false;
+              if (qTerm) {
+                const hay = `${caso.aprendiz_nombre || ''} ${caso.aprendiz_doc_tipo || ''} ${caso.aprendiz_doc_numero || ''} ${caso.ficha || ''} ${caso.aprendiz_correo || ''} ${caso.acudiente_nombre || ''} ${caso.acudiente_correo || ''} ${caso.resolucion || ''} ${caso.radicado || ''} ${caso.nis || ''} ${caso.fecha_radicado || ''} ${caso.descripcion_asunto || ''}`.toLowerCase();
+                if (!hay.includes(qTerm)) return false;
+              }
               return true;
             });
 
@@ -1900,7 +3799,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
 
             return (
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '16px' }}>
               <div>
                 <h3 style={{ margin: 0, color: '#0f172a', fontSize: '18px' }}>Histórico de Comunicaciones Registradas</h3>
                 <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '13px' }}>
@@ -1951,6 +3850,26 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                 </button>
 
                 <button
+                  onClick={() => setStatusFilter('Error')}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontWeight: '700',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    background: statusFilter === 'Error' ? '#dc2626' : 'transparent',
+                    color: statusFilter === 'Error' ? '#ffffff' : (countErrores > 0 ? '#dc2626' : '#475569'),
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <AlertCircle size={14} /> Con Error ({countErrores})
+                </button>
+
+                <button
                   onClick={() => setStatusFilter('Todos')}
                   style={{
                     padding: '8px 14px',
@@ -1969,6 +3888,137 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                 >
                   <FileText size={14} /> Todos ({countTodos})
                 </button>
+              </div>
+
+              {/* Buscador rápido en Histórico */}
+              <input
+                type="text"
+                value={historicoSearch}
+                onChange={(e) => setHistoricoSearch(e.target.value)}
+                placeholder="Buscar cédula, T.I., aprendiz, ficha, acudiente..."
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '12px',
+                  minWidth: '240px'
+                }}
+              />
+            </div>
+
+            {/* Barra de Filtro Rápido por Tipo de Documento (T.I. Menor de Edad vs Mayores CC/PPT) */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '10px',
+              marginBottom: '18px',
+              background: '#f8fafc',
+              padding: '10px 14px',
+              borderRadius: '10px',
+              border: '1px solid #e2e8f0'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '12px', fontWeight: '800', color: '#334155', marginRight: '4px' }}>
+                  🔎 Filtrar Tipo Doc:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setHistoricoDocTypeFilter('Todos')}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    border: historicoDocTypeFilter === 'Todos' ? '1.5px solid #00324d' : '1px solid #cbd5e1',
+                    background: historicoDocTypeFilter === 'Todos' ? '#00324d' : '#fff',
+                    color: historicoDocTypeFilter === 'Todos' ? '#fff' : '#475569',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Todos ({statusFilteredBase.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoricoDocTypeFilter('TI')}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    border: historicoDocTypeFilter === 'TI' ? '1.5px solid #6d28d9' : '1px solid #d8b4fe',
+                    background: historicoDocTypeFilter === 'TI' ? '#6d28d9' : '#f5f3ff',
+                    color: historicoDocTypeFilter === 'TI' ? '#fff' : '#5b21b6',
+                    fontSize: '12px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                >
+                  👦 Solo T.I. Menores ({countHistTi})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoricoDocTypeFilter('MAYORES')}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    border: historicoDocTypeFilter === 'MAYORES' ? '1.5px solid #0369a1' : '1px solid #bae6fd',
+                    background: historicoDocTypeFilter === 'MAYORES' ? '#0369a1' : '#f0f9ff',
+                    color: historicoDocTypeFilter === 'MAYORES' ? '#fff' : '#0369a1',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🧑 Mayores CC / PPT ({countHistMayores})
+                </button>
+                {countHistTiSinAcudiente > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setHistoricoDocTypeFilter('TI_SIN_ACUDIENTE')}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      border: historicoDocTypeFilter === 'TI_SIN_ACUDIENTE' ? '1.5px solid #b45309' : '1px solid #fcd34d',
+                      background: historicoDocTypeFilter === 'TI_SIN_ACUDIENTE' ? '#d97706' : '#fffbeb',
+                      color: historicoDocTypeFilter === 'TI_SIN_ACUDIENTE' ? '#fff' : '#b45309',
+                      fontSize: '12px',
+                      fontWeight: '800',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ⚠️ T.I. sin Correo Acudiente ({countHistTiSinAcudiente})
+                  </button>
+                )}
+                {countHistTi > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const onlyTiMap = {};
+                      statusFilteredBase.forEach(c => {
+                        if (isCasoTi(c)) onlyTiMap[c.id] = true;
+                      });
+                      setSelectedHistoricoRows(onlyTiMap);
+                      setHistoricoDocTypeFilter('TI');
+                    }}
+                    style={{
+                      background: '#ede9fe',
+                      color: '#5b21b6',
+                      border: '1px solid #c4b5fd',
+                      padding: '6px 10px',
+                      borderRadius: '7px',
+                      fontSize: '11.5px',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      marginLeft: '4px'
+                    }}
+                    title="Selecciona únicamente los aprendices con Tarjeta de Identidad (TI) para enviarlos o gestionarlos"
+                  >
+                    ☑️ Seleccionar solo los T.I. ({countHistTi})
+                  </button>
+                )}
               </div>
 
               {/* Botones de Acción Global */}
@@ -2039,6 +4089,74 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                       <Trash2 size={14} /> Eliminar ({selectedCount})
                     </button>
                   </>
+                )}
+
+                {countErrores > 0 && (
+                  <button
+                    onClick={() => handleStartOnBaseLiveSession(null, { retry_errors: true })}
+                    disabled={automationLoading}
+                    style={{
+                      background: '#fef2f2',
+                      color: '#dc2626',
+                      border: '1px solid #fca5a5',
+                      padding: '9px 14px',
+                      borderRadius: '8px',
+                      fontWeight: '700',
+                      fontSize: '12px',
+                      cursor: automationLoading ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                    title="Reintentar automáticamente en OnBase todos los casos que quedaron con estado Error"
+                  >
+                    <RefreshCw size={14} /> Reintentar Fallidos ({countErrores})
+                  </button>
+                )}
+
+                {historico.length > 0 && (
+                  <button
+                    onClick={handleExportarReporteExcel}
+                    style={{
+                      background: '#eff6ff',
+                      color: '#1d4ed8',
+                      border: '1px solid #bfdbfe',
+                      padding: '9px 14px',
+                      borderRadius: '8px',
+                      fontWeight: '700',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                    title="Descargar Acta Excel de Evidencia de Notificaciones (con estado, fecha de envío, Radicado/NIS y anexos)"
+                  >
+                    <Download size={14} /> Exportar Acta Excel
+                  </button>
+                )}
+
+                {countCargados > 0 && (
+                  <button
+                    onClick={() => handleVincularHistorias()}
+                    disabled={linkingHistorias}
+                    style={{
+                      background: '#f0fdf4',
+                      color: '#166534',
+                      border: '1px solid #86efac',
+                      padding: '9px 14px',
+                      borderRadius: '8px',
+                      fontWeight: '700',
+                      fontSize: '12px',
+                      cursor: linkingHistorias ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                    title="Indexar automáticamente los PDFs de casos cargados dentro del expediente de Historia Académica (68.9224.4-37) del aprendiz para Cargue AES"
+                  >
+                    <UserCheck size={14} /> {linkingHistorias ? 'Vinculando...' : 'Vincular a Historias Acad.'}
+                  </button>
                 )}
 
                 {historico.length > 0 && (
@@ -2170,32 +4288,133 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                               borderRadius: '12px',
                               fontSize: '11px',
                               fontWeight: '700',
-                              background: caso.etapa === 'CITACION_COMITE' ? '#e0f2fe' : '#fef3c7',
-                              color: caso.etapa === 'CITACION_COMITE' ? '#0369a1' : '#b45309'
+                              background: caso.etapa === 'CITACION_COMITE' ? '#e0f2fe' : caso.etapa === 'NOTIFICACION_APRENDIZ' ? '#dcfce7' : '#fef3c7',
+                              color: caso.etapa === 'CITACION_COMITE' ? '#0369a1' : caso.etapa === 'NOTIFICACION_APRENDIZ' ? '#15803d' : '#b45309'
                             }}>
-                              {caso.etapa === 'CITACION_COMITE' ? 'Citación Comité' : 'Notif. Resolución'}
+                              {caso.etapa === 'CITACION_COMITE' ? 'Citación Comité' : caso.etapa === 'NOTIFICACION_APRENDIZ' ? 'Notificación Aprendiz' : 'Notif. Resolución'}
                             </span>
                           </td>
                           <td style={{ padding: '12px' }}>
                             <strong style={{ color: '#0f172a' }}>{caso.aprendiz_nombre}</strong><br/>
-                            <span style={{ fontSize: '11px', color: '#64748b' }}>{caso.aprendiz_doc_tipo} {caso.aprendiz_doc_numero}</span><br/>
+                            <span style={{
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              color: String(caso.aprendiz_doc_tipo || '').toUpperCase() === 'TI' ? '#6d28d9' : '#64748b',
+                              background: String(caso.aprendiz_doc_tipo || '').toUpperCase() === 'TI' ? '#f3e8ff' : 'transparent',
+                              padding: String(caso.aprendiz_doc_tipo || '').toUpperCase() === 'TI' ? '1px 6px' : '0',
+                              borderRadius: '4px'
+                            }}>
+                              {String(caso.aprendiz_doc_tipo || '').toUpperCase() === 'TI' ? '👦 TI (Menor)' : caso.aprendiz_doc_tipo} {caso.aprendiz_doc_numero}
+                            </span><br/>
                             <span style={{ fontSize: '11px', color: '#0284c7', fontWeight: '600' }}>📧 {emailSofia}</span>
                           </td>
                           <td style={{ padding: '12px', fontWeight: '600' }}>{caso.ficha}</td>
                           <td style={{ padding: '12px' }}>{caso.onbase_target_user || selectedOnbaseUser}</td>
-                          <td style={{ padding: '12px' }}>
-                            {!Array.isArray(parsedCc) || parsedCc.length === 0 ? (
-                              <span style={{ color: '#94a3b8', fontSize: '11px' }}>Sin CC</span>
-                            ) : (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                {parsedCc.map((cc, i) => (
-                                  <div key={i} style={{ fontSize: '11px', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '4px 8px', borderRadius: '6px' }}>
-                                    <div style={{ fontWeight: '600', color: '#0f172a' }}>👤 {cc.name || 'Destinatario CC'}</div>
-                                    <div style={{ color: '#0284c7', fontSize: '10px' }}>📧 {cc.email}</div>
+                          <td style={{ padding: '12px', minWidth: '230px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                              {/* Botón y Editor Rápido de Acudiente Independiente por Aprendiz */}
+                              {editingAcudienteCasoId === caso.id ? (
+                                <div style={{ background: '#f5f3ff', border: '1.5px solid #8b5cf6', borderRadius: '8px', padding: '8px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                  <div style={{ fontSize: '11px', fontWeight: '800', color: '#5b21b6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span>👨‍👩‍👦 Acudiente de este Aprendiz</span>
+                                    <select
+                                      value={editAcudienteDocTipo}
+                                      onChange={(e) => setEditAcudienteDocTipo(e.target.value)}
+                                      style={{ fontSize: '10px', padding: '2px 4px', borderRadius: '4px', border: '1px solid #c4b5fd', fontWeight: '700', color: '#5b21b6' }}
+                                    >
+                                      <option value="TI">👦 TI (Menor)</option>
+                                      <option value="CC">🧑 CC (Mayor)</option>
+                                      <option value="PPT">🧑 PPT</option>
+                                    </select>
                                   </div>
-                                ))}
-                              </div>
-                            )}
+                                  <input
+                                    type="text"
+                                    value={editAcudienteNombre}
+                                    onChange={(e) => setEditAcudienteNombre(e.target.value)}
+                                    placeholder="Nombre del Acudiente / Padre..."
+                                    style={{ width: '100%', padding: '4px 7px', fontSize: '11px', borderRadius: '5px', border: '1px solid #c4b5fd', boxSizing: 'border-box' }}
+                                  />
+                                  <input
+                                    type="email"
+                                    value={editAcudienteCorreo}
+                                    onChange={(e) => setEditAcudienteCorreo(e.target.value)}
+                                    placeholder="Correo del Acudiente (ej. acudiente@gmail.com)"
+                                    style={{ width: '100%', padding: '4px 7px', fontSize: '11px', borderRadius: '5px', border: '1px solid #c4b5fd', boxSizing: 'border-box' }}
+                                  />
+                                  <div style={{ display: 'flex', gap: '5px', justifyContent: 'flex-end', marginTop: '2px' }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingAcudienteCasoId(null)}
+                                      style={{ background: '#fff', color: '#64748b', border: '1px solid #cbd5e1', padding: '3px 8px', borderRadius: '5px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}
+                                    >
+                                      Cancelar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={savingAcudienteId === caso.id}
+                                      onClick={() => handleSaveCasoAcudiente(caso.id)}
+                                      style={{ background: '#6d28d9', color: '#fff', border: 'none', padding: '3px 10px', borderRadius: '5px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}
+                                    >
+                                      {savingAcudienteId === caso.id ? 'Guardando...' : '💾 Guardar Acudiente'}
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const existingAcCc = Array.isArray(parsedCc) ? parsedCc.find(c => c && c.is_acudiente) : null;
+                                    setEditingAcudienteCasoId(caso.id);
+                                    setEditAcudienteNombre(caso.acudiente_nombre || existingAcCc?.name || '');
+                                    setEditAcudienteCorreo(caso.acudiente_correo || existingAcCc?.email || '');
+                                    setEditAcudienteDocTipo(caso.aprendiz_doc_tipo || 'TI');
+                                  }}
+                                  style={{
+                                    background: (caso.acudiente_correo || (Array.isArray(parsedCc) && parsedCc.some(c => c?.is_acudiente))) ? '#f3e8ff' : '#f8fafc',
+                                    color: '#6d28d9',
+                                    border: '1px dashed #c4b5fd',
+                                    padding: '4px 8px',
+                                    borderRadius: '6px',
+                                    fontSize: '10.5px',
+                                    fontWeight: '700',
+                                    cursor: 'pointer',
+                                    textAlign: 'left',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between'
+                                  }}
+                                  title="Agregar o editar el correo del Acudiente exclusivamente para este aprendiz"
+                                >
+                                  <span>
+                                    👨‍👩‍👦 {(caso.acudiente_correo || (Array.isArray(parsedCc) && parsedCc.some(c => c?.is_acudiente))) ? 'Editar Acudiente (Copia activa)' : '+ Agregar Correo Acudiente'}
+                                  </span>
+                                  <span>✏️</span>
+                                </button>
+                              )}
+
+                              {!Array.isArray(parsedCc) || parsedCc.length === 0 ? (
+                                <span style={{ color: '#94a3b8', fontSize: '11px' }}>Sin CC</span>
+                              ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  {parsedCc.map((cc, i) => (
+                                    <div key={i} style={{
+                                      fontSize: '11px',
+                                      background: cc.is_acudiente ? '#f5f3ff' : '#f8fafc',
+                                      border: `1px solid ${cc.is_acudiente ? '#c4b5fd' : '#e2e8f0'}`,
+                                      padding: '4px 8px',
+                                      borderRadius: '6px'
+                                    }}>
+                                      <div style={{ fontWeight: '700', color: cc.is_acudiente ? '#5b21b6' : '#0f172a' }}>
+                                        {cc.is_acudiente ? '👨‍👩‍👦 ' : '👤 '}{cc.name || 'Destinatario CC'}
+                                      </div>
+                                      <div style={{ color: cc.is_acudiente ? '#6d28d9' : '#0284c7', fontSize: '10px', fontWeight: cc.is_acudiente ? '700' : '400' }}>
+                                        📧 {cc.email}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           </td>
                           <td style={{ padding: '12px', textAlign: 'center' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
@@ -2222,7 +4441,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                               >
                                 <Eye size={12} /> Ver Carta
                               </button>
-                              {caso.comunicacion_pdf_path && (
+                              {caso.etapa !== 'CITACION_COMITE' && caso.comunicacion_pdf_path && (
                                 <a
                                   href={`/${caso.comunicacion_pdf_path.replace(/\\/g, '/')}`}
                                   target="_blank"
@@ -2240,7 +4459,9 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                             </div>
                           </td>
                           <td style={{ padding: '12px', textAlign: 'center' }}>
-                            {caso.anexo_path ? (
+                            {caso.etapa === 'CITACION_COMITE' ? (
+                              <span style={{ color: '#64748b', fontSize: '11px', fontWeight: '600' }}>No aplica (Citación)</span>
+                            ) : caso.anexo_path ? (
                               <a
                                 href={`/${caso.anexo_path.replace(/\\/g, '/')}`}
                                 target="_blank"
@@ -2266,16 +4487,72 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                             )}
                           </td>
                           <td style={{ padding: '12px', textAlign: 'center' }}>
-                            <span style={{
-                              padding: '4px 10px',
-                              borderRadius: '12px',
-                              fontSize: '11px',
-                              fontWeight: '700',
-                              background: caso.status === 'Cargado' ? '#dcfce7' : '#f3f4f6',
-                              color: caso.status === 'Cargado' ? '#15803d' : '#4b5563'
-                            }}>
-                              {caso.status}
-                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                              <span style={{
+                                padding: '4px 10px',
+                                borderRadius: '12px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                background: caso.status === 'Cargado' ? '#dcfce7' : caso.status === 'Error' ? '#fee2e2' : '#f3f4f6',
+                                color: caso.status === 'Cargado' ? '#15803d' : caso.status === 'Error' ? '#dc2626' : '#4b5563'
+                              }}>
+                                {caso.status}
+                              </span>
+                              {(caso.radicado || caso.nis || caso.fecha_radicado) && (
+                                <div style={{
+                                  background: '#eff6ff',
+                                  border: '1px solid #bfdbfe',
+                                  borderRadius: '8px',
+                                  padding: '5px 8px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '2px',
+                                  textAlign: 'left',
+                                  width: '100%'
+                                }}>
+                                  {caso.radicado && (
+                                    <div style={{ fontSize: '11px', color: '#0369a1', fontWeight: '800' }}>
+                                      📌 Rad: {caso.radicado}
+                                    </div>
+                                  )}
+                                  {caso.nis && (
+                                    <div style={{ fontSize: '10px', color: '#334155', fontWeight: '600' }}>
+                                      🔢 NIS: {caso.nis}
+                                    </div>
+                                  )}
+                                  {caso.fecha_radicado && (
+                                    <div style={{ fontSize: '10px', color: '#15803d', fontWeight: '700' }}>
+                                      📅 {caso.fecha_radicado}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              {caso.enviado_at && (
+                                <span style={{ fontSize: '10px', color: '#64748b' }}>
+                                  {new Date(caso.enviado_at).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}
+                                </span>
+                              )}
+                              {caso.historia_doc_id && (
+                                <span style={{ fontSize: '10px', background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', borderRadius: '6px', padding: '1px 6px', fontWeight: '700' }}>
+                                  ✓ En Historia Acad.
+                                </span>
+                              )}
+                              {caso.status === 'Error' && caso.error_message && (
+                                <div style={{ fontSize: '10px', color: '#b91c1c', maxWidth: '170px', lineHeight: '1.25' }} title={caso.error_message}>
+                                  {caso.error_message.length > 65 ? caso.error_message.substring(0, 65) + '...' : caso.error_message}
+                                </div>
+                              )}
+                              {caso.error_screenshot && (
+                                <a
+                                  href={caso.error_screenshot}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{ fontSize: '10px', color: '#dc2626', fontWeight: '700', textDecoration: 'underline' }}
+                                >
+                                  📸 Ver Captura Error
+                                </a>
+                              )}
+                            </div>
                           </td>
                           <td style={{ padding: '12px', textAlign: 'center' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
@@ -2349,7 +4626,7 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                                 <FileText size={11} /> Detalle Formulario
                               </button>
 
-                              {caso.status === 'Pendiente' ? (
+                              {(caso.status === 'Pendiente' || caso.status === 'Error') ? (
                                 <button
                                   onClick={() => handleMarcarCargados([caso.id])}
                                   style={{
@@ -2648,6 +4925,384 @@ Usted cuenta con los recursos de ley de conformidad con la normatividad instituc
                 Cerrar Detalle
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Extracción de Radicados y Fechas desde Correo (leparadam@sena.edu.co -> Carpeta Producidas) */}
+      {showEmailSyncModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.72)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2100,
+          padding: '18px'
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: '16px',
+            maxWidth: '1120px',
+            width: '100%',
+            maxHeight: '92vh',
+            overflowY: 'auto',
+            padding: '24px 28px',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.4)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #39a900', paddingBottom: '12px', marginBottom: '16px' }}>
+              <div>
+                <h3 style={{ margin: 0, color: '#00324d', fontSize: '19px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Mail size={22} color="#39a900" />
+                  Sincronizar Radicados y Fechas de Notificación desde Correo SENA (Carpeta "Producidas")
+                </h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '12.5px', color: '#475569' }}>
+                  Extrae de los correos de <strong>grupoadmondocumentos@sena.edu.co</strong> en <strong>leparadam@sena.edu.co</strong> la tabla oficial (<strong>Radicado | N.I.S. | Fecha</strong>), actualiza la base de datos y habilita la descarga del Excel idéntico al cargado.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowEmailSyncModal(false)}
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Selector de Modo: Robot Outlook 365 vs Pegado Rápido */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+              <button
+                onClick={() => setEmailSyncTab('robot')}
+                style={{
+                  padding: '9px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  fontWeight: '700',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  background: emailSyncTab === 'robot' ? '#00324d' : '#f1f5f9',
+                  color: emailSyncTab === 'robot' ? '#fff' : '#475569'
+                }}
+              >
+                🤖 1. Robot Automático Outlook 365 (leparadam@sena.edu.co → Carpeta Producidas)
+              </button>
+              <button
+                onClick={() => setEmailSyncTab('manual')}
+                style={{
+                  padding: '9px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  fontWeight: '700',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  background: emailSyncTab === 'manual' ? '#00324d' : '#f1f5f9',
+                  color: emailSyncTab === 'manual' ? '#fff' : '#475569'
+                }}
+              >
+                📋 2. Pegar Texto / Subir Correos (.eml / .htm)
+              </button>
+            </div>
+
+            {emailSyncTab === 'robot' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {/* Barra de configuración y botón de inicio */}
+                <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '14px 16px', display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'flex-end' }}>
+                  <div style={{ flex: '1 1 200px' }}>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#334155', marginBottom: '4px' }}>
+                      Correo Institucional SENA:
+                    </label>
+                    <input
+                      type="text"
+                      value={emailSyncUser}
+                      onChange={(e) => setEmailSyncUser(e.target.value)}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: '600' }}
+                    />
+                  </div>
+                  <div style={{ flex: '1 1 140px' }}>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#334155', marginBottom: '4px' }}>
+                      Carpeta del Correo:
+                    </label>
+                    <input
+                      type="text"
+                      value={emailSyncFolder}
+                      onChange={(e) => setEmailSyncFolder(e.target.value)}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: '600' }}
+                    />
+                  </div>
+                  <div style={{ flex: '1 1 190px' }}>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#334155', marginBottom: '4px' }}>
+                      Contraseña Correo (Guardada en Servidor):
+                    </label>
+                    <input
+                      type="password"
+                      value={emailSyncPass}
+                      onChange={(e) => setEmailSyncPass(e.target.value)}
+                      placeholder="Ya guardada (opcional cambiar)"
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {!emailSyncRunning ? (
+                      <button
+                        onClick={handleStartEmailSync}
+                        style={{
+                          background: '#39a900',
+                          color: '#fff',
+                          border: 'none',
+                          padding: '10px 18px',
+                          borderRadius: '8px',
+                          fontWeight: '800',
+                          fontSize: '13px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <Play size={15} /> {emailSyncStateData.hasBrowserOpen ? '🔄 Escanear Carpeta Producidas Ahora' : '🚀 Abrir Mi Correo en Servidor y Descargar Radicados'}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleStopEmailSync(false)}
+                        style={{
+                          background: '#d97706',
+                          color: '#fff',
+                          border: 'none',
+                          padding: '10px 14px',
+                          borderRadius: '8px',
+                          fontWeight: '800',
+                          fontSize: '13px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <Square size={15} /> Pausar Escaneo (Dejar Correo Abierto)
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => handleExportarExcelLote(selectedLoteId !== 'Todos' ? selectedLoteId : 'ULTIMO', 'original_completo')}
+                      style={{
+                        background: '#0284c7',
+                        color: '#fff',
+                        border: 'none',
+                        padding: '10px 16px',
+                        borderRadius: '8px',
+                        fontWeight: '800',
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Download size={15} /> Exportar Excel con Radicados
+                    </button>
+
+                    {emailSyncStateData.hasBrowserOpen && (
+                      <button
+                        onClick={() => handleStopEmailSync(true)}
+                        title="Reiniciar el navegador del correo en el servidor"
+                        style={{
+                          background: '#f1f5f9',
+                          color: '#64748b',
+                          border: '1px solid #cbd5e1',
+                          padding: '10px 12px',
+                          borderRadius: '8px',
+                          fontWeight: '700',
+                          fontSize: '12px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Reiniciar Navegador
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Alerta de Autenticación / Número de Microsoft Authenticator (Sale de inmediato al omitir el PIN) */}
+                {(emailSyncStateData.status === 'waiting_auth' || emailSyncStateData.mfaNumber || emailSyncStateData.authPrompt) && (
+                  <div style={{
+                    background: '#fffbeb',
+                    border: '2px solid #f59e0b',
+                    borderRadius: '10px',
+                    padding: '14px 18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '14px'
+                  }}>
+                    <div style={{ flex: '1 1 340px' }}>
+                      <div style={{ fontWeight: '800', color: '#b45309', fontSize: '14px', marginBottom: '4px' }}>
+                        📲 Código de Autorización Microsoft 365 (Para dejar abierto su correo en el servidor)
+                      </div>
+                      <div style={{ fontSize: '13px', color: '#78350f', marginBottom: '8px' }}>
+                        {emailSyncStateData.authPrompt || 'Apruebe el ingreso una sola vez para que su correo quede abierto permanentemente en el servidor.'}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        <button
+                          onClick={() => handleSwitchEmailAuthMethod('switch_mfa_push')}
+                          style={{ background: '#00324d', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '6px', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer' }}
+                        >
+                          📲 Ver Número en Authenticator
+                        </button>
+                        <button
+                          onClick={() => handleSwitchEmailAuthMethod('switch_mfa_sms')}
+                          style={{ background: '#0369a1', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '6px', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer' }}
+                        >
+                          📱 Enviar Código por SMS (...16)
+                        </button>
+                        <button
+                          onClick={() => handleSwitchEmailAuthMethod('switch_mfa_otp')}
+                          style={{ background: '#475569', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '6px', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer' }}
+                        >
+                          🔢 Usar Código de 6 Dígitos
+                        </button>
+                      </div>
+                    </div>
+
+                    {emailSyncStateData.mfaNumber && (
+                      <div style={{
+                        background: '#00324d',
+                        color: '#4ade80',
+                        fontSize: '34px',
+                        fontWeight: '900',
+                        padding: '10px 26px',
+                        borderRadius: '12px',
+                        letterSpacing: '3px',
+                        boxShadow: '0 6px 16px rgba(0,0,0,0.28)',
+                        textAlign: 'center'
+                      }}>
+                        <div style={{ fontSize: '10px', color: '#e2e8f0', letterSpacing: '0.5px', fontWeight: '700', marginBottom: '2px' }}>
+                          MARQUE EN SU CELULAR:
+                        </div>
+                        #{emailSyncStateData.mfaNumber}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Resumen de Contadores en Tiempo Real */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px 14px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '700' }}>CORREOS ESCANEADOS</div>
+                    <div style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a' }}>{emailSyncStateData.stats?.emailsScanned || 0}</div>
+                  </div>
+                  <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', padding: '10px 14px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '11px', color: '#0369a1', fontWeight: '700' }}>CPE ENCONTRADOS</div>
+                    <div style={{ fontSize: '22px', fontWeight: '800', color: '#0284c7' }}>{emailSyncStateData.stats?.cpeFound || 0}</div>
+                  </div>
+                  <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', padding: '10px 14px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '11px', color: '#166534', fontWeight: '700' }}>NUEVOS ACTUALIZADOS EN BD</div>
+                    <div style={{ fontSize: '22px', fontWeight: '800', color: '#15803d' }}>{emailSyncStateData.stats?.matchedUpdated || 0}</div>
+                  </div>
+                  <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px 14px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '11px', color: '#475569', fontWeight: '700' }}>YA TENÍAN RADICADO</div>
+                    <div style={{ fontSize: '22px', fontWeight: '800', color: '#334155' }}>{emailSyncStateData.stats?.alreadyUpdated || 0}</div>
+                  </div>
+                </div>
+
+                {/* Vista en Vivo del Buzón Outlook 365 + Consola de Logs */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1.35fr 1fr', gap: '16px' }}>
+                  <div style={{ background: '#0f172a', borderRadius: '10px', overflow: 'hidden', border: '2px solid #00324d', minHeight: '340px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center' }}>
+                    {emailSyncFrame ? (
+                      <>
+                        <div style={{ width: '100%', background: '#00324d', color: '#fff', fontSize: '11.5px', padding: '6px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>🟢 <strong>Correo Abierto en Servidor</strong> — {emailSyncUser} (Carpeta: {emailSyncFolder})</span>
+                          <span style={{ color: '#86efac', fontWeight: '700' }}>🖱️ Puede hacer clic directo en la pantalla</span>
+                        </div>
+                        <img
+                          src={emailSyncFrame}
+                          alt="Vista en vivo Outlook 365"
+                          onClick={handleEmailBrowserClick}
+                          style={{ width: '100%', maxHeight: '360px', objectFit: 'contain', cursor: 'pointer', background: '#fff' }}
+                          title="Haga clic directamente sobre cualquier botón o carpeta de su correo"
+                        />
+                        {/* Barra permanente para escribir código SMS / OTP / Contraseña al navegador */}
+                        <div style={{ width: '100%', background: '#1e293b', padding: '8px 10px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <input
+                            type="text"
+                            value={emailSyncBrowserInput}
+                            onChange={(e) => setEmailSyncBrowserInput(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleSendTextToEmailBrowser(); }}
+                            placeholder="Escribir código SMS / código 6 dígitos / contraseña en pantalla y Enter..."
+                            style={{ flex: 1, padding: '7px 10px', borderRadius: '6px', border: '1px solid #475569', fontSize: '12.5px', background: '#fff', color: '#0f172a' }}
+                          />
+                          <button
+                            onClick={handleSendTextToEmailBrowser}
+                            style={{
+                              background: '#39a900',
+                              color: '#fff',
+                              border: 'none',
+                              padding: '7px 14px',
+                              borderRadius: '6px',
+                              fontWeight: '800',
+                              fontSize: '12px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Enviar a Pantalla ↵
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8', fontSize: '13px', margin: 'auto' }}>
+                        <Monitor size={40} style={{ margin: '0 auto 10px', display: 'block', opacity: 0.5, color: '#38bdf8' }} />
+                        Presione <strong>"Abrir Mi Correo en Servidor y Descargar Radicados"</strong> para abrir el buzón <strong>{emailSyncUser}</strong> (el sistema saltará el PIN automáticamente y mostrará el código en pantalla).
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ background: '#0f172a', borderRadius: '10px', padding: '12px', color: '#4ade80', fontFamily: 'monospace', fontSize: '11.5px', height: '420px', overflowY: 'auto' }}>
+                    <div style={{ color: '#94a3b8', borderBottom: '1px solid #334155', paddingBottom: '6px', marginBottom: '8px', fontWeight: '700' }}>
+                      Registro en Vivo del Correo en Servidor ({emailSyncUser})
+                    </div>
+                    {emailSyncStateData.logs && emailSyncStateData.logs.length > 0 ? (
+                      emailSyncStateData.logs.map((lg, idx) => (
+                        <div key={idx} style={{ marginBottom: '4px', lineHeight: '1.35' }}>&gt; {lg}</div>
+                      ))
+                    ) : (
+                      <div style={{ color: '#64748b' }}>Esperando inicio de lectura del buzón {emailSyncUser}...</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Pestaña Manual: Pegar Texto o Tabla de Correos CPE */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ fontSize: '13px', color: '#334155' }}>
+                  También puede copiar y pegar aquí el texto de uno o varios correos de la carpeta <strong>Producidas</strong> (incluyendo el asunto <code>CPE No. 68-9-2026-...</code>, destinatario <code>Para:</code> y la tabla <code>Radicado | N.I.S. | Fecha</code>):
+                </div>
+                <textarea
+                  value={manualEmailText}
+                  onChange={(e) => setManualEmailText(e.target.value)}
+                  rows={10}
+                  placeholder={`Ejemplo:\nCPE No. 68-9-2026-057099 - CITACIÓN A COMITÉ DE EVALUACIÓN Y SEGUIMIENTO ¿ PRESUNTA DESERCIÓN POR INASISTENCIAS ¿ FICHA 3491179\nPara: ANDRESSPEREZ1687@GMAIL.COM\nRadicado\tN.I.S.\tFecha\n68-9-2026-057099\t2026-02-499770\t11/4/2026 8:53:03 AM`}
+                  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontFamily: 'monospace', fontSize: '12px' }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                  <button
+                    onClick={handleImportManualEmailText}
+                    disabled={importingManualEmail}
+                    style={{
+                      background: '#39a900',
+                      color: '#fff',
+                      border: 'none',
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      fontWeight: '800',
+                      fontSize: '13px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {importingManualEmail ? 'Procesando...' : '✅ Extraer y Actualizar Base de Datos'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

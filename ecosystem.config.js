@@ -1,20 +1,23 @@
 module.exports = {
   apps: [
     {
-      // ── Backend ────────────────────────────────────────────────────────────
-      // Node.js HTTP puro en puerto 80.
-      // NPM (Nginx Proxy Manager) recibe solicitudes en 443 (HTTPS)
-      // y las reenvía aquí como HTTP. NO se necesitan certificados SSL aquí.
+      // ── Backend (Optimizado para 8 GB RAM y lotes masivos de 4,000+ expedientes) ──
       name: "sena-backend",
       script: "server.js",
       cwd: "./backend",
       instances: 1,
+      exec_mode: "fork",
       autorestart: true,
+      max_memory_restart: "3500M",
+      node_args: "--max-old-space-size=3072",
       watch: false,
       env: {
         NODE_ENV: "production",
-        PORT: 80,             // Puerto upstream que OpenResty / NPM usa como destino (80)
-        BEHIND_PROXY: "true" // Corre detrás de proxy reverso (NPM)
+        PORT: 80,
+        BEHIND_PROXY: "true",
+        TMPDIR: "/mnt/almacen/.puppeteer_tmp",
+        TMP: "/mnt/almacen/.puppeteer_tmp",
+        TEMP: "/mnt/almacen/.puppeteer_tmp"
       }
     },
     {
@@ -23,7 +26,9 @@ module.exports = {
       script: "presentacion-server.js",
       cwd: "./backend",
       instances: 1,
+      exec_mode: "fork",
       autorestart: true,
+      max_memory_restart: "400M",
       watch: false,
       env: {
         NODE_ENV: "production",

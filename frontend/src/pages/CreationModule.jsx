@@ -181,8 +181,14 @@ function CreationModule() {
     const handleCreateTypology = async (seriesId, subseriesId = null) => {
         const name = prompt("Nombre Tipología:");
         if (name) {
+            const stageInput = prompt("Etapa de la tipología (opcional, ej: 1. Ingreso, 2. Ejecución, 3. Certificación):", "");
             try {
-                await axios.post(`${API_URL}/trd/typology`, { series_id: seriesId, subseries_id: subseriesId, name });
+                await axios.post(`${API_URL}/trd/typology`, {
+                    series_id: seriesId,
+                    subseries_id: subseriesId,
+                    name,
+                    stage: stageInput ? stageInput.trim() : null
+                });
                 fetchTRD(selectedNode.id);
             } catch (err) { 
                 alert('Error: ' + (err.response?.data?.error || err.message)); 
@@ -240,10 +246,33 @@ function CreationModule() {
     const handleEditTypology = async (t) => {
         const name = prompt('Nuevo nombre de tipología:', t.name);
         if (!name) return;
+        const stageInput = prompt('Etapa de la tipología (deje vacío para quitar etapa):', t.stage || '');
         try {
-            await axios.put(`${API_URL}/trd/typology/${t.id}`, { name });
+            await axios.put(`${API_URL}/trd/typology/${t.id}`, {
+                name,
+                stage: stageInput !== null ? (stageInput.trim() || null) : t.stage
+            });
             fetchTRD(selectedNode.id);
         } catch (err) { showApiError(err); }
+    };
+
+    const handleUpdateTypologyStage = async (t, newStage) => {
+        try {
+            await axios.put(`${API_URL}/trd/typology/${t.id}`, {
+                name: t.name,
+                stage: newStage || null
+            });
+            fetchTRD(selectedNode.id);
+        } catch (err) { showApiError(err); }
+    };
+
+    const getStageBadgeStyle = (stage) => {
+        if (!stage) return { background: '#f5f5f5', color: '#757575', border: '1px solid #ddd' };
+        const s = stage.toLowerCase();
+        if (s.includes('ingreso')) return { background: '#e3f2fd', color: '#0d47a1', border: '1px solid #90caf9' };
+        if (s.includes('ejecucion') || s.includes('ejecución')) return { background: '#fff8e1', color: '#e65100', border: '1px solid #ffcc80' };
+        if (s.includes('certificacion') || s.includes('certificación')) return { background: '#e8f5e9', color: '#1b5e20', border: '1px solid #a5d6a7' };
+        return { background: '#f3e5f5', color: '#4a148c', border: '1px solid #ce93d8' };
     };
 
     const handleDeleteTypology = async (typId) => {
@@ -808,9 +837,31 @@ function CreationModule() {
                                                         {series.typologies && Array.isArray(series.typologies) && series.typologies.length > 0 ? (
                                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                                                 {series.typologies.map((t, index) => (
-                                                                    <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px', background: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', border: '1px solid #ddd' }}>
-                                                                        <span>{index + 1}. {t.name}</span>
-                                                                        <div style={{ display: 'flex', gap: '4px' }}>
+                                                                    <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', border: '1px solid #ddd' }}>
+                                                                        <span style={{ flex: 1 }}><strong>{String(index + 1).padStart(2, '0')}.</strong> {t.name}</span>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                            <select
+                                                                                value={t.stage || ''}
+                                                                                onChange={(e) => handleUpdateTypologyStage(t, e.target.value)}
+                                                                                title="Etapa de la tipología"
+                                                                                style={{
+                                                                                    ...getStageBadgeStyle(t.stage),
+                                                                                    fontSize: '10px',
+                                                                                    fontWeight: 'bold',
+                                                                                    padding: '2px 6px',
+                                                                                    borderRadius: '10px',
+                                                                                    cursor: 'pointer',
+                                                                                    outline: 'none'
+                                                                                }}
+                                                                            >
+                                                                                <option value="">Sin etapa</option>
+                                                                                <option value="1. Ingreso">1. Ingreso</option>
+                                                                                <option value="2. Ejecución">2. Ejecución</option>
+                                                                                <option value="3. Certificación">3. Certificación</option>
+                                                                                {t.stage && !['1. Ingreso', '2. Ejecución', '3. Certificación'].includes(t.stage) && (
+                                                                                    <option value={t.stage}>{t.stage}</option>
+                                                                                )}
+                                                                            </select>
                                                                             <button onClick={() => handleEditTypology(t)} title="Editar tipología" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1565c0', fontSize: '11px', padding: '0 2px' }}>✏</button>
                                                                             <button onClick={() => handleDeleteTypology(t.id)} title="Eliminar tipología" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c62828', fontSize: '11px', padding: '0 2px' }}>✕</button>
                                                                         </div>
@@ -837,9 +888,31 @@ function CreationModule() {
                                                             {sub.typologies && Array.isArray(sub.typologies) && sub.typologies.length > 0 && (
                                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                                                     {sub.typologies.map((t, index) => (
-                                                                        <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px', background: '#f5f5f5', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', border: '1px solid #ddd' }}>
-                                                                            <span>{index + 1}. {t.name}</span>
-                                                                            <div style={{ display: 'flex', gap: '4px' }}>
+                                                                        <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: '#f5f5f5', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', border: '1px solid #ddd' }}>
+                                                                            <span style={{ flex: 1 }}><strong>{String(index + 1).padStart(2, '0')}.</strong> {t.name}</span>
+                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                                <select
+                                                                                    value={t.stage || ''}
+                                                                                    onChange={(e) => handleUpdateTypologyStage(t, e.target.value)}
+                                                                                    title="Etapa de la tipología"
+                                                                                    style={{
+                                                                                        ...getStageBadgeStyle(t.stage),
+                                                                                        fontSize: '10px',
+                                                                                        fontWeight: 'bold',
+                                                                                        padding: '2px 6px',
+                                                                                        borderRadius: '10px',
+                                                                                        cursor: 'pointer',
+                                                                                        outline: 'none'
+                                                                                    }}
+                                                                                >
+                                                                                    <option value="">Sin etapa</option>
+                                                                                    <option value="1. Ingreso">1. Ingreso</option>
+                                                                                    <option value="2. Ejecución">2. Ejecución</option>
+                                                                                    <option value="3. Certificación">3. Certificación</option>
+                                                                                    {t.stage && !['1. Ingreso', '2. Ejecución', '3. Certificación'].includes(t.stage) && (
+                                                                                        <option value={t.stage}>{t.stage}</option>
+                                                                                    )}
+                                                                                </select>
                                                                                 <button onClick={() => handleEditTypology(t)} title="Editar tipología" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1565c0', fontSize: '11px', padding: '0 2px' }}>✏</button>
                                                                                 <button onClick={() => handleDeleteTypology(t.id)} title="Eliminar tipología" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c62828', fontSize: '11px', padding: '0 2px' }}>✕</button>
                                                                             </div>
