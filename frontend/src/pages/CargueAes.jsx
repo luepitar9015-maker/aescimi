@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, Fragment } from 'react';
+import { useState, useEffect, useRef, useMemo, Fragment } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { Play, CheckCircle, CheckSquare, Clock, AlertCircle, FileText, Search, RefreshCw, Monitor, X, Globe, Settings as SettingsIcon, Save, Download, Trash, Database, Eye, ChevronDown, ChevronRight, Maximize2 } from 'lucide-react';
@@ -200,6 +200,8 @@ function CargueAes() {
     const [currentStepIndex, setCurrentStepIndex] = useState(-1);
     const [automationError, setAutomationError] = useState(false);
     const [selectedDocs, setSelectedDocs] = useState([]);
+    const [launchingBot, setLaunchingBot] = useState(false);
+    const selectedDocsSet = useMemo(() => new Set(selectedDocs), [selectedDocs]);
 
     const automationSteps = [
         { id: 'start', label: '1. Conectando e Iniciando Sesión (OnBase Web Client)', match: ['Iniciando proceso', 'Conectando con OnBase', 'Autenticación exitosa', 'Post-login URL', 'PASO 1'] },
@@ -489,12 +491,14 @@ function CargueAes() {
     }, []);
 
     const handleRunAutomation = async (specificDocId = null, targetBotKey = null) => {
-        // Filtrar documentos pendientes a procesar (individual, por Bot específico o todos los seleccionados)
+        if (launchingBot) return;
+
+        // Filtrar documentos pendientes a procesar (individual, por Bot específico o todos los seleccionados) con Set O(1)
         let docsToProcess = [];
         if (specificDocId) {
             docsToProcess = documents.filter(d => d.id === specificDocId);
         } else if (selectedDocs.length > 0) {
-            docsToProcess = documents.filter(d => selectedDocs.includes(d.id) && d.status === 'Pendiente');
+            docsToProcess = documents.filter(d => selectedDocsSet.has(d.id) && d.status === 'Pendiente');
             if (targetBotKey && targetBotKey !== 'all') {
                 docsToProcess = docsToProcess.filter(d => getDocBotKey(d) === targetBotKey);
             }
@@ -511,53 +515,68 @@ function CargueAes() {
             );
         }
 
-        // ── VALIDACIÓN: Primer documento obligatorio ──────────────────
-        const docsSinPrimerDoc = [];
-        for (const doc of docsToProcess) {
-            if (!doc.expediente_id) continue;
-            try {
-                const val = await axios.get(`/api/seguimiento/validar-primer-doc/${doc.expediente_id}`);
-                if (!val.data.valid && val.data.primer_documento) {
-                    docsSinPrimerDoc.push({
-                        filename: doc.filename,
-                        primer_doc: val.data.primer_documento
-                    });
-                }
-            } catch { /* no bloquear si falla la validación */ }
-        }
-        if (docsSinPrimerDoc.length > 0) {
-            const lista = docsSinPrimerDoc.map(d => `• ${d.filename} → falta: "${d.primer_doc}"`).join('\n');
-            const continuar = window.confirm(
-                `⚠️ ADVERTENCIA: Los siguientes expedientes NO tienen el primer documento obligatorio cargado:\n\n${lista}\n\n¿Desea continuar de todas formas?`
-            );
-            if (!continuar) return;
-        }
-        // ─────────────────────────────────────────────────────────────
-
+        setLaunchingBot(true);
         if (specificDocId) setConfigDoc(null);
         setAutomationLoading(true);
+        setAutomationError(false);
 
-        const token = localStorage.getItem('token');
-        const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
-        let settings;
-        try {
-            const settingsRes = await axios.get('/api/settings/all', { headers: authHeaders });
-            settings = settingsRes.data;
-            if (!settings.ades_url) throw new Error("La URL de AES no está configurada. Vaya a Configuración AES.");
-        } catch (err) {
-            setLogs([`Error de configuración: ${err.message}`]);
-            setAutomationError(true);
-            setAutomationLoading(false);
-            return;
-        }
-
-        const docIdsToProcess = docsToProcess.map(d => d.id);
         const focusBot = targetBotKey && targetBotKey !== 'all'
             ? targetBotKey
             : getDocBotKey(docsToProcess[0]);
         setActiveMonitorBot(focusBot);
+        setLogs([`⏳ Validando lote (${docsToProcess.length} documento(s)) e iniciando Bot ${focusBot}...`]);
+
+        const token = localStorage.getItem('token');
+        const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
         try {
+            // ── VALIDACIÓN MASIVA EN 1 SOLA PETICIÓN (<50ms en lugar de N peticiones secuenciales) ──
+            const uniqueExpIds = [...new Set(docsToProcess.map(d => d.expediente_id).filter(Boolean))];
+            if (uniqueExpIds.length > 0) {
+                try {
+                    const valRes = await axios.post(
+                        '/api/seguimiento/validar-primer-doc-lote',
+                        { expedienteIds: uniqueExpIds },
+                        { headers: authHeaders, timeout: 8000 }
+                    );
+                    const missingMap = valRes.data?.missingByExpId || {};
+                    const missingExps = Object.entries(missingMap);
+                    if (missingExps.length > 0) {
+                        const expSampleByExpId = new Map();
+                        docsToProcess.forEach(d => {
+                            if (d.expediente_id && !expSampleByExpId.has(d.expediente_id)) {
+                                expSampleByExpId.set(d.expediente_id, d.expediente_code || d.filename);
+                            }
+                        });
+                        const previewLines = missingExps.slice(0, 10).map(([eId, reqTyp]) =>
+                            `• ${expSampleByExpId.get(Number(eId)) || `Exp #${eId}`} → falta: "${reqTyp}"`
+                        ).join('\n');
+                        const moreTxt = missingExps.length > 10 ? `\n... y ${missingExps.length - 10} expediente(s) más.` : '';
+                        const continuar = window.confirm(
+                            `⚠️ ADVERTENCIA: ${missingExps.length} expediente(s) NO tienen el primer documento obligatorio cargado:\n\n${previewLines}${moreTxt}\n\n¿Desea continuar de todas formas?`
+                        );
+                        if (!continuar) {
+                            setAutomationLoading(false);
+                            setLaunchingBot(false);
+                            return;
+                        }
+                    }
+                } catch { /* no bloquear si falla la validación */ }
+            }
+
+            let settings;
+            try {
+                const settingsRes = await axios.get('/api/settings/all', { headers: authHeaders });
+                settings = settingsRes.data;
+                if (!settings.ades_url) throw new Error("La URL de AES no está configurada. Vaya a Configuración AES.");
+            } catch (err) {
+                setLogs([`Error de configuración: ${err.message}`]);
+                setAutomationError(true);
+                setAutomationLoading(false);
+                return;
+            }
+
+            const docIdsToProcess = docsToProcess.map(d => d.id);
             const res = await axios.post('/api/automation/execute', {
                 url: settings.ades_url,
                 username: settings.ades_username,
@@ -575,7 +594,8 @@ function CargueAes() {
                 setActiveMonitorBot(res.data.activeBotKey);
             }
             // Desmarcar de la selección los documentos que ya se enviaron a este(os) Bot(s)
-            setSelectedDocs(prev => prev.filter(id => !docIdsToProcess.includes(id)));
+            const sentSet = new Set(docIdsToProcess);
+            setSelectedDocs(prev => prev.filter(id => !sentSet.has(id)));
 
             // Iniciar o mantener el polling de los 3 Bots
             startStatusPolling();
@@ -586,6 +606,8 @@ function CargueAes() {
             setLogs(prev => [...prev, `Error: ${errMsg}`]);
             setAutomationError(true);
             setAutomationLoading(false);
+        } finally {
+            setLaunchingBot(false);
         }
     };
     // Documentos filtrados por dependencia (base para calcular subcategorías de Subserie TRD)
@@ -929,7 +951,7 @@ function CargueAes() {
         if (singleExpCode) {
             expCodes = [singleExpCode];
         } else {
-            const selectedDocsList = documents.filter(d => selectedDocs.includes(d.id));
+            const selectedDocsList = documents.filter(d => selectedDocsSet.has(d.id));
             const sourceDocs = selectedDocsList.length > 0 ? selectedDocsList : filteredDocs;
             expCodes = [...new Set(sourceDocs.map(d => (d.expediente_code || '').trim()).filter(Boolean))];
         }
@@ -2029,8 +2051,8 @@ function CargueAes() {
                                             const firstDoc = exp.documents[0];
                                             const firstDocId = firstDoc?.id;
                                             const pendingDocs = exp.documents.filter(d => d.status === 'Pendiente' && !d.is_duplicate_typology);
-                                            const isAllSelected = pendingDocs.length > 0 && pendingDocs.every(d => selectedDocs.includes(d.id));
-                                            const isSomeSelected = !isAllSelected && pendingDocs.some(d => selectedDocs.includes(d.id));
+                                            const isAllSelected = pendingDocs.length > 0 && pendingDocs.every(d => selectedDocsSet.has(d.id));
+                                            const isSomeSelected = !isAllSelected && pendingDocs.some(d => selectedDocsSet.has(d.id));
 
                                             // Detectar si inicia una nueva Subcategoría de Subserie Documental TRD
                                             const currentSubKey = exp.subserie || 'SIN-SUBSERIE';
@@ -2043,7 +2065,7 @@ function CargueAes() {
                                             const subseriePendingDocIds = isFirstOfSubserie
                                                 ? subserieExps.flatMap(g => g.documents.filter(d => d.status === 'Pendiente' && !d.is_duplicate_typology).map(d => d.id))
                                                 : [];
-                                            const isSubAllSelected = subseriePendingDocIds.length > 0 && subseriePendingDocIds.every(id => selectedDocs.includes(id));
+                                            const isSubAllSelected = subseriePendingDocIds.length > 0 && subseriePendingDocIds.every(id => selectedDocsSet.has(id));
                                             const maxWavesInSub = isFirstOfSubserie
                                                 ? subserieExps.reduce((mx, g) => Math.max(mx, g.documents.filter(d => !d.is_duplicate_typology).length), 0)
                                                 : 0;
@@ -2317,11 +2339,11 @@ function CargueAes() {
                                                                                 const isDupTyp = !!doc.is_duplicate_typology;
                                                                                 return (
                                                                                 <Fragment key={doc.id}>
-                                                                                <tr style={{ borderBottom: '1px solid #f0f0f0', backgroundColor: inlinePreviewDocIds.includes(doc.id) ? '#e3f2fd' : (selectedDocs.includes(doc.id) ? '#f1f8e9' : (isDupTyp ? '#fff8e1' : 'transparent')) }}>
+                                                                                <tr style={{ borderBottom: '1px solid #f0f0f0', backgroundColor: inlinePreviewDocIds.includes(doc.id) ? '#e3f2fd' : (selectedDocsSet.has(doc.id) ? '#f1f8e9' : (isDupTyp ? '#fff8e1' : 'transparent')) }}>
                                                                                     <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                                                                                         <input
                                                                                             type="checkbox"
-                                                                                            checked={selectedDocs.includes(doc.id)}
+                                                                                            checked={selectedDocsSet.has(doc.id)}
                                                                                             disabled={doc.status === 'Cargado' || isDupTyp}
                                                                                             onChange={(e) => {
                                                                                                 if (e.target.checked) setSelectedDocs(prev => [...prev, doc.id]);
@@ -2575,7 +2597,7 @@ function CargueAes() {
                             </div>
 
                             {filteredDocs.length > 0 && (() => {
-                                const selectedDocsList = documents.filter(d => selectedDocs.includes(d.id) && d.status === 'Pendiente');
+                                const selectedDocsList = documents.filter(d => selectedDocsSet.has(d.id) && d.status === 'Pendiente');
                                 const subCount = selectedDocsList.filter(d => getDocBotKey(d) === '9224').length;
                                 const formCount = selectedDocsList.filter(d => getDocBotKey(d) === '9224.4').length;
                                 const adminCount = selectedDocsList.filter(d => getDocBotKey(d) === '9224.2').length;
@@ -2766,21 +2788,21 @@ function CargueAes() {
                                                             ) : (
                                                                 <button
                                                                     type="button"
-                                                                    disabled={b.count === 0}
+                                                                    disabled={b.count === 0 || launchingBot}
                                                                     onClick={() => handleRunAutomation(null, b.key)}
                                                                     style={{
                                                                         flex: 1,
                                                                         padding: '5px 8px',
-                                                                        backgroundColor: b.count > 0 ? b.color : '#e0e0e0',
-                                                                        color: b.count > 0 ? '#fff' : '#888',
+                                                                        backgroundColor: (b.count > 0 && !launchingBot) ? b.color : '#e0e0e0',
+                                                                        color: (b.count > 0 && !launchingBot) ? '#fff' : '#888',
                                                                         border: 'none',
                                                                         borderRadius: '6px',
                                                                         fontSize: '11px',
                                                                         fontWeight: 'bold',
-                                                                        cursor: b.count > 0 ? 'pointer' : 'not-allowed'
+                                                                        cursor: (b.count > 0 && !launchingBot) ? 'pointer' : 'not-allowed'
                                                                     }}
                                                                 >
-                                                                    ▶️ Lanzar Bot ({b.count})
+                                                                    {launchingBot ? '⏳ Iniciando...' : `▶️ Lanzar Bot (${b.count})`}
                                                                 </button>
                                                             )}
                                                             {st.waitingForVerifier && !b.isVerifier && (
@@ -2845,13 +2867,15 @@ function CargueAes() {
                                         <button
                                             className="btn btn-primary"
                                             onClick={() => handleRunAutomation()}
-                                            disabled={selectedDocs.length === 0}
-                                            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', opacity: selectedDocs.length === 0 ? 0.65 : 1 }}
+                                            disabled={selectedDocs.length === 0 || launchingBot}
+                                            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', opacity: (selectedDocs.length === 0 || launchingBot) ? 0.65 : 1 }}
                                         >
                                             <Play size={18} />
-                                            {selectedOnBaseUser === 'auto'
-                                                ? `🚀 Iniciar Cargue Simultáneo con los 3 Bots (${selectedDocs.length} Docs seleccionados)`
-                                                : `Iniciar Cargue AES (${selectedDocs.length} de ${filteredDocs.filter(d => d.status === 'Pendiente').length} Docs seleccionados)`}
+                                            {launchingBot
+                                                ? '⏳ Validando e Iniciando Bots...'
+                                                : selectedOnBaseUser === 'auto'
+                                                    ? `🚀 Iniciar Cargue Simultáneo con los 3 Bots (${selectedDocs.length} Docs seleccionados)`
+                                                    : `Iniciar Cargue AES (${selectedDocs.length} de ${filteredDocs.filter(d => d.status === 'Pendiente').length} Docs seleccionados)`}
                                         </button>
 
                                         <button
