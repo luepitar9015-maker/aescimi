@@ -809,6 +809,11 @@ Elaboró: Mónica Gómez Rey, Contratista Coordinación Académica`;
             text: `✅ Excel recargado automáticamente (${rows.length} aprendices: ${res.data.total_mayores || 0} Mayores CC/PPT y ${res.data.total_ti || 0} Menores con Tarjeta de Identidad TI).`
           });
         }
+      } else if (!silent) {
+        setStatusMessage({
+          type: 'warning',
+          text: res.data?.message || 'No se encontró un Excel previo en el servidor.'
+        });
       }
     } catch (e) {
       if (!silent) {

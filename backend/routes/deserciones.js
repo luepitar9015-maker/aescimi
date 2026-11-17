@@ -42,14 +42,33 @@ const requireDesercionesAccess = async (req, res, next) => {
     return res.status(403).json({ error: 'Acceso denegado. No cuenta con permiso para el Módulo de Deserciones.' });
 };
 
+// Directorio persistente para Excel y Anexos de Deserciones (usa /mnt/almacen en Linux si existe)
+function resolveDesercionesUploadDir() {
+    if (process.platform === 'linux') {
+        try {
+            if (fs.existsSync('/mnt/almacen')) {
+                const dir = '/mnt/almacen/deserciones_uploads';
+                if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+                return dir;
+            }
+        } catch (_) {}
+    }
+    const localDir = path.join(__dirname, '..', 'uploads', 'deserciones');
+    if (!fs.existsSync(localDir)) fs.mkdirSync(localDir, { recursive: true });
+    return localDir;
+}
+
+function listCandidateDesercionesDirs() {
+    const dirs = [resolveDesercionesUploadDir(), path.join(__dirname, '..', 'uploads', 'deserciones')];
+    return [...new Set(dirs)].filter(d => {
+        try { return fs.existsSync(d); } catch { return false; }
+    });
+}
+
 // Configuración de almacenamiento para multer (Excel y Anexos PDF/Docs)
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const uploadDir = path.join(__dirname, '..', 'uploads', 'deserciones');
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        cb(null, uploadDir);
+        cb(null, resolveDesercionesUploadDir());
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -670,12 +689,7 @@ function formatExcelSerialDate(colKey, rawVal) {
     return strVal;
 }
 
-function parseExcelWorkbookToRows(filePath, filenameLabel) {
-    const workbook = xlsx.readFile(filePath);
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    const rawData = xlsx.utils.sheet_to_json(sheet, { defval: '' });
-
+function buildDesercionesProcessedPayload(rawData, filenameLabel, filePath = '') {
     if (!rawData || rawData.length === 0) {
         throw new Error('El archivo Excel está vacío o no tiene un formato válido.');
     }
@@ -778,14 +792,22 @@ function parseExcelWorkbookToRows(filePath, filenameLabel) {
 
     return {
         message: 'Excel procesado exitosamente',
-        filename: filenameLabel || path.basename(filePath),
-        filepath: filePath,
+        filename: filenameLabel || (filePath ? path.basename(filePath) : 'Excel_Deserciones.xlsx'),
+        filepath: filePath || '',
         columns,
         total: processedRows.length,
         total_ti: totalTi,
         total_mayores: totalMayores,
         rows: processedRows
     };
+}
+
+function parseExcelWorkbookToRows(filePath, filenameLabel) {
+    const workbook = xlsx.readFile(filePath);
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const rawData = xlsx.utils.sheet_to_json(sheet, { defval: '' });
+    return buildDesercionesProcessedPayload(rawData, filenameLabel, filePath);
 }
 
 // 1. Carga y parseo de Excel con registros de aprendices
@@ -802,29 +824,79 @@ router.post('/upload-excel', requireAuth, upload.single('excel'), (req, res) => 
     }
 });
 
-// 1.1 Recargar automáticamente el último Excel subido al servidor (para no tener que volver a subirlo)
-router.get('/latest-excel', requireAuth, (req, res) => {
+// 1.1 Recargar automáticamente el último Excel subido al servidor (o reconstruirlo desde BD sin lanzar 404 en consola)
+router.get('/latest-excel', requireAuth, async (req, res) => {
     try {
-        const upDir = path.join(__dirname, '..', 'uploads', 'deserciones');
-        if (!fs.existsSync(upDir)) {
-            return res.status(404).json({ error: 'No hay archivos Excel cargados recientemente.' });
+        const candidateDirs = listCandidateDesercionesDirs();
+        const excelFiles = [];
+        for (const dir of candidateDirs) {
+            for (const f of fs.readdirSync(dir)) {
+                if (!/\.(xlsx|xls)$/i.test(f)) continue;
+                const full = path.join(dir, f);
+                try {
+                    const st = fs.statSync(full);
+                    excelFiles.push({ name: f, fullPath: full, mtime: st.mtimeMs });
+                } catch (_) {}
+            }
         }
-        const excelFiles = fs.readdirSync(upDir)
-            .filter(f => /\.(xlsx|xls)$/i.test(f))
-            .map(f => {
-                const full = path.join(upDir, f);
-                const st = fs.statSync(full);
-                return { name: f, fullPath: full, mtime: st.mtimeMs };
-            })
-            .sort((a, b) => b.mtime - a.mtime);
+        excelFiles.sort((a, b) => b.mtime - a.mtime);
 
-        if (excelFiles.length === 0) {
-            return res.status(404).json({ error: 'No se encontró ningún archivo Excel previo en el servidor.' });
+        if (excelFiles.length > 0) {
+            const latest = excelFiles[0];
+            const parsed = parseExcelWorkbookToRows(latest.fullPath, latest.name);
+            return res.json(parsed);
         }
 
-        const latest = excelFiles[0];
-        const parsed = parseExcelWorkbookToRows(latest.fullPath, latest.name);
-        return res.json(parsed);
+        // Fallback inteligente: reconstruir el último lote de Excel directamente desde PostgreSQL (deserciones_casos.raw_row)
+        const latestBatchRes = await pool.query(`
+            SELECT lote_id, archivo_excel
+            FROM deserciones_casos
+            WHERE raw_row IS NOT NULL
+            ORDER BY id DESC
+            LIMIT 1
+        `);
+        if (latestBatchRes.rowCount > 0) {
+            const { lote_id, archivo_excel } = latestBatchRes.rows[0];
+            const dbRowsRes = lote_id
+                ? await pool.query(
+                    `SELECT DISTINCT ON (COALESCE(excel_row_index, id)) raw_row, excel_row_index
+                     FROM deserciones_casos
+                     WHERE lote_id = $1 AND raw_row IS NOT NULL
+                     ORDER BY COALESCE(excel_row_index, id) ASC`,
+                    [lote_id]
+                )
+                : await pool.query(
+                    `SELECT raw_row, excel_row_index
+                     FROM deserciones_casos
+                     WHERE archivo_excel IS NOT DISTINCT FROM $1 AND raw_row IS NOT NULL
+                     ORDER BY COALESCE(excel_row_index, id) ASC`,
+                    [archivo_excel]
+                );
+            const rawList = (dbRowsRes.rows || [])
+                .map(r => (typeof r.raw_row === 'string' ? JSON.parse(r.raw_row) : r.raw_row))
+                .filter(r => r && typeof r === 'object' && Object.keys(r).length > 0);
+            if (rawList.length > 0) {
+                const parsedFromDb = buildDesercionesProcessedPayload(
+                    rawList,
+                    archivo_excel || 'Ultimo_Excel_Deserciones.xlsx',
+                    ''
+                );
+                return res.json(parsedFromDb);
+            }
+        }
+
+        // Responder 200 vacío en vez de 404 para evitar errores rojos en la consola del navegador
+        return res.json({
+            empty: true,
+            message: 'No hay archivos Excel cargados recientemente.',
+            filename: null,
+            filepath: '',
+            columns: [],
+            total: 0,
+            total_ti: 0,
+            total_mayores: 0,
+            rows: []
+        });
     } catch (err) {
         console.error('[DESERCIONES] Error cargando último Excel:', err);
         return res.status(500).json({ error: `Error al recargar el último Excel: ${err.message}` });

@@ -222,56 +222,61 @@ router.get('/estadisticas', requireAuth, async (req, res) => {
                 documentos_cargados_aes: String(d.documentos_cargados_aes)
             }));
 
-        // 2. Avance real por usuario, resumen global y tendencia en paralelo
+        // 2. Avance real por usuario (pre-agregado por CTE sin subconsultas correlacionadas), resumen global y tendencia en paralelo
         const [userStats, globalCounts, tendencia] = await Promise.all([
             pool.query(`
                 WITH doc_exp AS (
                     SELECT DISTINCT expediente_id FROM documents WHERE expediente_id IS NOT NULL
+                ),
+                ea_agg AS (
+                    SELECT
+                        ea.user_id,
+                        COUNT(DISTINCT ea.expediente_id) AS expedientes_asignados,
+                        COUNT(DISTINCT CASE WHEN de.expediente_id IS NOT NULL THEN ea.expediente_id END) AS expedientes_con_docs
+                    FROM expediente_assignments ea
+                    LEFT JOIN doc_exp de ON de.expediente_id = ea.expediente_id
+                    GROUP BY ea.user_id
+                ),
+                user_docs_union AS (
+                    SELECT d.user_id AS uid, d.id AS doc_id, d.expediente_id, d.status, d.created_at, d.user_id AS orig_uid
+                    FROM documents d
+                    WHERE d.user_id IS NOT NULL
+                    UNION
+                    SELECT ea.user_id AS uid, d.id AS doc_id, d.expediente_id, d.status, d.created_at, d.user_id AS orig_uid
+                    FROM expediente_assignments ea
+                    INNER JOIN documents d ON d.expediente_id = ea.expediente_id
+                ),
+                ud_agg AS (
+                    SELECT
+                        uid AS user_id,
+                        COUNT(*) FILTER (WHERE orig_uid = uid OR orig_uid IS NULL) AS total_documentos,
+                        COUNT(DISTINCT expediente_id) FILTER (WHERE status = 'Cargado' AND expediente_id IS NOT NULL) AS expedientes_cargados_aes,
+                        COUNT(*) FILTER (WHERE status = 'Cargado') AS documentos_cargados_aes,
+                        COUNT(*) FILTER (WHERE DATE(created_at) = CURRENT_DATE) AS docs_hoy
+                    FROM user_docs_union
+                    GROUP BY uid
                 )
                 SELECT
-                    u.id            AS user_id,
-                    u.full_name     AS usuario,
+                    u.id AS user_id,
+                    u.full_name AS usuario,
                     u.area,
-                    COUNT(DISTINCT ea.expediente_id) AS expedientes_asignados,
-                    COUNT(DISTINCT CASE WHEN de.expediente_id IS NOT NULL THEN ea.expediente_id END) AS expedientes_con_docs,
+                    COALESCE(ea_agg.expedientes_asignados, 0) AS expedientes_asignados,
+                    COALESCE(ea_agg.expedientes_con_docs, 0) AS expedientes_con_docs,
                     ROUND(
-                        CASE WHEN COUNT(DISTINCT ea.expediente_id) > 0
-                             THEN COUNT(DISTINCT CASE WHEN de.expediente_id IS NOT NULL THEN ea.expediente_id END)::NUMERIC
-                                   / COUNT(DISTINCT ea.expediente_id) * 100
+                        CASE WHEN COALESCE(ea_agg.expedientes_asignados, 0) > 0
+                             THEN COALESCE(ea_agg.expedientes_con_docs, 0)::NUMERIC / ea_agg.expedientes_asignados * 100
                              ELSE 0
                         END, 1
                     ) AS porcentaje_cargue,
-                    COALESCE((
-                        SELECT COUNT(*) 
-                        FROM documents doc 
-                        WHERE doc.user_id = u.id 
-                           OR (doc.user_id IS NULL AND doc.expediente_id IN (SELECT expediente_id FROM expediente_assignments WHERE user_id = u.id))
-                    ), 0) AS total_documentos,
-                    COALESCE((
-                        SELECT COUNT(DISTINCT doc.expediente_id) 
-                        FROM documents doc 
-                        WHERE (doc.user_id = u.id OR doc.expediente_id IN (SELECT expediente_id FROM expediente_assignments WHERE user_id = u.id))
-                          AND doc.status = 'Cargado'
-                          AND doc.expediente_id IS NOT NULL
-                    ), 0) AS expedientes_cargados_aes,
-                    COALESCE((
-                        SELECT COUNT(*) 
-                        FROM documents doc 
-                        WHERE (doc.user_id = u.id OR doc.expediente_id IN (SELECT expediente_id FROM expediente_assignments WHERE user_id = u.id))
-                          AND doc.status = 'Cargado'
-                    ), 0) AS documentos_cargados_aes,
-                    COALESCE((
-                        SELECT COUNT(*) 
-                        FROM documents doc 
-                        WHERE (doc.user_id = u.id OR doc.expediente_id IN (SELECT expediente_id FROM expediente_assignments WHERE user_id = u.id))
-                          AND DATE(doc.created_at) = CURRENT_DATE
-                    ), 0) AS docs_hoy
+                    COALESCE(ud_agg.total_documentos, 0) AS total_documentos,
+                    COALESCE(ud_agg.expedientes_cargados_aes, 0) AS expedientes_cargados_aes,
+                    COALESCE(ud_agg.documentos_cargados_aes, 0) AS documentos_cargados_aes,
+                    COALESCE(ud_agg.docs_hoy, 0) AS docs_hoy
                 FROM users u
-                LEFT JOIN expediente_assignments ea ON ea.user_id = u.id
-                LEFT JOIN doc_exp de ON de.expediente_id = ea.expediente_id
+                LEFT JOIN ea_agg ON ea_agg.user_id = u.id
+                LEFT JOIN ud_agg ON ud_agg.user_id = u.id
                 WHERE u.is_active = 1
-                GROUP BY u.id, u.full_name, u.area
-                ORDER BY expedientes_asignados DESC
+                ORDER BY COALESCE(ea_agg.expedientes_asignados, 0) DESC
             `),
             pool.query(`
                 SELECT

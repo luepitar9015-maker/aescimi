@@ -6,27 +6,46 @@ import AIChatBot from './components/AIChatBot'; // IA Assistant
 import InventoryPdfModal from './components/InventoryPdfModal';
 import './App.css';
 
-// Lazy loaded page components to optimize bundle size and speed up page switching
-const CreationModule = lazy(() => import('./pages/CreationModule'));
-const ExpedienteCreation = lazy(() => import('./pages/ExpedienteCreation'));
-const UsersManagement = lazy(() => import('./pages/UsersManagement'));
-const Automation = lazy(() => import('./pages/Automation'));
-const DocumentManagement = lazy(() => import('./pages/DocumentManagement'));
-const BatchClassification = lazy(() => import('./pages/BatchClassification'));
-const DocumentQuery = lazy(() => import('./pages/DocumentQuery'));
-const CargueAes = lazy(() => import('./pages/CargueAes'));
-const OneDriveSettings = lazy(() => import('./pages/OneDriveSettings'));
-const AesSettings = lazy(() => import('./pages/AesSettings'));
-const PermissionsManagement = lazy(() => import('./pages/PermissionsManagement'));
-const Dashboard = lazy(() => import('./pages/Dashboard'));
-const TRDQuery = lazy(() => import('./pages/TRDQuery'));
-const SuperuserModule = lazy(() => import('./pages/SuperuserModule'));
-const ExploradorDocumental = lazy(() => import('./pages/ExploradorDocumental'));
-const Formatos = lazy(() => import('./pages/Formatos'));
-const ComunicacionesProducidas = lazy(() => import('./pages/ComunicacionesProducidas'));
-const DesercionesModule = lazy(() => import('./pages/DesercionesModule'));
-const SeguimientoExpedientes = lazy(() => import('./pages/SeguimientoExpedientes'));
-const InteractivePresentation = lazy(() => import('./pages/InteractivePresentation'));
+// Lazy loaded page components con auto-recuperación ante actualizaciones de versión (chunk hash)
+const lazyWithRetry = (importer) =>
+  lazy(async () => {
+    try {
+      const mod = await importer();
+      try { sessionStorage.removeItem('sena_chunk_retry'); } catch {}
+      return mod;
+    } catch (err) {
+      const alreadyRetried = (() => {
+        try { return sessionStorage.getItem('sena_chunk_retry') === '1'; } catch { return true; }
+      })();
+      if (!alreadyRetried) {
+        try { sessionStorage.setItem('sena_chunk_retry', '1'); } catch {}
+        window.location.reload();
+        return new Promise(() => {});
+      }
+      throw err;
+    }
+  });
+
+const CreationModule = lazyWithRetry(() => import('./pages/CreationModule'));
+const ExpedienteCreation = lazyWithRetry(() => import('./pages/ExpedienteCreation'));
+const UsersManagement = lazyWithRetry(() => import('./pages/UsersManagement'));
+const Automation = lazyWithRetry(() => import('./pages/Automation'));
+const DocumentManagement = lazyWithRetry(() => import('./pages/DocumentManagement'));
+const BatchClassification = lazyWithRetry(() => import('./pages/BatchClassification'));
+const DocumentQuery = lazyWithRetry(() => import('./pages/DocumentQuery'));
+const CargueAes = lazyWithRetry(() => import('./pages/CargueAes'));
+const OneDriveSettings = lazyWithRetry(() => import('./pages/OneDriveSettings'));
+const AesSettings = lazyWithRetry(() => import('./pages/AesSettings'));
+const PermissionsManagement = lazyWithRetry(() => import('./pages/PermissionsManagement'));
+const Dashboard = lazyWithRetry(() => import('./pages/Dashboard'));
+const TRDQuery = lazyWithRetry(() => import('./pages/TRDQuery'));
+const SuperuserModule = lazyWithRetry(() => import('./pages/SuperuserModule'));
+const ExploradorDocumental = lazyWithRetry(() => import('./pages/ExploradorDocumental'));
+const Formatos = lazyWithRetry(() => import('./pages/Formatos'));
+const ComunicacionesProducidas = lazyWithRetry(() => import('./pages/ComunicacionesProducidas'));
+const DesercionesModule = lazyWithRetry(() => import('./pages/DesercionesModule'));
+const SeguimientoExpedientes = lazyWithRetry(() => import('./pages/SeguimientoExpedientes'));
+const InteractivePresentation = lazyWithRetry(() => import('./pages/InteractivePresentation'));
 
 // --- Global Axios Interceptors ---
 axios.interceptors.request.use(
