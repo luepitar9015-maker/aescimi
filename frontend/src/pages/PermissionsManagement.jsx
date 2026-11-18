@@ -7,6 +7,8 @@ const MODULE_LABELS = {
     'trd': 'Estructura y TRD',
     'expedientes': 'Crear Expedientes',
     'documents': 'Gestión Documental',
+    'clasificacion-masiva': 'Clasificación Masiva',
+    'historias-academicas': 'Historias Académicas (Correo)',
     'query': 'Consulta de Documentos',
     'mass-upload': 'Cargue Masivo',
     'cargue-aes': 'Cargue AES',

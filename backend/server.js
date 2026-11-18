@@ -300,6 +300,8 @@ app.use('/api/ai', require('./routes/ai')); // AI Assistant & Classifier Routes
 app.use('/api/system', require('./routes/system')); // System Routes (Backup, etc)
 app.use('/api/audit', require('./routes/audit')); // Audit Log Routes
 app.use('/api/deserciones', require('./routes/deserciones')); // Módulo de Deserciones (OnBase)
+app.use('/api/aes-confirmations', require('./routes/aes_confirmations')); // Registro Horario de Confirmación Cargue AES
+app.use('/api/historias-academicas', require('./routes/historias_academicas')); // Sincronización Correo y Validación Historias Académicas (68.9224.4-37)
 
 // ── RUTA TEMPORAL: Reproductor de video para análisis (SOLO USO LOCAL) ──
 app.get('/video-player', (req, res) => {

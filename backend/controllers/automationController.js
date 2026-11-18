@@ -5,6 +5,7 @@ const { exec } = require('child_process');
 const EventEmitter = require('events');
 const db = require('../database');
 const { pool } = require('../database_pg');
+const { recordAesDocConfirmation, sendAesBatchSummaryEmail } = require('../routes/aes_confirmations');
 
 const automationEmitter = new EventEmitter();
 automationEmitter.setMaxListeners(20);
@@ -4907,8 +4908,12 @@ async function runIndependentBotWorker(session, currentBatch, options = {}) {
         formPage = page;
         formFrame = page.mainFrame();
 
+        const currentBatchId = `BATCH-${session.botKey || 'AES'}-${Date.now()}`;
+        session.batchId = currentBatchId;
+
         // Función auxiliar que sube 1 documento a OnBase con hasta 2 intentos y control anti-duplicado
         const uploadSingleDocToOnBase = async (docInfo, docLabel, hasMoreInBatch) => {
+            const docStartedAtIso = new Date().toISOString();
             // Doble chequeo en BD justo antes de subir para garantizar 0 duplicados
             if (docInfo?.id) {
                 try {
@@ -4988,13 +4993,30 @@ async function runIndependentBotWorker(session, currentBatch, options = {}) {
                     }
 
                     if (docInfo?.id) {
+                        const confirmedAtIso = new Date().toISOString();
                         await new Promise(resolve => {
                             db.run(
                                 'UPDATE documents SET status = ?, load_date = ? WHERE id = ?',
-                                ['Cargado', new Date().toISOString(), docInfo.id],
+                                ['Cargado', confirmedAtIso, docInfo.id],
                                 () => resolve()
                             );
                         });
+                        try {
+                            const confRec = await recordAesDocConfirmation({
+                                documentId: docInfo.id,
+                                batchId: currentBatchId,
+                                botKey: session.botKey || null,
+                                onbaseUser: session.onbaseUser || null,
+                                operatorName: session.operatorName || null,
+                                startedAt: docStartedAtIso,
+                                confirmedAt: confirmedAtIso,
+                                sourceMode: 'BOT_ONBASE'
+                            });
+                            if (confRec && confRec.expediente_completed) {
+                                const bogotaStr = new Date(confirmedAtIso).toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour12: true });
+                                session.logs.push(`${botTag} 🕒 [CONFIRMACIÓN EXPEDIENTE] ${docInfo.expediente_code || ''} completado (${confRec.expediente_docs_loaded}/${confRec.expediente_docs_total} docs) a las ${bogotaStr}.`);
+                            }
+                        } catch (_) {}
                         activeDocLocks.delete(docInfo.id);
                     }
                     return true;
@@ -5135,6 +5157,18 @@ async function runIndependentBotWorker(session, currentBatch, options = {}) {
         session.waitingForVerifier = false;
         session.completed = true;
         session.currentDocId = null;
+        if (session.processedDocs > 0 && session.batchId) {
+            sendAesBatchSummaryEmail({
+                batchId: session.batchId,
+                botKey: session.botKey || null,
+                onbaseUser: session.onbaseUser || null,
+                isAutoBatchEnd: true
+            }).then(mailRes => {
+                if (mailRes && !mailRes.skipped) {
+                    session.logs.push(`${botTag} 📧 Reporte de Confirmación AES generado (${mailRes.total_expedientes} expedientes / ${mailRes.total_documents} docs -> ${mailRes.recipient_email}: ${mailRes.delivery_status}).`);
+                }
+            }).catch(() => {});
+        }
         automationEmitter.emit('done', session);
     }
 }

@@ -4,6 +4,7 @@ const db = require('../database');
 const fs = require('fs');
 const path = require('path');
 const { requireAuth } = require('../middleware/authMiddleware');
+const { recordAesDocConfirmation } = require('./aes_confirmations');
 
 // Resolutor inteligente de rutas físicas de documentos en servidor (soporta /mnt/almacen/9224 vs /689224/ y rutas relativas)
 const resolveDocumentPath = (docPath, filename) => {
@@ -488,6 +489,18 @@ router.post('/update-status', (req, res) => {
     `;
     db.run(query, [status, ades_id || null, load_date, verifiedVal, verifyStage, id], function (err) {
         if (err) return res.status(500).json({ error: err.message });
+        if (isCargado && id) {
+            recordAesDocConfirmation({
+                documentId: id,
+                batchId: `MANUAL-${new Date().toISOString().slice(0, 10)}`,
+                botKey: 'MANUAL',
+                onbaseUser: req.user?.name || 'MANUAL',
+                operatorName: req.user?.name || null,
+                startedAt: load_date,
+                confirmedAt: load_date,
+                sourceMode: 'CONFIRMACION_MANUAL'
+            }).catch(() => {});
+        }
         res.json({ message: 'Document status updated', id });
     });
 });

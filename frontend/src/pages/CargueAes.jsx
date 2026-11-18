@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo, Fragment } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { Play, CheckCircle, CheckSquare, Clock, AlertCircle, FileText, Search, RefreshCw, Monitor, X, Globe, Settings as SettingsIcon, Save, Download, Trash, Database, Eye, ChevronDown, ChevronRight, Maximize2 } from 'lucide-react';
+import AesConfirmationsPanel from '../components/AesConfirmationsPanel';
 
 function CargueAes() {
     const currentUser = (() => { try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; } })();
@@ -1839,6 +1840,12 @@ function CargueAes() {
                         style={{ padding: '10px 22px', borderRadius: '8px 8px 0 0', border: 'none', background: activeTab === 'verificador' ? '#e8f5e9' : '#e0e0e0', color: activeTab === 'verificador' ? '#1b5e20' : '#333', fontWeight: 'bold', cursor: 'pointer', borderBottom: activeTab === 'verificador' ? '3px solid #2e7d32' : 'none', display: 'flex', alignItems: 'center', gap: '6px' }}
                     >
                         ✅ Verificador
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('confirmaciones')}
+                        style={{ padding: '10px 20px', borderRadius: '8px 8px 0 0', border: 'none', background: activeTab === 'confirmaciones' ? '#eff6ff' : '#e0e0e0', color: activeTab === 'confirmaciones' ? '#00324d' : '#333', fontWeight: 'bold', cursor: 'pointer', borderBottom: activeTab === 'confirmaciones' ? '3px solid #00324d' : 'none', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                        🕒 Registro Confirmación (Hora Exacta)
                     </button>
                     <button
                         onClick={() => setActiveTab('creacion')}
@@ -3824,6 +3831,8 @@ function CargueAes() {
                         </div>
                     );
                 })()
+            ) : activeTab === 'confirmaciones' ? (
+                <AesConfirmationsPanel />
             ) : (
                 <div className="mass-creation-container">
                     <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>

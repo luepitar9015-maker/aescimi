@@ -46,6 +46,7 @@ const ComunicacionesProducidas = lazyWithRetry(() => import('./pages/Comunicacio
 const DesercionesModule = lazyWithRetry(() => import('./pages/DesercionesModule'));
 const SeguimientoExpedientes = lazyWithRetry(() => import('./pages/SeguimientoExpedientes'));
 const InteractivePresentation = lazyWithRetry(() => import('./pages/InteractivePresentation'));
+const HistoriasAcademicasCorreo = lazyWithRetry(() => import('./pages/HistoriasAcademicasCorreo'));
 
 // --- Global Axios Interceptors ---
 axios.interceptors.request.use(
@@ -479,8 +480,8 @@ const styles = {
 
 // Protected Route Wrapper
 
-const ALLOWED_USER_MODULES = ['dashboard', 'documents', 'clasificacion-masiva', 'query'];
-const ALLOWED_USER_PATHS = ['/dashboard', '/documents', '/clasificacion-masiva', '/query'];
+const ALLOWED_USER_MODULES = ['dashboard', 'documents', 'clasificacion-masiva', 'query', 'historias-academicas', 'seguimiento', 'formatos', 'trd_query'];
+const ALLOWED_USER_PATHS = ['/dashboard', '/documents', '/clasificacion-masiva', '/query', '/historias-academicas', '/seguimiento', '/formatos', '/trd-query'];
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token');
@@ -542,7 +543,7 @@ function Layout({ children }) {
     if (currentUser.role === 'admin' || currentUser.role === 'superadmin') return true;
     if (!ALLOWED_USER_MODULES.includes(moduleId)) return false;
     const perm = permissions.find(p => p.module_id === moduleId);
-    return perm ? Number(perm.can_view) === 1 : true;
+    return perm ? Number(perm.can_view) === 1 : ['dashboard', 'documents', 'clasificacion-masiva', 'query'].includes(moduleId);
   };
 
   if (!currentUser) return <div className="p-8">Cargando perfil...</div>;
@@ -561,6 +562,7 @@ function Layout({ children }) {
           {canView('expedientes') && <Link to="/expedientes" className="nav-item"><FolderKanban size={18} /> Crear Expedientes</Link>}
           {canView('documents') && <Link to="/documents" className="nav-item"><Folder size={18} /> Gestión Documental</Link>}
           {canView('clasificacion-masiva') && <Link to="/clasificacion-masiva" className="nav-item"><Upload size={18} /> Clasificación Masiva</Link>}
+          {canView('historias-academicas') && <Link to="/historias-academicas" className="nav-item"><FileText size={18} /> Historias Académicas (Correo)</Link>}
           {canView('query') && <Link to="/query" className="nav-item"><Globe size={18} /> Consulta de Documentos</Link>}
           <button
             type="button"
@@ -674,6 +676,9 @@ function App() {
         } />
         <Route path="/clasificacion-masiva" element={
           <ProtectedRoute><Layout><BatchClassification /></Layout></ProtectedRoute>
+        } />
+        <Route path="/historias-academicas" element={
+          <ProtectedRoute><Layout><HistoriasAcademicasCorreo /></Layout></ProtectedRoute>
         } />
         <Route path="/query" element={
           <ProtectedRoute><Layout><DocumentQuery /></Layout></ProtectedRoute>
