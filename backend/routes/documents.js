@@ -2618,7 +2618,7 @@ const buildInventoryDataset = async (req, maxDeepReads = 300) => {
             d.filename ASC,
             d.created_at ASC,
             d.id ASC
-        LIMIT 15000
+        LIMIT 35000
     `;
 
     const resDocs = await pgPool.query(sql, params);
