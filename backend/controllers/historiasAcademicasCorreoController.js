@@ -544,9 +544,10 @@ async function ensureOutlookBrowserOpen(mailboxEmail = 'leparadam@sena.edu.co') 
     }
 
     // 2. Limpiar procesos huérfanos / bloqueos de ese perfil antes de lanzar nuevo Chromium
-    if (process.platform === 'linux') {
+    if (process.platform === 'linux' && profileInfo.slug) {
         try {
-            require('child_process').execSync(`pkill -9 -f ${profileInfo.slug} || true`);
+            const safePattern = `[${profileInfo.slug[0]}]${profileInfo.slug.slice(1)}`;
+            require('child_process').execSync(`pkill -9 -f "${safePattern}" || true`);
         } catch (_) {}
     }
     ['SingletonLock', 'SingletonCookie', 'SingletonSocket'].forEach(lockFile => {

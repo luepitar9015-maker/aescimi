@@ -2311,20 +2311,25 @@ const wrapPdfText = (rawText, font, fontSize, maxWidth, maxLines = 4) => {
     return lines.length > 0 ? lines : [''];
 };
 
-const ensurePageCountsForDocs = async (rows, pgPool, maxDeepReads = 350) => {
-    let deepReads = 0;
+const ensurePageCountsForDocs = async (rows, pgPool, maxDeepReads = 120) => {
+    let diskReads = 0;
+    const hardCap = Math.max(0, Number(maxDeepReads) || 0);
     for (const row of rows) {
         if (row.page_count && Number(row.page_count) > 0) {
             row.page_count = Number(row.page_count);
             continue;
         }
+        if (diskReads >= hardCap) {
+            row.page_count = 1;
+            continue;
+        }
+        diskReads++;
         let detected = null;
         try {
             const physPath = await resolveExistingPhysicalFile(row);
             if (physPath && fs.existsSync(physPath)) {
                 const buf = fs.readFileSync(physPath);
-                if (deepReads < maxDeepReads) {
-                    deepReads++;
+                if (diskReads <= Math.min(hardCap, 60)) {
                     const pdf = await PDFDocument.load(buf, { ignoreEncryption: true });
                     detected = pdf.getPageCount();
                 } else {
@@ -2332,7 +2337,7 @@ const ensurePageCountsForDocs = async (rows, pgPool, maxDeepReads = 350) => {
                     detected = m && m.length > 0 ? m.length : 1;
                 }
                 if (detected && detected > 0) {
-                    await pgPool.query('UPDATE documents SET page_count = $1 WHERE id = $2', [detected, row.id]).catch(() => {});
+                    pgPool.query('UPDATE documents SET page_count = $1 WHERE id = $2', [detected, row.id]).catch(() => {});
                 }
             }
         } catch (_) {}
