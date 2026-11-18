@@ -241,7 +241,8 @@ export default function HistoriasAcademicasCorreo() {
         password: mailboxPass,
         folder_name: folderName,
         search_query: outlookQuery,
-        max_messages: maxMsgs
+        max_messages: maxMsgs,
+        force_restart: true
       });
       setMailboxPass('');
       showNotice('info', 'Sincronización Outlook 365 iniciada. Observe el visor en vivo.');
@@ -260,7 +261,7 @@ export default function HistoriasAcademicasCorreo() {
     if (!outlookStatus.lastFrame) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const scaleX = 1366 / rect.width;
-    const scaleY = 820 / rect.height;
+    const scaleY = 860 / rect.height;
     const x = Math.round((e.clientX - rect.left) * scaleX);
     const y = Math.round((e.clientY - rect.top) * scaleY);
     try {
@@ -927,10 +928,15 @@ export default function HistoriasAcademicasCorreo() {
                 <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                   <button
                     type="submit"
-                    disabled={outlookStatus.isRunning}
+                    disabled={outlookStatus.isRunning && outlookStatus.status !== 'waiting_auth'}
                     style={{ flex: 1, padding: '10px 14px', borderRadius: 8, border: 'none', background: '#39a900', color: '#fff', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                   >
-                    <Play size={15} /> {outlookStatus.isRunning ? 'Sincronizando Buzón...' : 'Conectar y Sincronizar Correo'}
+                    <Play size={15} />
+                    {outlookStatus.isRunning && outlookStatus.status !== 'waiting_auth'
+                      ? 'Sincronizando Buzón...'
+                      : outlookStatus.status === 'waiting_auth'
+                        ? 'Reintentar / Enviar Credenciales'
+                        : 'Conectar y Sincronizar Correo'}
                   </button>
                   {outlookStatus.isRunning && (
                     <button
@@ -989,6 +995,12 @@ export default function HistoriasAcademicasCorreo() {
             {outlookStatus.mfaNumber && (
               <div style={{ background: '#fef08a', color: '#713f12', padding: '10px 14px', borderRadius: 8, fontWeight: 800, textAlign: 'center', fontSize: 15 }}>
                 🔐 Apruebe en Microsoft Authenticator el número: <span style={{ fontSize: 22, padding: '2px 10px', background: '#fff', borderRadius: 6 }}>{outlookStatus.mfaNumber}</span>
+              </div>
+            )}
+
+            {!outlookStatus.mfaNumber && outlookStatus.authPrompt && (
+              <div style={{ background: '#dbeafe', color: '#1e3a8a', padding: '8px 12px', borderRadius: 8, fontWeight: 700, fontSize: 12.5 }}>
+                ℹ️ {outlookStatus.authPrompt}
               </div>
             )}
 

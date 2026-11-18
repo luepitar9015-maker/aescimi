@@ -35,6 +35,16 @@ const SuperuserModule = () => {
   const [loadingAesReport, setLoadingAesReport] = useState(false);
   const [loadingNoCodeReport, setLoadingNoCodeReport] = useState(false);
 
+  const [assignedEmptyAlert, setAssignedEmptyAlert] = useState({
+    total_sin_docs_distinct: 0,
+    total_users_affected: 0,
+    by_user: [],
+    items: []
+  });
+  const [selectedEmptyUserId, setSelectedEmptyUserId] = useState('all');
+  const [emptySearch, setEmptySearch] = useState('');
+  const [loadingEmptyAlert, setLoadingEmptyAlert] = useState(false);
+
   // ── Monitoreo y Bitácora ──────────────────────────
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
@@ -70,6 +80,7 @@ const SuperuserModule = () => {
       fetchExpirationDate();
       fetchOnlineUsers();
       fetchAuditLogs();
+      fetchAssignedEmptyAlert();
     }
   }, []);
 
@@ -320,6 +331,44 @@ const SuperuserModule = () => {
     }
   };
 
+  const fetchAssignedEmptyAlert = async (uid = 'all') => {
+    setLoadingEmptyAlert(true);
+    try {
+      const params = uid && uid !== 'all' ? { user_id: uid } : {};
+      const res = await axios.get(`${API_URL}/alerts/assigned-without-docs`, { headers, params });
+      if (res.data?.success) {
+        setAssignedEmptyAlert(res.data);
+      }
+    } catch (err) {
+      console.error('Error fetching assigned empty alerts:', err);
+    } finally {
+      setLoadingEmptyAlert(false);
+    }
+  };
+
+  const downloadAssignedEmptyExcel = async () => {
+    try {
+      const params = selectedEmptyUserId && selectedEmptyUserId !== 'all' ? { user_id: selectedEmptyUserId } : {};
+      const res = await axios.get(`${API_URL}/reports/assigned-without-docs-excel`, {
+        headers,
+        params,
+        responseType: 'blob'
+      });
+      const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Novedades_Asignados_Sin_Documentos_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      showSuccess('Reporte de expedientes asignados sin documentos descargado.');
+    } catch (err) {
+      showError('Error al descargar el reporte de novedades.');
+    }
+  };
+
   const downloadNoCodeReport = async () => {
     setLoadingNoCodeReport(true);
     try {
@@ -474,6 +523,38 @@ const SuperuserModule = () => {
           </div>
         )}
 
+        {assignedEmptyAlert.total_sin_docs_distinct > 0 && (
+          <div className="mb-6 bg-amber-50 border-2 border-amber-400 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="bg-amber-500 text-white p-2 rounded-xl mt-0.5">
+                <AlertTriangle size={22} />
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-amber-950">
+                  NOVEDAD DE CARGUE DETECTADA: {assignedEmptyAlert.total_sin_docs_distinct} expediente(s) asignado(s) tienen 0 documentos cargados
+                </h3>
+                <p className="text-xs text-amber-800 mt-0.5">
+                   distribuidos en <strong>{assignedEmptyAlert.total_users_affected}</strong> funcionario(s) con asignación activa que aún no registran ningún archivo PDF en dichos expedientes.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => { setActiveSection('novedades_sin_docs'); fetchAssignedEmptyAlert('all'); }}
+                className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-extrabold px-4 py-2 rounded-xl shadow-sm transition-colors"
+              >
+                Ver Funcionarios y Expedientes ({assignedEmptyAlert.total_sin_docs_distinct})
+              </button>
+              <button
+                onClick={downloadAssignedEmptyExcel}
+                className="bg-white hover:bg-amber-100 text-amber-900 border border-amber-400 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 transition-colors"
+              >
+                <Download size={14} /> Excel
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {/* Sidebar - Navigation */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden h-fit flex flex-col gap-4 p-4">
@@ -530,6 +611,22 @@ const SuperuserModule = () => {
                   </span>
                 </button>
                 <button
+                  onClick={() => { setActiveSection('novedades_sin_docs'); fetchAssignedEmptyAlert(selectedEmptyUserId); }}
+                  className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all flex items-center justify-between ${
+                    activeSection === 'novedades_sin_docs'
+                      ? 'bg-amber-100 text-amber-900 font-bold shadow-sm'
+                      : 'text-gray-700 hover:bg-amber-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle size={16} className="text-amber-600" />
+                    <span>Sin Documentos</span>
+                  </div>
+                  <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-extrabold">
+                    {assignedEmptyAlert.total_sin_docs_distinct || 0}
+                  </span>
+                </button>
+                <button
                   onClick={() => { setActiveSection('reportes'); }}
                   className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all flex items-center justify-between ${
                     activeSection === 'reportes'
@@ -576,6 +673,142 @@ const SuperuserModule = () => {
           {/* Main Content - Dynamic Section Panels */}
           <div className="md:col-span-3 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             
+            {/* NOVEDADES: EXPEDIENTES ASIGNADOS CON 0 DOCUMENTOS */}
+            {activeSection === 'novedades_sin_docs' && (
+              <div className="p-6 space-y-6">
+                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-4">
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                      <AlertTriangle size={20} className="text-amber-600" />
+                      Novedades: Expedientes Asignados Sin Ningún Documento Cargado (0 PDFs)
+                    </h2>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Identifica por funcionario cuáles expedientes asignados aún no tienen ningún soporte PDF cargado en el sistema.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => fetchAssignedEmptyAlert(selectedEmptyUserId)}
+                      className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5"
+                    >
+                      <RefreshCw size={14} className={loadingEmptyAlert ? 'animate-spin' : ''} /> Actualizar
+                    </button>
+                    <button
+                      onClick={downloadAssignedEmptyExcel}
+                      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-sm"
+                    >
+                      <Download size={14} /> Descargar Reporte Excel
+                    </button>
+                  </div>
+                </div>
+
+                {/* Resumen por Funcionario */}
+                <div>
+                  <h3 className="text-xs font-extrabold text-gray-600 uppercase mb-2">
+                    Resumen por Funcionario Asignado (Haga clic en un funcionario para filtrar sus expedientes vacíos)
+                  </h3>
+                  <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-gray-50 text-gray-700 font-bold border-b border-gray-200">
+                        <tr>
+                          <th className="p-3">Funcionario</th>
+                          <th className="p-3">Cargo / Área</th>
+                          <th className="p-3 text-center">Total Asignados</th>
+                          <th className="p-3 text-center">Con Documentos</th>
+                          <th className="p-3 text-center">Sin Documentos (0 PDFs)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        <tr
+                          onClick={() => { setSelectedEmptyUserId('all'); fetchAssignedEmptyAlert('all'); }}
+                          className={`cursor-pointer ${selectedEmptyUserId === 'all' ? 'bg-amber-50 font-bold' : 'hover:bg-gray-50'}`}
+                        >
+                          <td className="p-3 text-purple-800 font-extrabold" colSpan={2}>
+                            📊 Ver Todos los Funcionarios con Novedad ({assignedEmptyAlert.by_user.length})
+                          </td>
+                          <td className="p-3 text-center">—</td>
+                          <td className="p-3 text-center">—</td>
+                          <td className="p-3 text-center font-extrabold text-red-600">{assignedEmptyAlert.total_sin_docs_distinct}</td>
+                        </tr>
+                        {assignedEmptyAlert.by_user.map(u => (
+                          <tr
+                            key={u.user_id}
+                            onClick={() => { setSelectedEmptyUserId(String(u.user_id)); fetchAssignedEmptyAlert(u.user_id); }}
+                            className={`cursor-pointer ${String(selectedEmptyUserId) === String(u.user_id) ? 'bg-amber-50' : 'hover:bg-gray-50'}`}
+                          >
+                            <td className="p-3">
+                              <div className="font-bold text-gray-900">{u.full_name}</div>
+                              <div className="text-[11px] text-gray-500">Doc: {u.document_no}</div>
+                            </td>
+                            <td className="p-3 text-gray-600">{u.position || '—'} · {u.area || ''}</td>
+                            <td className="p-3 text-center font-bold text-gray-800">{u.total_asignados}</td>
+                            <td className="p-3 text-center font-bold text-green-700">{u.con_documentos}</td>
+                            <td className="p-3 text-center">
+                              <span className="bg-red-100 text-red-800 font-extrabold px-2.5 py-1 rounded-full">
+                                {u.sin_documentos} sin cargar
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Buscador y Detalle de Expedientes con 0 Documentos */}
+                <div>
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+                    <h3 className="text-xs font-extrabold text-gray-600 uppercase">
+                      Detalle de Expedientes con 0 Documentos ({assignedEmptyAlert.items.length})
+                    </h3>
+                    <div className="relative w-72">
+                      <Search size={14} className="absolute left-3 top-2.5 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Buscar código EX, ficha, aprendiz..."
+                        value={emptySearch}
+                        onChange={e => setEmptySearch(e.target.value)}
+                        className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-lg text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto border border-gray-200 rounded-xl max-h-[420px]">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-gray-800 text-white font-bold sticky top-0">
+                        <tr>
+                          <th className="p-2.5">Código AES</th>
+                          <th className="p-2.5">Subserie</th>
+                          <th className="p-2.5">Ficha / Contrato</th>
+                          <th className="p-2.5">Aprendiz / Contratista</th>
+                          <th className="p-2.5">Funcionario(s) Asignado(s)</th>
+                          <th className="p-2.5 text-center">Días Sin Cargue</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {assignedEmptyAlert.items
+                          .filter(it => !emptySearch || `${it.expediente_code} ${it.subserie} ${it.referencia} ${it.titular} ${it.responsables}`.toLowerCase().includes(emptySearch.toLowerCase()))
+                          .slice(0, 500)
+                          .map(it => (
+                            <tr key={it.expediente_id} className="hover:bg-red-50/40">
+                              <td className="p-2.5 font-bold text-gray-900">{it.expediente_code}</td>
+                              <td className="p-2.5 text-gray-600">{it.subserie}</td>
+                              <td className="p-2.5 font-semibold text-blue-900">{it.referencia || '—'}</td>
+                              <td className="p-2.5 font-semibold text-gray-800">{it.titular || '—'}</td>
+                              <td className="p-2.5 text-gray-700">{it.responsables}</td>
+                              <td className="p-2.5 text-center">
+                                <span className="bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded">
+                                  {it.dias_sin_cargue} día(s)
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* 0. SECCIÓN: MONITOREO DE SERVIDOR Y SISTEMA EN VIVO */}
             {activeSection === 'server_monitor' && (
               <div className="p-6 space-y-6">

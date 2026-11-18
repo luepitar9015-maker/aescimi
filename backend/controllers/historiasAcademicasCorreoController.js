@@ -22,15 +22,29 @@ const STORAGE_ROOT = (() => {
 const INBOX_STORAGE_DIR = path.join(STORAGE_ROOT, 'historias_correo_inbox');
 try { fs.mkdirSync(INBOX_STORAGE_DIR, { recursive: true }); } catch (_) {}
 
-const OUTLOOK_PROFILE_DIR = (() => {
-    if (process.platform === 'linux' && fs.existsSync('/mnt/almacen')) {
-        const d = '/mnt/almacen/.puppeteer_tmp/outlook_historias_profile';
-        try { fs.mkdirSync(d, { recursive: true }); return d; } catch (_) {}
+function resolveOutlookProfileDir(mailboxEmail = 'leparadam@sena.edu.co') {
+    const cleanEmail = String(mailboxEmail || 'leparadam@sena.edu.co').trim().toLowerCase();
+    // Reutilizar el perfil persistente oficial ya autenticado de leparadam@sena.edu.co
+    if (!cleanEmail || cleanEmail === 'leparadam@sena.edu.co') {
+        const sharedDir = path.join(__dirname, '..', 'uploads', 'outlook_profile_leparadam');
+        try { fs.mkdirSync(sharedDir, { recursive: true }); } catch (_) {}
+        return { dir: sharedDir, isSharedLeparadam: true, slug: 'outlook_profile_leparadam' };
     }
-    const d = path.join(__dirname, '..', 'uploads', 'outlook_historias_profile');
+    const slug = `outlook_profile_${cleanEmail.replace(/[^a-z0-9]/g, '_').slice(0, 40)}`;
+    if (process.platform === 'linux' && fs.existsSync('/mnt/almacen')) {
+        const d = path.join('/mnt/almacen/.puppeteer_tmp', slug);
+        try { fs.mkdirSync(d, { recursive: true }); return { dir: d, isSharedLeparadam: false, slug }; } catch (_) {}
+    }
+    const d = path.join(__dirname, '..', 'uploads', slug);
     try { fs.mkdirSync(d, { recursive: true }); } catch (_) {}
-    return d;
-})();
+    return { dir: d, isSharedLeparadam: false, slug };
+}
+
+const withTimeout = (promise, ms, fallbackVal = null) =>
+    Promise.race([
+        promise,
+        new Promise((resolve) => setTimeout(() => resolve(fallbackVal), ms))
+    ]);
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -355,8 +369,16 @@ const outlookSyncState = {
     authPrompt: null,
     logs: [],
     lastFrame: null,
+    currentUrl: '',
     browser: null,
     page: null,
+    activeProfileSlug: null,
+    frameTimer: null,
+    _capturing: false,
+    _triedAutoPass: false,
+    _clickedAuthPushCount: 0,
+    _troubleReloadCount: 0,
+    _lastMfaLogged: null,
     stats: { scanned: 0, savedToInbox: 0, matched: 0, duplicates: 0 }
 };
 
@@ -367,18 +389,171 @@ function addOutlookLog(msg) {
     if (outlookSyncState.logs.length > 300) outlookSyncState.logs.shift();
 }
 
-async function captureOutlookFrame() {
-    if (!outlookSyncState.page || outlookSyncState.page.isClosed()) return;
+async function flushMicrosoftLoginAnimations(page) {
+    if (!page || page.isClosed()) return;
     try {
-        const b64 = await outlookSyncState.page.screenshot({ encoding: 'base64', type: 'jpeg', quality: 62 });
-        outlookSyncState.lastFrame = `data:image/jpeg;base64,${b64}`;
+        await withTimeout(page.evaluate(() => {
+            const lb = document.querySelector('#lightbox');
+            const pv = document.querySelector('.pagination-view');
+            if (window.ko && lb) {
+                try {
+                    const ctx = window.ko.contextFor(lb);
+                    if (ctx?.$page?.paginationControlHelper?.animationEnd) {
+                        ctx.$page.paginationControlHelper.animationEnd();
+                    }
+                } catch (_) {}
+            }
+            [lb, pv, ...(document.querySelectorAll('.animate, .slide-in-next, .slide-in-back, .pagination-view > div'))]
+                .filter(Boolean)
+                .forEach(el => {
+                    try {
+                        el.dispatchEvent(new AnimationEvent('animationend', { bubbles: true }));
+                        el.dispatchEvent(new Event('webkitAnimationEnd', { bubbles: true }));
+                    } catch (_) {}
+                });
+        }), 1200);
     } catch (_) {}
 }
 
-async function ensureOutlookBrowserOpen() {
-    if (outlookSyncState.browser && outlookSyncState.browser.isConnected() && outlookSyncState.page && !outlookSyncState.page.isClosed()) {
-        return { browser: outlookSyncState.browser, page: outlookSyncState.page };
+async function captureOutlookFrame() {
+    if (!outlookSyncState.page || outlookSyncState._capturing) return;
+    outlookSyncState._capturing = true;
+    try {
+        if (outlookSyncState.page.isClosed()) return;
+        if (outlookSyncState.browser) {
+            try {
+                const pages = await withTimeout(outlookSyncState.browser.pages(), 1200, []);
+                if (Array.isArray(pages) && pages.length > 1) {
+                    for (const p of pages) {
+                        if (p !== outlookSyncState.page && /support\.microsoft\.com|aka\.ms/i.test(p.url() || '')) {
+                            await p.close().catch(() => {});
+                        }
+                    }
+                    await outlookSyncState.page.bringToFront().catch(() => {});
+                }
+            } catch (_) {}
+        }
+        outlookSyncState.currentUrl = outlookSyncState.page.url() || '';
+        if (/login\.microsoftonline\.com|login\.live\.com/i.test(outlookSyncState.currentUrl)) {
+            await flushMicrosoftLoginAnimations(outlookSyncState.page);
+        }
+        const b64 = await withTimeout(
+            outlookSyncState.page.screenshot({ encoding: 'base64', type: 'jpeg', quality: 65 }),
+            2500,
+            null
+        );
+        if (b64) outlookSyncState.lastFrame = `data:image/jpeg;base64,${b64}`;
+    } catch (_) {
+    } finally {
+        outlookSyncState._capturing = false;
     }
+}
+
+function ensureContinuousOutlookFrameCapture() {
+    if (outlookSyncState.frameTimer) clearInterval(outlookSyncState.frameTimer);
+    outlookSyncState.frameTimer = setInterval(async () => {
+        if (!outlookSyncState.isRunning && outlookSyncState.page && !outlookSyncState.page.isClosed()) {
+            try {
+                await captureOutlookFrame();
+                const liveInfo = await withTimeout(outlookSyncState.page.evaluate(() => {
+                    const mfaEl = document.querySelector('#idRichContext_DisplaySign, #displaySign, .displaySign, [data-bind*="displaySign"]');
+                    const mfaNum = (mfaEl && mfaEl.offsetParent !== null) ? mfaEl.innerText.trim() : null;
+                    const hasMail = Boolean(
+                        document.querySelector('[role="tree"]') ||
+                        document.querySelector('#MainModule') ||
+                        document.querySelector('#topSearchInput') ||
+                        document.querySelector('[data-app-section="NavigationPane"]') ||
+                        document.querySelector('[data-app-section="MessageList"]')
+                    );
+                    return { mfaNum, hasMail };
+                }), 1500, null);
+                if (liveInfo) {
+                    if (liveInfo.mfaNum) {
+                        outlookSyncState.mfaNumber = liveInfo.mfaNum;
+                        outlookSyncState.status = 'waiting_auth';
+                        outlookSyncState.authPrompt = `Apruebe en Microsoft Authenticator el número: ${liveInfo.mfaNum}`;
+                    } else if (liveInfo.hasMail && outlookSyncState.status === 'waiting_auth') {
+                        outlookSyncState.mfaNumber = null;
+                        outlookSyncState.authPrompt = null;
+                        outlookSyncState.status = 'completed';
+                    }
+                }
+            } catch (_) {}
+        }
+    }, 1800);
+}
+
+async function ensureOutlookBrowserOpen(mailboxEmail = 'leparadam@sena.edu.co') {
+    const profileInfo = resolveOutlookProfileDir(mailboxEmail);
+
+    if (
+        outlookSyncState.browser &&
+        outlookSyncState.page &&
+        outlookSyncState.activeProfileSlug === profileInfo.slug
+    ) {
+        try {
+            if (outlookSyncState.browser.isConnected() && !outlookSyncState.page.isClosed()) {
+                const ok = await withTimeout(outlookSyncState.page.title(), 2000, null);
+                if (ok !== null) {
+                    ensureContinuousOutlookFrameCapture();
+                    return { browser: outlookSyncState.browser, page: outlookSyncState.page, reused: true };
+                }
+            }
+        } catch (_) {}
+        try { await withTimeout(outlookSyncState.browser.close(), 1500); } catch (_) {}
+        outlookSyncState.browser = null;
+        outlookSyncState.page = null;
+    } else if (outlookSyncState.browser && outlookSyncState.activeProfileSlug !== profileInfo.slug) {
+        try { await withTimeout(outlookSyncState.browser.close(), 1500); } catch (_) {}
+        outlookSyncState.browser = null;
+        outlookSyncState.page = null;
+    }
+
+    // 1. Intentar reconectar si el navegador persistente ya está vivo en el servidor (ej. perfil compartido leparadam)
+    const activePortFile = path.join(profileInfo.dir, 'DevToolsActivePort');
+    if (fs.existsSync(activePortFile)) {
+        try {
+            const lines = fs.readFileSync(activePortFile, 'utf8').trim().split(/\r?\n/);
+            if (lines.length >= 2 && lines[0] && lines[1]) {
+                const wsEndpoint = `ws://127.0.0.1:${lines[0].trim()}${lines[1].trim()}`;
+                const existingBrowser = await withTimeout(
+                    puppeteer.connect({
+                        browserWSEndpoint: wsEndpoint,
+                        protocolTimeout: 20000,
+                        defaultViewport: { width: 1366, height: 860 }
+                    }),
+                    3500,
+                    null
+                );
+                if (existingBrowser) {
+                    const existingPages = await withTimeout(existingBrowser.pages(), 2000, []);
+                    const existingPage = existingPages.find(p => /outlook|microsoft/i.test(p.url() || '')) || existingPages[existingPages.length - 1];
+                    if (existingPage && !existingPage.isClosed()) {
+                        const titleOk = await withTimeout(existingPage.title(), 2000, null);
+                        if (titleOk !== null) {
+                            outlookSyncState.browser = existingBrowser;
+                            outlookSyncState.page = existingPage;
+                            outlookSyncState.activeProfileSlug = profileInfo.slug;
+                            ensureContinuousOutlookFrameCapture();
+                            return { browser: existingBrowser, page: existingPage, reused: true };
+                        }
+                    }
+                }
+            }
+        } catch (_) {}
+    }
+
+    // 2. Limpiar procesos huérfanos / bloqueos de ese perfil antes de lanzar nuevo Chromium
+    if (process.platform === 'linux') {
+        try {
+            require('child_process').execSync(`pkill -9 -f ${profileInfo.slug} || true`);
+        } catch (_) {}
+    }
+    ['SingletonLock', 'SingletonCookie', 'SingletonSocket'].forEach(lockFile => {
+        const p = path.join(profileInfo.dir, lockFile);
+        try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch (_) {}
+    });
+
     const execPath = (() => {
         if (process.platform === 'linux') {
             for (const c of ['/usr/bin/google-chrome-stable', '/usr/bin/google-chrome', '/usr/bin/chromium-browser', '/usr/bin/chromium']) {
@@ -391,20 +566,80 @@ async function ensureOutlookBrowserOpen() {
     const browser = await puppeteer.launch({
         headless: 'new',
         executablePath: execPath,
-        userDataDir: OUTLOOK_PROFILE_DIR,
+        userDataDir: profileInfo.dir,
+        protocolTimeout: 20000,
+        defaultViewport: { width: 1366, height: 860 },
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--window-size=1366,820'
-        ],
-        defaultViewport: { width: 1366, height: 820 }
+            '--disable-gpu',
+            '--window-size=1366,860'
+        ]
     });
-    const pages = await browser.pages();
-    const page = pages.length > 0 ? pages[0] : await browser.newPage();
+
+    const oldPages = await browser.pages();
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1366, height: 860 });
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36');
+
+    // CRÍTICO: Evitar bloqueo por Windows Hello / Passkey (FIDO2) y desbloquear animaciones KnockoutJS en login.microsoftonline.com
+    const injectWebAuthnAndAnimationBypass = () => {
+        if (navigator.credentials && navigator.credentials.get) {
+            navigator.credentials.get = function () {
+                return new Promise((_, reject) => {
+                    setTimeout(() => {
+                        reject(new DOMException('The operation either timed out or was not allowed.', 'NotAllowedError'));
+                    }, 250);
+                });
+            };
+        }
+        setInterval(() => {
+            try {
+                if (!/login\.microsoftonline\.com|login\.live\.com/i.test(window.location.href)) return;
+                const animating = document.querySelector('.pagination-view.animate, .slide-in-next, .slide-in-prev, .slide-out-next, .slide-out-prev');
+                if (!animating) return;
+                if (window.ko && typeof window.ko.contextFor === 'function') {
+                    const lb = document.querySelector('#lightbox') || animating;
+                    const ctx = window.ko.contextFor(lb);
+                    if (ctx && ctx.$page && ctx.$page.paginationControlHelper && typeof ctx.$page.paginationControlHelper.animationEnd === 'function') {
+                        ctx.$page.paginationControlHelper.animationEnd();
+                    }
+                }
+                document.querySelectorAll('.pagination-view, .animate, .slide-in-next, .slide-in-prev, #lightbox').forEach(el => {
+                    try {
+                        el.dispatchEvent(new AnimationEvent('animationend', { bubbles: true }));
+                        el.dispatchEvent(new TransitionEvent('transitionend', { bubbles: true }));
+                    } catch (_) {}
+                });
+            } catch (_) {}
+        }, 450);
+    };
+    await page.evaluateOnNewDocument(injectWebAuthnAndAnimationBypass);
+    for (const op of oldPages) {
+        try { await op.close(); } catch (_) {}
+    }
+
+    browser.on('targetcreated', async (target) => {
+        try {
+            if (target.type() === 'page') {
+                const newP = await target.page();
+                if (newP && newP !== outlookSyncState.page) {
+                    await sleep(500);
+                    const u = newP.url() || '';
+                    if (!/outlook\.(office|office365)\.com|outlook\.cloud\.microsoft|login\.microsoftonline\.com/i.test(u)) {
+                        await newP.close().catch(() => {});
+                    }
+                }
+            }
+        } catch (_) {}
+    });
+
     outlookSyncState.browser = browser;
     outlookSyncState.page = page;
-    return { browser, page };
+    outlookSyncState.activeProfileSlug = profileInfo.slug;
+    ensureContinuousOutlookFrameCapture();
+    return { browser, page, reused: false };
 }
 
 /**
@@ -774,6 +1009,50 @@ async function buildAndAssignHistoriaPdf({
     };
 }
 
+// ─── INTERACCIÓN SEGURA SIN BLOQUEO (< 3s) CON VISOR OUTLOOK 365 ─────────────
+async function interactWithOutlookPage({ type, x, y, text, pressEnter }) {
+    const page = outlookSyncState.page;
+    if (!page || page.isClosed()) {
+        throw new Error('No hay navegador Outlook activo. Pulse primero "Conectar y Sincronizar Correo".');
+    }
+
+    await withTimeout((async () => {
+        await flushMicrosoftLoginAnimations(page);
+        if (type === 'click' && typeof x === 'number' && typeof y === 'number') {
+            await page.mouse.click(x, y);
+        } else if (type === 'type' && text !== undefined) {
+            const strVal = String(text);
+            // Si estamos en pantalla de contraseña u OTP de Microsoft, enfocar automáticamente la caja visible
+            const targetSelector = await page.evaluate(() => {
+                const pwd = document.querySelector('input[type="password"], input[name="passwd"], #i0118');
+                if (pwd && pwd.offsetParent !== null) return 'input[type="password"], input[name="passwd"], #i0118';
+                const otp = document.querySelector('input[name="otc"], #idTxtBx_SAOTCC_OTC, input[type="tel"]');
+                if (otp && otp.offsetParent !== null) return 'input[name="otc"], #idTxtBx_SAOTCC_OTC, input[type="tel"]';
+                const em = document.querySelector('input[type="email"], input[name="loginfmt"], #i0116');
+                if (em && em.offsetParent !== null) return 'input[type="email"], input[name="loginfmt"], #i0116';
+                return null;
+            }).catch(() => null);
+
+            if (targetSelector) {
+                await page.click(targetSelector, { clickCount: 3 }).catch(() => {});
+                await page.keyboard.press('Backspace').catch(() => {});
+                await page.type(targetSelector, strVal, { delay: 18 }).catch(() => {});
+                if (pressEnter) {
+                    await sleep(250);
+                    await page.click('#idSIButton9, input[type="submit"], button[type="submit"]').catch(() => page.keyboard.press('Enter'));
+                }
+            } else {
+                await page.keyboard.type(strVal, { delay: 18 });
+                if (pressEnter) await page.keyboard.press('Enter');
+            }
+        }
+    })(), 3200);
+
+    await sleep(550);
+    await captureOutlookFrame();
+    return { lastFrame: outlookSyncState.lastFrame };
+}
+
 // ─── ESCANEO EN VIVO DE OUTLOOK 365 WEB ──────────────────────────────────────
 async function startOutlookHistoriasSync({
     mailboxEmail = 'leparadam@sena.edu.co',
@@ -781,26 +1060,59 @@ async function startOutlookHistoriasSync({
     folderName = 'Bandeja de entrada',
     searchQuery = '',
     maxMessages = 35,
-    ownerUserId = null
+    ownerUserId = null,
+    forceRestart = false
 }) {
+    const cleanEmail = String(mailboxEmail || 'leparadam@sena.edu.co').trim().toLowerCase();
+
     if (outlookSyncState.isRunning) {
-        return { started: false, message: 'Ya hay una sincronización de correo en ejecución.' };
+        if (forceRestart || outlookSyncState.status === 'waiting_auth' || outlookSyncState.status === 'error') {
+            outlookSyncState.isRunning = false;
+            await sleep(350);
+        } else {
+            return { started: false, message: 'Ya hay una sincronización de correo en ejecución.' };
+        }
+    }
+
+    // Si es leparadam@sena.edu.co y envían contraseña nueva, persistirla; si no envían, reutilizar la guardada
+    let effectivePass = String(password || '').trim();
+    if (cleanEmail === 'leparadam@sena.edu.co') {
+        try {
+            if (effectivePass) {
+                await pool.query(
+                    `INSERT INTO system_settings (key, value) VALUES ('deserciones_email_pass', $1)
+                     ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = CURRENT_TIMESTAMP`,
+                    [effectivePass]
+                );
+            } else {
+                const pRes = await pool.query("SELECT value FROM system_settings WHERE key = 'deserciones_email_pass' LIMIT 1");
+                if (pRes.rows?.[0]?.value) effectivePass = String(pRes.rows[0].value).trim();
+            }
+        } catch (_) {}
     }
 
     outlookSyncState.isRunning = true;
     outlookSyncState.status = 'running';
-    outlookSyncState.mailboxEmail = mailboxEmail;
+    outlookSyncState.mailboxEmail = cleanEmail;
     outlookSyncState.folderName = folderName;
     outlookSyncState.mfaNumber = null;
     outlookSyncState.authPrompt = null;
     outlookSyncState.logs = [];
+    outlookSyncState._triedAutoPass = false;
+    outlookSyncState._clickedAuthPushCount = 0;
+    outlookSyncState._troubleReloadCount = 0;
+    outlookSyncState._lastMfaLogged = null;
     outlookSyncState.stats = { scanned: 0, savedToInbox: 0, matched: 0, duplicates: 0 };
 
+    // Ejecución 100% en segundo plano para responder < 50ms al cliente HTTP (nunca 504)
     (async () => {
         try {
             await ensureHistoriasCorreoSchema();
-            addOutlookLog(`🚀 Conectando al buzón Outlook 365 (${mailboxEmail}) — Carpeta: ${folderName}...`);
-            const { page } = await ensureOutlookBrowserOpen();
+            addOutlookLog(`🚀 Conectando al buzón Outlook 365 (${cleanEmail}) — Carpeta: ${folderName}...`);
+            const { page, reused } = await ensureOutlookBrowserOpen(cleanEmail);
+            if (reused) {
+                addOutlookLog(`🟢 Reutilizando sesión persistente activa en el servidor para ${cleanEmail}...`);
+            }
 
             // Configurar carpeta de descarga de adjuntos
             const dlDir = path.join(INBOX_STORAGE_DIR, 'downloads_tmp');
@@ -811,92 +1123,290 @@ async function startOutlookHistoriasSync({
             } catch (_) {}
 
             const curUrl = page.url() || '';
-            if (!curUrl.includes('outlook.office.com/mail') && !curUrl.includes('outlook.cloud.microsoft/mail')) {
-                await page.goto('https://outlook.office.com/mail/', { waitUntil: 'domcontentloaded', timeout: 45000 }).catch(() => {});
+            const isAlreadyInsideMail = /outlook\.(office|office365)\.com\/mail|outlook\.cloud\.microsoft\/mail/i.test(curUrl);
+            if (!isAlreadyInsideMail) {
+                addOutlookLog(`🌐 Abriendo Outlook 365 Web (https://outlook.office.com/mail/)...`);
+                await page.goto('https://outlook.office.com/mail/', { waitUntil: 'domcontentloaded', timeout: 12000 }).catch(() => {});
+                await sleep(2000);
+                await flushMicrosoftLoginAnimations(page);
             }
+            await captureOutlookFrame();
 
-            // Ciclo de autenticación (reutiliza sesión persistente o muestra MFA interactivo)
+            // Ciclo de autenticación Microsoft 365 completo (sin bloqueo por FIDO2/KnockoutJS)
             let mailboxReady = false;
-            const authDeadline = Date.now() + 180000;
+            const authDeadline = Date.now() + 300000; // Hasta 5 minutos para MFA
 
             while (Date.now() < authDeadline && outlookSyncState.isRunning) {
+                await flushMicrosoftLoginAnimations(page);
                 await captureOutlookFrame();
-                const state = await page.evaluate(() => {
-                    const url = location.href || '';
-                    const txt = document.body ? (document.body.innerText || '') : '';
-                    const hasMailList = Boolean(
-                        document.querySelector('[role="listbox"]') ||
-                        document.querySelector('[aria-label*="Lista de mensajes" i]') ||
-                        document.querySelector('[aria-label*="Message list" i]') ||
-                        document.querySelector('#MainModule')
+
+                const pageState = await withTimeout(page.evaluate((targetEmail) => {
+                    const url = window.location.href || '';
+                    const bodyTxt = document.body?.innerText || '';
+                    const lowerEmail = String(targetEmail || 'leparadam@sena.edu.co').toLowerCase().trim();
+
+                    const hasMailUi = Boolean(
+                        document.querySelector('[role="tree"]') ||
+                        document.querySelector('#MainModule') ||
+                        document.querySelector('#topSearchInput') ||
+                        document.querySelector('[data-app-section="NavigationPane"]') ||
+                        document.querySelector('[data-app-section="MessageList"]') ||
+                        document.querySelector('[aria-label*="Panel de carpetas" i]') ||
+                        document.querySelector('[aria-label*="Folder pane" i]') ||
+                        document.querySelector('button[aria-label*="Correo nuevo" i]') ||
+                        document.querySelector('button[aria-label*="New mail" i]')
                     );
-                    if (hasMailList && (url.includes('outlook.office') || url.includes('outlook.cloud.microsoft'))) {
-                        return { type: 'READY' };
+                    if (hasMailUi && (url.includes('outlook.office') || url.includes('outlook.cloud.microsoft'))) {
+                        return { type: 'MAIL_READY', url };
                     }
-                    const mfaEl = document.querySelector('#idRichContext_DisplaySign');
-                    if (mfaEl && (mfaEl.innerText || '').trim()) {
-                        return { type: 'MFA', code: (mfaEl.innerText || '').trim() };
+
+                    if (/having trouble verifying your account|problemas para verificar su cuenta|try signing in again/i.test(bodyTxt)) {
+                        return { type: 'MFA_TROUBLE_ERROR', url };
                     }
+
+                    const resendLink = document.querySelector('#idA_SAOTCAS_Resend');
+                    if (resendLink && resendLink.offsetParent !== null) {
+                        return { type: 'MFA_RESEND', url };
+                    }
+
+                    const mfaDisplay = document.querySelector('#idRichContext_DisplaySign, #displaySign, .displaySign, [data-bind*="displaySign"]');
+                    if (mfaDisplay && mfaDisplay.offsetParent !== null && mfaDisplay.innerText.trim()) {
+                        return { type: 'MFA_NUMBER', number: mfaDisplay.innerText.trim(), url };
+                    }
+
+                    const otpInput = document.querySelector('input[name="otc"], #idTxtBx_SAOTCC_OTC, input[type="tel"]');
+                    if (otpInput && otpInput.offsetParent !== null) {
+                        return { type: 'MFA_OTP', url };
+                    }
+
+                    const primaryBtn = document.querySelector('#idSIButton9');
+                    const landingTitle = document.querySelector('#landingTitle, #heading, [role="heading"]');
+                    const titleTxt = (landingTitle ? landingTitle.innerText : '') || '';
+                    if (
+                        primaryBtn &&
+                        primaryBtn.offsetParent !== null &&
+                        (/suspicious activity|actividad sospechosa|unusual about this sign-in|before you can continue, we need to verify/i.test(bodyTxt) ||
+                         /suspicious activity|actividad sospechosa/i.test(titleTxt) ||
+                         /^verify$|^verificar$/i.test((primaryBtn.value || primaryBtn.innerText || '').trim()))
+                    ) {
+                        return { type: 'SUSPICIOUS_ACTIVITY_VERIFY', url };
+                    }
+
+                    const clickables = Array.from(document.querySelectorAll('div[role="button"], button, a, div.table'));
+                    const usePwdOption = clickables.find(el =>
+                        el.offsetParent !== null &&
+                        /use my password|usar mi contrase|usar contrase|iniciar sesi[oó]n con contrase/i.test(el.innerText || '')
+                    );
+                    if (usePwdOption) {
+                        return { type: 'CHOOSE_USE_PASSWORD', url };
+                    }
+
+                    const passInput = document.querySelector('input[type="password"], input[name="passwd"], #i0118');
+                    if (passInput && passInput.offsetParent !== null) {
+                        const errEl = document.querySelector('#passwordError, .error');
+                        return { type: 'NEED_PASSWORD', url, error: errEl ? errEl.innerText.trim() : '' };
+                    }
+
+                    const authPushOption = clickables.find(el =>
+                        el.offsetParent !== null &&
+                        /approve a request on my microsoft authenticator|aprobar una solicitud en mi aplicaci[oó]n microsoft authenticator/i.test(el.innerText || '')
+                    );
+                    if (authPushOption && /verify your identity|verificar su identidad|comprobar su identidad/i.test(bodyTxt)) {
+                        return { type: 'CHOOSE_MFA_METHOD', url };
+                    }
+
                     const emailInput = document.querySelector('input[type="email"], input[name="loginfmt"], #i0116');
                     if (emailInput && emailInput.offsetParent !== null) {
-                        return { type: 'EMAIL' };
+                        return { type: 'NEED_EMAIL', url };
                     }
-                    const pwdInput = document.querySelector('input[type="password"], input[name="passwd"], #i0118');
-                    if (pwdInput && pwdInput.offsetParent !== null) {
-                        return { type: 'PASSWORD' };
-                    }
-                    const kmsiBtn = document.querySelector('#idSIButton9');
-                    if (kmsiBtn && /mantener la sesi|stay signed in/i.test(txt)) {
-                        return { type: 'KMSI' };
-                    }
-                    return { type: 'WAIT' };
-                }).catch(() => ({ type: 'WAIT' }));
 
-                if (state.type === 'READY') {
+                    const kmsiBtn = document.querySelector('#idSIButton9, button[type="submit"]');
+                    if (kmsiBtn && kmsiBtn.offsetParent !== null && /mantener la sesi[oó]n|stay signed in/i.test(bodyTxt)) {
+                        return { type: 'KMSI_PROMPT', url };
+                    }
+
+                    const otherTile = document.querySelector('#otherTile');
+                    const accountTile =
+                        document.querySelector(`[data-test-id="${lowerEmail}"]`) ||
+                        Array.from(document.querySelectorAll('#tilesHolder .table, #tilesHolder [role="listitem"], #tilesHolder [role="button"]')).find(
+                            el => el.offsetParent !== null && el.id !== 'otherTile' && (el.innerText || '').toLowerCase().includes(lowerEmail)
+                        );
+                    const hasAccountTile = Boolean(accountTile && accountTile.offsetParent !== null);
+                    const hasOtherTile = Boolean(otherTile && otherTile.offsetParent !== null);
+                    if (hasAccountTile || hasOtherTile) {
+                        return { type: 'PICK_ACCOUNT', hasAccountTile, hasOtherTile, url };
+                    }
+
+                    if (url.includes('/bridge/fido') || /face, fingerprint, pin or security key|rostro, huella digital, pin/i.test(bodyTxt)) {
+                        return { type: 'FIDO_BRIDGE', url };
+                    }
+
+                    return { type: 'LOADING', url };
+                }, cleanEmail), 3000, { type: 'LOADING', url: '' });
+
+                if (pageState.type === 'MAIL_READY') {
                     mailboxReady = true;
                     outlookSyncState.status = 'running';
                     outlookSyncState.mfaNumber = null;
                     outlookSyncState.authPrompt = null;
-                    addOutlookLog(`✅ Buzón Outlook 365 autenticado y listo.`);
+                    addOutlookLog(`✅ Buzón Outlook 365 autenticado y activo (${cleanEmail}).`);
                     break;
                 }
-                if (state.type === 'EMAIL' && mailboxEmail) {
-                    addOutlookLog(`✉️ Ingresando correo institucional ${mailboxEmail}...`);
-                    await page.click('input[type="email"], input[name="loginfmt"], #i0116', { clickCount: 3 }).catch(() => {});
-                    await page.keyboard.type(mailboxEmail, { delay: 20 });
-                    await page.keyboard.press('Enter');
-                    await sleep(2500);
-                    continue;
-                }
-                if (state.type === 'PASSWORD') {
-                    if (password) {
-                        addOutlookLog(`🔑 Ingresando contraseña suministrada...`);
-                        await page.click('input[type="password"], input[name="passwd"], #i0118', { clickCount: 3 }).catch(() => {});
-                        await page.keyboard.type(password, { delay: 20 });
-                        await page.keyboard.press('Enter');
-                        password = ''; // Usar una sola vez
-                        await sleep(3000);
-                        continue;
-                    } else {
-                        outlookSyncState.status = 'waiting_auth';
-                        outlookSyncState.authPrompt = 'Ingrese su contraseña de correo institucional en el recuadro o directamente en el visor.';
-                    }
-                }
-                if (state.type === 'MFA') {
-                    outlookSyncState.status = 'waiting_auth';
-                    outlookSyncState.mfaNumber = state.code;
-                    outlookSyncState.authPrompt = `Apruebe en Microsoft Authenticator el número: ${state.code}`;
-                }
-                if (state.type === 'KMSI') {
-                    await page.click('#idSIButton9').catch(() => {});
+
+                if (pageState.type === 'MFA_TROUBLE_ERROR' && outlookSyncState._troubleReloadCount < 3) {
+                    outlookSyncState._troubleReloadCount++;
+                    outlookSyncState._clickedAuthPushCount = 0;
+                    outlookSyncState._triedAutoPass = false;
+                    addOutlookLog(`🔄 Sesión previa expirada; reabriendo Outlook 365...`);
+                    await page.goto('https://outlook.office.com/mail/', { waitUntil: 'domcontentloaded', timeout: 12000 }).catch(() => {});
                     await sleep(2200);
                     continue;
                 }
-                await sleep(2200);
+
+                if (pageState.type === 'SUSPICIOUS_ACTIVITY_VERIFY') {
+                    addOutlookLog(`🛡️ Confirmando verificación de seguridad de Microsoft...`);
+                    await page.evaluate(() => {
+                        const btn = document.querySelector('#idSIButton9, input[type="submit"], button[type="submit"]');
+                        if (btn) btn.click();
+                    }).catch(() => {});
+                    await sleep(1800);
+                    continue;
+                }
+
+                if (pageState.type === 'FIDO_BRIDGE') {
+                    addOutlookLog(`⚡ Omitiendo PIN / Windows Hello para pasar directo a Contraseña / Authenticator...`);
+                    await sleep(1500);
+                    continue;
+                }
+
+                if (pageState.type === 'CHOOSE_USE_PASSWORD') {
+                    addOutlookLog(`🔑 Seleccionando automáticamente "Usar mi contraseña"...`);
+                    await page.evaluate(() => {
+                        const clickables = Array.from(document.querySelectorAll('div[role="button"], button, a, div.table'));
+                        const usePwd = clickables.find(el =>
+                            el.offsetParent !== null &&
+                            /use my password|usar mi contrase|usar contrase|iniciar sesi[oó]n con contrase/i.test(el.innerText || '')
+                        );
+                        if (usePwd) usePwd.click();
+                    }).catch(() => {});
+                    await sleep(1800);
+                    continue;
+                }
+
+                if (pageState.type === 'PICK_ACCOUNT') {
+                    if (pageState.hasAccountTile) {
+                        addOutlookLog(`👤 Seleccionando cuenta institucional guardada ${cleanEmail}...`);
+                        await page.evaluate((targetEmail) => {
+                            const lowerEmail = String(targetEmail || '').toLowerCase().trim();
+                            const tile =
+                                document.querySelector(`[data-test-id="${lowerEmail}"] .table`) ||
+                                document.querySelector(`[data-test-id="${lowerEmail}"]`) ||
+                                Array.from(document.querySelectorAll('#tilesHolder .table, #tilesHolder [role="listitem"], #tilesHolder [role="button"]')).find(
+                                    el => el.offsetParent !== null && el.id !== 'otherTile' && (el.innerText || '').toLowerCase().includes(lowerEmail)
+                                );
+                            if (tile) tile.click();
+                        }, cleanEmail).catch(() => {});
+                    } else if (pageState.hasOtherTile) {
+                        await page.click('#otherTile').catch(() => {});
+                    }
+                    await sleep(2000);
+                    continue;
+                }
+
+                if (pageState.type === 'NEED_EMAIL' && cleanEmail) {
+                    addOutlookLog(`✉️ Ingresando correo institucional ${cleanEmail}...`);
+                    await page.click('input[type="email"], input[name="loginfmt"], #i0116', { clickCount: 3 }).catch(() => {});
+                    await page.keyboard.press('Backspace').catch(() => {});
+                    await page.type('input[type="email"], input[name="loginfmt"], #i0116', cleanEmail, { delay: 22 }).catch(() => {});
+                    await sleep(350);
+                    await page.click('#idSIButton9, input[type="submit"], button[type="submit"]').catch(() => page.keyboard.press('Enter'));
+                    await sleep(3500);
+                    continue;
+                }
+
+                if (pageState.type === 'NEED_PASSWORD') {
+                    if (effectivePass && !outlookSyncState._triedAutoPass) {
+                        outlookSyncState._triedAutoPass = true;
+                        addOutlookLog(`🔑 Ingresando contraseña de ${cleanEmail}...`);
+                        await page.click('input[type="password"], input[name="passwd"], #i0118', { clickCount: 3 }).catch(() => {});
+                        await page.keyboard.press('Backspace').catch(() => {});
+                        await page.type('input[type="password"], input[name="passwd"], #i0118', effectivePass, { delay: 22 }).catch(() => {});
+                        await sleep(350);
+                        await page.click('#idSIButton9, input[type="submit"], button[type="submit"]').catch(() => page.keyboard.press('Enter'));
+                        await sleep(2800);
+                        continue;
+                    } else {
+                        outlookSyncState.status = 'waiting_auth';
+                        outlookSyncState.authPrompt = pageState.error
+                            ? `Microsoft reportó: "${pageState.error}". Escriba su contraseña en la barra inferior y pulse Enviar.`
+                            : `Escriba la contraseña de ${cleanEmail} en la barra inferior del visor y pulse Enviar.`;
+                        await sleep(1800);
+                        continue;
+                    }
+                }
+
+                if (pageState.type === 'CHOOSE_MFA_METHOD' && outlookSyncState._clickedAuthPushCount < 3) {
+                    outlookSyncState._clickedAuthPushCount++;
+                    addOutlookLog(`📲 Solicitando código de aprobación en Microsoft Authenticator...`);
+                    await page.evaluate(() => {
+                        const clickables = Array.from(document.querySelectorAll('div[role="button"], button, a, div.table'));
+                        const authPush = clickables.find(el =>
+                            el.offsetParent !== null &&
+                            /approve a request on my microsoft authenticator|aprobar una solicitud en mi aplicaci[oó]n microsoft authenticator/i.test(el.innerText || '')
+                        );
+                        if (authPush) authPush.click();
+                    }).catch(() => {});
+                    await sleep(2000);
+                    continue;
+                }
+
+                if (pageState.type === 'MFA_RESEND') {
+                    addOutlookLog(`🔄 Renovando solicitud de número en Microsoft Authenticator...`);
+                    await page.click('#idA_SAOTCAS_Resend').catch(() => {});
+                    await sleep(2200);
+                    continue;
+                }
+
+                if (pageState.type === 'MFA_NUMBER') {
+                    outlookSyncState.status = 'waiting_auth';
+                    outlookSyncState.mfaNumber = pageState.number;
+                    outlookSyncState.authPrompt = `Apruebe en Microsoft Authenticator el número: ${pageState.number}`;
+                    await page.evaluate(() => {
+                        const chk = document.querySelector('#idChkBx_SAOTCAS_TD, input[type="checkbox"]');
+                        if (chk && !chk.checked) chk.click();
+                    }).catch(() => {});
+                    if (outlookSyncState._lastMfaLogged !== pageState.number) {
+                        outlookSyncState._lastMfaLogged = pageState.number;
+                        addOutlookLog(`📲 [CÓDIGO #${pageState.number}] Apruebe el número ${pageState.number} en su celular (Microsoft Authenticator).`);
+                    }
+                    await sleep(1800);
+                    continue;
+                }
+
+                if (pageState.type === 'MFA_OTP') {
+                    outlookSyncState.status = 'waiting_auth';
+                    outlookSyncState.authPrompt = 'Escriba el código de verificación de 6 dígitos en la barra inferior del visor y pulse Enviar.';
+                    await sleep(1800);
+                    continue;
+                }
+
+                if (pageState.type === 'KMSI_PROMPT') {
+                    addOutlookLog(`💾 Confirmando "Mantener la sesión iniciada" en el servidor...`);
+                    await page.evaluate(() => {
+                        const chk = document.querySelector('#KmsiCheckboxField, input[type="checkbox"]');
+                        if (chk && !chk.checked) chk.click();
+                        const yesBtn = document.querySelector('#idSIButton9, button[type="submit"], input[type="submit"]');
+                        if (yesBtn) yesBtn.click();
+                    }).catch(() => {});
+                    await sleep(3000);
+                    continue;
+                }
+
+                await sleep(1600);
             }
 
             if (!mailboxReady) {
-                throw new Error('Tiempo de espera de autenticación en Outlook agotado.');
+                throw new Error('Tiempo de espera agotado esperando aprobación en Outlook 365. El visor sigue abierto para completar el ingreso.');
             }
 
             // Seleccionar carpeta solicitada
@@ -1131,6 +1641,7 @@ module.exports = {
     buildAndAssignHistoriaPdf,
     renderEmailCoverAndBodyPdf,
     startOutlookHistoriasSync,
+    interactWithOutlookPage,
     sendEmailViaOutlookWeb,
     outlookSyncState,
     captureOutlookFrame,

@@ -584,7 +584,8 @@ router.post('/outlook/start', requireAuth, async (req, res) => {
             password = '',
             folder_name = 'Bandeja de entrada',
             search_query = '',
-            max_messages = 30
+            max_messages = 30,
+            force_restart = false
         } = req.body || {};
         const out = await ctrl.startOutlookHistoriasSync({
             mailboxEmail: mailbox_email,
@@ -592,7 +593,8 @@ router.post('/outlook/start', requireAuth, async (req, res) => {
             folderName: folder_name,
             searchQuery: search_query,
             maxMessages: max_messages,
-            ownerUserId: req.user?.id || null
+            ownerUserId: req.user?.id || null,
+            forceRestart: Boolean(force_restart)
         });
         res.json({ success: true, ...out });
     } catch (err) {
@@ -618,21 +620,10 @@ router.get('/outlook/status', requireAuth, async (_req, res) => {
 router.post('/outlook/interact', requireAuth, async (req, res) => {
     try {
         const { type, x, y, text, pressEnter } = req.body || {};
-        const page = ctrl.outlookSyncState.page;
-        if (!page || page.isClosed()) {
-            return res.status(400).json({ error: 'No hay navegador Outlook activo.' });
-        }
-        if (type === 'click' && typeof x === 'number' && typeof y === 'number') {
-            await page.mouse.click(x, y);
-        } else if (type === 'type' && text !== undefined) {
-            await page.keyboard.type(String(text), { delay: 20 });
-            if (pressEnter) await page.keyboard.press('Enter');
-        }
-        await new Promise(r => setTimeout(r, 900));
-        await ctrl.captureOutlookFrame();
-        res.json({ success: true, lastFrame: ctrl.outlookSyncState.lastFrame });
+        const out = await ctrl.interactWithOutlookPage({ type, x, y, text, pressEnter });
+        res.json({ success: true, lastFrame: out.lastFrame });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(400).json({ error: err.message });
     }
 });
 
@@ -640,9 +631,10 @@ router.post('/outlook/stop', requireAuth, async (req, res) => {
     ctrl.outlookSyncState.isRunning = false;
     ctrl.outlookSyncState.status = 'idle';
     if (req.body?.close_browser && ctrl.outlookSyncState.browser) {
-        try { await ctrl.outlookSyncState.browser.close(); } catch (_) {}
+        const b = ctrl.outlookSyncState.browser;
         ctrl.outlookSyncState.browser = null;
         ctrl.outlookSyncState.page = null;
+        Promise.race([b.close(), new Promise(r => setTimeout(r, 2000))]).catch(() => {});
     }
     res.json({ success: true });
 });

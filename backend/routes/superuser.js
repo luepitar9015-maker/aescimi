@@ -795,6 +795,165 @@ router.post('/server-action', async (req, res) => {
     }
 });
 
+// ──────────────────────────────────────────────────────────────────────────────
+// NOVEDADES Y ALERTAS AL SUPERUSUARIO: EXPEDIENTES ASIGNADOS SIN DOCUMENTOS (0 PDFs)
+// ──────────────────────────────────────────────────────────────────────────────
+async function queryAssignedWithoutDocsData(filterUserId = null) {
+    const byUserRes = await pool.query(`
+        SELECT
+            u.id AS user_id,
+            u.full_name,
+            u.document_no,
+            COALESCE(u.position, '') AS position,
+            COALESCE(u.area, '') AS area,
+            COUNT(DISTINCT ea.expediente_id)::int AS total_asignados,
+            COUNT(DISTINCT ea.expediente_id) FILTER (
+                WHERE EXISTS (SELECT 1 FROM documents d WHERE d.expediente_id = ea.expediente_id)
+            )::int AS con_documentos,
+            COUNT(DISTINCT ea.expediente_id) FILTER (
+                WHERE NOT EXISTS (SELECT 1 FROM documents d WHERE d.expediente_id = ea.expediente_id)
+            )::int AS sin_documentos
+        FROM users u
+        JOIN expediente_assignments ea ON ea.user_id = u.id
+        GROUP BY u.id, u.full_name, u.document_no, u.position, u.area
+        HAVING COUNT(DISTINCT ea.expediente_id) FILTER (
+            WHERE NOT EXISTS (SELECT 1 FROM documents d WHERE d.expediente_id = ea.expediente_id)
+        ) > 0
+        ORDER BY sin_documentos DESC, u.full_name ASC
+    `);
+
+    const params = [];
+    let userFilterSql = '';
+    if (filterUserId && Number.isFinite(Number(filterUserId))) {
+        params.push(Number(filterUserId));
+        userFilterSql = `AND EXISTS (SELECT 1 FROM expediente_assignments ea_f WHERE ea_f.expediente_id = e.id AND ea_f.user_id = $1)`;
+    }
+
+    const itemsRes = await pool.query(`
+        SELECT
+            e.id AS expediente_id,
+            COALESCE(NULLIF(TRIM(e.expediente_code), ''), 'SIN CÓDIGO AES') AS expediente_code,
+            COALESCE(e.subserie, '') AS subserie,
+            COALESCE(e.title, '') AS title,
+            e.metadata_values,
+            MIN(ea.assigned_at) AS first_assigned_at,
+            EXTRACT(DAY FROM (NOW() - MIN(ea.assigned_at)))::int AS dias_sin_cargue,
+            string_agg(DISTINCT u.full_name, ', ') AS responsables,
+            array_agg(DISTINCT u.id) AS user_ids
+        FROM expedientes e
+        JOIN expediente_assignments ea ON ea.expediente_id = e.id
+        JOIN users u ON u.id = ea.user_id
+        WHERE NOT EXISTS (SELECT 1 FROM documents d WHERE d.expediente_id = e.id)
+          ${userFilterSql}
+        GROUP BY e.id, e.expediente_code, e.subserie, e.title, e.metadata_values
+        ORDER BY e.subserie ASC, e.expediente_code ASC, e.id DESC
+    `, params);
+
+    const parseMeta = (raw) => {
+        if (!raw) return {};
+        if (typeof raw === 'object') return raw;
+        try {
+            const p = JSON.parse(raw);
+            return typeof p === 'string' ? JSON.parse(p) : (p || {});
+        } catch (_) { return {}; }
+    };
+
+    const items = (itemsRes.rows || []).map(r => {
+        const m = parseMeta(r.metadata_values);
+        const sub = String(r.subserie || '');
+        let referencia = '';
+        let titular = r.title || '';
+        if (sub.includes('9224.4-37') || sub.endsWith('-37')) {
+            referencia = `Ficha ${m.valor4 || m.ficha || ''}`.trim();
+            titular = m.valor7 && !/^\d+$/.test(String(m.valor7)) ? `${m.valor5 || ''} ${m.valor6 || ''} - ${m.valor7}`.trim() : (m.valor6 || titular);
+        } else if (sub.includes('22.')) {
+            referencia = m.valor1 || '';
+            titular = `${m.valor4 || titular} ${m.valor5 ? `(CC ${m.valor5})` : ''}`.trim();
+        } else {
+            referencia = m.radicado || m.valor1 || '';
+            titular = m.peticionario || m.valor2 || titular;
+        }
+        return {
+            expediente_id: r.expediente_id,
+            expediente_code: r.expediente_code,
+            subserie: r.subserie,
+            referencia,
+            titular,
+            responsables: r.responsables || '',
+            user_ids: r.user_ids || [],
+            assigned_at: r.first_assigned_at ? new Date(r.first_assigned_at).toISOString().slice(0, 10) : '',
+            dias_sin_cargue: Math.max(0, Number(r.dias_sin_cargue || 0))
+        };
+    });
+
+    return {
+        total_sin_docs_distinct: items.length,
+        total_users_affected: (byUserRes.rows || []).length,
+        by_user: byUserRes.rows || [],
+        items
+    };
+}
+
+router.get('/alerts/assigned-without-docs', async (req, res) => {
+    try {
+        const data = await queryAssignedWithoutDocsData(req.query?.user_id || null);
+        res.json({ success: true, ...data });
+    } catch (err) {
+        console.error('[SUPERUSER] alerts/assigned-without-docs error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/reports/assigned-without-docs-excel', async (req, res) => {
+    try {
+        const xlsx = require('xlsx');
+        const data = await queryAssignedWithoutDocsData(req.query?.user_id || null);
+        const wb = xlsx.utils.book_new();
+
+        const userSheetRows = data.by_user.map((u, idx) => ({
+            '#': idx + 1,
+            'Funcionario Asignado': u.full_name,
+            'Cédula': u.document_no || '',
+            'Cargo': u.position || '',
+            'Dependencia / Área': u.area || '',
+            'Total Expedientes Asignados': u.total_asignados,
+            'Expedientes CON Documentos': u.con_documentos,
+            'Expedientes SIN Documentos (0 PDFs)': u.sin_documentos,
+            '% Pendiente Sin Cargue': u.total_asignados > 0 ? `${((u.sin_documentos / u.total_asignados) * 100).toFixed(1)}%` : '0%'
+        }));
+
+        const detailRows = data.items.map((it, idx) => ({
+            '#': idx + 1,
+            'ID BD': it.expediente_id,
+            'Código Expediente AES': it.expediente_code,
+            'Subserie TRD': it.subserie,
+            'Ficha / Contrato / Radicado': it.referencia,
+            'Aprendiz / Contratista / Titular': it.titular,
+            'Funcionario(s) Asignado(s)': it.responsables,
+            'Fecha Asignación': it.assigned_at,
+            'Días Sin Cargue': it.dias_sin_cargue,
+            'Estado Documental': '0 DOCUMENTOS CARGADOS'
+        }));
+
+        const ws1 = xlsx.utils.json_to_sheet(userSheetRows.length ? userSheetRows : [{ Mensaje: 'Sin novedades' }]);
+        const ws2 = xlsx.utils.json_to_sheet(detailRows.length ? detailRows : [{ Mensaje: 'Sin expedientes vacíos' }]);
+        ws1['!cols'] = [{ wch: 5 }, { wch: 34 }, { wch: 14 }, { wch: 24 }, { wch: 36 }, { wch: 24 }, { wch: 24 }, { wch: 28 }, { wch: 20 }];
+        ws2['!cols'] = [{ wch: 5 }, { wch: 9 }, { wch: 18 }, { wch: 16 }, { wch: 24 }, { wch: 42 }, { wch: 38 }, { wch: 16 }, { wch: 15 }, { wch: 24 }];
+
+        xlsx.utils.book_append_sheet(wb, ws1, 'Resumen Por Funcionario');
+        xlsx.utils.book_append_sheet(wb, ws2, 'Expedientes Sin Documentos');
+
+        const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+        const today = new Date().toISOString().slice(0, 10);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="Novedades_Asignados_Sin_Documentos_${today}.xlsx"`);
+        res.send(buf);
+    } catch (err) {
+        console.error('[SUPERUSER] reports/assigned-without-docs-excel error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;
 
 

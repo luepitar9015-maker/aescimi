@@ -25,7 +25,7 @@ export default function InventoryPdfModal({ isOpen, onClose, initialUserId = nul
   const [statusFilter, setStatusFilter] = useState('all');
   const [subserie, setSubserie] = useState('all');
   const [search, setSearch] = useState('');
-  const [includeAssigned, setIncludeAssigned] = useState(false);
+  const [includeAssigned, setIncludeAssigned] = useState(true);
   const [showHeaderSignEditor, setShowHeaderSignEditor] = useState(false);
 
   // Campos institucionales exactos GD-F-004 Versión: 06
@@ -131,7 +131,7 @@ export default function InventoryPdfModal({ isOpen, onClose, initialUserId = nul
         if (statusFilter !== 'all') params.set('status_filter', statusFilter);
         if (subserie && subserie !== 'all') params.set('subserie', subserie);
         if (search.trim()) params.set('search', search.trim());
-        if (includeAssigned) params.set('include_assigned', '1');
+        params.set('include_assigned', includeAssigned ? '1' : '0');
 
         const res = await axios.get(`/api/documents/inventory-preview?${params.toString()}`, {
           headers: getAuthHeaders()
@@ -614,6 +614,19 @@ export default function InventoryPdfModal({ isOpen, onClose, initialUserId = nul
           {errorMsg && (
             <div style={{ padding: '10px 14px', borderRadius: '8px', background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: '12.5px', fontWeight: 600 }}>
               {errorMsg}
+            </div>
+          )}
+
+          {Number(kpis.assigned_sin_docs) > 0 && (
+            <div style={{ padding: '8px 14px', borderRadius: '8px', background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', fontSize: '12px', fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>
+                ⚠️ Novedad: Este funcionario registra <strong>{kpis.assigned_sin_docs}</strong> expediente(s) asignado(s) sin ningún documento cargado (0 PDFs).
+              </span>
+              {isAdmin && (
+                <a href="/superuser" style={{ color: '#b45309', textDecoration: 'underline', fontWeight: 800 }}>
+                  Ver detalle en Superusuario →
+                </a>
+              )}
             </div>
           )}
 

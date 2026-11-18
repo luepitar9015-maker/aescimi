@@ -52,7 +52,7 @@ export default function InventarioDocumental() {
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
-    const [includeAssigned, setIncludeAssigned] = useState(false);
+    const [includeAssigned, setIncludeAssigned] = useState(true);
     const [totalDbRows, setTotalDbRows] = useState(0);
     const [kpis, setKpis] = useState({ total_expedientes: 0, total_documents: 0, total_folios: 0 });
 
@@ -120,7 +120,7 @@ export default function InventarioDocumental() {
             if (dateFrom) params.set('date_from', dateFrom);
             if (dateTo) params.set('date_to', dateTo);
             if (statusFilter !== 'all') params.set('status_filter', statusFilter);
-            if (includeAssigned) params.set('include_assigned', '1');
+            params.set('include_assigned', includeAssigned ? '1' : '0');
 
             const res = await axios.get(`/api/documents/inventory-preview?${params.toString()}`, {
                 headers: getAuthHeaders()
@@ -232,7 +232,7 @@ export default function InventarioDocumental() {
                 if (dateFrom) params.set('date_from', dateFrom);
                 if (dateTo) params.set('date_to', dateTo);
                 if (statusFilter !== 'all') params.set('status_filter', statusFilter);
-                if (includeAssigned) params.set('include_assigned', '1');
+                params.set('include_assigned', includeAssigned ? '1' : '0');
                 Object.entries(headerPayload).forEach(([k, v]) => params.set(k, v || ''));
                 Object.entries(signaturesPayload).forEach(([k, v]) => params.set(k, v || ''));
 

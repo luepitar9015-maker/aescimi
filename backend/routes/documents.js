@@ -2458,7 +2458,7 @@ const buildInventoryDataset = async (req, maxDeepReads = 300) => {
     const subserie = req.query.subserie ? String(req.query.subserie).trim() : '';
     const statusFilter = req.query.status_filter ? String(req.query.status_filter).trim() : 'all';
     const search = req.query.search ? String(req.query.search).trim() : '';
-    const includeAssigned = req.query.include_assigned === '1' || req.query.include_assigned === 'true';
+    const includeAssigned = req.query.include_assigned !== '0' && req.query.include_assigned !== 'false';
     const defaultFrecuencia = sanitizeWinAnsi(req.query.frecuencia || 'ALTA') || 'ALTA';
 
     const orgRes = await pgPool.query('SELECT * FROM organization_structure ORDER BY id ASC');
@@ -2512,8 +2512,7 @@ const buildInventoryDataset = async (req, maxDeepReads = 300) => {
             where.push(`(
                 d.user_id = $${pIdx}
                 OR (
-                    d.user_id IS NULL
-                    AND d.expediente_id IS NOT NULL
+                    d.expediente_id IS NOT NULL
                     AND EXISTS (
                         SELECT 1 FROM expediente_assignments ea
                         WHERE ea.expediente_id = d.expediente_id AND ea.user_id = $${pIdx}
@@ -2838,6 +2837,27 @@ const buildInventoryDataset = async (req, maxDeepReads = 300) => {
         };
     });
 
+    let assignedSinDocs = 0;
+    try {
+        if (effectiveUserId !== 'all' && Number.isFinite(effectiveUserId)) {
+            const emptyRes = await pgPool.query(
+                `SELECT COUNT(DISTINCT ea.expediente_id)::int AS c
+                 FROM expediente_assignments ea
+                 WHERE ea.user_id = $1
+                   AND NOT EXISTS (SELECT 1 FROM documents d WHERE d.expediente_id = ea.expediente_id)`,
+                [effectiveUserId]
+            );
+            assignedSinDocs = emptyRes.rows?.[0]?.c || 0;
+        } else {
+            const emptyRes = await pgPool.query(
+                `SELECT COUNT(DISTINCT ea.expediente_id)::int AS c
+                 FROM expediente_assignments ea
+                 WHERE NOT EXISTS (SELECT 1 FROM documents d WHERE d.expediente_id = ea.expediente_id)`
+            );
+            assignedSinDocs = emptyRes.rows?.[0]?.c || 0;
+        }
+    } catch (_) {}
+
     return {
         mode,
         targetUser,
@@ -2855,7 +2875,8 @@ const buildInventoryDataset = async (req, maxDeepReads = 300) => {
             total_documents: docs.length,
             total_folios: totalFolios,
             cargados_aes: cargadosAes,
-            pendientes_aes: pendientesAes
+            pendientes_aes: pendientesAes,
+            assigned_sin_docs: assignedSinDocs
         },
         subseriesList: Array.from(subseriesSet.values()),
         fuidRows,
@@ -3492,9 +3513,18 @@ router.get('/inventory-users', requireAuth, async (req, res) => {
         if (!isAdmin) {
             const own = await pgPool.query(
                 `SELECT u.id, u.full_name, u.document_no, u.area, u.position, u.role,
-                        (SELECT COUNT(*)::int FROM documents d WHERE d.user_id = u.id) AS docs_uploaded,
-                        (SELECT COUNT(DISTINCT d.expediente_id)::int FROM documents d WHERE d.user_id = u.id AND d.expediente_id IS NOT NULL) AS expedientes_uploaded,
-                        (SELECT COUNT(DISTINCT ea.expediente_id)::int FROM expediente_assignments ea WHERE ea.user_id = u.id) AS assigned_expedientes
+                        (SELECT COUNT(*)::int FROM documents d
+                         WHERE d.user_id = u.id
+                            OR (d.expediente_id IS NOT NULL AND EXISTS (SELECT 1 FROM expediente_assignments ea WHERE ea.expediente_id = d.expediente_id AND ea.user_id = u.id))
+                        ) AS docs_uploaded,
+                        (SELECT COUNT(DISTINCT d.expediente_id)::int FROM documents d
+                         WHERE d.expediente_id IS NOT NULL
+                           AND (d.user_id = u.id OR EXISTS (SELECT 1 FROM expediente_assignments ea WHERE ea.expediente_id = d.expediente_id AND ea.user_id = u.id))
+                        ) AS expedientes_uploaded,
+                        (SELECT COUNT(DISTINCT ea.expediente_id)::int FROM expediente_assignments ea WHERE ea.user_id = u.id) AS assigned_expedientes,
+                        (SELECT COUNT(DISTINCT ea.expediente_id)::int FROM expediente_assignments ea
+                         WHERE ea.user_id = u.id AND NOT EXISTS (SELECT 1 FROM documents d WHERE d.expediente_id = ea.expediente_id)
+                        ) AS assigned_sin_docs
                  FROM users u WHERE u.id = $1 LIMIT 1`,
                 [req.user.id]
             );
@@ -3510,9 +3540,18 @@ router.get('/inventory-users', requireAuth, async (req, res) => {
                 u.position,
                 u.role,
                 u.is_active,
-                (SELECT COUNT(*)::int FROM documents d WHERE d.user_id = u.id) AS docs_uploaded,
-                (SELECT COUNT(DISTINCT d.expediente_id)::int FROM documents d WHERE d.user_id = u.id AND d.expediente_id IS NOT NULL) AS expedientes_uploaded,
-                (SELECT COUNT(DISTINCT ea.expediente_id)::int FROM expediente_assignments ea WHERE ea.user_id = u.id) AS assigned_expedientes
+                (SELECT COUNT(*)::int FROM documents d
+                 WHERE d.user_id = u.id
+                    OR (d.expediente_id IS NOT NULL AND EXISTS (SELECT 1 FROM expediente_assignments ea WHERE ea.expediente_id = d.expediente_id AND ea.user_id = u.id))
+                ) AS docs_uploaded,
+                (SELECT COUNT(DISTINCT d.expediente_id)::int FROM documents d
+                 WHERE d.expediente_id IS NOT NULL
+                   AND (d.user_id = u.id OR EXISTS (SELECT 1 FROM expediente_assignments ea WHERE ea.expediente_id = d.expediente_id AND ea.user_id = u.id))
+                ) AS expedientes_uploaded,
+                (SELECT COUNT(DISTINCT ea.expediente_id)::int FROM expediente_assignments ea WHERE ea.user_id = u.id) AS assigned_expedientes,
+                (SELECT COUNT(DISTINCT ea.expediente_id)::int FROM expediente_assignments ea
+                 WHERE ea.user_id = u.id AND NOT EXISTS (SELECT 1 FROM documents d WHERE d.expediente_id = ea.expediente_id)
+                ) AS assigned_sin_docs
             FROM users u
             ORDER BY docs_uploaded DESC, u.full_name ASC
         `);
@@ -3527,7 +3566,7 @@ router.get('/inventory-users', requireAuth, async (req, res) => {
 router.get('/inventory-preview', requireAuth, async (req, res) => {
     try {
         const reqLimit = Math.min(Math.max(parseInt(req.query.limit || '60', 10) || 60, 10), 5000);
-        const dataset = await buildInventoryDataset(req, 200);
+        const dataset = await buildInventoryDataset(req, 25);
         const isHojaControl = dataset.mode === 'hoja_control';
 
         res.json({
