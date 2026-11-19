@@ -117,6 +117,31 @@ const authLimiter = rateLimit({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// Compresión GZIP nativa para respuestas JSON grandes (ej. /api/expedientes de 2.9 MB -> ~200 KB)
+const zlib = require('zlib');
+app.use((req, res, next) => {
+    const acceptEnc = String(req.headers['accept-encoding'] || '');
+    if (!acceptEnc.includes('gzip')) return next();
+    const origJson = res.json.bind(res);
+    res.json = (body) => {
+        try {
+            const payload = JSON.stringify(body);
+            if (!payload || payload.length < 2048 || res.headersSent) {
+                return origJson(body);
+            }
+            const compressed = zlib.gzipSync(Buffer.from(payload, 'utf8'), { level: 5 });
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.setHeader('Content-Encoding', 'gzip');
+            res.setHeader('Vary', 'Accept-Encoding');
+            res.setHeader('Content-Length', compressed.length);
+            return res.send(compressed);
+        } catch (_) {
+            return origJson(body);
+        }
+    };
+    next();
+});
+
 // Sistema de Auditoría
 const { auditMiddleware } = require('./middleware/auditMiddleware');
 app.use(auditMiddleware);
