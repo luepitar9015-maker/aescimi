@@ -79,14 +79,36 @@ export default function Dashboard() {
     useEffect(() => {
         const stored = JSON.parse(localStorage.getItem('user') || '{}');
         setUser(stored);
-        fetchStats();
-        if (stored.role) fetchPerms(stored.role);
+        // Pintar caché de sesión instantáneamente mientras refresca en segundo plano
+        const uidKey = stored.id || 'anon';
+        try {
+            const cachedS = JSON.parse(sessionStorage.getItem(`dash_stats_${uidKey}`) || 'null');
+            if (cachedS) {
+                if (cachedS.scope === 'global') {
+                    setGlobalStats(cachedS.data);
+                    setAssignedStats(cachedS.assigned);
+                    setViewMode('global');
+                } else {
+                    setAssignedStats(cachedS.data);
+                    setViewMode('assigned');
+                }
+                setLoadingStats(false);
+            }
+            const cachedP = JSON.parse(sessionStorage.getItem(`dash_perms_${uidKey}`) || 'null');
+            if (Array.isArray(cachedP)) {
+                setPerms(cachedP);
+                setLoadingPerms(false);
+            }
+        } catch (_) {}
+        fetchStats(uidKey);
+        if (stored.role) fetchPerms(stored.role, uidKey);
     }, []);
 
-    const fetchStats = async () => {
+    const fetchStats = async (uidKey = 'anon') => {
         try {
             const res = await axios.get('/api/documents/stats/dashboard');
             const data = res.data;
+            try { sessionStorage.setItem(`dash_stats_${uidKey}`, JSON.stringify(data)); } catch (_) {}
             if (data.scope === 'global') {
                 setGlobalStats(data.data);
                 setAssignedStats(data.assigned);
@@ -96,19 +118,21 @@ export default function Dashboard() {
                 setViewMode('assigned');
             }
         } catch {
-            setGlobalStats({});
-            setAssignedStats({});
+            setGlobalStats(prev => prev || {});
+            setAssignedStats(prev => prev || {});
         } finally {
             setLoadingStats(false);
         }
     };
 
-    const fetchPerms = async (role) => {
+    const fetchPerms = async (role, uidKey = 'anon') => {
         try {
             const res = await axios.get(`/api/permissions/${role}`);
-            setPerms(res.data.data || []);
+            const rows = res.data.data || [];
+            setPerms(rows);
+            try { sessionStorage.setItem(`dash_perms_${uidKey}`, JSON.stringify(rows)); } catch (_) {}
         } catch {
-            setPerms([]);
+            setPerms(prev => prev || []);
         } finally {
             setLoadingPerms(false);
         }

@@ -608,16 +608,58 @@ app.get('/diapositivas.html', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/public/diapositivas.html'));
 });
 
-// Configurar servidor para servir el Frontend compilado en Producción desde frontend/dist
+// Configurar servidor para servir el Frontend compilado en Producción desde frontend/dist (con GZIP en memoria y caché inmutable)
 const distPath = path.resolve(__dirname, '../frontend/dist');
+const staticGzipCache = new Map();
+
+app.use((req, res, next) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+    if (!/\.(js|css|svg|json)$/i.test(req.path)) return next();
+    if (!String(req.headers['accept-encoding'] || '').includes('gzip')) return next();
+
+    const cleanRel = req.path.replace(/^\/+/, '');
+    const fullFile = path.resolve(distPath, cleanRel);
+    if (!fullFile.startsWith(distPath) || !fs.existsSync(fullFile)) return next();
+
+    try {
+        const stat = fs.statSync(fullFile);
+        if (!stat.isFile()) return next();
+        const cacheKey = `${fullFile}:${stat.mtimeMs}`;
+        let gzBuf = staticGzipCache.get(cacheKey);
+        if (!gzBuf) {
+            if (staticGzipCache.size > 120) staticGzipCache.clear();
+            gzBuf = zlib.gzipSync(fs.readFileSync(fullFile), { level: 6 });
+            staticGzipCache.set(cacheKey, gzBuf);
+        }
+        const ext = path.extname(fullFile).toLowerCase();
+        const mime = ext === '.js' ? 'application/javascript; charset=utf-8'
+            : ext === '.css' ? 'text/css; charset=utf-8'
+            : ext === '.svg' ? 'image/svg+xml'
+            : 'application/json; charset=utf-8';
+        res.setHeader('Content-Type', mime);
+        res.setHeader('Content-Encoding', 'gzip');
+        res.setHeader('Vary', 'Accept-Encoding');
+        res.setHeader('Content-Length', gzBuf.length);
+        if (req.path.startsWith('/assets/') || req.path.startsWith('/vendor/')) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        } else {
+            res.setHeader('Cache-Control', 'public, max-age=3600');
+        }
+        return res.send(gzBuf);
+    } catch (_) {
+        return next();
+    }
+});
 
 app.use(express.static(distPath, {
-    maxAge: '1d',
+    maxAge: '7d',
     setHeaders: (res, filePath) => {
         if (filePath.endsWith('.html')) {
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
             res.setHeader('Pragma', 'no-cache');
             res.setHeader('Expires', '0');
+        } else if (filePath.includes(`${path.sep}assets${path.sep}`) || filePath.includes(`${path.sep}vendor${path.sep}`)) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         }
     }
 }));
