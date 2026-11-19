@@ -354,6 +354,7 @@ function DocumentManagement() {
     const [existingDocs, setExistingDocs] = useState([]);
     const [loadingExisting, setLoadingExisting] = useState(false);
     const [selectedStageFilter, setSelectedStageFilter] = useState('ALL');
+    const [typologyQuickSearch, setTypologyQuickSearch] = useState('');
     const [userAllowedStages, setUserAllowedStages] = useState(null);
     const [checklistTab, setChecklistTab] = useState('pendientes'); // 'pendientes' | 'cargados' | 'todas'
     const [checklistSearch, setChecklistSearch] = useState('');
@@ -644,6 +645,7 @@ function DocumentManagement() {
         setMergedAddText('no');
         setMergedText('');
         setSelectedStageFilter('ALL');
+        setTypologyQuickSearch('');
         setUserAllowedStages(null);
         setChecklistTab('pendientes');
         setChecklistSearch('');
@@ -683,6 +685,26 @@ function DocumentManagement() {
             setUserAllowedStages(allowedStagesFound);
             if (Array.isArray(allowedStagesFound) && allowedStagesFound.length > 0) {
                 setSelectedStageFilter(allowedStagesFound[0]);
+            } else {
+                // Autodetección inteligente de Modalidad de Contrato desde metadata_values.valor3 (ej. CONTRATACIÓN DIRECTA, MÍNIMA CUANTÍA)
+                try {
+                    let metaObj = exp.metadata_values;
+                    if (typeof metaObj === 'string') metaObj = JSON.parse(metaObj);
+                    if (typeof metaObj === 'string') metaObj = JSON.parse(metaObj);
+                    const rawModalidad = String(metaObj?.valor3 || metaObj?.modalidad || '').trim();
+                    if (rawModalidad) {
+                        const normM = (v) => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+                        const targetM = normM(rawModalidad);
+                        const uniqueStages = Array.from(new Set(withOrder.map(t => t.stage).filter(Boolean)));
+                        const matchedStage = uniqueStages.find(st => {
+                            const nst = normM(st).replace(/^MODALIDAD\s+/, '');
+                            return nst === targetM || nst.includes(targetM) || targetM.includes(nst);
+                        });
+                        if (matchedStage) {
+                            setSelectedStageFilter(matchedStage);
+                        }
+                    }
+                } catch (_) {}
             }
         } catch (err) {
             console.error("Error fetching typologies:", err);
@@ -1163,15 +1185,44 @@ function DocumentManagement() {
     })();
 
     const getFilteredTypologies = () => {
+        const qNorm = String(typologyQuickSearch || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .trim();
         return typologies.filter(t => {
             if (userAllowedStages && userAllowedStages.length > 0 && t.stage && !userAllowedStages.includes(t.stage)) {
                 return false;
             }
             if (selectedStageFilter !== 'ALL' && t.stage) {
-                return t.stage === selectedStageFilter;
+                if (t.stage !== selectedStageFilter) return false;
+            }
+            if (qNorm) {
+                const tn = String(t.name || '')
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .toLowerCase();
+                if (!tn.includes(qNorm)) return false;
             }
             return true;
         });
+    };
+
+    const loadedTypCounts = (() => {
+        const map = new Map();
+        (existingDocs || []).forEach(d => {
+            const k = String(d.typology_name || '').trim().toUpperCase();
+            if (k) map.set(k, (map.get(k) || 0) + 1);
+        });
+        return map;
+    })();
+
+    const formatTypOptionLabel = (t) => {
+        const cnt = loadedTypCounts.get(String(t.name || '').trim().toUpperCase()) || 0;
+        const prefix = cnt > 0 ? '✅ ' : '';
+        const suffix = cnt > 1 ? ` (${cnt} PDFs)` : (cnt === 1 ? ' (Cargado)' : '');
+        const ord = t.trd_order ? `${String(t.trd_order).padStart(2, '0')}. ` : '';
+        return `${prefix}${ord}${t.name}${suffix}`;
     };
 
     const renderTypologyOptions = () => {
@@ -1191,10 +1242,10 @@ function DocumentManagement() {
             return (
                 <>
                     {Object.entries(groups).map(([stageName, items]) => (
-                        <optgroup key={stageName} label={`📌 Etapa: ${stageName}`}>
+                        <optgroup key={stageName} label={`📌 ${stageName}`}>
                             {items.map(t => (
                                 <option key={t.id} value={t.id}>
-                                    {String(t.trd_order || '').padStart(2, '0')}. {t.name}
+                                    {formatTypOptionLabel(t)}
                                 </option>
                             ))}
                         </optgroup>
@@ -1203,7 +1254,7 @@ function DocumentManagement() {
                         <optgroup label="Otras Tipologías">
                             {noStage.map(t => (
                                 <option key={t.id} value={t.id}>
-                                    {String(t.trd_order || '').padStart(2, '0')}. {t.name}
+                                    {formatTypOptionLabel(t)}
                                 </option>
                             ))}
                         </optgroup>
@@ -1213,7 +1264,7 @@ function DocumentManagement() {
         }
         return list.map(t => (
             <option key={t.id} value={t.id}>
-                {t.trd_order ? `${String(t.trd_order).padStart(2, '0')}. ` : ''}{t.name}
+                {formatTypOptionLabel(t)}
             </option>
         ));
     };
@@ -2657,51 +2708,73 @@ function DocumentManagement() {
                                         </div>
                                     </div>
 
-                                    {/* Stage Filter Bar (Etapas de Historia Académica / TRD) */}
-                                    {availableStages.length > 0 && (
-                                        <div className="bg-indigo-50/70 border border-indigo-200 rounded-lg p-2.5 space-y-1.5 shadow-sm">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-[10px] font-bold text-indigo-900 uppercase tracking-wide">
-                                                    📌 Filtrar Tipologías por Etapa:
-                                                </span>
-                                                {userAllowedStages && userAllowedStages.length > 0 && (
-                                                    <span className="text-[9px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded font-semibold">
-                                                        Asignadas a su usuario
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="flex flex-wrap gap-1">
-                                                {(!userAllowedStages || userAllowedStages.length === 0 || userAllowedStages.length > 1) && (
+                                    {/* Stage / Modality Filter Bar + Quick Typology Search */}
+                                    {(availableStages.length > 0 || typologies.length > 15) && (
+                                        <div className="bg-indigo-50/70 border border-indigo-200 rounded-lg p-2.5 space-y-2 shadow-sm">
+                                            {availableStages.length > 0 && (
+                                                <>
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[10px] font-bold text-indigo-900 uppercase tracking-wide">
+                                                            📌 Filtrar Tipologías por Etapa / Modalidad:
+                                                        </span>
+                                                        {userAllowedStages && userAllowedStages.length > 0 && (
+                                                            <span className="text-[9px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded font-semibold">
+                                                                Asignadas a su usuario
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {(!userAllowedStages || userAllowedStages.length === 0 || userAllowedStages.length > 1) && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setSelectedStageFilter('ALL')}
+                                                                className={`text-[10px] px-2 py-1 rounded-md font-bold border transition-all ${
+                                                                    selectedStageFilter === 'ALL'
+                                                                        ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm'
+                                                                        : 'bg-white text-gray-700 border-gray-300 hover:bg-indigo-50'
+                                                                }`}
+                                                            >
+                                                                Todas ({typologies.length})
+                                                            </button>
+                                                        )}
+                                                        {availableStages.map(st => {
+                                                            const count = typologies.filter(t => t.stage === st).length;
+                                                            const isSelected = selectedStageFilter === st;
+                                                            return (
+                                                                <button
+                                                                    key={st}
+                                                                    type="button"
+                                                                    onClick={() => setSelectedStageFilter(st)}
+                                                                    className={`text-[10px] px-2 py-1 rounded-md font-bold border transition-all ${
+                                                                        isSelected
+                                                                            ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm'
+                                                                            : 'bg-white text-gray-700 border-gray-300 hover:bg-indigo-50'
+                                                                    }`}
+                                                                >
+                                                                    {st} ({count})
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </>
+                                            )}
+                                            <div className="flex items-center gap-1.5">
+                                                <input
+                                                    type="text"
+                                                    value={typologyQuickSearch}
+                                                    onChange={(e) => setTypologyQuickSearch(e.target.value)}
+                                                    placeholder="🔎 Buscar tipología rápido (ej. CDP, Póliza, Estudio previo, Liquidación)..."
+                                                    className="w-full px-2.5 py-1.5 text-xs bg-white border border-indigo-200 rounded-md focus:ring-2 focus:ring-indigo-400 outline-none"
+                                                />
+                                                {typologyQuickSearch && (
                                                     <button
                                                         type="button"
-                                                        onClick={() => setSelectedStageFilter('ALL')}
-                                                        className={`text-[10px] px-2 py-1 rounded-md font-bold border transition-all ${
-                                                            selectedStageFilter === 'ALL'
-                                                                ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm'
-                                                                : 'bg-white text-gray-700 border-gray-300 hover:bg-indigo-50'
-                                                        }`}
+                                                        onClick={() => setTypologyQuickSearch('')}
+                                                        className="text-[10px] px-2 py-1.5 rounded-md bg-white border border-gray-300 text-gray-600 font-bold hover:bg-gray-100"
                                                     >
-                                                        Todas ({getFilteredTypologies().length})
+                                                        ✕
                                                     </button>
                                                 )}
-                                                {availableStages.map(st => {
-                                                    const count = typologies.filter(t => t.stage === st).length;
-                                                    const isSelected = selectedStageFilter === st;
-                                                    return (
-                                                        <button
-                                                            key={st}
-                                                            type="button"
-                                                            onClick={() => setSelectedStageFilter(st)}
-                                                            className={`text-[10px] px-2 py-1 rounded-md font-bold border transition-all ${
-                                                                isSelected
-                                                                    ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm'
-                                                                    : 'bg-white text-gray-700 border-gray-300 hover:bg-indigo-50'
-                                                            }`}
-                                                        >
-                                                            {st} ({count})
-                                                        </button>
-                                                    );
-                                                })}
                                             </div>
                                         </div>
                                     )}
